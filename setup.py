@@ -31,6 +31,7 @@ CLASSIFIERS = [
 
 PACKAGE_REQUIREMENTS = [
     'numpy',
+    'xarray',
     'scipy',
     'tensorflow',
     'keras',

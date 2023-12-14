@@ -7,7 +7,7 @@ from ml_for_national_blend.io import wrf_arw_io
 DIRECTORY_NAME = 'foo'
 INIT_TIMES_UNIX_SEC = numpy.array([1667260800, 1667304000], dtype=int)
 WRF_ARW_FILE_NAMES = [
-    'foo/wrf_arw_2022-11-01-00.nc', 'foo/wrf_arw_2022-11-01-12.nc'
+    'foo/wrf_arw_2022-11-01-00.zarr', 'foo/wrf_arw_2022-11-01-12.zarr'
 ]
 
 

@@ -128,7 +128,7 @@ def concat_over_forecast_hours(wrf_arw_tables_xarray):
     """
 
     return xarray.concat(
-        wrf_arw_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars='all',
+        wrf_arw_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars=[DATA_KEY],
         coords='minimal', compat='identical', join='exact'
     )
 
