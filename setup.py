@@ -3,7 +3,8 @@
 from setuptools import setup
 
 PACKAGE_NAMES = [
-    'ml_for_national_blend'
+    'ml_for_national_blend', 'ml_for_national_blend.io',
+    'ml_for_national_blend.utils'
 ]
 KEYWORDS = [
     'machine learning', 'deep learning', 'artificial intelligence',
