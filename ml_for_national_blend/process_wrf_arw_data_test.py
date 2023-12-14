@@ -173,7 +173,7 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
 
         print('Writing data to: "{0:s}"...'.format(output_file_name))
         wrf_arw_io.write_file(
-            netcdf_file_name=output_file_name,
+            zarr_file_name=output_file_name,
             wrf_arw_table_xarray=wrf_arw_table_xarray
         )
         print(SEPARATOR_STRING)

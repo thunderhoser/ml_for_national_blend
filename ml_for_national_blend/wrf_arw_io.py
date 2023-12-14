@@ -1,11 +1,12 @@
 """Input/output methods for processed WRF-ARW model data.
 
-Processed WRF-ARW data are stored with one NetCDF file per model run (init
+Processed WRF-ARW data are stored with one zarr file per model run (init
 time), containing forecasts valid at all lead times.
 """
 
 import os
 import sys
+import shutil
 import xarray
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -24,7 +25,7 @@ HOURS_TO_SECONDS = 3600
 
 
 def find_file(directory_name, init_time_unix_sec, raise_error_if_missing=True):
-    """Finds NetCDF file with one WRF-ARW model run (init time).
+    """Finds zarr file with one WRF-ARW model run (init time).
 
     :param directory_name: Path to input directory.
     :param init_time_unix_sec: Initialization time.
@@ -40,12 +41,12 @@ def find_file(directory_name, init_time_unix_sec, raise_error_if_missing=True):
     wrf_arw_utils.check_init_time(init_time_unix_sec)
     error_checking.assert_is_boolean(raise_error_if_missing)
 
-    wrf_arw_file_name = '{0:s}/wrf_arw_{1:s}.nc'.format(
+    wrf_arw_file_name = '{0:s}/wrf_arw_{1:s}.zarr'.format(
         directory_name,
         time_conversion.unix_sec_to_string(init_time_unix_sec, TIME_FORMAT)
     )
 
-    if raise_error_if_missing and not os.path.isfile(wrf_arw_file_name):
+    if raise_error_if_missing and not os.path.isdir(wrf_arw_file_name):
         error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
             wrf_arw_file_name
         )
@@ -66,7 +67,7 @@ def find_files_for_period(
         `raise_error_if_any_missing == True`, will throw error.
     :param raise_error_if_all_missing: Boolean flag.  If all files are missing
         and `raise_error_if_all_missing == True`, will throw error.
-    :return: netcdf_file_names: 1-D list of paths to NetCDF files with WRF-ARW
+    :return: zarr_file_names: 1-D list of paths to zarr files with WRF-ARW
         forecasts, one per model run.
     :raises: ValueError: if all files are missing and
         `raise_error_if_all_missing == True`.
@@ -81,7 +82,7 @@ def find_files_for_period(
         include_endpoint=True
     )
 
-    netcdf_file_names = []
+    zarr_file_names = []
 
     for this_init_time_unix_sec in init_times_unix_sec:
         this_file_name = find_file(
@@ -90,10 +91,10 @@ def find_files_for_period(
             raise_error_if_missing=raise_error_if_any_missing
         )
 
-        if os.path.isfile(this_file_name):
-            netcdf_file_names.append(this_file_name)
+        if os.path.isdir(this_file_name):
+            zarr_file_names.append(this_file_name)
 
-    if raise_error_if_all_missing and len(netcdf_file_names) == 0:
+    if raise_error_if_all_missing and len(zarr_file_names) == 0:
         error_string = (
             'Cannot find any file in directory "{0:s}" from init times {1:s} '
             'to {2:s}.'
@@ -108,7 +109,7 @@ def find_files_for_period(
         )
         raise ValueError(error_string)
 
-    return netcdf_file_names
+    return zarr_file_names
 
 
 def file_name_to_init_time(wrf_arw_file_name):
@@ -130,25 +131,35 @@ def file_name_to_init_time(wrf_arw_file_name):
     return init_time_unix_sec
 
 
-def read_file(netcdf_file_name):
-    """Reads WRF-ARW data from NetCDF file.
+def read_file(zarr_file_name):
+    """Reads WRF-ARW data from zarr file.
 
-    :param netcdf_file_name: Path to input file.
+    :param zarr_file_name: Path to input file.
     :return: wrf_arw_table_xarray: xarray table.  Documentation in the xarray
         table should make values self-explanatory.
     """
 
-    return xarray.open_dataset(netcdf_file_name)
+    return xarray.open_zarr(zarr_file_name)
 
 
-def write_file(wrf_arw_table_xarray, netcdf_file_name):
-    """Writes WRF-ARW data to NetCDF file.
+def write_file(wrf_arw_table_xarray, zarr_file_name):
+    """Writes WRF-ARW data to zarr file.
 
     :param wrf_arw_table_xarray: xarray table in format returned by `read_file`.
-    :param netcdf_file_name: Path to output file.
+    :param zarr_file_name: Path to output file.
     """
 
-    file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
-    wrf_arw_table_xarray.to_netcdf(
-        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
+    error_checking.assert_is_string(zarr_file_name)
+    if os.path.isdir(zarr_file_name):
+        shutil.rmtree(zarr_file_name)
+
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=zarr_file_name
+    )
+
+    encoding_dict = {
+        wrf_arw_utils.DATA_KEY: {'dtype': 'float32'}
+    }
+    wrf_arw_table_xarray.to_zarr(
+        store=zarr_file_name, mode='w', encoding=encoding_dict
     )

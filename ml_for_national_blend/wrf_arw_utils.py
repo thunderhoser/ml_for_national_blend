@@ -16,6 +16,10 @@ import time_conversion
 import error_checking
 import nwp_model_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 TOLERANCE = 1e-6
 
 INIT_TIME_FORMAT = '%Y-%m-%d-%H'
@@ -131,7 +135,7 @@ def concat_over_forecast_hours(wrf_arw_tables_xarray):
     """
 
     return xarray.concat(
-        wrf_arw_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars='all',
+        wrf_arw_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars=[DATA_KEY],
         coords='minimal', compat='identical', join='exact'
     )
 
