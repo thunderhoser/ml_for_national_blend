@@ -16,6 +16,5 @@ dist/
 slurm/
 
 # Code that I don't intend to commit.
-ml_for_national_blend/*.py
 ml_for_national_blend/dead_code/
 ml_for_national_blend/dead_scratch_code/
