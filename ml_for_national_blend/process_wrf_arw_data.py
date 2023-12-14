@@ -105,10 +105,10 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
     :param output_dir_name: Same.
     """
 
-    first_init_time_unix_sec = time_conversion.unix_sec_to_string(
+    first_init_time_unix_sec = time_conversion.string_to_unix_sec(
         first_init_time_string, TIME_FORMAT
     )
-    last_init_time_unix_sec = time_conversion.unix_sec_to_string(
+    last_init_time_unix_sec = time_conversion.string_to_unix_sec(
         last_init_time_string, TIME_FORMAT
     )
     init_times_unix_sec = time_periods.range_and_interval_to_list(
