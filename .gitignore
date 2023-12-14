@@ -13,7 +13,7 @@ dist/
 *.iml
 
 # Slurm scripts.
-slurm/
+ml_for_national_blend/slurm/
 
 # Code that I don't intend to commit.
 ml_for_national_blend/dead_code/
