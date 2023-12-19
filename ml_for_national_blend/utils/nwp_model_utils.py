@@ -29,7 +29,10 @@ DATA_KEY = 'data_matrix'
 WRF_ARW_MODEL_NAME = 'wrf_arw'
 NAM_MODEL_NAME = 'nam'
 NAM_NEST_MODEL_NAME = 'nam_nest'
-ALL_MODEL_NAMES = [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME]
+RAP_MODEL_NAME = 'rap'
+ALL_MODEL_NAMES = [
+    WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME
+]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
 SURFACE_PRESSURE_NAME = 'pressure_surface_pascals'
@@ -124,6 +127,9 @@ def check_init_time(init_time_unix_sec, model_name):
     )
     hour_string = init_time_string.split('-')[-1]
 
+    if model_name == RAP_MODEL_NAME:
+        return
+
     if model_name == WRF_ARW_MODEL_NAME:
         assert hour_string in ['00', '12']
     else:
@@ -139,24 +145,57 @@ def model_to_init_time_interval(model_name):
     """
 
     check_model_name(model_name)
+    if model_name == RAP_MODEL_NAME:
+        return HOURS_TO_SECONDS
     if model_name == WRF_ARW_MODEL_NAME:
         return 12 * HOURS_TO_SECONDS
 
     return 6 * HOURS_TO_SECONDS
 
 
-def model_to_forecast_hours(model_name):
+def model_to_forecast_hours(model_name, init_time_unix_sec):
     """Returns list of all available forecast hours for the given model.
 
     :param model_name: Name of model.
+    :param init_time_unix_sec: Initialization time.
     :return: all_forecast_hours: 1-D numpy array of integers.
     """
 
     check_model_name(model_name)
+
+    if model_name == RAP_MODEL_NAME:
+        init_time_string = time_conversion.unix_sec_to_string(
+            init_time_unix_sec, '%Y-%m-%d-%H'
+        )
+        init_hour_string = init_time_string.split('-')[-1]
+
+        if init_hour_string in ['03', '09', '15', '21']:
+            return numpy.linspace(1, 51, num=51, dtype=int)
+
+        return numpy.linspace(1, 21, num=21, dtype=int)
+
     if model_name == NAM_MODEL_NAME:
         return numpy.linspace(51, 84, num=12, dtype=int)
 
     return numpy.linspace(1, 48, num=48, dtype=int)
+
+
+def model_to_maybe_missing_fields(model_name):
+    """Returns list of acceptably missing fields for the given model.
+
+    :param model_name: Name of model.
+    :return: maybe_missing_field_names: 1-D list with names of acceptably
+        missing fields.
+    """
+
+    check_model_name(model_name)
+
+    if model_name == RAP_MODEL_NAME:
+        return [
+            MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
+        ]
+
+    return []
 
 
 def read_model_coords(netcdf_file_name=None, model_name=None):
@@ -409,7 +448,9 @@ def read_24hour_precip_different_times(
     orig_forecast_hours = (
         nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
     )
-    all_forecast_hours = model_to_forecast_hours(model_name)
+    all_forecast_hours = model_to_forecast_hours(
+        model_name=model_name, init_time_unix_sec=init_time_unix_sec
+    )
 
     if not numpy.all(numpy.isin(all_forecast_hours, orig_forecast_hours)):
         missing_hour_array_string = str(
@@ -487,7 +528,8 @@ def read_24hour_precip_different_times(
     return interp_24hour_precip_matrix_metres
 
 
-def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name):
+def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
+                                        init_time_unix_sec):
     """Converts precip from incremental values to full-run values.
 
     "Incremental value" = an accumulation between two forecast hours
@@ -496,13 +538,16 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name):
 
     :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
     :param model_name: Name of NWP model.
+    :param init_time_unix_sec: Initialization time.
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
 
     forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
     num_forecast_hours = len(forecast_hours)
 
-    all_forecast_hours = model_to_forecast_hours(model_name)
+    all_forecast_hours = model_to_forecast_hours(
+        model_name=model_name, init_time_unix_sec=init_time_unix_sec
+    )
     assert numpy.all(numpy.isin(
         element=all_forecast_hours,
         test_elements=forecast_hours
@@ -511,7 +556,7 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name):
     data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
 
     for j in range(num_forecast_hours)[::-1]:
-        if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME]:
+        if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, RAP_MODEL_NAME]:
             addend_indices = numpy.where(forecast_hours <= forecast_hours[j])[0]
         elif model_name == NAM_NEST_MODEL_NAME:
             addend_flags = numpy.logical_or(

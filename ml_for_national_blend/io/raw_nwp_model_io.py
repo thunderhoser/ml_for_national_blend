@@ -252,7 +252,10 @@ def read_file(grib2_file_name, model_name,
     for f in range(num_fields):
         if field_names[f] in [nwp_model_utils.PRECIP_NAME]:
             if read_incremental_precip:
-                if model_name == nwp_model_utils.WRF_ARW_MODEL_NAME:
+                if model_name in [
+                        nwp_model_utils.WRF_ARW_MODEL_NAME,
+                        nwp_model_utils.RAP_MODEL_NAME
+                ]:
                     grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         forecast_hour - 1,
@@ -276,7 +279,10 @@ def read_file(grib2_file_name, model_name,
                     grib_search_string = None
             else:
                 if (
-                        model_name == nwp_model_utils.WRF_ARW_MODEL_NAME and
+                        model_name in [
+                            nwp_model_utils.WRF_ARW_MODEL_NAME,
+                            nwp_model_utils.RAP_MODEL_NAME
+                        ] and
                         numpy.mod(forecast_hour, DAYS_TO_HOURS) == 0
                 ):
                     grib_search_string = '{0:s}:0-{1:d} day acc'.format(
@@ -303,8 +309,10 @@ def read_file(grib2_file_name, model_name,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=SENTINEL_VALUE,
-            raise_error_if_fails=True
-            # field_names[f] not in wrf_arw_utils.MAYBE_MISSING_FIELD_NAMES
+            raise_error_if_fails=(
+                field_names[f] not in
+                nwp_model_utils.model_to_maybe_missing_fields(model_name)
+            )
         )
 
         if this_data_matrix is None:

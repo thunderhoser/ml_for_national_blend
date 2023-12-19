@@ -32,7 +32,7 @@ DATA_MATRIX = numpy.expand_dims(DATA_MATRIX, axis=-1)
 
 COORD_DICT = {
     nwp_model_utils.FORECAST_HOUR_DIM: nwp_model_utils.model_to_forecast_hours(
-        nwp_model_utils.WRF_ARW_MODEL_NAME
+        model_name=nwp_model_utils.WRF_ARW_MODEL_NAME, init_time_unix_sec=0
     ),
     nwp_model_utils.ROW_DIM: numpy.array([0], dtype=int),
     nwp_model_utils.COLUMN_DIM: numpy.array([0], dtype=int),
@@ -75,7 +75,7 @@ DATA_MATRIX = numpy.expand_dims(DATA_MATRIX, axis=-1)
 
 COORD_DICT = {
     nwp_model_utils.FORECAST_HOUR_DIM: nwp_model_utils.model_to_forecast_hours(
-        nwp_model_utils.NAM_MODEL_NAME
+        model_name=nwp_model_utils.NAM_MODEL_NAME, init_time_unix_sec=0
     ),
     nwp_model_utils.ROW_DIM: numpy.array([0], dtype=int),
     nwp_model_utils.COLUMN_DIM: numpy.array([0], dtype=int),
@@ -124,7 +124,7 @@ DATA_MATRIX = numpy.expand_dims(DATA_MATRIX, axis=-1)
 
 COORD_DICT = {
     nwp_model_utils.FORECAST_HOUR_DIM: nwp_model_utils.model_to_forecast_hours(
-        nwp_model_utils.NAM_NEST_MODEL_NAME
+        model_name=nwp_model_utils.NAM_NEST_MODEL_NAME, init_time_unix_sec=0
     ),
     nwp_model_utils.ROW_DIM: numpy.array([0], dtype=int),
     nwp_model_utils.COLUMN_DIM: numpy.array([0], dtype=int),
@@ -190,7 +190,7 @@ MAIN_DATA_DICT.update({
 
 COORD_DICT = {
     nwp_model_utils.FORECAST_HOUR_DIM: nwp_model_utils.model_to_forecast_hours(
-        nwp_model_utils.WRF_ARW_MODEL_NAME
+        model_name=nwp_model_utils.WRF_ARW_MODEL_NAME, init_time_unix_sec=0
     ),
     nwp_model_utils.ROW_DIM: numpy.array([0], dtype=int),
     nwp_model_utils.COLUMN_DIM: numpy.array([0], dtype=int),
@@ -214,7 +214,8 @@ class NwpModelUtilsTests(unittest.TestCase):
         new_forecast_table_xarray = (
             nwp_model_utils.precip_from_incremental_to_full_run(
                 nwp_forecast_table_xarray=WRF_ARW_TABLE_XARRAY,
-                model_name=nwp_model_utils.WRF_ARW_MODEL_NAME
+                model_name=nwp_model_utils.WRF_ARW_MODEL_NAME,
+                init_time_unix_sec=0
             )
         )
 
@@ -236,7 +237,8 @@ class NwpModelUtilsTests(unittest.TestCase):
         new_forecast_table_xarray = (
             nwp_model_utils.precip_from_incremental_to_full_run(
                 nwp_forecast_table_xarray=NAM_TABLE_XARRAY,
-                model_name=nwp_model_utils.NAM_MODEL_NAME
+                model_name=nwp_model_utils.NAM_MODEL_NAME,
+                init_time_unix_sec=0
             )
         )
 
@@ -258,7 +260,8 @@ class NwpModelUtilsTests(unittest.TestCase):
         new_forecast_table_xarray = (
             nwp_model_utils.precip_from_incremental_to_full_run(
                 nwp_forecast_table_xarray=NAM_NEST_TABLE_XARRAY,
-                model_name=nwp_model_utils.NAM_NEST_MODEL_NAME
+                model_name=nwp_model_utils.NAM_NEST_MODEL_NAME,
+                init_time_unix_sec=0
             )
         )
 
