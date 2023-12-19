@@ -22,6 +22,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grib_io
+import number_rounding
 import time_conversion
 import longitude_conversion as lng_conversion
 import error_checking
@@ -273,7 +274,9 @@ def read_file(grib2_file_name, model_name,
                 elif model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
                     grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
-                        int(numpy.floor(float(forecast_hour) / 3 - 1)),
+                        int(number_rounding.floor_to_nearest(
+                            forecast_hour - 1, 3
+                        )),
                         forecast_hour
                     )
                 else:
