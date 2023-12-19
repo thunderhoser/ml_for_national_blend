@@ -1,26 +1,116 @@
 """Scratch space."""
 
+import numpy
+import xarray
+
+# coord_matrix = numpy.loadtxt('/home/ralager/Downloads/wrf_arw_coords.txt', delimiter=',')
+coord_matrix = numpy.loadtxt('/home/ralager/urma_coords.txt', delimiter=',')
+print(coord_matrix[:5, :])
+
+row_indices = numpy.round(coord_matrix[:, 0]).astype(int)
+column_indices = numpy.round(coord_matrix[:, 1]).astype(int)
+latitudes_deg_n = coord_matrix[:, 2]
+longitudes_deg_e = coord_matrix[:, 3]
+
+num_rows = numpy.max(row_indices)
+num_columns = numpy.max(column_indices)
+
+# row_index_matrix = numpy.reshape(row_indices, (num_rows, num_columns), order='F')
+latitude_matrix_deg_n = numpy.reshape(latitudes_deg_n, (num_rows, num_columns), order='F')
+longitude_matrix_deg_n = numpy.reshape(longitudes_deg_e, (num_rows, num_columns), order='F')
+
+print(latitude_matrix_deg_n[:5, :5])
+print(longitude_matrix_deg_n[:5, :5])
+
+ROW_DIM = 'row'
+COLUMN_DIM = 'column'
+
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
+
+data_dict = {
+    LATITUDE_KEY: ((ROW_DIM, COLUMN_DIM), latitude_matrix_deg_n),
+    LONGITUDE_KEY: ((ROW_DIM, COLUMN_DIM), longitude_matrix_deg_n)
+}
+
+coord_table_xarray = xarray.Dataset(data_vars=data_dict)
+print(coord_table_xarray)
+
+coord_table_xarray.to_netcdf(
+    path='/home/ralager/ml_for_national_blend/ml_for_national_blend/utils/urma_coords.nc',
+    mode='w', format='NETCDF3_64BIT'
+)
+
+
+
+
+
+
+
+
+
+
 # import numpy
 # import xarray
+# import matplotlib
+# matplotlib.use('agg')
+# from matplotlib import pyplot
+# from pyproj import Proj
+# from gewittergefahr.gg_utils import grids
+# from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
+# from ml_for_wildfire_wpo.io import border_io
+# from ml_for_wildfire_wpo.plotting import plotting_utils
 #
-# # coord_matrix = numpy.loadtxt('/home/ralager/Downloads/wrf_arw_coords.txt', delimiter=',')
-# coord_matrix = numpy.loadtxt('/home/ralager/nam_nest_coords.txt', delimiter=',')
-# print(coord_matrix[:5, :])
+# # -6448701.88 -5642620.27 6448707.45 5642616.94
+# # UL) -139.0858 -10.5906, LR) 22.66102 46.59194
 #
-# row_indices = numpy.round(coord_matrix[:, 0]).astype(int)
-# column_indices = numpy.round(coord_matrix[:, 1]).astype(int)
-# latitudes_deg_n = coord_matrix[:, 2]
-# longitudes_deg_e = coord_matrix[:, 3]
+# X_COORDS_METRES = numpy.linspace(-6448701.88, 6448707.45, num=953)
+# Y_COORDS_METRES = numpy.linspace(-5642620.27, 5642616.94, num=834)
 #
-# num_rows = numpy.max(row_indices)
-# num_columns = numpy.max(column_indices)
+# x_coord_matrix, y_coord_matrix = grids.xy_vectors_to_matrices(
+#     x_unique_metres=X_COORDS_METRES, y_unique_metres=Y_COORDS_METRES
+# )
 #
-# # row_index_matrix = numpy.reshape(row_indices, (num_rows, num_columns), order='F')
-# latitude_matrix_deg_n = numpy.reshape(latitudes_deg_n, (num_rows, num_columns), order='F')
-# longitude_matrix_deg_n = numpy.reshape(longitudes_deg_e, (num_rows, num_columns), order='F')
+# proj_object = Proj('+proj=ob_tran +o_proj=eqc +o_lon_p=180 +o_lat_p=144 +lon_0=74 +R=6371229')
+# print(proj_object(-6448701.88, -5642620.27, inverse=True))
+# print(proj_object(6448707.45, 5642616.94, inverse=True))
 #
-# print(latitude_matrix_deg_n[:5, :5])
-# print(longitude_matrix_deg_n[:5, :5])
+# longitude_matrix_deg_e, latitude_matrix_deg_n = proj_object(
+#     x_coord_matrix, y_coord_matrix, inverse=True
+# )
+# longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
+#     longitude_matrix_deg_e
+# )
+#
+# border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
+# border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+#     border_longitudes_deg_e
+# )
+#
+# figure_object, axes_object = pyplot.subplots(
+#     1, 1, figsize=(15, 15)
+# )
+#
+# plotting_utils.plot_borders(
+#     border_latitudes_deg_n=border_latitudes_deg_n,
+#     border_longitudes_deg_e=border_longitudes_deg_e,
+#     axes_object=axes_object,
+#     line_colour=numpy.full(3, 0.)
+# )
+#
+# axes_object.plot(
+#     numpy.ravel(longitude_matrix_deg_e[::4, ::4]),
+#     numpy.ravel(latitude_matrix_deg_n[::4, ::4]),
+#     'go'
+# )
+#
+# output_file_name = '/home/ralager/tccf_paper_2024/rap_coords.jpg'
+# print('Saving figure to: "{0:s}"...'.format(output_file_name))
+# figure_object.savefig(
+#     output_file_name, dpi=300,
+#     pad_inches=0, bbox_inches='tight'
+# )
+# pyplot.close(figure_object)
 #
 # ROW_DIM = 'row'
 # COLUMN_DIM = 'column'
@@ -30,14 +120,14 @@
 #
 # data_dict = {
 #     LATITUDE_KEY: ((ROW_DIM, COLUMN_DIM), latitude_matrix_deg_n),
-#     LONGITUDE_KEY: ((ROW_DIM, COLUMN_DIM), longitude_matrix_deg_n)
+#     LONGITUDE_KEY: ((ROW_DIM, COLUMN_DIM), longitude_matrix_deg_e)
 # }
 #
 # coord_table_xarray = xarray.Dataset(data_vars=data_dict)
 # print(coord_table_xarray)
 #
 # coord_table_xarray.to_netcdf(
-#     path='/home/ralager/ml_for_national_blend/ml_for_national_blend/utils/nam_nest_coords.nc',
+#     path='/home/ralager/ml_for_national_blend/ml_for_national_blend/utils/rap_coords.nc',
 #     mode='w', format='NETCDF3_64BIT'
 # )
 
@@ -61,7 +151,14 @@
 # )
 #
 # init_times_unix_sec = init_times_unix_sec[:-1] + 2 * 86400
-# init_times_unix_sec = numpy.concatenate((init_times_unix_sec, init_times_unix_sec + 43200))
+# orig_init_times_unix_sec = init_times_unix_sec + 0
+#
+# hour_offsets_sec = numpy.linspace(3600, 82800, num=23, dtype=int)
+# for this_hour_offset_sec in hour_offsets_sec:
+#     init_times_unix_sec = numpy.concatenate((
+#         init_times_unix_sec, orig_init_times_unix_sec + this_hour_offset_sec
+#     ))
+#
 # init_times_unix_sec = numpy.sort(init_times_unix_sec)
 #
 # init_time_strings = [
@@ -71,6 +168,9 @@
 #
 # print(len(init_time_strings))
 # print(' '.join(['"{0:s}"'.format(t) for t in init_time_strings]))
+#
+# indices = numpy.linspace(1, 1752, num=1752, dtype=int)[::12]
+# print(','.join(['{0:d}'.format(i) for i in indices]))
 
 
 
@@ -98,7 +198,8 @@
 # TOLERANCE = 1e-6
 #
 # # LEAD_TIMES_HOURS = numpy.array([2, 24, 48], dtype=int)
-# LEAD_TIMES_HOURS = numpy.array([51, 60, 84], dtype=int)
+# # LEAD_TIMES_HOURS = numpy.array([51, 60, 84], dtype=int)
+# LEAD_TIMES_HOURS = numpy.array([1, 6, 12], dtype=int)
 #
 # FIGURE_WIDTH_INCHES = 15
 # FIGURE_HEIGHT_INCHES = 15
@@ -108,8 +209,8 @@
 #
 # OUTPUT_DIR_NAME = (
 #     '/home/ralager/condo/swatwork/ralager/scratch1/RDARCH/rda-ghpcs/'
-#     'Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam/'
-#     'processed/nam_2022-11-21-12'
+#     'Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/rap/'
+#     'processed/rap_2022-11-01-00'
 # )
 #
 #
@@ -126,10 +227,10 @@
 #
 #     grid_cell_edge_coords = (grid_point_coords[:-1] + grid_point_coords[1:]) / 2
 #     first_edge_coords = (
-#         grid_point_coords[0] - numpy.diff(grid_point_coords[:2]) / 2
+#             grid_point_coords[0] - numpy.diff(grid_point_coords[:2]) / 2
 #     )
 #     last_edge_coords = (
-#         grid_point_coords[-1] + numpy.diff(grid_point_coords[-2:]) / 2
+#             grid_point_coords[-1] + numpy.diff(grid_point_coords[-2:]) / 2
 #     )
 #
 #     return numpy.concatenate((
@@ -188,8 +289,8 @@
 #
 # nwp_forecast_table_xarray = nwp_model_io.read_file(
 #     '/home/ralager/condo/swatwork/ralager/scratch1/RDARCH/rda-ghpcs/'
-#     'Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam/'
-#     'processed/nam_2022-11-21-12.zarr'
+#     'Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/rap/'
+#     'processed/rap_2022-11-01-00.zarr'
 # )
 #
 # print(nwp_forecast_table_xarray)
@@ -265,18 +366,26 @@
 #         edge_longitude_matrix_deg_e = _grid_points_to_edges_2d(
 #             nwp_forecast_table_xarray[nwp_model_utils.LONGITUDE_KEY].values
 #         )
-#         data_matrix_to_plot = grids.latlng_field_grid_points_to_edges(
-#             field_matrix=data_matrix_to_plot,
-#             min_latitude_deg=1., min_longitude_deg=1.,
-#             lat_spacing_deg=1e-6, lng_spacing_deg=1e-6
-#         )[0]
+#         # data_matrix_to_plot = grids.latlng_field_grid_points_to_edges(
+#         #     field_matrix=data_matrix_to_plot,
+#         #     min_latitude_deg=1., min_longitude_deg=1.,
+#         #     lat_spacing_deg=1e-6, lng_spacing_deg=1e-6
+#         # )[0]
 #
 #         data_matrix_to_plot = numpy.ma.masked_where(
 #             numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
 #         )
 #
+#         # axes_object.pcolor(
+#         #     edge_longitude_matrix_deg_e, edge_latitude_matrix_deg_n,
+#         #     data_matrix_to_plot,
+#         #     cmap=colour_map_object, norm=colour_norm_object,
+#         #     edgecolors='None', zorder=-1e11
+#         # )
+#
 #         axes_object.pcolor(
-#             edge_longitude_matrix_deg_e, edge_latitude_matrix_deg_n,
+#             nwp_forecast_table_xarray[nwp_model_utils.LONGITUDE_KEY].values,
+#             nwp_forecast_table_xarray[nwp_model_utils.LATITUDE_KEY].values,
 #             data_matrix_to_plot,
 #             cmap=colour_map_object, norm=colour_norm_object,
 #             edgecolors='None', zorder=-1e11
@@ -336,91 +445,3 @@
 #             output_file_name, dpi=300, pad_inches=0, bbox_inches='tight'
 #         )
 #         pyplot.close(figure_object)
-
-
-
-
-
-
-
-
-import numpy
-import xarray
-import matplotlib
-matplotlib.use('agg')
-from matplotlib import pyplot
-from pyproj import Proj
-from gewittergefahr.gg_utils import grids
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from ml_for_wildfire_wpo.io import border_io
-from ml_for_wildfire_wpo.plotting import plotting_utils
-
-# -6448701.88 -5642620.27 6448707.45 5642616.94
-# UL) -139.0858 -10.5906, LR) 22.66102 46.59194
-
-X_COORDS_METRES = numpy.linspace(-6448701.88, 6448707.45, num=953)
-Y_COORDS_METRES = numpy.linspace(-5642620.27, 5642616.94, num=834)
-
-x_coord_matrix, y_coord_matrix = grids.xy_vectors_to_matrices(
-    x_unique_metres=X_COORDS_METRES, y_unique_metres=Y_COORDS_METRES
-)
-
-proj_object = Proj('+proj=ob_tran +o_proj=eqc +o_lon_p=180 +o_lat_p=144 +lon_0=74 +R=6371229')
-print(proj_object(-6448701.88, -5642620.27, inverse=True))
-print(proj_object(6448707.45, 5642616.94, inverse=True))
-
-longitude_matrix_deg_e, latitude_matrix_deg_n = proj_object(
-    x_coord_matrix, y_coord_matrix, inverse=True
-)
-longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
-    longitude_matrix_deg_e
-)
-
-border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
-border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
-    border_longitudes_deg_e
-)
-
-figure_object, axes_object = pyplot.subplots(
-    1, 1, figsize=(15, 15)
-)
-
-plotting_utils.plot_borders(
-    border_latitudes_deg_n=border_latitudes_deg_n,
-    border_longitudes_deg_e=border_longitudes_deg_e,
-    axes_object=axes_object,
-    line_colour=numpy.full(3, 0.)
-)
-
-axes_object.plot(
-    numpy.ravel(longitude_matrix_deg_e[::4, ::4]),
-    numpy.ravel(latitude_matrix_deg_n[::4, ::4]),
-    'go'
-)
-
-output_file_name = '/home/ralager/tccf_paper_2024/rap_coords.jpg'
-print('Saving figure to: "{0:s}"...'.format(output_file_name))
-figure_object.savefig(
-    output_file_name, dpi=300,
-    pad_inches=0, bbox_inches='tight'
-)
-pyplot.close(figure_object)
-
-ROW_DIM = 'row'
-COLUMN_DIM = 'column'
-
-LATITUDE_KEY = 'latitude_deg_n'
-LONGITUDE_KEY = 'longitude_deg_e'
-
-data_dict = {
-    LATITUDE_KEY: ((ROW_DIM, COLUMN_DIM), latitude_matrix_deg_n),
-    LONGITUDE_KEY: ((ROW_DIM, COLUMN_DIM), longitude_matrix_deg_e)
-}
-
-coord_table_xarray = xarray.Dataset(data_vars=data_dict)
-print(coord_table_xarray)
-
-coord_table_xarray.to_netcdf(
-    path='/home/ralager/ml_for_national_blend/ml_for_national_blend/utils/rap_coords.nc',
-    mode='w', format='NETCDF3_64BIT'
-)
