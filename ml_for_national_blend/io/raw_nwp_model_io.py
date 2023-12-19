@@ -15,6 +15,7 @@ import warnings
 import numpy
 import xarray
 from gewittergefahr.gg_io import grib_io
+from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import error_checking
@@ -266,7 +267,9 @@ def read_file(grib2_file_name, model_name,
                 elif model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
                     grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
-                        int(numpy.floor(float(forecast_hour) / 3 - 1)),
+                        int(number_rounding.floor_to_nearest(
+                            forecast_hour - 1, 3
+                        )),
                         forecast_hour
                     )
                 else:
