@@ -182,7 +182,7 @@ file_system_utils.mkdir_recursive_if_necessary(directory_name=OUTPUT_DIR_NAME)
 wrf_arw_table_xarray = wrf_arw_io.read_file(
     '/home/ralager/condo/swatwork/ralager/scratch1/RDARCH/rda-ghpcs/'
     'Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/wrf_arw/'
-    'processed_test/wrf_arw_2022-11-21-12.nc'
+    'processed_test/wrf_arw_2022-11-21-12.zarr'
 )
 
 print(wrf_arw_table_xarray)
@@ -209,9 +209,9 @@ for i in range(len(LEAD_TIMES_HOURS)):
         data_matrix = wrf_arw_table_xarray[wrf_arw_utils.DATA_KEY].values[
             i_other, ..., j
         ]
-        orig_dimensions = data_matrix.shape
-        data_matrix = numpy.ravel(data_matrix)
-        data_matrix = numpy.reshape(data_matrix, orig_dimensions, order='F')
+        # orig_dimensions = data_matrix.shape
+        # data_matrix = numpy.ravel(data_matrix)
+        # data_matrix = numpy.reshape(data_matrix, orig_dimensions, order='F')
 
         if '_wind' in field_names[j]:
             colour_map_object = DIVERGING_COLOUR_MAP_OBJECT
@@ -251,10 +251,10 @@ for i in range(len(LEAD_TIMES_HOURS)):
             data_matrix_to_plot = data_matrix + 0.
 
         edge_latitude_matrix_deg_n = _grid_points_to_edges_2d(
-            wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values[0, ...]
+            wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values
         )
         edge_longitude_matrix_deg_e = _grid_points_to_edges_2d(
-            wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values[0, ...]
+            wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values
         )
         data_matrix_to_plot = grids.latlng_field_grid_points_to_edges(
             field_matrix=data_matrix_to_plot,
@@ -306,12 +306,12 @@ for i in range(len(LEAD_TIMES_HOURS)):
         )
 
         axes_object.set_xlim(
-            numpy.min(wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values[0, ...]),
-            numpy.max(wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values[0, ...])
+            numpy.min(wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values),
+            numpy.max(wrf_arw_table_xarray[wrf_arw_utils.LONGITUDE_KEY].values)
         )
         axes_object.set_ylim(
-            numpy.min(wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values[0, ...]),
-            numpy.max(wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values[0, ...])
+            numpy.min(wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values),
+            numpy.max(wrf_arw_table_xarray[wrf_arw_utils.LATITUDE_KEY].values)
         )
 
         axes_object.set_title('{0:s} at {1:d}-hour lead time'.format(

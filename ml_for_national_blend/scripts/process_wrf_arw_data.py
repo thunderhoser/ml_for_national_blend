@@ -17,9 +17,9 @@ import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
-from ml_for_national_blend.io import wrf_arw_io
-from ml_for_national_blend.io import raw_wrf_arw_io
-from ml_for_national_blend.utils import wrf_arw_utils
+from ml_for_national_blend.io import nwp_model_io
+from ml_for_national_blend.io import raw_nwp_model_io
+from ml_for_national_blend.utils import nwp_model_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -106,11 +106,15 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
     init_times_unix_sec = time_periods.range_and_interval_to_list(
         start_time_unix_sec=first_init_time_unix_sec,
         end_time_unix_sec=last_init_time_unix_sec,
-        time_interval_sec=12 * HOURS_TO_SECONDS,
+        time_interval_sec=nwp_model_utils.model_to_init_time_interval(
+            nwp_model_utils.WRF_ARW_MODEL_NAME
+        ),
         include_endpoint=True
     )
 
-    latitude_matrix_deg_n = wrf_arw_utils.read_model_coords()[0]
+    latitude_matrix_deg_n = nwp_model_utils.read_model_coords(
+        model_name=nwp_model_utils.WRF_ARW_MODEL_NAME
+    )[0]
     num_grid_rows = latitude_matrix_deg_n.shape[0]
     num_grid_columns = latitude_matrix_deg_n.shape[1]
 
@@ -120,14 +124,17 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
     desired_column_indices = numpy.linspace(
         0, num_grid_columns - 1, num=num_grid_columns, dtype=int
     )
-    field_names = wrf_arw_utils.ALL_FIELD_NAMES
-    forecast_hours = wrf_arw_utils.ALL_FORECAST_HOURS
+    field_names = nwp_model_utils.ALL_FIELD_NAMES
+    forecast_hours = nwp_model_utils.model_to_forecast_hours(
+        nwp_model_utils.WRF_ARW_MODEL_NAME
+    )
     num_forecast_hours = len(forecast_hours)
 
     for this_init_time_unix_sec in init_times_unix_sec:
         input_file_names = [
-            raw_wrf_arw_io.find_file(
+            raw_nwp_model_io.find_file(
                 directory_name=input_dir_name,
+                model_name=nwp_model_utils.WRF_ARW_MODEL_NAME,
                 init_time_unix_sec=this_init_time_unix_sec,
                 forecast_hour=h,
                 raise_error_if_missing=True
@@ -138,8 +145,9 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
         wrf_arw_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
-            wrf_arw_tables_xarray[k] = raw_wrf_arw_io.read_file(
+            wrf_arw_tables_xarray[k] = raw_nwp_model_io.read_file(
                 grib2_file_name=input_file_names[k],
+                model_name=nwp_model_utils.WRF_ARW_MODEL_NAME,
                 desired_row_indices=desired_row_indices,
                 desired_column_indices=desired_column_indices,
                 wgrib2_exe_name=wgrib2_exe_name,
@@ -150,23 +158,24 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
 
             print(SEPARATOR_STRING)
 
-        wrf_arw_table_xarray = wrf_arw_utils.concat_over_forecast_hours(
+        wrf_arw_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             wrf_arw_tables_xarray
         )
-        wrf_arw_table_xarray = wrf_arw_utils.remove_negative_precip(
+        wrf_arw_table_xarray = nwp_model_utils.remove_negative_precip(
             wrf_arw_table_xarray
         )
 
-        output_file_name = wrf_arw_io.find_file(
+        output_file_name = nwp_model_io.find_file(
             directory_name=output_dir_name,
+            model_name=nwp_model_utils.WRF_ARW_MODEL_NAME,
             init_time_unix_sec=this_init_time_unix_sec,
             raise_error_if_missing=False
         )
 
         print('Writing data to: "{0:s}"...'.format(output_file_name))
-        wrf_arw_io.write_file(
+        nwp_model_io.write_file(
             zarr_file_name=output_file_name,
-            wrf_arw_table_xarray=wrf_arw_table_xarray
+            nwp_forecast_table_xarray=wrf_arw_table_xarray
         )
         print(SEPARATOR_STRING)
 
