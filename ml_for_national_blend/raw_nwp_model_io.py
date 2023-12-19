@@ -333,10 +333,11 @@ def read_file(grib2_file_name, model_name,
             warnings.warn(warning_string)
             continue
 
-        orig_dimensions = this_data_matrix.shape
-        this_data_matrix = numpy.reshape(
-            numpy.ravel(this_data_matrix), orig_dimensions, order='F'
-        )
+        if model_name != nwp_model_utils.RAP_MODEL_NAME:
+            orig_dimensions = this_data_matrix.shape
+            this_data_matrix = numpy.reshape(
+                numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+            )
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
