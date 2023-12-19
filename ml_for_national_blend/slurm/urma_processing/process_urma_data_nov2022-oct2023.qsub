@@ -43,7 +43,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 2` && $i <= $#VALID_DATE_STRINGS)
     --first_valid_date_string="${valid_date_string}" \
     --last_valid_date_string="${valid_date_string}" \
     --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
-    --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
+    --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${valid_date_string}" \
     --output_netcdf_dir_name="${OUTPUT_DIR_NAME}"
     
     @ i = $i + 1
