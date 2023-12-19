@@ -11,10 +11,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-
 VALID_TIME_DIM = 'valid_time_unix_sec'
 ROW_DIM = 'row'
 COLUMN_DIM = 'column'

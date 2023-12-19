@@ -143,10 +143,13 @@ def _run(input_dir_name, model_name,
         0, num_grid_columns - 1, num=num_grid_columns, dtype=int
     )
     field_names = nwp_model_utils.ALL_FIELD_NAMES
-    forecast_hours = nwp_model_utils.model_to_forecast_hours(model_name)
-    num_forecast_hours = len(forecast_hours)
 
     for this_init_time_unix_sec in init_times_unix_sec:
+        forecast_hours = nwp_model_utils.model_to_forecast_hours(
+            model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
+        )
+        num_forecast_hours = len(forecast_hours)
+
         input_file_names = [
             raw_nwp_model_io.find_file(
                 directory_name=input_dir_name,
@@ -183,7 +186,8 @@ def _run(input_dir_name, model_name,
             nwp_forecast_table_xarray = (
                 nwp_model_utils.precip_from_incremental_to_full_run(
                     nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    model_name=model_name
+                    model_name=model_name,
+                    init_time_unix_sec=this_init_time_unix_sec
                 )
             )
 
