@@ -102,6 +102,10 @@ def file_name_to_type(grib_file_name):
     if file_extension_string == '':
         return GRIB2_FILE_TYPE
 
+    # TODO(thunderhoser): Hack for URMA data on HPSS.
+    if file_extension_string == '.grb2_wexp':
+        return GRIB2_FILE_TYPE
+
     error_string = (
         'File type should be either "{0:s}" or "{1:s}".  Instead, got: "{2:s}"'
     ).format(GRIB1_FILE_TYPE, GRIB2_FILE_TYPE, grib_file_name)
