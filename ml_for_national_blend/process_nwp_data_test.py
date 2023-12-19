@@ -144,6 +144,10 @@ def _run(input_dir_name, model_name,
     )
     field_names = nwp_model_utils.ALL_FIELD_NAMES
 
+    read_incremental_precip = model_name in [
+        nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
+    ]
+
     for this_init_time_unix_sec in init_times_unix_sec:
         # forecast_hours = nwp_model_utils.model_to_forecast_hours(
         #     model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
@@ -173,9 +177,7 @@ def _run(input_dir_name, model_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 field_names=field_names,
-                read_incremental_precip=(
-                    model_name != nwp_model_utils.WRF_ARW_MODEL_NAME
-                )
+                read_incremental_precip=read_incremental_precip
             )
 
             print(SEPARATOR_STRING)
@@ -183,7 +185,7 @@ def _run(input_dir_name, model_name,
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )
-        if model_name != nwp_model_utils.WRF_ARW_MODEL_NAME:
+        if read_incremental_precip:
             nwp_forecast_table_xarray = (
                 nwp_model_utils.precip_from_incremental_to_full_run(
                     nwp_forecast_table_xarray=nwp_forecast_table_xarray,
