@@ -198,6 +198,13 @@ def _run(input_dir_name, model_name,
             nwp_forecast_table_xarray
         )
 
+        if model_name == nwp_model_utils.RAP_MODEL_NAME:
+            nwp_forecast_table_xarray = (
+                nwp_model_utils.rotate_rap_winds_to_earth_relative(
+                    nwp_forecast_table_xarray
+                )
+            )
+
         output_file_name = nwp_model_io.find_file(
             directory_name=output_dir_name,
             model_name=model_name,

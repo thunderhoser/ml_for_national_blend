@@ -12,6 +12,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import longitude_conversion as lng_conversion
 import time_conversion
 import error_checking
 
@@ -19,6 +20,7 @@ TOLERANCE = 1e-6
 
 HOURS_TO_SECONDS = 3600
 INIT_TIME_FORMAT = '%Y-%m-%d-%H'
+DEGREES_TO_RADIANS = numpy.pi / 180.
 
 FORECAST_HOUR_DIM = 'forecast_hour'
 ROW_DIM = 'row'
@@ -72,6 +74,60 @@ ALL_FIELD_NAMES = [
     TEMPERATURE_850MB_NAME, TEMPERATURE_950MB_NAME,
     MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
 ]
+
+U_WIND_NAME_TO_V_WIND_NAME = {
+    U_WIND_10METRE_NAME: V_WIND_10METRE_NAME,
+    U_WIND_500MB_NAME: V_WIND_500MB_NAME,
+    U_WIND_700MB_NAME: V_WIND_700MB_NAME,
+    U_WIND_1000MB_NAME: V_WIND_1000MB_NAME
+}
+
+
+def _get_rap_wind_rotation_angles(latitude_array_deg_n, longitude_array_deg_e):
+    """Computes wind-rotation angle at each RAP pixel.
+
+    I got the projection parameters (standard latitude and central longitude)
+    from here:
+
+    https://www.ssec.wisc.edu/realearth/
+    solved-north-american-domain-rap-13-5km-rotated-pole-grib2-for-gis/
+
+    And I got the rotation formula from here:
+
+    https://ruc.noaa.gov/ruc/RUC.faq.html
+
+    :param latitude_array_deg_n: numpy array of latitudes (deg north).
+    :param longitude_array_deg_e: numpy array of longitudes (deg east) with same
+        shape as `latitude_array_deg_n`.
+    :return: cosine_array: numpy array with cosines of rotation angles, in same
+        shape as `latitude_array_deg_n`.
+    :return: sine_array: numpy array with sines of rotation angles, in same
+        shape as `latitude_array_deg_n`.
+    """
+
+    error_checking.assert_is_valid_lat_numpy_array(
+        latitudes_deg=latitude_array_deg_n, allow_nan=False
+    )
+    longitude_array_pos_in_west_deg_e = (
+        lng_conversion.convert_lng_positive_in_west(
+            longitudes_deg=longitude_array_deg_e + 0., allow_nan=False
+        )
+    )
+    error_checking.assert_is_numpy_array(
+        longitude_array_deg_e,
+        exact_dimensions=numpy.array(latitude_array_deg_n.shape, dtype=int)
+    )
+
+    standard_latitudes_deg_n = numpy.array([54.])
+    central_longitude_deg_e = 254.
+
+    angle_array_radians = (
+        numpy.sin(standard_latitudes_deg_n[0] * DEGREES_TO_RADIANS) *
+        (longitude_array_pos_in_west_deg_e - central_longitude_deg_e) *
+        DEGREES_TO_RADIANS
+    )
+
+    return numpy.cos(angle_array_radians), numpy.sin(angle_array_radians)
 
 
 def check_model_name(model_name):
@@ -633,6 +689,58 @@ def remove_negative_precip(nwp_forecast_table_xarray):
     nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
         DATA_KEY: (
             nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+        )
+    })
+
+    return nwp_forecast_table_xarray
+
+
+def rotate_rap_winds_to_earth_relative(nwp_forecast_table_xarray):
+    """Rotates RAP winds from grid-relative to Earth-relative.
+
+    :param nwp_forecast_table_xarray: xarray table with RAP forecasts.  Winds
+        must be grid-relative (with the u-component running along the rows and
+        v-component running along the columns), but this method has no way to
+        verify, so BE CAREFUL.
+    :return: nwp_forecast_table_xarray: Same but with Earth-relative winds.
+    """
+
+    cosine_matrix, sine_matrix = _get_rap_wind_rotation_angles(
+        latitude_array_deg_n=nwp_forecast_table_xarray[LATITUDE_KEY].values,
+        longitude_array_deg_e=nwp_forecast_table_xarray[LONGITUDE_KEY].values
+    )
+
+    forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
+    num_forecast_hours = len(forecast_hours)
+
+    orig_data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
+    new_data_matrix = orig_data_matrix + 0.
+
+    for j in range(num_forecast_hours):
+        for this_field_name in list(U_WIND_NAME_TO_V_WIND_NAME.keys()):
+            u_index = numpy.where(
+                nwp_forecast_table_xarray.coords[FIELD_DIM].values ==
+                this_field_name
+            )[0][0]
+
+            v_index = numpy.where(
+                nwp_forecast_table_xarray.coords[FIELD_DIM].values ==
+                U_WIND_NAME_TO_V_WIND_NAME[this_field_name]
+            )[0][0]
+
+            new_data_matrix[j, ..., u_index] = (
+                cosine_matrix * orig_data_matrix[j, ..., u_index] +
+                sine_matrix * orig_data_matrix[j, ..., v_index]
+            )
+
+            new_data_matrix[j, ..., v_index] = (
+                cosine_matrix * orig_data_matrix[j, ..., v_index] -
+                sine_matrix * orig_data_matrix[j, ..., u_index]
+            )
+
+    nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+        DATA_KEY: (
+            nwp_forecast_table_xarray[DATA_KEY].dims, new_data_matrix
         )
     })
 
