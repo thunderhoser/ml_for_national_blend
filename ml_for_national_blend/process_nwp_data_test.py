@@ -185,14 +185,14 @@ def _run(input_dir_name, model_name,
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )
-        if read_incremental_precip:
-            nwp_forecast_table_xarray = (
-                nwp_model_utils.precip_from_incremental_to_full_run(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    model_name=model_name,
-                    init_time_unix_sec=this_init_time_unix_sec
-                )
-            )
+        # if read_incremental_precip:
+        #     nwp_forecast_table_xarray = (
+        #         nwp_model_utils.precip_from_incremental_to_full_run(
+        #             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        #             model_name=model_name,
+        #             init_time_unix_sec=this_init_time_unix_sec
+        #         )
+        #     )
 
         nwp_forecast_table_xarray = nwp_model_utils.remove_negative_precip(
             nwp_forecast_table_xarray
