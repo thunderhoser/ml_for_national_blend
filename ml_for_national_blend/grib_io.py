@@ -138,7 +138,7 @@ def rotate_winds_in_grib_file(
         file_name=output_grib_file_name
     )
     error_checking.assert_file_exists(grid_definition_file_name)
-    error_checking.assert_file_exists(wgrib2_exe_name)
+    # error_checking.assert_file_exists(wgrib2_exe_name)
     error_checking.assert_is_boolean(raise_error_if_fails)
 
     assert file_name_to_type(input_grib_file_name) == GRIB2_FILE_TYPE
