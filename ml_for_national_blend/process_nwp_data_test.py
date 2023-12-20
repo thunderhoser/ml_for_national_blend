@@ -155,6 +155,8 @@ def _run(input_dir_name, model_name,
 
         if model_name == nwp_model_utils.NAM_MODEL_NAME:
             forecast_hours = numpy.array([51, 60], dtype=int)
+        elif model_name == nwp_model_utils.RAP_MODEL_NAME:
+            forecast_hours = numpy.array([1, 48], dtype=int)
         else:
             forecast_hours = numpy.array([1, 6], dtype=int)
 
