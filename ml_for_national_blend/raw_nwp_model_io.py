@@ -25,6 +25,7 @@ import grib_io
 import number_rounding
 import time_conversion
 import longitude_conversion as lng_conversion
+import file_system_utils
 import error_checking
 import nwp_model_utils
 
@@ -182,10 +183,11 @@ def file_name_to_forecast_hour(nwp_forecast_file_name):
     return forecast_hour
 
 
-def read_file(grib2_file_name, model_name,
-              desired_row_indices, desired_column_indices,
-              read_incremental_precip, wgrib2_exe_name, temporary_dir_name,
-              field_names=ALL_FIELD_NAMES):
+def read_file(
+        grib2_file_name, model_name,
+        desired_row_indices, desired_column_indices,
+        read_incremental_precip, wgrib2_exe_name, temporary_dir_name,
+        rotate_winds, field_names=ALL_FIELD_NAMES):
     """Reads NWP-forecast data from GRIB2 file into xarray table.
 
     :param grib2_file_name: Path to input file.
@@ -201,9 +203,11 @@ def read_file(grib2_file_name, model_name,
     :param wgrib2_exe_name: Path to wgrib2 executable.
     :param temporary_dir_name: Path to temporary directory for text files
         created by wgrib2.
+    :param rotate_winds: Boolean flag.  If True, will rotate winds from grid-
+        relative to Earth-relative.
     :param field_names: 1-D list with names of fields to read.
-    :return: nwp_forecast_table_xarray: xarray table with all data.  Metadata and
-        variable names should make this table self-explanatory.
+    :return: nwp_forecast_table_xarray: xarray table with all data.  Metadata
+        and variable names should make this table self-explanatory.
     """
 
     # Check input args.
@@ -242,6 +246,7 @@ def read_file(grib2_file_name, model_name,
     ]:
         read_incremental_precip = True
 
+    error_checking.assert_is_boolean(rotate_winds)
     error_checking.assert_is_string_list(field_names)
     for this_field_name in field_names:
         nwp_model_utils.check_field_name(this_field_name)
@@ -255,6 +260,32 @@ def read_file(grib2_file_name, model_name,
     data_matrix = numpy.full(
         (num_grid_rows, num_grid_columns, num_fields), numpy.nan
     )
+
+    if rotate_winds:
+        grid_definition_file_name = '{0:s}/grid_defn.pl'.format(
+            THIS_DIRECTORY_NAME
+        )
+        error_checking.assert_file_exists(grid_definition_file_name)
+
+        file_system_utils.mkdir_recursive_if_necessary(
+            directory_name=temporary_dir_name
+        )
+        new_grib2_file_name = '{0:s}/{1:s}'.format(
+            temporary_dir_name,
+            os.path.split(grib2_file_name)[1]
+        )
+        grib_io.rotate_winds_in_grib_file(
+            input_grib_file_name=grib2_file_name,
+            output_grib_file_name=new_grib2_file_name,
+            grid_definition_file_name=grid_definition_file_name,
+            wgrib2_exe_name=wgrib2_exe_name,
+            raise_error_if_fails=True
+        )
+
+        grib2_file_name_to_use = new_grib2_file_name
+    else:
+        new_grib2_file_name = None
+        grib2_file_name_to_use = grib2_file_name
 
     for f in range(num_fields):
         if field_names[f] in [nwp_model_utils.PRECIP_NAME]:
@@ -305,10 +336,10 @@ def read_file(grib2_file_name, model_name,
             grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
 
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
-            grib_search_string, grib2_file_name
+            grib_search_string, grib2_file_name_to_use
         ))
         this_data_matrix = grib_io.read_field_from_grib_file(
-            grib_file_name=grib2_file_name,
+            grib_file_name=grib2_file_name_to_use,
             field_name_grib1=grib_search_string,
             num_grid_rows=num_grid_rows,
             num_grid_columns=num_grid_columns,
@@ -327,7 +358,7 @@ def read_file(grib2_file_name, model_name,
                 'POTENTIAL ERROR: Cannot find line "{0:s}" in GRIB2 file: '
                 '"{1:s}"'
             ).format(
-                grib_search_string, grib2_file_name
+                grib_search_string, grib2_file_name_to_use
             )
 
             warnings.warn(warning_string)
@@ -346,6 +377,9 @@ def read_file(grib2_file_name, model_name,
         data_matrix[..., f] = (
             this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
         )
+
+    if rotate_winds:
+        os.remove(new_grib2_file_name)
 
     coord_dict = {
         nwp_model_utils.FORECAST_HOUR_DIM:

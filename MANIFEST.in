@@ -1,3 +1,4 @@
+include ml_for_national_blend/grid_defn.pl
 include ml_for_national_blend/wrf_arw_coords.nc
 include ml_for_national_blend/nam_coords.nc
 include ml_for_national_blend/nam_nest_coords.nc

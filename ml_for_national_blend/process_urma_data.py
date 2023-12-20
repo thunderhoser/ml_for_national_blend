@@ -148,6 +148,7 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
                 desired_column_indices=desired_column_indices,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
+                rotate_winds=True,
                 field_names=field_names
             )
             print(SEPARATOR_STRING)

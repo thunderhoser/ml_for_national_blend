@@ -152,7 +152,12 @@ def _run(input_dir_name, model_name,
         # forecast_hours = nwp_model_utils.model_to_forecast_hours(
         #     model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
         # )
-        forecast_hours = numpy.array([1, 6, 12], dtype=int)
+
+        if model_name == nwp_model_utils.NAM_MODEL_NAME:
+            forecast_hours = numpy.array([51, 60], dtype=int)
+        else:
+            forecast_hours = numpy.array([1, 6], dtype=int)
+
         num_forecast_hours = len(forecast_hours)
 
         input_file_names = [
@@ -177,6 +182,7 @@ def _run(input_dir_name, model_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 field_names=field_names,
+                rotate_winds=model_name != nwp_model_utils.RAP_MODEL_NAME,
                 read_incremental_precip=read_incremental_precip
             )
 
@@ -185,14 +191,14 @@ def _run(input_dir_name, model_name,
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )
-        # if read_incremental_precip:
-        #     nwp_forecast_table_xarray = (
-        #         nwp_model_utils.precip_from_incremental_to_full_run(
-        #             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        #             model_name=model_name,
-        #             init_time_unix_sec=this_init_time_unix_sec
-        #         )
-        #     )
+        if read_incremental_precip:
+            nwp_forecast_table_xarray = (
+                nwp_model_utils.precip_from_incremental_to_full_run(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    model_name=model_name,
+                    init_time_unix_sec=this_init_time_unix_sec
+                )
+            )
 
         nwp_forecast_table_xarray = nwp_model_utils.remove_negative_precip(
             nwp_forecast_table_xarray

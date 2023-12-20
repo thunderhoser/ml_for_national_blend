@@ -176,6 +176,7 @@ def _run(input_dir_name, model_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 field_names=field_names,
+                rotate_winds=model_name != nwp_model_utils.RAP_MODEL_NAME,
                 read_incremental_precip=read_incremental_precip
             )
 
