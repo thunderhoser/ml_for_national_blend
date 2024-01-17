@@ -40,9 +40,10 @@ NAM_MODEL_NAME = 'nam'
 NAM_NEST_MODEL_NAME = 'nam_nest'
 RAP_MODEL_NAME = 'rap'
 GFS_MODEL_NAME = 'gfs'
+HRRR_MODEL_NAME = 'gfs'
 ALL_MODEL_NAMES = [
     WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
-    GFS_MODEL_NAME
+    GFS_MODEL_NAME, HRRR_MODEL_NAME
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
@@ -192,7 +193,7 @@ def check_init_time(init_time_unix_sec, model_name):
     )
     hour_string = init_time_string.split('-')[-1]
 
-    if model_name == RAP_MODEL_NAME:
+    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME]:
         return
 
     if model_name == WRF_ARW_MODEL_NAME:
@@ -210,7 +211,7 @@ def model_to_init_time_interval(model_name):
     """
 
     check_model_name(model_name)
-    if model_name == RAP_MODEL_NAME:
+    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME]:
         return HOURS_TO_SECONDS
     if model_name == WRF_ARW_MODEL_NAME:
         return 12 * HOURS_TO_SECONDS
@@ -239,6 +240,17 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
 
         return numpy.linspace(1, 21, num=21, dtype=int)
 
+    if model_name == HRRR_MODEL_NAME:
+        init_time_string = time_conversion.unix_sec_to_string(
+            init_time_unix_sec, '%Y-%m-%d-%H'
+        )
+        init_hour_string = init_time_string.split('-')[-1]
+
+        if init_hour_string in ['00', '06', '12', '18']:
+            return numpy.linspace(1, 48, num=48, dtype=int)
+
+        return numpy.linspace(1, 18, num=18, dtype=int)
+
     if model_name == NAM_MODEL_NAME:
         return numpy.linspace(51, 84, num=12, dtype=int)
 
@@ -261,7 +273,7 @@ def model_to_maybe_missing_fields(model_name):
 
     check_model_name(model_name)
 
-    if model_name in [RAP_MODEL_NAME, GFS_MODEL_NAME]:
+    if model_name in [RAP_MODEL_NAME, GFS_MODEL_NAME, HRRR_MODEL_NAME]:
         return [
             MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
         ]
@@ -305,10 +317,17 @@ def concat_over_forecast_hours(nwp_forecast_tables_xarray):
     :return: nwp_forecast_table_xarray: Single xarray table with NWP forecasts.
     """
 
-    return xarray.concat(
-        nwp_forecast_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars=[DATA_KEY],
-        coords='minimal', compat='identical', join='exact'
-    )
+    try:
+        return xarray.concat(
+            nwp_forecast_tables_xarray, dim=FORECAST_HOUR_DIM,
+            data_vars=[DATA_KEY], coords='minimal', compat='identical',
+            join='exact'
+        )
+    except:
+        return xarray.concat(
+            nwp_forecast_tables_xarray, dim=FORECAST_HOUR_DIM,
+            data_vars=[DATA_KEY], coords='minimal', compat='identical'
+        )
 
 
 def subset_by_row(nwp_forecast_table_xarray, desired_row_indices):
@@ -613,7 +632,7 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
 
-    assert model_name != GFS_MODEL_NAME
+    assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME]
 
     forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
     num_forecast_hours = len(forecast_hours)
@@ -653,11 +672,16 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
                 data_matrix[addend_indices, ..., k], axis=0
             )
 
-    nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
-        DATA_KEY: (
-            nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+    try:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+            DATA_KEY: (
+                nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+            )
+        })
+    except:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign(
+            DATA_KEY=(nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix)
         )
-    })
 
     return nwp_forecast_table_xarray
 
@@ -700,11 +724,16 @@ def remove_negative_precip(nwp_forecast_table_xarray):
                 data_matrix[:(j + 1), ..., k], axis=0
             )
 
-    nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
-        DATA_KEY: (
-            nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+    try:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+            DATA_KEY: (
+                nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+            )
+        })
+    except:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign(
+            DATA_KEY=(nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix)
         )
-    })
 
     return nwp_forecast_table_xarray
 
@@ -752,10 +781,15 @@ def rotate_rap_winds_to_earth_relative(nwp_forecast_table_xarray):
                 sine_matrix * orig_data_matrix[j, ..., u_index]
             )
 
-    nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
-        DATA_KEY: (
-            nwp_forecast_table_xarray[DATA_KEY].dims, new_data_matrix
+    try:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+            DATA_KEY: (
+                nwp_forecast_table_xarray[DATA_KEY].dims, new_data_matrix
+            )
+        })
+    except:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign(
+            DATA_KEY=(nwp_forecast_table_xarray[DATA_KEY].dims, new_data_matrix)
         )
-    })
 
     return nwp_forecast_table_xarray

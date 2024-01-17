@@ -29,10 +29,6 @@ import file_system_utils
 import error_checking
 import nwp_model_utils
 
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-
 SENTINEL_VALUE = 9.999e20
 DAYS_TO_HOURS = 24
 
@@ -245,8 +241,12 @@ def read_file(
     error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
 
     error_checking.assert_is_boolean(read_incremental_precip)
-    if model_name == nwp_model_utils.GFS_MODEL_NAME:
+
+    if model_name in [
+            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.HRRR_MODEL_NAME
+    ]:
         read_incremental_precip = False
+
     if model_name in [
             nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
     ]:
@@ -326,7 +326,8 @@ def read_file(
                         model_name in [
                             nwp_model_utils.WRF_ARW_MODEL_NAME,
                             nwp_model_utils.RAP_MODEL_NAME,
-                            nwp_model_utils.GFS_MODEL_NAME
+                            nwp_model_utils.GFS_MODEL_NAME,
+                            nwp_model_utils.HRRR_MODEL_NAME
                         ] and
                         numpy.mod(forecast_hour, DAYS_TO_HOURS) == 0
                 ):
@@ -371,7 +372,10 @@ def read_file(
             warnings.warn(warning_string)
             continue
 
-        if model_name != nwp_model_utils.RAP_MODEL_NAME:
+        # TODO(thunderhoser): I hope this is right.
+        if model_name not in [
+                nwp_model_utils.RAP_MODEL_NAME, nwp_model_utils.GFS_MODEL_NAME
+        ]:
             orig_dimensions = this_data_matrix.shape
             this_data_matrix = numpy.reshape(
                 numpy.ravel(this_data_matrix), orig_dimensions, order='F'
