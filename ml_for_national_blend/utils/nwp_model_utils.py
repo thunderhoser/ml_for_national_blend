@@ -32,8 +32,10 @@ WRF_ARW_MODEL_NAME = 'wrf_arw'
 NAM_MODEL_NAME = 'nam'
 NAM_NEST_MODEL_NAME = 'nam_nest'
 RAP_MODEL_NAME = 'rap'
+GFS_MODEL_NAME = 'gfs'
 ALL_MODEL_NAMES = [
-    WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME
+    WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
+    GFS_MODEL_NAME
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
@@ -233,6 +235,12 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
     if model_name == NAM_MODEL_NAME:
         return numpy.linspace(51, 84, num=12, dtype=int)
 
+    if model_name == GFS_MODEL_NAME:
+        return numpy.concatenate([
+            numpy.linspace(1, 120, num=120, dtype=int),
+            numpy.linspace(123, 384, num=88, dtype=int)
+        ])
+
     return numpy.linspace(1, 48, num=48, dtype=int)
 
 
@@ -246,7 +254,7 @@ def model_to_maybe_missing_fields(model_name):
 
     check_model_name(model_name)
 
-    if model_name == RAP_MODEL_NAME:
+    if model_name in [RAP_MODEL_NAME, GFS_MODEL_NAME]:
         return [
             MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
         ]
@@ -597,6 +605,8 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
     :param init_time_unix_sec: Initialization time.
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
+
+    assert model_name != GFS_MODEL_NAME
 
     forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
     num_forecast_hours = len(forecast_hours)

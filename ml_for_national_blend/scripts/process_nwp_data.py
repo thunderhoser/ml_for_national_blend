@@ -160,6 +160,11 @@ def _run(input_dir_name, model_name,
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
+            this_rotate_flag = model_name not in [
+                nwp_model_utils.RAP_MODEL_NAME,
+                nwp_model_utils.GFS_MODEL_NAME
+            ]
+
             nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
                 grib2_file_name=input_file_names[k],
                 model_name=model_name,
@@ -168,7 +173,7 @@ def _run(input_dir_name, model_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 field_names=field_names,
-                rotate_winds=model_name != nwp_model_utils.RAP_MODEL_NAME,
+                rotate_winds=this_rotate_flag,
                 read_incremental_precip=read_incremental_precip
             )
 

@@ -238,6 +238,8 @@ def read_file(
     error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
 
     error_checking.assert_is_boolean(read_incremental_precip)
+    if model_name == nwp_model_utils.GFS_MODEL_NAME:
+        read_incremental_precip = False
     if model_name in [
             nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
     ]:
@@ -316,7 +318,8 @@ def read_file(
                 if (
                         model_name in [
                             nwp_model_utils.WRF_ARW_MODEL_NAME,
-                            nwp_model_utils.RAP_MODEL_NAME
+                            nwp_model_utils.RAP_MODEL_NAME,
+                            nwp_model_utils.GFS_MODEL_NAME
                         ] and
                         numpy.mod(forecast_hour, DAYS_TO_HOURS) == 0
                 ):
