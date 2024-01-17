@@ -341,7 +341,13 @@ def read_file(
                         forecast_hour
                     )
         else:
-            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
+            if (
+                    model_name == nwp_model_utils.HRRR_MODEL_NAME and
+                    field_names[f] == nwp_model_utils.MSL_PRESSURE_NAME
+            ):
+                grib_search_string = 'MSLMA:mean sea level'
+            else:
+                grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
 
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             grib_search_string, grib2_file_name_to_use
