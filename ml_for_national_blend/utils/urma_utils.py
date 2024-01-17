@@ -81,7 +81,13 @@ def concat_over_time(urma_tables_xarray):
     :return: urma_table_xarray: Single xarray table with URMA data.
     """
 
-    return xarray.concat(
-        urma_tables_xarray, dim=VALID_TIME_DIM, data_vars=[DATA_KEY],
-        coords='minimal', compat='identical', join='exact'
-    )
+    try:
+        return xarray.concat(
+            urma_tables_xarray, dim=VALID_TIME_DIM, data_vars=[DATA_KEY],
+            coords='minimal', compat='identical', join='exact'
+        )
+    except:
+        return xarray.concat(
+            urma_tables_xarray, dim=VALID_TIME_DIM, data_vars=[DATA_KEY],
+            coords='minimal', compat='identical'
+        )
