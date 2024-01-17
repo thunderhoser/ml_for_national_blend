@@ -155,6 +155,8 @@ def _run(input_dir_name, model_name,
 
         if model_name == nwp_model_utils.GFS_MODEL_NAME:
             forecast_hours = numpy.array([1, 6, 24], dtype=int)
+        elif model_name == nwp_model_utils.HRRR_MODEL_NAME:
+            forecast_hours = numpy.array([1, 6, 18], dtype=int)
 
         num_forecast_hours = len(forecast_hours)
 
