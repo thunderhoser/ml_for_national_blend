@@ -13,6 +13,8 @@ The output will contain the same data, in zarr format, with one file per model
 run (init time).
 """
 
+import os
+import shutil
 import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
@@ -21,6 +23,7 @@ from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import raw_nwp_model_io
 from ml_for_national_blend.utils import gfs_utils
 from ml_for_national_blend.utils import nwp_model_utils
+from ml_for_national_blend.utils import misc_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -37,6 +40,7 @@ START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
+TAR_OUTPUTS_ARG_NAME = 'tar_output_files'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -82,6 +86,7 @@ WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
 )
+TAR_OUTPUTS_HELP_STRING = 'Boolean flag.  If 1, will tar output files.'
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
     'zarr file per model run) by `nwp_model_io.write_file`, to exact locations '
@@ -129,6 +134,10 @@ INPUT_ARG_PARSER.add_argument(
     help=TEMPORARY_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TAR_OUTPUTS_ARG_NAME, type=int, required=False, default=0,
+    help=TAR_OUTPUTS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -138,7 +147,8 @@ def _run(input_dir_name, model_name,
          first_init_time_string, last_init_time_string,
          start_latitude_deg_n, end_latitude_deg_n,
          start_longitude_deg_e, end_longitude_deg_e,
-         wgrib2_exe_name, temporary_dir_name, output_dir_name):
+         wgrib2_exe_name, temporary_dir_name, tar_output_files,
+         output_dir_name):
     """Processes NWP data.
 
     This is effectively the main method.
@@ -153,6 +163,7 @@ def _run(input_dir_name, model_name,
     :param end_longitude_deg_e: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
+    :param tar_output_files: Same.
     :param output_dir_name: Same.
     """
 
@@ -292,6 +303,20 @@ def _run(input_dir_name, model_name,
         )
         print(SEPARATOR_STRING)
 
+        if not tar_output_files:
+            continue
+
+        output_file_name_tarred = '{0:s}.tar'.format(
+            os.path.splitext(output_file_name)[0]
+        )
+        print('Creating tar file: "{0:s}"...'.format(output_file_name_tarred))
+
+        misc_utils.create_tar_file(
+            source_paths_to_tar=[output_file_name],
+            tar_file_name=output_file_name_tarred
+        )
+        shutil.rmtree(output_file_name)
+
 
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
@@ -313,5 +338,6 @@ if __name__ == '__main__':
         end_longitude_deg_e=getattr(INPUT_ARG_OBJECT, END_LONGITUDE_ARG_NAME),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
+        tar_output_files=bool(getattr(INPUT_ARG_OBJECT, TAR_OUTPUTS_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
