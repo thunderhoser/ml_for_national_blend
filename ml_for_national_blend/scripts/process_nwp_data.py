@@ -19,6 +19,7 @@ from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import raw_nwp_model_io
+from ml_for_national_blend.utils import gfs_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -30,6 +31,10 @@ INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
 MODEL_ARG_NAME = 'model_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
+START_LATITUDE_ARG_NAME = 'start_latitude_deg_n'
+END_LATITUDE_ARG_NAME = 'end_latitude_deg_n'
+START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
+END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
@@ -46,11 +51,33 @@ MODEL_HELP_STRING = (
 FIRST_INIT_TIME_HELP_STRING = (
     'First init time (format "yyyy-mm-dd-HH").  This script will process model '
     'runs initialized at all times in the continuous period {0:s}...{1:s}.'
-).format(FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME)
-
+).format(
+    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
+)
 LAST_INIT_TIME_HELP_STRING = 'See documentation for {0:s}.'.format(
     FIRST_INIT_TIME_ARG_NAME
 )
+
+START_LATITUDE_HELP_STRING = (
+    'Start latitude.  This script will process all latitudes in the '
+    'contiguous domain {0:s}...{1:s}.'
+).format(
+    START_LATITUDE_ARG_NAME, END_LATITUDE_ARG_NAME
+)
+END_LATITUDE_HELP_STRING = 'Same as {0:s} but end latitude.'.format(
+    START_LATITUDE_ARG_NAME
+)
+START_LONGITUDE_HELP_STRING = (
+    'Start longitude.  This script will process all longitudes in the '
+    'contiguous domain {0:s}...{1:s}.  This domain may cross the International '
+    'Date Line.'
+).format(
+    START_LONGITUDE_ARG_NAME, END_LONGITUDE_ARG_NAME
+)
+END_LONGITUDE_HELP_STRING = 'Same as {0:s} but end longitude.'.format(
+    START_LONGITUDE_ARG_NAME
+)
+
 WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
@@ -78,6 +105,22 @@ INPUT_ARG_PARSER.add_argument(
     help=LAST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + START_LATITUDE_ARG_NAME, type=float, required=False, default=1001,
+    help=START_LATITUDE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + END_LATITUDE_ARG_NAME, type=float, required=False, default=1001,
+    help=END_LATITUDE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + START_LONGITUDE_ARG_NAME, type=float, required=False, default=1001,
+    help=START_LONGITUDE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + END_LONGITUDE_ARG_NAME, type=float, required=False, default=1001,
+    help=END_LONGITUDE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + WGRIB2_EXE_ARG_NAME, type=str, required=True,
     help=WGRIB2_EXE_HELP_STRING
 )
@@ -93,6 +136,8 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(input_dir_name, model_name,
          first_init_time_string, last_init_time_string,
+         start_latitude_deg_n, end_latitude_deg_n,
+         start_longitude_deg_e, end_longitude_deg_e,
          wgrib2_exe_name, temporary_dir_name, output_dir_name):
     """Processes NWP data.
 
@@ -102,10 +147,31 @@ def _run(input_dir_name, model_name,
     :param model_name: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
+    :param start_latitude_deg_n: Same.
+    :param end_latitude_deg_n: Same.
+    :param start_longitude_deg_e: Same.
+    :param end_longitude_deg_e: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
     :param output_dir_name: Same.
     """
+
+    if model_name != nwp_model_utils.GFS_MODEL_NAME:
+        start_latitude_deg_n = 1001.
+        end_latitude_deg_n = 1001.
+        start_longitude_deg_e = 1001.
+        end_longitude_deg_e = 1001.
+
+    these_coords = [
+        start_latitude_deg_n, end_latitude_deg_n,
+        start_longitude_deg_e, end_longitude_deg_e
+    ]
+
+    if any([c > 1000 for c in these_coords]):
+        start_latitude_deg_n = None
+        end_latitude_deg_n = None
+        start_longitude_deg_e = None
+        end_longitude_deg_e = None
 
     first_init_time_unix_sec = time_conversion.string_to_unix_sec(
         first_init_time_string, TIME_FORMAT
@@ -128,14 +194,24 @@ def _run(input_dir_name, model_name,
     num_grid_rows = latitude_matrix_deg_n.shape[0]
     num_grid_columns = latitude_matrix_deg_n.shape[1]
 
-    desired_row_indices = numpy.linspace(
-        0, num_grid_rows - 1, num=num_grid_rows, dtype=int
-    )
-    desired_column_indices = numpy.linspace(
-        0, num_grid_columns - 1, num=num_grid_columns, dtype=int
-    )
-    field_names = nwp_model_utils.ALL_FIELD_NAMES
+    if start_latitude_deg_n is None:
+        desired_row_indices = numpy.linspace(
+            0, num_grid_rows - 1, num=num_grid_rows, dtype=int
+        )
+        desired_column_indices = numpy.linspace(
+            0, num_grid_columns - 1, num=num_grid_columns, dtype=int
+        )
+    else:
+        desired_row_indices = gfs_utils.desired_latitudes_to_rows(
+            start_latitude_deg_n=start_latitude_deg_n,
+            end_latitude_deg_n=end_latitude_deg_n
+        )
+        desired_column_indices = gfs_utils.desired_longitudes_to_columns(
+            start_longitude_deg_e=start_longitude_deg_e,
+            end_longitude_deg_e=end_longitude_deg_e
+        )
 
+    field_names = nwp_model_utils.ALL_FIELD_NAMES
     read_incremental_precip = model_name in [
         nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
     ]
@@ -229,6 +305,12 @@ if __name__ == '__main__':
         last_init_time_string=getattr(
             INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
         ),
+        start_latitude_deg_n=getattr(INPUT_ARG_OBJECT, START_LATITUDE_ARG_NAME),
+        end_latitude_deg_n=getattr(INPUT_ARG_OBJECT, END_LATITUDE_ARG_NAME),
+        start_longitude_deg_e=getattr(
+            INPUT_ARG_OBJECT, START_LONGITUDE_ARG_NAME
+        ),
+        end_longitude_deg_e=getattr(INPUT_ARG_OBJECT, END_LONGITUDE_ARG_NAME),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
