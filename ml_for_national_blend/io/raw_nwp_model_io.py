@@ -352,8 +352,8 @@ def read_file(
         this_data_matrix = grib_io.read_field_from_grib_file(
             grib_file_name=grib2_file_name_to_use,
             field_name_grib1=grib_search_string,
-            num_grid_rows=num_grid_rows,
-            num_grid_columns=num_grid_columns,
+            num_grid_rows=latitude_matrix_deg_n.shape[0],
+            num_grid_columns=latitude_matrix_deg_n.shape[1],
             wgrib_exe_name=wgrib2_exe_name,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
@@ -415,8 +415,14 @@ def read_file(
 
     these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
     main_data_dict.update({
-        nwp_model_utils.LATITUDE_KEY: (these_dim, latitude_matrix_deg_n),
-        nwp_model_utils.LONGITUDE_KEY: (these_dim, longitude_matrix_deg_e)
+        nwp_model_utils.LATITUDE_KEY: (
+            these_dim,
+            latitude_matrix_deg_n[desired_row_indices, :][:, desired_column_indices]
+        ),
+        nwp_model_utils.LONGITUDE_KEY: (
+            these_dim,
+            longitude_matrix_deg_e[desired_row_indices, :][:, desired_column_indices]
+        )
     })
 
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
