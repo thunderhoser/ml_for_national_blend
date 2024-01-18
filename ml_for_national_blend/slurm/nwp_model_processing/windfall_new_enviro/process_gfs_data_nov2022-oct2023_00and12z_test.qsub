@@ -39,6 +39,10 @@ python3 -u "${CODE_DIR_NAME}/process_nwp_data.py" \
 --model_name="gfs" \
 --first_init_time_string="${init_time_string}" \
 --last_init_time_string="${init_time_string}" \
+--start_latitude_deg_n=10 \
+--end_latitude_deg_n=80 \
+--start_longitude_deg_e=160 \
+--end_longitude_deg_e=-55 \
 --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
 --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
 --output_zarr_dir_name="${OUTPUT_DIR_NAME}"
