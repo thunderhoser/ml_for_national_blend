@@ -13,6 +13,7 @@ The output will contain the same data, in NetCDF format, with one file per day.
 
 import os
 import sys
+import shutil
 import argparse
 import numpy
 
@@ -26,6 +27,7 @@ import time_periods
 import urma_io
 import raw_urma_io
 import urma_utils
+import misc_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -37,6 +39,7 @@ FIRST_DATE_ARG_NAME = 'first_valid_date_string'
 LAST_DATE_ARG_NAME = 'last_valid_date_string'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
+TAR_OUTPUTS_ARG_NAME = 'tar_output_files'
 OUTPUT_DIR_ARG_NAME = 'output_netcdf_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -56,6 +59,7 @@ WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
 )
+TAR_OUTPUTS_HELP_STRING = 'Boolean flag.  If 1, will tar output files.'
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
     'NetCDF file per day) by `urma_io.write_file`, to exact locations '
@@ -84,13 +88,18 @@ INPUT_ARG_PARSER.add_argument(
     help=TEMPORARY_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TAR_OUTPUTS_ARG_NAME, type=int, required=False, default=0,
+    help=TAR_OUTPUTS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
 
 
 def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
-         wgrib2_exe_name, temporary_dir_name, output_dir_name):
+         wgrib2_exe_name, temporary_dir_name, tar_output_files,
+         output_dir_name):
     """Processes NWP data.
 
     This is effectively the main method.
@@ -100,6 +109,7 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
     :param last_valid_date_string: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
+    :param tar_output_files: Same.
     :param output_dir_name: Same.
     """
 
@@ -168,6 +178,20 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
         )
         print(SEPARATOR_STRING)
 
+        if not tar_output_files:
+            continue
+
+        output_file_name_tarred = '{0:s}.tar'.format(
+            os.path.splitext(output_file_name)[0]
+        )
+        print('Creating tar file: "{0:s}"...'.format(output_file_name_tarred))
+
+        misc_utils.create_tar_file(
+            source_paths_to_tar=[output_file_name],
+            tar_file_name=output_file_name_tarred
+        )
+        shutil.rmtree(output_file_name)
+
 
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
@@ -182,5 +206,6 @@ if __name__ == '__main__':
         ),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
+        tar_output_files=bool(getattr(INPUT_ARG_OBJECT, TAR_OUTPUTS_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
