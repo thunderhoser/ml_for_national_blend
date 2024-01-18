@@ -238,6 +238,12 @@ def _run(input_dir_name, model_name,
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
         )
+
+        if model_name == nwp_model_utils.GFS_MODEL_NAME:
+            forecast_hours = numpy.array([1, 6, 24], dtype=int)
+        if model_name == nwp_model_utils.HRRR_MODEL_NAME:
+            forecast_hours = numpy.array([1, 6, 18], dtype=int)
+
         num_forecast_hours = len(forecast_hours)
 
         input_file_names = [

@@ -29,6 +29,10 @@ import file_system_utils
 import error_checking
 import nwp_model_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 SENTINEL_VALUE = 9.999e20
 DAYS_TO_HOURS = 24
 
