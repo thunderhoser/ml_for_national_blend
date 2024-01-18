@@ -420,11 +420,11 @@ def read_file(
     main_data_dict.update({
         nwp_model_utils.LATITUDE_KEY: (
             these_dim,
-            latitude_matrix_deg_n[desired_row_indices, desired_column_indices]
+            latitude_matrix_deg_n[desired_row_indices, :][:, desired_column_indices]
         ),
         nwp_model_utils.LONGITUDE_KEY: (
             these_dim,
-            longitude_matrix_deg_e[desired_row_indices, desired_column_indices]
+            longitude_matrix_deg_e[desired_row_indices, :][:, desired_column_indices]
         )
     })
 
