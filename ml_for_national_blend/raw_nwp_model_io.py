@@ -419,10 +419,12 @@ def read_file(
     these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
     main_data_dict.update({
         nwp_model_utils.LATITUDE_KEY: (
-            these_dim, latitude_matrix_deg_n[desired_row_indices, :]
+            these_dim,
+            latitude_matrix_deg_n[desired_row_indices, desired_column_indices]
         ),
         nwp_model_utils.LONGITUDE_KEY: (
-            these_dim, longitude_matrix_deg_e[:, desired_column_indices]
+            these_dim,
+            longitude_matrix_deg_e[desired_row_indices, desired_column_indices]
         )
     })
 

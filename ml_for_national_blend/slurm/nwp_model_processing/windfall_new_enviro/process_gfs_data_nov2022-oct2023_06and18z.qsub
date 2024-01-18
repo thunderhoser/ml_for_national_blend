@@ -45,4 +45,5 @@ python3 -u "${CODE_DIR_NAME}/process_nwp_data.py" \
 --end_longitude_deg_e=-55 \
 --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
 --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
+--tar_output_files=1 \
 --output_zarr_dir_name="${OUTPUT_DIR_NAME}"
