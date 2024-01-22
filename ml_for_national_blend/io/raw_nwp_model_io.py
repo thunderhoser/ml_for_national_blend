@@ -118,12 +118,20 @@ def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
         init_time_unix_sec, DATE_FORMAT
     )
 
-    nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:06d}'.format(
-        directory_name,
-        init_date_string,
-        init_time_string_julian,
-        forecast_hour
-    )
+    if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
+        nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:04d}'.format(
+            directory_name,
+            init_date_string,
+            init_time_string_julian,
+            forecast_hour
+        )
+    else:
+        nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:06d}'.format(
+            directory_name,
+            init_date_string,
+            init_time_string_julian,
+            forecast_hour
+        )
 
     if raise_error_if_missing and not os.path.isfile(nwp_forecast_file_name):
         error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(

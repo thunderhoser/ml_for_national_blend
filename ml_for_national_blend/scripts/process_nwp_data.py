@@ -22,6 +22,7 @@ from gewittergefahr.gg_utils import time_periods
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import raw_nwp_model_io
 from ml_for_national_blend.utils import gfs_utils
+from ml_for_national_blend.utils import gefs_utils
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import misc_utils
 
@@ -214,12 +215,21 @@ def _run(input_dir_name, model_name,
         desired_column_indices = numpy.linspace(
             0, num_grid_columns - 1, num=num_grid_columns, dtype=int
         )
-    else:
+    elif model_name == nwp_model_utils.GFS_MODEL_NAME:
         desired_row_indices = gfs_utils.desired_latitudes_to_rows(
             start_latitude_deg_n=start_latitude_deg_n,
             end_latitude_deg_n=end_latitude_deg_n
         )
         desired_column_indices = gfs_utils.desired_longitudes_to_columns(
+            start_longitude_deg_e=start_longitude_deg_e,
+            end_longitude_deg_e=end_longitude_deg_e
+        )
+    else:
+        desired_row_indices = gefs_utils.desired_latitudes_to_rows(
+            start_latitude_deg_n=start_latitude_deg_n,
+            end_latitude_deg_n=end_latitude_deg_n
+        )
+        desired_column_indices = gefs_utils.desired_longitudes_to_columns(
             start_longitude_deg_e=start_longitude_deg_e,
             end_longitude_deg_e=end_longitude_deg_e
         )
@@ -237,6 +247,8 @@ def _run(input_dir_name, model_name,
         num_forecast_hours = len(forecast_hours)
 
         # TODO(thunderhoser): For test scripts, shorten forecast-hour list here.
+        if model_name in [nwp_model_utils.GEFS_MODEL_NAME, nwp_model_utils.GRIDDED_LAMP_MODEL_NAME]:
+            forecast_hours = numpy.array([6, 24], dtype=int)
 
         input_file_names = [
             raw_nwp_model_io.find_file(
