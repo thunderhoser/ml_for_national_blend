@@ -167,7 +167,9 @@ def _run(input_dir_name, model_name,
     :param output_dir_name: Same.
     """
 
-    if model_name != nwp_model_utils.GFS_MODEL_NAME:
+    if model_name not in [
+            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.GEFS_MODEL_NAME
+    ]:
         start_latitude_deg_n = 1001.
         end_latitude_deg_n = 1001.
         start_longitude_deg_e = 1001.
@@ -224,7 +226,8 @@ def _run(input_dir_name, model_name,
 
     field_names = nwp_model_utils.ALL_FIELD_NAMES
     read_incremental_precip = model_name in [
-        nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
+        nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME,
+        nwp_model_utils.GEFS_MODEL_NAME
     ]
 
     for this_init_time_unix_sec in init_times_unix_sec:
@@ -232,6 +235,8 @@ def _run(input_dir_name, model_name,
             model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
         )
         num_forecast_hours = len(forecast_hours)
+
+        # TODO(thunderhoser): For test scripts, shorten forecast-hour list here.
 
         input_file_names = [
             raw_nwp_model_io.find_file(
@@ -249,7 +254,9 @@ def _run(input_dir_name, model_name,
         for k in range(num_forecast_hours):
             this_rotate_flag = model_name not in [
                 nwp_model_utils.RAP_MODEL_NAME,
-                nwp_model_utils.GFS_MODEL_NAME
+                nwp_model_utils.GFS_MODEL_NAME,
+                nwp_model_utils.GEFS_MODEL_NAME,
+                nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
             ]
 
             nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(

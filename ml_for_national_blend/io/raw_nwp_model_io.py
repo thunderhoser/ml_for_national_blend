@@ -240,12 +240,14 @@ def read_file(
     error_checking.assert_is_boolean(read_incremental_precip)
 
     if model_name in [
-            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.HRRR_MODEL_NAME
+            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.HRRR_MODEL_NAME,
+            nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
     ]:
         read_incremental_precip = False
 
     if model_name in [
-            nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME
+            nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME,
+            nwp_model_utils.GEFS_MODEL_NAME
     ]:
         read_incremental_precip = True
 
@@ -300,6 +302,26 @@ def read_file(
                     grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         forecast_hour - 1,
+                        forecast_hour
+                    )
+                elif model_name == nwp_model_utils.GEFS_MODEL_NAME:
+                    all_forecast_hours = nwp_model_utils.model_to_forecast_hours(
+                        model_name=model_name,
+                        init_time_unix_sec=file_name_to_init_time(
+                            nwp_forecast_file_name=grib2_file_name,
+                            model_name=model_name
+                        )
+                    )
+
+                    k = numpy.where(all_forecast_hours == forecast_hour)[0][0]
+                    if k == 0:
+                        prev_forecast_hour = 0
+                    else:
+                        prev_forecast_hour = all_forecast_hours[k - 1]
+
+                    grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
+                        prev_forecast_hour,
                         forecast_hour
                     )
                 elif model_name == nwp_model_utils.NAM_MODEL_NAME:
@@ -375,9 +397,10 @@ def read_file(
             warnings.warn(warning_string)
             continue
 
-        # TODO(thunderhoser): I hope this is right.
         if model_name not in [
-                nwp_model_utils.RAP_MODEL_NAME, nwp_model_utils.GFS_MODEL_NAME
+                nwp_model_utils.RAP_MODEL_NAME,
+                nwp_model_utils.GFS_MODEL_NAME,
+                nwp_model_utils.GEFS_MODEL_NAME
         ]:
             orig_dimensions = this_data_matrix.shape
             this_data_matrix = numpy.reshape(

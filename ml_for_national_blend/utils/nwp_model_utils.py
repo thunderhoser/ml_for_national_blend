@@ -34,9 +34,11 @@ NAM_NEST_MODEL_NAME = 'nam_nest'
 RAP_MODEL_NAME = 'rap'
 GFS_MODEL_NAME = 'gfs'
 HRRR_MODEL_NAME = 'hrrr'
+GEFS_MODEL_NAME = 'gefs'
+GRIDDED_LAMP_MODEL_NAME = 'gridded_lamp'
 ALL_MODEL_NAMES = [
     WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
-    GFS_MODEL_NAME, HRRR_MODEL_NAME
+    GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
@@ -46,6 +48,7 @@ DEWPOINT_2METRE_NAME = 'dewpoint_2m_agl_kelvins'
 RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'
 U_WIND_10METRE_NAME = 'u_wind_10m_agl_m_s01'
 V_WIND_10METRE_NAME = 'v_wind_10m_agl_m_s01'
+WIND_GUST_10METRE_NAME = 'wind_gust_10m_agl_m_s01'
 PRECIP_NAME = 'accumulated_precip_metres'
 HEIGHT_500MB_NAME = 'geopotential_height_500mb_m_asl'
 HEIGHT_700MB_NAME = 'geopotential_height_700mb_m_asl'
@@ -66,7 +69,8 @@ MAX_RELATIVE_HUMIDITY_2METRE_NAME = 'hourly_max_relative_humidity_2m_agl'
 ALL_FIELD_NAMES = [
     MSL_PRESSURE_NAME, SURFACE_PRESSURE_NAME, TEMPERATURE_2METRE_NAME,
     DEWPOINT_2METRE_NAME, RELATIVE_HUMIDITY_2METRE_NAME, U_WIND_10METRE_NAME,
-    V_WIND_10METRE_NAME, PRECIP_NAME, HEIGHT_500MB_NAME, HEIGHT_700MB_NAME,
+    V_WIND_10METRE_NAME, WIND_GUST_10METRE_NAME, PRECIP_NAME,
+    HEIGHT_500MB_NAME, HEIGHT_700MB_NAME,
     RELATIVE_HUMIDITY_500MB_NAME, RELATIVE_HUMIDITY_700MB_NAME,
     RELATIVE_HUMIDITY_850MB_NAME,
     U_WIND_500MB_NAME, U_WIND_700MB_NAME, U_WIND_1000MB_NAME,
@@ -186,7 +190,7 @@ def check_init_time(init_time_unix_sec, model_name):
     )
     hour_string = init_time_string.split('-')[-1]
 
-    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME]:
+    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return
 
     if model_name == WRF_ARW_MODEL_NAME:
@@ -204,7 +208,7 @@ def model_to_init_time_interval(model_name):
     """
 
     check_model_name(model_name)
-    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME]:
+    if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
     if model_name == WRF_ARW_MODEL_NAME:
         return 12 * HOURS_TO_SECONDS
@@ -247,10 +251,19 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
     if model_name == NAM_MODEL_NAME:
         return numpy.linspace(51, 84, num=12, dtype=int)
 
+    if model_name == GRIDDED_LAMP_MODEL_NAME:
+        return numpy.linspace(1, 25, num=25, dtype=int)
+
     if model_name == GFS_MODEL_NAME:
         return numpy.concatenate([
             numpy.linspace(1, 120, num=120, dtype=int),
             numpy.linspace(123, 384, num=88, dtype=int)
+        ])
+
+    if model_name == GEFS_MODEL_NAME:
+        return numpy.concatenate([
+            numpy.linspace(3, 240, num=80, dtype=int),
+            numpy.linspace(246, 384, num=24, dtype=int)
         ])
 
     return numpy.linspace(1, 48, num=48, dtype=int)
@@ -266,12 +279,29 @@ def model_to_maybe_missing_fields(model_name):
 
     check_model_name(model_name)
 
-    if model_name in [RAP_MODEL_NAME, GFS_MODEL_NAME, HRRR_MODEL_NAME]:
+    if model_name in [
+            RAP_MODEL_NAME, GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME
+    ]:
         return [
+            WIND_GUST_10METRE_NAME,
+            MIN_RELATIVE_HUMIDITY_2METRE_NAME,
+            MAX_RELATIVE_HUMIDITY_2METRE_NAME
+        ]
+
+    if model_name == GRIDDED_LAMP_MODEL_NAME:
+        return [
+            MSL_PRESSURE_NAME, SURFACE_PRESSURE_NAME,
+            RELATIVE_HUMIDITY_2METRE_NAME, PRECIP_NAME,
+            HEIGHT_500MB_NAME, HEIGHT_700MB_NAME,
+            RELATIVE_HUMIDITY_500MB_NAME, RELATIVE_HUMIDITY_700MB_NAME,
+            RELATIVE_HUMIDITY_850MB_NAME,
+            U_WIND_500MB_NAME, U_WIND_700MB_NAME, U_WIND_1000MB_NAME,
+            V_WIND_500MB_NAME, V_WIND_700MB_NAME, V_WIND_1000MB_NAME,
+            TEMPERATURE_850MB_NAME, TEMPERATURE_950MB_NAME,
             MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
         ]
 
-    return []
+    return [WIND_GUST_10METRE_NAME]
 
 
 def read_model_coords(netcdf_file_name=None, model_name=None):
@@ -641,7 +671,10 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
     data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
 
     for j in range(num_forecast_hours)[::-1]:
-        if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, RAP_MODEL_NAME]:
+        if model_name in [
+                WRF_ARW_MODEL_NAME, NAM_MODEL_NAME,
+                RAP_MODEL_NAME, GEFS_MODEL_NAME
+        ]:
             addend_indices = numpy.where(forecast_hours <= forecast_hours[j])[0]
         elif model_name == NAM_NEST_MODEL_NAME:
             addend_flags = numpy.logical_or(
