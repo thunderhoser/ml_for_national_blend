@@ -29,6 +29,7 @@ import time_periods
 import nwp_model_io
 import raw_nwp_model_io
 import gfs_utils
+import gefs_utils
 import nwp_model_utils
 import misc_utils
 
@@ -221,12 +222,21 @@ def _run(input_dir_name, model_name,
         desired_column_indices = numpy.linspace(
             0, num_grid_columns - 1, num=num_grid_columns, dtype=int
         )
-    else:
+    elif model_name == nwp_model_utils.GFS_MODEL_NAME:
         desired_row_indices = gfs_utils.desired_latitudes_to_rows(
             start_latitude_deg_n=start_latitude_deg_n,
             end_latitude_deg_n=end_latitude_deg_n
         )
         desired_column_indices = gfs_utils.desired_longitudes_to_columns(
+            start_longitude_deg_e=start_longitude_deg_e,
+            end_longitude_deg_e=end_longitude_deg_e
+        )
+    else:
+        desired_row_indices = gefs_utils.desired_latitudes_to_rows(
+            start_latitude_deg_n=start_latitude_deg_n,
+            end_latitude_deg_n=end_latitude_deg_n
+        )
+        desired_column_indices = gefs_utils.desired_longitudes_to_columns(
             start_longitude_deg_e=start_longitude_deg_e,
             end_longitude_deg_e=end_longitude_deg_e
         )
