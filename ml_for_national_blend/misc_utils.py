@@ -89,10 +89,13 @@ def speed_and_direction_to_uv(wind_speeds_m_s01, wind_directions_deg):
     :return: v_winds_m_s01: Equivalent-shape numpy array of v-components.
     """
 
-    error_checking.assert_is_geq_numpy_array(wind_speeds_m_s01, 0.)
+    error_checking.assert_is_geq_numpy_array(
+        wind_speeds_m_s01, 0., allow_nan=True
+    )
     error_checking.assert_is_numpy_array(
         wind_directions_deg,
-        exact_dimensions=numpy.array(wind_speeds_m_s01.shape))
+        exact_dimensions=numpy.array(wind_speeds_m_s01.shape, dtype=int)
+    )
 
     these_wind_directions_deg = wind_directions_deg + 0.
     these_wind_directions_deg[
