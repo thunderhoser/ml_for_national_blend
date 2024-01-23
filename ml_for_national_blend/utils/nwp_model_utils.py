@@ -671,14 +671,20 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
     data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
 
     for j in range(num_forecast_hours)[::-1]:
-        if model_name in [
-                WRF_ARW_MODEL_NAME, NAM_MODEL_NAME,
-                RAP_MODEL_NAME, GEFS_MODEL_NAME
-        ]:
+        if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, RAP_MODEL_NAME]:
             addend_indices = numpy.where(forecast_hours <= forecast_hours[j])[0]
         elif model_name == NAM_NEST_MODEL_NAME:
             addend_flags = numpy.logical_or(
                 numpy.mod(forecast_hours, 3) == 0,
+                forecast_hours == forecast_hours[j]
+            )
+            addend_flags = numpy.logical_and(
+                addend_flags, forecast_hours <= forecast_hours[j]
+            )
+            addend_indices = numpy.where(addend_flags)[0]
+        elif model_name == GEFS_MODEL_NAME:
+            addend_flags = numpy.logical_or(
+                numpy.mod(forecast_hours, 6) == 0,
                 forecast_hours == forecast_hours[j]
             )
             addend_flags = numpy.logical_and(

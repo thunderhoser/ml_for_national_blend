@@ -149,6 +149,65 @@ NAM_NEST_TABLE_XARRAY = xarray.Dataset(
     data_vars=MAIN_DATA_DICT, coords=COORD_DICT
 )
 
+INCREMENTAL_PRECIP_VALUES_GEFS = numpy.array([
+    0,
+    1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
+    1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
+    1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
+    3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4,
+    5, 6, 7, 8, 9,
+    5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6,
+    5, 6, 5, 6, 5, 6, 5, 6, 5, 6,
+    5, 6, 5, 6, 5, 6, 5, 6, 5, 6,
+    7, 8, 7, 8, 7, 8, 7, 8, 7, 8, 7, 8,
+    9, 10, 9, 10, 9, 10, 9, 10, 9, 10, 9, 10
+], dtype=float)
+
+ACCUMULATED_PRECIP_VALUES_GEFS = numpy.array([
+    0,
+    1, 3, 2, 4, 3, 5, 4, 6, 5, 7,
+    6, 8, 7, 9, 8, 10, 9, 11, 10, 12,
+    11, 13, 12, 14, 13, 15, 14, 16, 15, 17,
+    18, 22, 21, 25, 24, 28, 27, 31, 30, 34, 33, 37,
+    38, 44, 45, 53, 54,
+    59, 60, 65, 66, 71, 72, 77, 78, 83, 84, 89, 90,
+    95, 96, 101, 102, 107, 108, 113, 114, 119, 120,
+    125, 126, 131, 132, 137, 138, 143, 144, 149, 150,
+    157, 165, 172, 180, 187, 195, 202, 210, 217, 225, 232, 240,
+    249, 259, 268, 278, 287, 297, 306, 316, 325, 335, 344, 354
+], dtype=float)
+
+DATA_MATRIX = numpy.expand_dims(INCREMENTAL_PRECIP_VALUES_GEFS, axis=-1)
+DATA_MATRIX = numpy.expand_dims(DATA_MATRIX, axis=-1)
+DATA_MATRIX = numpy.expand_dims(DATA_MATRIX, axis=-1)
+
+COORD_DICT = {
+    nwp_model_utils.FORECAST_HOUR_DIM: nwp_model_utils.model_to_forecast_hours(
+        model_name=nwp_model_utils.GEFS_MODEL_NAME, init_time_unix_sec=0
+    ),
+    nwp_model_utils.ROW_DIM: numpy.array([0], dtype=int),
+    nwp_model_utils.COLUMN_DIM: numpy.array([0], dtype=int),
+    nwp_model_utils.FIELD_DIM: [nwp_model_utils.PRECIP_NAME]
+}
+
+THESE_DIM = (
+    nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
+    nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+)
+MAIN_DATA_DICT = {
+    nwp_model_utils.DATA_KEY: (THESE_DIM, DATA_MATRIX)
+}
+
+THESE_DIM = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
+MAIN_DATA_DICT.update({
+    nwp_model_utils.LATITUDE_KEY: (THESE_DIM, numpy.array([[40.02]])),
+    nwp_model_utils.LONGITUDE_KEY: (THESE_DIM, numpy.array([[254.75]]))
+})
+
+GEFS_TABLE_XARRAY = xarray.Dataset(
+    data_vars=MAIN_DATA_DICT, coords=COORD_DICT
+)
+
 # The following constants are used to test remove_negative_precip.
 ACCUMULATED_PRECIP_VALUES_WRF_ARW_WITH_NEG = numpy.array([
     numpy.nan,
@@ -271,6 +330,29 @@ class NwpModelUtilsTests(unittest.TestCase):
 
         self.assertTrue(numpy.allclose(
             these_precip_values, ACCUMULATED_PRECIP_VALUES_NAM_NEST,
+            atol=TOLERANCE
+        ))
+
+    def test_precip_from_incremental_to_full_run_gefs(self):
+        """Ensures correct output from precip_from_incremental_to_full_run.
+
+        In this case, assuming the model is GEFS.
+        """
+
+        new_forecast_table_xarray = (
+            nwp_model_utils.precip_from_incremental_to_full_run(
+                nwp_forecast_table_xarray=GEFS_TABLE_XARRAY,
+                model_name=nwp_model_utils.GEFS_MODEL_NAME,
+                init_time_unix_sec=0
+            )
+        )
+
+        these_precip_values = new_forecast_table_xarray[
+            nwp_model_utils.DATA_KEY
+        ].values[..., 0, 0, 0]
+
+        self.assertTrue(numpy.allclose(
+            these_precip_values, ACCUMULATED_PRECIP_VALUES_GEFS,
             atol=TOLERANCE
         ))
 
