@@ -75,6 +75,7 @@ FIELD_NAME_TO_CONV_FACTOR = {
     nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME: 0.01,
     nwp_model_utils.U_WIND_10METRE_NAME: 1.,
     nwp_model_utils.V_WIND_10METRE_NAME: 1.,
+    nwp_model_utils.WIND_GUST_10METRE_NAME: 1.,
     nwp_model_utils.PRECIP_NAME: 0.001,
     nwp_model_utils.HEIGHT_500MB_NAME: 1.,
     nwp_model_utils.HEIGHT_700MB_NAME: 1.,
@@ -422,23 +423,11 @@ def read_file(
                         forecast_hour
                     )
                 elif model_name == nwp_model_utils.GEFS_MODEL_NAME:
-                    all_forecast_hours = nwp_model_utils.model_to_forecast_hours(
-                        model_name=model_name,
-                        init_time_unix_sec=file_name_to_init_time(
-                            nwp_forecast_file_name=grib2_file_name,
-                            model_name=model_name
-                        )
-                    )
-
-                    k = numpy.where(all_forecast_hours == forecast_hour)[0][0]
-                    if k == 0:
-                        prev_forecast_hour = 0
-                    else:
-                        prev_forecast_hour = all_forecast_hours[k - 1]
-
                     grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
-                        prev_forecast_hour,
+                        int(number_rounding.floor_to_nearest(
+                            forecast_hour - 3, 6
+                        )),
                         forecast_hour
                     )
                 elif model_name == nwp_model_utils.NAM_MODEL_NAME:
