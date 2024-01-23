@@ -247,8 +247,6 @@ def _run(input_dir_name, model_name,
         nwp_model_utils.GEFS_MODEL_NAME
     ]
 
-    field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
-    field_names = set(field_names)
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
         field_names = [
             nwp_model_utils.TEMPERATURE_2METRE_NAME,
@@ -258,7 +256,10 @@ def _run(input_dir_name, model_name,
             nwp_model_utils.V_WIND_10METRE_NAME
         ]
     else:
+        field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
+        field_names = set(field_names)
         field_names.remove(nwp_model_utils.WIND_GUST_10METRE_NAME)
+        field_names = list(field_names)
 
     for this_init_time_unix_sec in init_times_unix_sec:
         forecast_hours = nwp_model_utils.model_to_forecast_hours(

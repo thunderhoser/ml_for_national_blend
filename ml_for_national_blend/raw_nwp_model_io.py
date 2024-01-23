@@ -125,12 +125,15 @@ def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
     )
 
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
-        fake_init_year = int(init_date_string[:4]) + 1
-        fake_init_date_string = '{0:04d}{1:s}'.format(
-            fake_init_year, init_date_string[4:]
+        init_time_string = time_conversion.unix_sec_to_string(
+            init_time_unix_sec, '%Y-%m-%d-%H'
+        )
+        fake_init_year = int(init_time_string[:4]) + 1
+        fake_init_time_string = '{0:04d}{1:s}'.format(
+            fake_init_year, init_time_string[4:]
         )
         fake_init_time_unix_sec = time_conversion.string_to_unix_sec(
-            fake_init_date_string, DATE_FORMAT
+            fake_init_time_string, '%Y-%m-%d-%H'
         )
         fake_init_time_string_julian = time_conversion.unix_sec_to_string(
             fake_init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
@@ -171,8 +174,31 @@ def file_name_to_init_time(nwp_forecast_file_name, model_name):
     """
 
     error_checking.assert_is_string(nwp_forecast_file_name)
-
     pathless_file_name = os.path.split(nwp_forecast_file_name)[1]
+
+    if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
+        assert len(pathless_file_name) == 11
+
+        fake_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            pathless_file_name[:7], INIT_TIME_FORMAT_JULIAN
+        )
+        fake_init_time_string = time_conversion.unix_sec_to_string(
+            fake_init_time_unix_sec, '%Y-%m-%d-%H'
+        )
+        fake_init_year = int(fake_init_time_string[:4])
+
+        init_time_string = '{0:04d}{1:s}'.format(
+            fake_init_year - 1, fake_init_time_string[4:]
+        )
+        init_time_unix_sec = time_conversion.string_to_unix_sec(
+            init_time_string, '%Y-%m-%d-%H'
+        )
+
+        nwp_model_utils.check_init_time(
+            init_time_unix_sec=init_time_unix_sec, model_name=model_name
+        )
+        return init_time_unix_sec
+
     assert len(pathless_file_name) == 13
 
     init_time_unix_sec = time_conversion.string_to_unix_sec(
@@ -181,7 +207,6 @@ def file_name_to_init_time(nwp_forecast_file_name, model_name):
     nwp_model_utils.check_init_time(
         init_time_unix_sec=init_time_unix_sec, model_name=model_name
     )
-
     return init_time_unix_sec
 
 
@@ -197,11 +222,11 @@ def file_name_to_forecast_hour(nwp_forecast_file_name):
     # already verify init times.
 
     error_checking.assert_is_string(nwp_forecast_file_name)
-
     pathless_file_name = os.path.split(nwp_forecast_file_name)[1]
-    assert len(pathless_file_name) == 13
 
-    forecast_hour = int(pathless_file_name[-6:])
+    assert len(pathless_file_name) in [11, 13]
+
+    forecast_hour = int(pathless_file_name[-4:])
     error_checking.assert_is_integer(forecast_hour)
     error_checking.assert_is_greater(forecast_hour, 0)
 
