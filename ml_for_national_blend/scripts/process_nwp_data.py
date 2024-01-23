@@ -261,8 +261,10 @@ def _run(input_dir_name, model_name,
         num_forecast_hours = len(forecast_hours)
 
         # TODO(thunderhoser): For test scripts, shorten forecast-hour list here.
-        if model_name in [nwp_model_utils.GEFS_MODEL_NAME, nwp_model_utils.GRIDDED_LAMP_MODEL_NAME]:
-            forecast_hours = numpy.array([6, 24], dtype=int)
+        # if model_name in [nwp_model_utils.GEFS_MODEL_NAME, nwp_model_utils.GRIDDED_LAMP_MODEL_NAME]:
+        #     forecast_hours = numpy.array([6, 24], dtype=int)
+        #     num_forecast_hours = len(forecast_hours)
+        #     read_incremental_precip = False
 
         input_file_names = [
             raw_nwp_model_io.find_file(
