@@ -1,8 +1,12 @@
 """Miscellaneous helper methods."""
 
 import os
+import numpy
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
+
+DEGREES_TO_RADIANS = numpy.pi / 180
+WIND_DIR_DEFAULT_DEG = 0.
 
 
 def untar_file(tar_file_name, target_dir_name, relative_paths_to_untar=None):
@@ -65,3 +69,34 @@ def create_tar_file(source_paths_to_tar, tar_file_name):
             '\nUnix command failed (log messages shown above should explain '
             'why).'
         )
+
+
+def speed_and_direction_to_uv(wind_speeds_m_s01, wind_directions_deg):
+    """Converts wind vectors from speed and direction to u- and v-components.
+
+    :param wind_speeds_m_s01: numpy array of wind speeds (metres per second).
+    :param wind_directions_deg: Equivalent-shape numpy array of wind
+        directions (direction of origin, as per meteorological convention).
+    :return: u_winds_m_s01: Equivalent-shape numpy array of u-components (metres
+        per second).
+    :return: v_winds_m_s01: Equivalent-shape numpy array of v-components.
+    """
+
+    error_checking.assert_is_geq_numpy_array(wind_speeds_m_s01, 0.)
+    error_checking.assert_is_numpy_array(
+        wind_directions_deg,
+        exact_dimensions=numpy.array(wind_speeds_m_s01.shape))
+
+    these_wind_directions_deg = wind_directions_deg + 0.
+    these_wind_directions_deg[
+        numpy.isnan(these_wind_directions_deg)
+    ] = WIND_DIR_DEFAULT_DEG
+
+    u_winds_m_s01 = -1 * wind_speeds_m_s01 * numpy.sin(
+        these_wind_directions_deg * DEGREES_TO_RADIANS
+    )
+    v_winds_m_s01 = -1 * wind_speeds_m_s01 * numpy.cos(
+        these_wind_directions_deg * DEGREES_TO_RADIANS
+    )
+
+    return u_winds_m_s01, v_winds_m_s01

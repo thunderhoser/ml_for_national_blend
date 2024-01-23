@@ -14,6 +14,7 @@ run (init time).
 """
 
 import os
+import copy
 import shutil
 import argparse
 import numpy
@@ -234,11 +235,23 @@ def _run(input_dir_name, model_name,
             end_longitude_deg_e=end_longitude_deg_e
         )
 
-    field_names = nwp_model_utils.ALL_FIELD_NAMES
     read_incremental_precip = model_name in [
         nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME,
         nwp_model_utils.GEFS_MODEL_NAME
     ]
+
+    field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
+    field_names = set(field_names)
+    if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
+        field_names = [
+            nwp_model_utils.TEMPERATURE_2METRE_NAME,
+            nwp_model_utils.DEWPOINT_2METRE_NAME,
+            nwp_model_utils.WIND_GUST_10METRE_NAME,
+            nwp_model_utils.U_WIND_10METRE_NAME,
+            nwp_model_utils.V_WIND_10METRE_NAME
+        ]
+    else:
+        field_names.remove(nwp_model_utils.WIND_GUST_10METRE_NAME)
 
     for this_init_time_unix_sec in init_times_unix_sec:
         forecast_hours = nwp_model_utils.model_to_forecast_hours(

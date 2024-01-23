@@ -20,6 +20,7 @@ from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -40,6 +41,7 @@ FIELD_NAME_TO_GRIB_NAME = {
     nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME: 'RH:2 m above ground',
     nwp_model_utils.U_WIND_10METRE_NAME: 'UGRD:10 m above ground',
     nwp_model_utils.V_WIND_10METRE_NAME: 'VGRD:10 m above ground',
+    nwp_model_utils.WIND_GUST_10METRE_NAME: 'GUST:10 m above ground',
     nwp_model_utils.PRECIP_NAME: 'APCP:surface',
     nwp_model_utils.HEIGHT_500MB_NAME: 'HGT:500 mb',
     nwp_model_utils.HEIGHT_700MB_NAME: 'HGT:700 mb',
@@ -111,21 +113,32 @@ def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
     error_checking.assert_is_greater(forecast_hour, 0)
     error_checking.assert_is_boolean(raise_error_if_missing)
 
-    init_time_string_julian = time_conversion.unix_sec_to_string(
-        init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
-    )
     init_date_string = time_conversion.unix_sec_to_string(
         init_time_unix_sec, DATE_FORMAT
     )
 
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
+        fake_init_year = int(init_date_string[:4]) + 1
+        fake_init_date_string = '{0:04d}{1:s}'.format(
+            fake_init_year, init_date_string[4:]
+        )
+        fake_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            fake_init_date_string, DATE_FORMAT
+        )
+        fake_init_time_string_julian = time_conversion.unix_sec_to_string(
+            fake_init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
+        )
+
         nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:04d}'.format(
             directory_name,
             init_date_string,
-            init_time_string_julian,
+            fake_init_time_string_julian,
             forecast_hour
         )
     else:
+        init_time_string_julian = time_conversion.unix_sec_to_string(
+            init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
+        )
         nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:06d}'.format(
             directory_name,
             init_date_string,
@@ -301,6 +314,70 @@ def read_file(
         grib2_file_name_to_use = grib2_file_name
 
     for f in range(num_fields):
+        wind_10m_names = [
+            nwp_model_utils.U_WIND_10METRE_NAME,
+            nwp_model_utils.V_WIND_10METRE_NAME
+        ]
+
+        if (
+                model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME and
+                field_names[f] in wind_10m_names
+        ):
+            grib_search_string = 'WIND:10 m above ground'
+            print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
+                grib_search_string, grib2_file_name_to_use
+            ))
+            speed_matrix_m_s01 = grib_io.read_field_from_grib_file(
+                grib_file_name=grib2_file_name_to_use,
+                field_name_grib1=grib_search_string,
+                num_grid_rows=latitude_matrix_deg_n.shape[0],
+                num_grid_columns=latitude_matrix_deg_n.shape[1],
+                wgrib_exe_name=wgrib2_exe_name,
+                wgrib2_exe_name=wgrib2_exe_name,
+                temporary_dir_name=temporary_dir_name,
+                sentinel_value=SENTINEL_VALUE,
+                raise_error_if_fails=True
+            )
+
+            grib_search_string = 'WDIR:10 m above ground'
+            print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
+                grib_search_string, grib2_file_name_to_use
+            ))
+            direction_matrix_deg = grib_io.read_field_from_grib_file(
+                grib_file_name=grib2_file_name_to_use,
+                field_name_grib1=grib_search_string,
+                num_grid_rows=latitude_matrix_deg_n.shape[0],
+                num_grid_columns=latitude_matrix_deg_n.shape[1],
+                wgrib_exe_name=wgrib2_exe_name,
+                wgrib2_exe_name=wgrib2_exe_name,
+                temporary_dir_name=temporary_dir_name,
+                sentinel_value=SENTINEL_VALUE,
+                raise_error_if_fails=True
+            )
+
+            if field_names[f] == nwp_model_utils.U_WIND_10METRE_NAME:
+                this_data_matrix = misc_utils.speed_and_direction_to_uv(
+                    wind_speeds_m_s01=speed_matrix_m_s01,
+                    wind_directions_deg=direction_matrix_deg
+                )[0]
+            else:
+                this_data_matrix = misc_utils.speed_and_direction_to_uv(
+                    wind_speeds_m_s01=speed_matrix_m_s01,
+                    wind_directions_deg=direction_matrix_deg
+                )[1]
+
+            orig_dimensions = this_data_matrix.shape
+            this_data_matrix = numpy.reshape(
+                numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+            )
+
+            this_data_matrix = this_data_matrix[desired_row_indices, :]
+            this_data_matrix = this_data_matrix[:, desired_column_indices]
+            # assert not numpy.any(numpy.isnan(this_data_matrix))
+
+            data_matrix[..., f] = this_data_matrix + 0.
+            continue
+
         if field_names[f] in [nwp_model_utils.PRECIP_NAME]:
             if read_incremental_precip:
                 if model_name in [
@@ -367,14 +444,13 @@ def read_file(
                         FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         forecast_hour
                     )
+        elif (
+                model_name == nwp_model_utils.HRRR_MODEL_NAME and
+                field_names[f] == nwp_model_utils.MSL_PRESSURE_NAME
+        ):
+            grib_search_string = 'MSLMA:mean sea level'
         else:
-            if (
-                    model_name == nwp_model_utils.HRRR_MODEL_NAME and
-                    field_names[f] == nwp_model_utils.MSL_PRESSURE_NAME
-            ):
-                grib_search_string = 'MSLMA:mean sea level'
-            else:
-                grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
+            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
 
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             grib_search_string, grib2_file_name_to_use
