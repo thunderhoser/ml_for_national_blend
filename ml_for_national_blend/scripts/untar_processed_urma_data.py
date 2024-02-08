@@ -90,7 +90,7 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
         print('Untarring file to (hopefully): "{0:s}"...'.format(
             zarr_file_name
         ))
-        misc_utils.untar_file(
+        misc_utils.untar_zarr_or_netcdf_file(
             tar_file_name=tar_file_name,
             target_dir_name=output_dir_name
         )
