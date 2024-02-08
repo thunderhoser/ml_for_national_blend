@@ -49,6 +49,46 @@ def untar_file(tar_file_name, target_dir_name, relative_paths_to_untar=None):
         )
 
 
+def untar_zarr_or_netcdf_file(tar_file_name, target_dir_name):
+    """Untars zarr or NetCDF file, getting rid of subdirectories in tar.
+
+    :param tar_file_name: Path to tar file.
+    :param target_dir_name: Path to output directory.
+    :raises: ValueError: if the Unix command fails.
+    """
+
+    error_checking.assert_file_exists(tar_file_name)
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=target_dir_name
+    )
+
+    command_string = 'tar -tvf "{0:s}"'.format(tar_file_name)
+    tar_contents_string = os.popen(command_string).read()
+    last_line = tar_contents_string.splitlines()[-1]
+    last_path_in_tar_file = last_line.split()[-1]
+
+    zarr_subdir_flags = numpy.array([
+        s.endswith('.zarr') or s.endswith('.nc') or s.endswith('.netcdf')
+        for s in last_path_in_tar_file.split('/')
+    ], dtype=bool)
+
+    zarr_subdir_index = numpy.where(zarr_subdir_flags)[0][0]
+
+    command_string = 'tar -C "{0:s}" -xvf "{1:s}"'.format(
+        target_dir_name, tar_file_name
+    )
+
+    if zarr_subdir_index > 0:
+        command_string += ' --strip={0:d}'.format(zarr_subdir_index)
+
+    exit_code = os.system(command_string)
+    if exit_code != 0:
+        raise ValueError(
+            '\nUnix command failed (log messages shown above should explain '
+            'why).'
+        )
+
+
 def create_tar_file(source_paths_to_tar, tar_file_name):
     """Creates a tar file.
 
