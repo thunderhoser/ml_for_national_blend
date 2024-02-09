@@ -2,8 +2,8 @@
 
 import os
 import sys
-import time
 import numpy
+import xarray
 import pyproj
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 
@@ -14,6 +14,9 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
+
 NBM_PROJECTION_OBJECT = pyproj.Proj(
     proj='lcc', lat_1=25., lat_2=25., lon_0=265.,
     R=6371200., ellps='sphere',
@@ -22,6 +25,30 @@ NBM_PROJECTION_OBJECT = pyproj.Proj(
 
 NBM_X_COORDS_METRES = numpy.linspace(0, 5.95306383e+06, num=2345, dtype=float)
 NBM_Y_COORDS_METRES = numpy.linspace(0, 4.05336599e+06, num=1597, dtype=float)
+
+
+def read_coords(netcdf_file_name=None):
+    """Reads NBM lat-long coordinates from NetCDF file.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param netcdf_file_name: Path to NetCDF file.
+    :return: latitude_matrix_deg_n: M-by-N numpy array of latitudes (deg north).
+    :return: longitude_matrix_deg_e: M-by-N numpy array of longitudes (deg
+        east).
+    """
+
+    if netcdf_file_name is None:
+        netcdf_file_name = '{0:s}/nbm_coords.nc'.format(THIS_DIRECTORY_NAME)
+
+    error_checking.assert_file_exists(netcdf_file_name)
+    coord_table_xarray = xarray.open_dataset(netcdf_file_name)
+
+    return (
+        coord_table_xarray[LATITUDE_KEY].values,
+        coord_table_xarray[LONGITUDE_KEY].values
+    )
 
 
 def project_latlng_to_xy(latitudes_deg_n, longitudes_deg_e):
@@ -132,6 +159,10 @@ def interp_data_to_nbm_grid(
         (x_coord_matrix.size, data_matrix.shape[-1])
     )
 
+    linear_interp_object = LinearNDInterpolator(
+        points=point_matrix, values=value_matrix, fill_value=numpy.nan
+    )
+
     if test_mode:
         new_x_matrix, new_y_matrix = numpy.meshgrid(new_x_coords, new_y_coords)
     else:
@@ -139,24 +170,11 @@ def interp_data_to_nbm_grid(
             NBM_X_COORDS_METRES, NBM_Y_COORDS_METRES
         )
 
-    start_time_unix_sec = time.time()
-    linear_interp_object = LinearNDInterpolator(
-        points=point_matrix, values=value_matrix, fill_value=numpy.nan
-    )
     interp_data_matrix = linear_interp_object(new_y_matrix, new_x_matrix)
-    print('Elapsed time for linear interp = {0:.1f} s'.format(
-        time.time() - start_time_unix_sec
-    ))
-
     if not use_nearest_neigh:
         return interp_data_matrix
 
-    start_time_unix_sec = time.time()
     nn_interp_object = NearestNDInterpolator(x=point_matrix, y=value_matrix)
     nn_interp_data_matrix = nn_interp_object(new_y_matrix, new_x_matrix)
-    print('Elapsed time for NN interp = {0:.1f} s'.format(
-        time.time() - start_time_unix_sec
-    ))
-
     nn_interp_data_matrix[numpy.isnan(interp_data_matrix)] = numpy.nan
     return nn_interp_data_matrix
