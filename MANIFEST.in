@@ -8,3 +8,4 @@ include ml_for_national_blend/utils/hrrr_coords.nc
 include ml_for_national_blend/utils/gefs_coords.nc
 include ml_for_national_blend/utils/gridded_lamp_coords.nc
 include ml_for_national_blend/utils/urma_coords.nc
+include ml_for_national_blend/utils/nbm_coords.nc

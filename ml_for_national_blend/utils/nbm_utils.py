@@ -1,9 +1,18 @@
 """Helper methods for National Blend of Models (NBM)."""
 
+import os
 import numpy
+import xarray
 import pyproj
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 from gewittergefahr.gg_utils import error_checking
+
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
 
 NBM_PROJECTION_OBJECT = pyproj.Proj(
     proj='lcc', lat_1=25., lat_2=25., lon_0=265.,
@@ -13,6 +22,30 @@ NBM_PROJECTION_OBJECT = pyproj.Proj(
 
 NBM_X_COORDS_METRES = numpy.linspace(0, 5.95306383e+06, num=2345, dtype=float)
 NBM_Y_COORDS_METRES = numpy.linspace(0, 4.05336599e+06, num=1597, dtype=float)
+
+
+def read_coords(netcdf_file_name=None):
+    """Reads NBM lat-long coordinates from NetCDF file.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param netcdf_file_name: Path to NetCDF file.
+    :return: latitude_matrix_deg_n: M-by-N numpy array of latitudes (deg north).
+    :return: longitude_matrix_deg_e: M-by-N numpy array of longitudes (deg
+        east).
+    """
+
+    if netcdf_file_name is None:
+        netcdf_file_name = '{0:s}/nbm_coords.nc'.format(THIS_DIRECTORY_NAME)
+
+    error_checking.assert_file_exists(netcdf_file_name)
+    coord_table_xarray = xarray.open_dataset(netcdf_file_name)
+
+    return (
+        coord_table_xarray[LATITUDE_KEY].values,
+        coord_table_xarray[LONGITUDE_KEY].values
+    )
 
 
 def project_latlng_to_xy(latitudes_deg_n, longitudes_deg_e):

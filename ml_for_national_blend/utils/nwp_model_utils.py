@@ -1,13 +1,16 @@
 """Helper methods for output from any NWP model."""
 
 import os
+import time
 import warnings
 import numpy
 import xarray
-from scipy.interpolate import interp1d
+import pyproj
+from scipy.interpolate import interp1d, RegularGridInterpolator
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.utils import nbm_utils
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -304,6 +307,82 @@ def model_to_maybe_missing_fields(model_name):
     return [WIND_GUST_10METRE_NAME]
 
 
+def model_to_projection(model_name):
+    """Returns geographic projection for the given model.
+
+    :param model_name: Name of model.
+    :return: proj_object: Instance of `pyproj.Proj`.
+    """
+
+    check_model_name(model_name)
+
+    if model_name == HRRR_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=38.5, lat_2=38.5, lat_0=38.5, lon_0=262.5,
+            R=6371229., ellps='sphere',
+            x_0=2697573.22353293, y_0=1587306.06944136
+        )
+
+    if model_name == WRF_ARW_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=25., lat_2=25., lat_0=25., lon_0=265.,
+            R=6371229., ellps='sphere',
+            x_0=4226106.99691547, y_0=832698.26101756
+        )
+
+    if model_name == NAM_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=25., lat_2=25., lat_0=25., lon_0=265.,
+            R=6371229., ellps='sphere',
+            x_0=4226106.99691547, y_0=832698.26101756
+        )
+
+    if model_name == NAM_NEST_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=38.5, lat_2=38.5, lat_0=38.5, lon_0=262.5,
+            R=6371229., ellps='sphere',
+            x_0=2697573.22353293, y_0=1587306.06944136
+        )
+
+    if model_name == RAP_MODEL_NAME:
+        return pyproj.Proj(
+            '+proj=ob_tran +o_proj=eqc +o_lon_p=180 +o_lat_p=144 +lon_0=74 '
+            '+R=6371229 +x_0=6448701.88 +y_0=5642620.27'
+        )
+
+    if model_name == GRIDDED_LAMP_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=25., lat_2=25., lat_0=25., lon_0=265.,
+            R=6371229., ellps='sphere',
+            x_0=2763216.95215798, y_0=263790.58033545
+        )
+
+    return None  # Lat-long projection
+
+
+def model_to_nbm_downsampling_factor(model_name):
+    """Returns NBM downsampling factor for the given model.
+
+    "NBM downsampling factor" = how much the National Blend of Models (NBM)
+    grid is downsampled when interpolating data from the given model to the NBM
+    grid.
+
+    :param model_name: Name of model.
+    :return: downsampling_factor: Downsampling factor (positive integer).
+    """
+
+    check_model_name(model_name)
+
+    if model_name in [RAP_MODEL_NAME, NAM_MODEL_NAME]:
+        return 4
+    if model_name == GFS_MODEL_NAME:
+        return 8
+    if model_name == GEFS_MODEL_NAME:
+        return 16
+
+    return 1
+
+
 def read_model_coords(netcdf_file_name=None, model_name=None):
     """Reads model coordinates from NetCDF file.
 
@@ -425,6 +504,141 @@ def get_field(nwp_forecast_table_xarray, field_name):
         nwp_forecast_table_xarray.coords[FIELD_DIM].values == field_name
     )[0][0]
     return nwp_forecast_table_xarray[DATA_KEY].values[..., k]
+
+
+def interp_data_to_nbm_grid(nwp_forecast_table_xarray, model_name,
+                            use_nearest_neigh):
+    """Interpolates NWP output to the National Blend of Models (NBM) grid.
+
+    :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
+    :param model_name: Model name.
+    :param use_nearest_neigh: Boolean flag.  If True (False), will use
+        nearest-neighbour (linear) interpolation.
+    :return: interp_forecast_table_xarray: Same as input but with interpolated
+        forecasts.
+    """
+
+    error_checking.assert_is_boolean(use_nearest_neigh)
+    proj_object = model_to_projection(model_name)
+
+    nwpft = nwp_forecast_table_xarray
+
+    if proj_object is None:
+        model_x_matrix_metres = nwpft[LONGITUDE_KEY].values
+        model_y_matrix_metres = nwpft[LATITUDE_KEY].values
+    else:
+        model_x_matrix_metres, model_y_matrix_metres = proj_object(
+            nwpft[LONGITUDE_KEY].values, nwpft[LATITUDE_KEY].values
+        )
+
+    mean_x_diff_col_to_col = numpy.mean(
+        numpy.diff(model_x_matrix_metres, axis=1)
+    )
+    mean_x_diff_row_to_row = numpy.mean(
+        numpy.diff(model_x_matrix_metres, axis=0)
+    )
+    is_grid_transposed = mean_x_diff_row_to_row > mean_x_diff_col_to_col
+
+    if is_grid_transposed:
+        model_x_coords_metres = numpy.mean(model_x_matrix_metres, axis=1)
+        model_y_coords_metres = numpy.mean(model_y_matrix_metres, axis=0)
+    else:
+        model_x_coords_metres = numpy.mean(model_x_matrix_metres, axis=0)
+        model_y_coords_metres = numpy.mean(model_y_matrix_metres, axis=1)
+
+    downsampling_factor = model_to_nbm_downsampling_factor(model_name)
+
+    nbm_latitude_matrix_deg_n, nbm_longitude_matrix_deg_e = (
+        nbm_utils.read_coords()
+    )
+
+    if downsampling_factor > 1:
+        dsf = downsampling_factor
+        nbm_latitude_matrix_deg_n = (
+            nbm_latitude_matrix_deg_n[::dsf, ::dsf][:-1, :-1]
+        )
+        nbm_longitude_matrix_deg_e = (
+            nbm_longitude_matrix_deg_e[::dsf, ::dsf][:-1, :-1]
+        )
+
+    if proj_object is None:
+        nbm_x_matrix_metres = nbm_longitude_matrix_deg_e
+        nbm_y_matrix_metres = nbm_latitude_matrix_deg_n
+    else:
+        nbm_x_matrix_metres, nbm_y_matrix_metres = proj_object(
+            nbm_longitude_matrix_deg_e, nbm_latitude_matrix_deg_n
+        )
+
+    nbm_xy_matrix_metres = numpy.transpose(numpy.vstack((
+        numpy.ravel(nbm_y_matrix_metres),
+        numpy.ravel(nbm_x_matrix_metres)
+    )))
+
+    forecast_hours = nwpft.coords[FORECAST_HOUR_DIM].values
+    field_names = nwpft.coords[FIELD_DIM].values
+    orig_data_matrix = nwpft[DATA_KEY].values
+
+    num_grid_rows_nbm = nbm_x_matrix_metres.shape[0]
+    num_grid_columns_nbm = nbm_x_matrix_metres.shape[1]
+    num_forecast_hours = len(forecast_hours)
+    num_fields = len(field_names)
+
+    these_dim = (
+        num_forecast_hours, num_grid_rows_nbm, num_grid_columns_nbm, num_fields
+    )
+    interp_data_matrix = numpy.full(these_dim, numpy.nan)
+
+    for i in range(num_forecast_hours):
+        for j in range(num_fields):
+            print('Interpolating {0:s} at forecast hour {1:d}...'.format(
+                field_names[j], forecast_hours[i]
+            ))
+
+            exec_start_time_unix_sec = time.time()
+
+            interp_object = RegularGridInterpolator(
+                points=(model_y_coords_metres, model_x_coords_metres),
+                values=(
+                    numpy.transpose(orig_data_matrix[i, ..., j])
+                    if is_grid_transposed
+                    else orig_data_matrix[i, ..., j]
+                ),
+                method='nearest' if use_nearest_neigh else 'linear',
+                bounds_error=False, fill_value=numpy.nan
+            )
+
+            these_interp_values = interp_object(nbm_xy_matrix_metres)
+            interp_data_matrix[i, ..., j] = numpy.reshape(
+                these_interp_values, nbm_x_matrix_metres.shape
+            )
+
+            print('Elapsed time = {0:.2f} seconds'.format(
+                time.time() - exec_start_time_unix_sec
+            ))
+
+    coord_dict = {
+        FORECAST_HOUR_DIM: forecast_hours,
+        ROW_DIM: numpy.linspace(
+            0, num_grid_rows_nbm - 1, num=num_grid_rows_nbm, dtype=int
+        ),
+        COLUMN_DIM: numpy.linspace(
+            0, num_grid_columns_nbm - 1, num=num_grid_columns_nbm, dtype=int
+        ),
+        FIELD_DIM: field_names
+    }
+
+    these_dim = (FORECAST_HOUR_DIM, ROW_DIM, COLUMN_DIM, FIELD_DIM)
+    main_data_dict = {
+        DATA_KEY: (these_dim, interp_data_matrix)
+    }
+
+    these_dim = (ROW_DIM, COLUMN_DIM)
+    main_data_dict.update({
+        LATITUDE_KEY: (these_dim, nbm_latitude_matrix_deg_n),
+        LONGITUDE_KEY: (these_dim, nbm_longitude_matrix_deg_e)
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
 def read_nonprecip_field_different_times(
