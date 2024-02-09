@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import numpy
 import pyproj
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
@@ -131,10 +132,6 @@ def interp_data_to_nbm_grid(
         (x_coord_matrix.size, data_matrix.shape[-1])
     )
 
-    linear_interp_object = LinearNDInterpolator(
-        points=point_matrix, values=value_matrix, fill_value=numpy.nan
-    )
-
     if test_mode:
         new_x_matrix, new_y_matrix = numpy.meshgrid(new_x_coords, new_y_coords)
     else:
@@ -142,11 +139,24 @@ def interp_data_to_nbm_grid(
             NBM_X_COORDS_METRES, NBM_Y_COORDS_METRES
         )
 
+    start_time_unix_sec = time.time()
+    linear_interp_object = LinearNDInterpolator(
+        points=point_matrix, values=value_matrix, fill_value=numpy.nan
+    )
     interp_data_matrix = linear_interp_object(new_y_matrix, new_x_matrix)
+    print('Elapsed time for linear interp = {0:.1f} s'.format(
+        time.time() - start_time_unix_sec
+    ))
+
     if not use_nearest_neigh:
         return interp_data_matrix
 
+    start_time_unix_sec = time.time()
     nn_interp_object = NearestNDInterpolator(x=point_matrix, y=value_matrix)
     nn_interp_data_matrix = nn_interp_object(new_y_matrix, new_x_matrix)
+    print('Elapsed time for NN interp = {0:.1f} s'.format(
+        time.time() - start_time_unix_sec
+    ))
+
     nn_interp_data_matrix[numpy.isnan(interp_data_matrix)] = numpy.nan
     return nn_interp_data_matrix
