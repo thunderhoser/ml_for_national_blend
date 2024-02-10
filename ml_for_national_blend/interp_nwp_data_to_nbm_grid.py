@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 import shutil
 import argparse
 
@@ -134,6 +135,12 @@ def _run(input_dir_name, model_name, first_init_time_string,
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
             zarr_file_name=output_file_name
         )
+
+        if this_input_file_name.endswith('.tar'):
+            this_input_file_name_zarr = re.sub(
+                '.tar$', '.zarr', this_input_file_name
+            )
+            shutil.rmtree(this_input_file_name_zarr)
 
         if not tar_output_files:
             continue
