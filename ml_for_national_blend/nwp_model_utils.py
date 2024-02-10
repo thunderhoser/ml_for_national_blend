@@ -526,6 +526,7 @@ def interp_data_to_nbm_grid(nwp_forecast_table_xarray, model_name,
 
     nwpft = nwp_forecast_table_xarray
     print(nwpft)
+    print(nwpft['longitude_deg_e'])
 
     if proj_object is None:
         model_x_matrix_metres = nwpft[LONGITUDE_KEY].values
