@@ -11,7 +11,7 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=10:00:00
+#SBATCH --time=01:00:00
 #SBATCH --array=1
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
@@ -38,6 +38,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 0` && $i <= $#INIT_TIME_STRINGS)
     --model_name="hrrr" \
     --first_init_time_string="${init_time_string}" \
     --last_init_time_string="${init_time_string}" \
+    --tar_output_files=1 \
     --output_nbm_grid_dir_name="${OUTPUT_DIR_NAME}"
     
     @ i = $i + 1

@@ -2,38 +2,26 @@
 
 import os
 import sys
+import shutil
 import argparse
-import numpy
-import xarray
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
-import grids
 import time_conversion
 import nwp_model_io
-import nbm_utils
+import misc_utils
 import nwp_model_utils
 
 TIME_FORMAT = '%Y-%m-%d-%H'
-
-MODEL_NAME_TO_DOWNSAMPLING_FACTOR = {
-    nwp_model_utils.WRF_ARW_MODEL_NAME: 1,
-    nwp_model_utils.NAM_NEST_MODEL_NAME: 1,
-    nwp_model_utils.HRRR_MODEL_NAME: 1,
-    nwp_model_utils.GRIDDED_LAMP_MODEL_NAME: 1,
-    nwp_model_utils.RAP_MODEL_NAME: 4,
-    nwp_model_utils.NAM_MODEL_NAME: 4,
-    nwp_model_utils.GFS_MODEL_NAME: 8,
-    nwp_model_utils.GEFS_MODEL_NAME: 16
-}
 
 INPUT_DIR_ARG_NAME = 'input_native_grid_dir_name'
 MODEL_ARG_NAME = 'model_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
+TAR_OUTPUTS_ARG_NAME = 'tar_output_files'
 OUTPUT_DIR_ARG_NAME = 'output_nbm_grid_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -53,11 +41,11 @@ FIRST_INIT_TIME_HELP_STRING = (
 LAST_INIT_TIME_HELP_STRING = 'See documentation for {0:s}.'.format(
     FIRST_INIT_TIME_ARG_NAME
 )
+TAR_OUTPUTS_HELP_STRING = 'Boolean flag.  If 1, will tar output files.'
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Data on NBM grid will be written here (one '
-    'NetCDF file per model run per lead time) by '
-    '`nwp_model_io.write_file_on_nbm_grid`, to exact locations determined by '
-    '`nwp_model_io.find_file_on_nbm_grid`.'
+    'NetCDF file per model run per lead time) by `nwp_model_io.write_file`, '
+    'to exact locations determined by `nwp_model_io.find_file`.'
 )
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
@@ -77,13 +65,17 @@ INPUT_ARG_PARSER.add_argument(
     help=LAST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TAR_OUTPUTS_ARG_NAME, type=int, required=False, default=0,
+    help=TAR_OUTPUTS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
 
 
 def _run(input_dir_name, model_name, first_init_time_string,
-         last_init_time_string, output_dir_name):
+         last_init_time_string, tar_output_files, output_dir_name):
     """Interpolates NWP data from native grid to NBM grid.
 
     This is effectively the main method.
@@ -92,6 +84,7 @@ def _run(input_dir_name, model_name, first_init_time_string,
     :param model_name: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
+    :param tar_output_files: Same.
     :param output_dir_name: Same.
     """
 
@@ -110,108 +103,47 @@ def _run(input_dir_name, model_name, first_init_time_string,
         raise_error_if_all_missing=True
     )
 
-    downsampling_factor = MODEL_NAME_TO_DOWNSAMPLING_FACTOR[model_name]
-    if downsampling_factor == 1:
-        nbm_x_coords = nbm_utils.NBM_X_COORDS_METRES
-        nbm_y_coords = nbm_utils.NBM_Y_COORDS_METRES
-    else:
-        nbm_x_coords = nbm_utils.NBM_X_COORDS_METRES[::downsampling_factor][:-1]
-        nbm_y_coords = nbm_utils.NBM_Y_COORDS_METRES[::downsampling_factor][:-1]
-
-    nbm_x_coord_matrix, nbm_y_coord_matrix = grids.xy_vectors_to_matrices(
-        x_unique_metres=nbm_x_coords, y_unique_metres=nbm_y_coords
-    )
-    nbm_latitude_matrix_deg_n, nbm_longitude_matrix_deg_e = (
-        nbm_utils.project_xy_to_latlng(
-            x_coords_metres=nbm_x_coord_matrix,
-            y_coords_metres=nbm_y_coord_matrix
-        )
-    )
-
     for this_input_file_name in input_file_names:
         print('Reading data on native grid from: "{0:s}"...'.format(
             this_input_file_name
         ))
         nwp_forecast_table_xarray = nwp_model_io.read_file(this_input_file_name)
-        nwpft = nwp_forecast_table_xarray
 
-        native_x_coord_matrix, native_y_coord_matrix = (
-            nbm_utils.project_latlng_to_xy(
-                latitudes_deg_n=nwpft[nwp_model_utils.LATITUDE_KEY].values,
-                longitudes_deg_e=nwpft[nwp_model_utils.LONGITUDE_KEY].values
-            )
+        nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            model_name=model_name,
+            use_nearest_neigh=True
         )
 
-        forecast_hours = nwpft.coords[nwp_model_utils.FORECAST_HOUR_DIM].values
+        output_file_name = nwp_model_io.find_file(
+            directory_name=output_dir_name,
+            model_name=model_name,
+            init_time_unix_sec=
+            nwp_model_io.file_name_to_init_time(this_input_file_name),
+            raise_error_if_missing=False
+        )
 
-        for j in range(len(forecast_hours)):
-            data_matrix = nwpft[nwp_model_utils.DATA_KEY].values[j, ...]
-            interp_data_matrix = nbm_utils.interp_data_to_nbm_grid(
-                data_matrix=data_matrix,
-                x_coord_matrix=native_x_coord_matrix,
-                y_coord_matrix=native_y_coord_matrix,
-                use_nearest_neigh=True,
-                new_x_coords=nbm_x_coords,
-                new_y_coords=nbm_y_coords
-            )
+        print('Writing interpolated data to: "{0:s}"...'.format(
+            output_file_name
+        ))
+        nwp_model_io.write_file(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            zarr_file_name=output_file_name
+        )
 
-            coord_dict = {
-                nwp_model_utils.FORECAST_HOUR_DIM: numpy.array(
-                    [forecast_hours[j]], dtype=int
-                ),
-                nwp_model_utils.ROW_DIM: numpy.linspace(
-                    0, interp_data_matrix.shape[0] - 1,
-                    num=interp_data_matrix.shape[0], dtype=int
-                ),
-                nwp_model_utils.COLUMN_DIM: numpy.linspace(
-                    0, interp_data_matrix.shape[1] - 1,
-                    num=interp_data_matrix.shape[1], dtype=int
-                ),
-                nwp_model_utils.FIELD_DIM:
-                    nwpft.coords[nwp_model_utils.FIELD_DIM].values
-            }
+        if not tar_output_files:
+            continue
 
-            these_dim = (
-                nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
-                nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
-            )
-            main_data_dict = {
-                nwp_model_utils.DATA_KEY: (
-                    these_dim, numpy.expand_dims(interp_data_matrix, axis=0)
-                )
-            }
+        output_file_name_tarred = '{0:s}.tar'.format(
+            os.path.splitext(output_file_name)[0]
+        )
+        print('Creating tar file: "{0:s}"...'.format(output_file_name_tarred))
 
-            these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
-            main_data_dict.update({
-                nwp_model_utils.LATITUDE_KEY: (
-                    these_dim, nbm_latitude_matrix_deg_n
-                ),
-                nwp_model_utils.LONGITUDE_KEY: (
-                    these_dim, nbm_longitude_matrix_deg_e
-                )
-            })
-
-            interp_table_xarray = xarray.Dataset(
-                data_vars=main_data_dict, coords=coord_dict
-            )
-
-            output_file_name = nwp_model_io.find_file(
-                directory_name=output_dir_name,
-                model_name=model_name,
-                init_time_unix_sec=
-                nwp_model_io.file_name_to_init_time(this_input_file_name),
-                in_zarr_format=False,
-                forecast_hour=forecast_hours[j],
-                raise_error_if_missing=False
-            )
-
-            print('Writing interpolated data to: "{0:s}"...'.format(
-                output_file_name
-            ))
-            nwp_model_io.write_file(
-                nwp_forecast_table_xarray=interp_table_xarray,
-                netcdf_file_name=output_file_name
-            )
+        misc_utils.create_tar_file(
+            source_paths_to_tar=[output_file_name],
+            tar_file_name=output_file_name_tarred
+        )
+        shutil.rmtree(output_file_name)
 
 
 if __name__ == '__main__':
@@ -226,5 +158,6 @@ if __name__ == '__main__':
         last_init_time_string=getattr(
             INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
         ),
+        tar_output_files=bool(getattr(INPUT_ARG_OBJECT, TAR_OUTPUTS_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
