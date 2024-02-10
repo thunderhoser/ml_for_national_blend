@@ -113,13 +113,17 @@ def find_files_for_period(
     zarr_file_names = []
 
     for this_init_time_unix_sec in init_times_unix_sec:
-        this_file_name = find_file(
-            directory_name=directory_name,
-            model_name=model_name,
-            init_time_unix_sec=this_init_time_unix_sec,
-            allow_tar=allow_tar,
-            raise_error_if_missing=raise_error_if_any_missing
-        )
+        try:
+            this_file_name = find_file(
+                directory_name=directory_name,
+                model_name=model_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                allow_tar=allow_tar,
+                raise_error_if_missing=True
+            )
+        except ValueError as this_error:
+            if raise_error_if_any_missing:
+                raise this_error
 
         if os.path.isdir(this_file_name) or os.path.isfile(this_file_name):
             zarr_file_names.append(this_file_name)
