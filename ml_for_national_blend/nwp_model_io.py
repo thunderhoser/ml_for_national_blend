@@ -207,7 +207,7 @@ def read_file(zarr_file_name, allow_tar=False):
 
     zarr_file_name = re.sub('.tar$', '.zarr', tar_file_name)
     nwp_forecast_table_xarray = xarray.open_zarr(zarr_file_name)
-    shutil.rmtree(zarr_file_name)
+    # shutil.rmtree(zarr_file_name)
 
     return nwp_forecast_table_xarray
 
