@@ -108,7 +108,10 @@ def _run(input_dir_name, model_name, first_init_time_string,
         print('Reading data on native grid from: "{0:s}"...'.format(
             this_input_file_name
         ))
-        nwp_forecast_table_xarray = nwp_model_io.read_file(this_input_file_name)
+        nwp_forecast_table_xarray = nwp_model_io.read_file(
+            zarr_file_name=this_input_file_name,
+            allow_tar=True
+        )
 
         nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
