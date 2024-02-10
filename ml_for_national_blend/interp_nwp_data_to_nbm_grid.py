@@ -99,6 +99,7 @@ def _run(input_dir_name, model_name, first_init_time_string,
         model_name=model_name,
         first_init_time_unix_sec=first_init_time_unix_sec,
         last_init_time_unix_sec=last_init_time_unix_sec,
+        allow_tar=True,
         raise_error_if_any_missing=False,
         raise_error_if_all_missing=True
     )
