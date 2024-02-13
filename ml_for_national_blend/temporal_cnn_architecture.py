@@ -508,6 +508,9 @@ def create_model(option_dict):
             i += 1
 
             this_name = 'concat_10km_20km'
+            print(pooling_layer_by_level[i])
+            print(layer_object_20km_res)
+
             pooling_layer_by_level[i] = layers.Concatenate(
                 axis=-1, name=this_name
             )(
