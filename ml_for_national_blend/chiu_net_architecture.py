@@ -1,7 +1,9 @@
-"""Methods for creating temporal-CNN architecture.
+"""Methods for creating Chiu-net architecture.
 
-This is a CNN with TimeDistributed layers to handle NWP forecasts at different
+This is a U-net with TimeDistributed layers to handle NWP forecasts at different
 lead times.
+
+Based on Chiu et al. (2020): https://doi.org/10.1109/LRA.2020.2992184
 """
 
 import os
@@ -47,16 +49,17 @@ OUTPUT_ACTIV_FUNCTION_ALPHA_KEY = 'output_activ_function_alpha'
 L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
+NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 
 DEFAULT_OPTION_DICT = {
-    NUM_CONV_LAYERS_KEY: numpy.full(8, 2, dtype=int),
-    POOLING_SIZE_KEY: numpy.full(7, 2, dtype=int),
-    NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96], dtype=int),
-    ENCODER_DROPOUT_RATES_KEY: numpy.full(8, 0.),
-    DECODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    SKIP_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
+    POOLING_SIZE_KEY: numpy.full(8, 2, dtype=int),
+    NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96, 96], dtype=int),
+    ENCODER_DROPOUT_RATES_KEY: numpy.full(9, 0.),
+    DECODER_DROPOUT_RATES_KEY: numpy.full(8, 0.),
+    SKIP_DROPOUT_RATES_KEY: numpy.full(8, 0.),
     FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     FC_MODULE_USE_3D_CONV: True,
@@ -120,6 +123,7 @@ def check_input_args(option_dict):
     option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
         batch normalization after each non-output layer.
     option_dict["ensemble_size"]: Number of ensemble members.
+    option_dict["num_output_channels"]: Number of output channels.
     option_dict["loss_function"]: Loss function.
     option_dict["optimizer_function"]: Optimizer function.
 
@@ -130,11 +134,6 @@ def check_input_args(option_dict):
     option_dict = DEFAULT_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
-    # TODO(thunderhoser): The four input layers must have the same num lead
-    # times.  They can have different num channels.  Also, the spatial extent
-    # for the {10-, 20-, 40-km} inputs should be {1/4, 1/8, 1/16} times the
-    # spatial extent for the 2.5-km inputs.  I should explicitly check for all
-    # this.
     if option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY] is not None:
         error_checking.assert_is_numpy_array(
             option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY],
@@ -257,6 +256,8 @@ def check_input_args(option_dict):
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
     error_checking.assert_is_geq(option_dict[ENSEMBLE_SIZE_KEY], 1)
+    error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
+    error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
 
     return option_dict
 
@@ -275,8 +276,6 @@ def _get_time_slicing_function(time_index):
         :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
         """
 
-        # TODO(thunderhoser): Time axis might be first and not second -- depends
-        # on how Keras handles batch axis.
         return input_tensor_3d[:, time_index, ...]
 
     return time_slicing_function
@@ -290,7 +289,7 @@ def create_model(option_dict):
         `keras.models.Model`.
     """
 
-    # TODO(thunderhoser): Need to deal with num output channels.
+    # TODO(thunderhoser): metric_list should be an input arg.
 
     option_dict = check_input_args(option_dict)
 
@@ -316,6 +315,7 @@ def create_model(option_dict):
     loss_function = option_dict[LOSS_FUNCTION_KEY]
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
+    num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
 
     if input_dimensions_2pt5km_res is None:
         input_layer_object_2pt5km_res = None
@@ -363,7 +363,6 @@ def create_model(option_dict):
 
     l2_function = architecture_utils.get_weight_regularizer(l2_weight=l2_weight)
 
-    layer_object = None
     num_lead_times = 0
 
     num_levels = len(pooling_size_by_level_px)
@@ -502,9 +501,6 @@ def create_model(option_dict):
         pooling_layer_by_level[i] = layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(conv_layer_by_level[i])
-
-        print(conv_layer_by_level[i])
-        print(pooling_layer_by_level[i])
 
         if input_dimensions_20km_res is not None:
             i = 0 if input_dimensions_2pt5km_res is None else 2
@@ -815,8 +811,6 @@ def create_model(option_dict):
     this_name = 'upsampling_level{0:d}_conv'.format(num_levels - 1)
     i = num_levels - 1
 
-    print(this_layer_object)
-
     upconv_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=2, num_kernel_columns=2,
         num_rows_per_stride=1, num_columns_per_stride=1,
@@ -825,8 +819,6 @@ def create_model(option_dict):
         weight_regularizer=l2_function,
         layer_name=this_name
     )(this_layer_object)
-
-    print(upconv_layer_by_level[i])
 
     this_name = 'upsampling_level{0:d}_activation'.format(num_levels - 1)
     upconv_layer_by_level[i] = architecture_utils.get_activation_layer(
@@ -841,6 +833,12 @@ def create_model(option_dict):
 
         upconv_layer_by_level[i] = architecture_utils.get_dropout_layer(
             dropout_fraction=decoder_dropout_rate_by_level[i],
+            layer_name=this_name
+        )(upconv_layer_by_level[i])
+
+    if use_batch_normalization:
+        this_name = 'upsampling_level{0:d}_bn'.format(i)
+        upconv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
             layer_name=this_name
         )(upconv_layer_by_level[i])
 
@@ -918,12 +916,10 @@ def create_model(option_dict):
                 )
 
         if i == 0:
-
-            # TODO(thunderhoser): Deal with ensemble size.  Allow Boolean
-            # flag for penultimate conv.
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1, num_filters=2,
+                num_rows_per_stride=1, num_columns_per_stride=1,
+                num_filters=2 * ensemble_size * num_output_channels,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=l2_function,
                 layer_name='penultimate_conv'
@@ -981,6 +977,12 @@ def create_model(option_dict):
                 layer_name=this_name
             )(upconv_layer_by_level[i - 1])
 
+        if use_batch_normalization:
+            this_name = 'upsampling_level{0:d}_bn'.format(i - 1)
+            upconv_layer_by_level[i - 1] = architecture_utils.get_batch_norm_layer(
+                layer_name=this_name
+            )(upconv_layer_by_level[i - 1])
+
         this_function = _get_time_slicing_function(-1)
         this_name = 'skip_level{0:d}_take_last_time'.format(i - 1)
         conv_layer_by_level[i - 1] = keras.layers.Lambda(
@@ -990,9 +992,6 @@ def create_model(option_dict):
         num_upconv_rows = upconv_layer_by_level[i - 1].get_shape()[1]
         num_desired_rows = conv_layer_by_level[i - 1].get_shape()[1]
         num_padding_rows = num_desired_rows - num_upconv_rows
-
-        print(conv_layer_by_level[i - 1].get_shape())
-        print(upconv_layer_by_level[i - 1].get_shape())
 
         num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[2]
         num_desired_columns = conv_layer_by_level[i - 1].get_shape()[2]
@@ -1015,7 +1014,8 @@ def create_model(option_dict):
 
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
-        num_rows_per_stride=1, num_columns_per_stride=1, num_filters=1,
+        num_rows_per_stride=1, num_columns_per_stride=1,
+        num_filters=ensemble_size * num_output_channels,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
         weight_regularizer=l2_function,
         layer_name='last_conv'
@@ -1028,6 +1028,17 @@ def create_model(option_dict):
             alpha_for_elu=output_activ_function_alpha,
             layer_name='last_conv_activation'
         )(skip_layer_by_level[0])
+
+    # TODO(thunderhoser): For now, input_dimensions_2pt5km_res cannot actually
+    # be None.  In other words, the model must take 2.5-km data as input.  I
+    # will change this if need be.
+    new_dims = (
+        input_dimensions_2pt5km_res[0], input_dimensions_2pt5km_res[1],
+        num_output_channels, ensemble_size
+    )
+    skip_layer_by_level[0] = keras.layers.Reshape(
+        target_shape=new_dims, name='reshape_predictions'
+    )(skip_layer_by_level[0])
 
     input_layer_objects = []
     if input_dimensions_2pt5km_res is not None:
@@ -1045,7 +1056,6 @@ def create_model(option_dict):
 
     model_object.compile(
         loss=loss_function, optimizer=optimizer_function
-        # optimizer=keras.optimizers.Adam(),
         # metrics=metric_function_list
     )
 
