@@ -715,7 +715,7 @@ def create_model(option_dict):
 
     forecast_module_layer_object = layers.Permute(
         dims=(2, 3, 1, 4), name='fc_module_put_time_last'
-    )(layer_object)
+    )(conv_layer_by_level[-1])
 
     if not forecast_module_use_3d_conv:
         orig_dims = forecast_module_layer_object.get_shape()
