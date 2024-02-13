@@ -17,11 +17,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=test_temporal_cnn_architecture.qsub_%A.out
+#SBATCH --output=test_temporal_cnn_architecture_%A.out
 
-module use /scratch2/BMC/gsd-hpcs/bass/modulefiles
-module load Anaconda3/2019.07
-
-set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-
-python3 -u "${CODE_DIR_NAME}/test_temporal_cnn_architecture.py"
+set this_directory_name=`pwd`
+singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_temporal_cnn_architecture.sh"
