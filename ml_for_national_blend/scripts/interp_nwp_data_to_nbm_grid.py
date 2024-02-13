@@ -1,6 +1,7 @@
 """Interpolates NWP data from native grid to NBM grid."""
 
 import os
+import re
 import shutil
 import argparse
 from gewittergefahr.gg_utils import time_conversion
@@ -92,6 +93,7 @@ def _run(input_dir_name, model_name, first_init_time_string,
         model_name=model_name,
         first_init_time_unix_sec=first_init_time_unix_sec,
         last_init_time_unix_sec=last_init_time_unix_sec,
+        allow_tar=True,
         raise_error_if_any_missing=False,
         raise_error_if_all_missing=True
     )
@@ -100,7 +102,10 @@ def _run(input_dir_name, model_name, first_init_time_string,
         print('Reading data on native grid from: "{0:s}"...'.format(
             this_input_file_name
         ))
-        nwp_forecast_table_xarray = nwp_model_io.read_file(this_input_file_name)
+        nwp_forecast_table_xarray = nwp_model_io.read_file(
+            zarr_file_name=this_input_file_name,
+            allow_tar=True
+        )
 
         nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
@@ -123,6 +128,12 @@ def _run(input_dir_name, model_name, first_init_time_string,
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
             zarr_file_name=output_file_name
         )
+
+        if this_input_file_name.endswith('.tar'):
+            this_input_file_name_zarr = re.sub(
+                '.tar$', '.zarr', this_input_file_name
+            )
+            shutil.rmtree(this_input_file_name_zarr)
 
         if not tar_output_files:
             continue
