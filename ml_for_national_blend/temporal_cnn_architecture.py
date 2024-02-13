@@ -503,14 +503,14 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(conv_layer_by_level[i])
 
+        print(conv_layer_by_level[i])
+        print(pooling_layer_by_level[i])
+
         if input_dimensions_20km_res is not None:
             i = 0 if input_dimensions_2pt5km_res is None else 2
             i += 1
 
             this_name = 'concat_10km_20km'
-            print(pooling_layer_by_level[i])
-            print(layer_object_20km_res)
-
             pooling_layer_by_level[i] = layers.Concatenate(
                 axis=-1, name=this_name
             )(
