@@ -870,7 +870,7 @@ def create_model(option_dict):
     merged_layer_by_level[i] = keras.layers.Concatenate(
         axis=-1, name=this_name
     )(
-        [this_layer_object, upconv_layer_by_level[i]]
+        [conv_layer_by_level[i], upconv_layer_by_level[i]]
     )
 
     level_indices = numpy.linspace(
@@ -1010,7 +1010,7 @@ def create_model(option_dict):
         merged_layer_by_level[i - 1] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [this_layer_object, upconv_layer_by_level[i - 1]]
+            [conv_layer_by_level[i - 1], upconv_layer_by_level[i - 1]]
         )
 
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
