@@ -508,7 +508,6 @@ def create_model(option_dict):
 
         if input_dimensions_20km_res is not None:
             i = 0 if input_dimensions_2pt5km_res is None else 2
-            i += 1
 
             this_name = 'concat_10km_20km'
             pooling_layer_by_level[i] = layers.Concatenate(
@@ -582,7 +581,6 @@ def create_model(option_dict):
         if input_dimensions_40km_res is not None:
             i = 0 if input_dimensions_2pt5km_res is None else 2
             i += 0 if input_dimensions_10km_res is None else 1
-            i += 1
 
             this_name = 'concat_20km_40km'
             pooling_layer_by_level[i] = layers.Concatenate(
