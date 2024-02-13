@@ -844,12 +844,18 @@ def create_model(option_dict):
             layer_name=this_name
         )(upconv_layer_by_level[i])
 
-    num_upconv_rows = upconv_layer_by_level[i].get_shape()[2]
-    num_desired_rows = conv_layer_by_level[i].get_shape()[2]
+    this_function = _get_time_slicing_function(-1)
+    this_name = 'skip_level{0:d}_take_last_time'.format(i)
+    conv_layer_by_level[i] = keras.layers.Lambda(
+        this_function, name=this_name
+    )(conv_layer_by_level[i])
+
+    num_upconv_rows = upconv_layer_by_level[i].get_shape()[1]
+    num_desired_rows = conv_layer_by_level[i].get_shape()[1]
     num_padding_rows = num_desired_rows - num_upconv_rows
 
-    num_upconv_columns = upconv_layer_by_level[i].get_shape()[3]
-    num_desired_columns = conv_layer_by_level[i].get_shape()[3]
+    num_upconv_columns = upconv_layer_by_level[i].get_shape()[2]
+    num_desired_columns = conv_layer_by_level[i].get_shape()[2]
     num_padding_columns = num_desired_columns - num_upconv_columns
 
     if num_padding_rows + num_padding_columns > 0:
@@ -859,12 +865,6 @@ def create_model(option_dict):
         upconv_layer_by_level[i] = keras.layers.ZeroPadding2D(
             padding=padding_arg, name=this_name
         )(upconv_layer_by_level[i])
-
-    this_function = _get_time_slicing_function(-1)
-    this_name = 'skip_level{0:d}_take_last_time'.format(i)
-    this_layer_object = keras.layers.Lambda(
-        this_function, name=this_name
-    )(conv_layer_by_level[i])
 
     this_name = 'skip_level{0:d}'.format(i)
     merged_layer_by_level[i] = keras.layers.Concatenate(
@@ -981,15 +981,21 @@ def create_model(option_dict):
                 layer_name=this_name
             )(upconv_layer_by_level[i - 1])
 
-        num_upconv_rows = upconv_layer_by_level[i - 1].get_shape()[2]
-        num_desired_rows = conv_layer_by_level[i - 1].get_shape()[2]
+        this_function = _get_time_slicing_function(-1)
+        this_name = 'skip_level{0:d}_take_last_time'.format(i - 1)
+        conv_layer_by_level[i - 1] = keras.layers.Lambda(
+            this_function, name=this_name
+        )(conv_layer_by_level[i - 1])
+
+        num_upconv_rows = upconv_layer_by_level[i - 1].get_shape()[1]
+        num_desired_rows = conv_layer_by_level[i - 1].get_shape()[1]
         num_padding_rows = num_desired_rows - num_upconv_rows
 
         print(conv_layer_by_level[i - 1].get_shape())
         print(upconv_layer_by_level[i - 1].get_shape())
 
-        num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[3]
-        num_desired_columns = conv_layer_by_level[i - 1].get_shape()[3]
+        num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[2]
+        num_desired_columns = conv_layer_by_level[i - 1].get_shape()[2]
         num_padding_columns = num_desired_columns - num_upconv_columns
 
         if num_padding_rows + num_padding_columns > 0:
@@ -999,12 +1005,6 @@ def create_model(option_dict):
             upconv_layer_by_level[i - 1] = keras.layers.ZeroPadding2D(
                 padding=padding_arg, name=this_name
             )(upconv_layer_by_level[i - 1])
-
-        this_function = _get_time_slicing_function(-1)
-        this_name = 'skip_level{0:d}_take_last_time'.format(i - 1)
-        this_layer_object = keras.layers.Lambda(
-            this_function, name=this_name
-        )(conv_layer_by_level[i - 1])
 
         this_name = 'skip_level{0:d}'.format(i - 1)
         merged_layer_by_level[i - 1] = keras.layers.Concatenate(
