@@ -815,6 +815,8 @@ def create_model(option_dict):
     this_name = 'upsampling_level{0:d}_conv'.format(num_levels - 1)
     i = num_levels - 1
 
+    print(this_layer_object)
+
     upconv_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=2, num_kernel_columns=2,
         num_rows_per_stride=1, num_columns_per_stride=1,
@@ -823,6 +825,8 @@ def create_model(option_dict):
         weight_regularizer=l2_function,
         layer_name=this_name
     )(this_layer_object)
+
+    print(upconv_layer_by_level[i])
 
     this_name = 'upsampling_level{0:d}_activation'.format(num_levels - 1)
     upconv_layer_by_level[i] = architecture_utils.get_activation_layer(
@@ -860,7 +864,7 @@ def create_model(option_dict):
     this_name = 'skip_level{0:d}_take_last_time'.format(i)
     this_layer_object = keras.layers.Lambda(
         this_function, name=this_name
-    )(conv_layer_by_level[i - 1])
+    )(conv_layer_by_level[i])
 
     this_name = 'skip_level{0:d}'.format(i)
     merged_layer_by_level[i] = keras.layers.Concatenate(
