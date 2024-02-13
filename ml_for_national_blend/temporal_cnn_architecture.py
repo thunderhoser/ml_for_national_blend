@@ -699,7 +699,7 @@ def create_model(option_dict):
                     layer_name=this_name
                 )(conv_layer_by_level[i])
 
-        if i != num_levels + 1:
+        if i != num_levels:
             this_name = 'encoder_level{0:d}_pooling'.format(i)
             this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
                 num_rows_in_window=pooling_size_by_level_px[i],
