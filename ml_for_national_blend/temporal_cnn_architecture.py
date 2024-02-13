@@ -985,6 +985,9 @@ def create_model(option_dict):
         num_desired_rows = conv_layer_by_level[i - 1].get_shape()[2]
         num_padding_rows = num_desired_rows - num_upconv_rows
 
+        print(conv_layer_by_level[i - 1].get_shape())
+        print(upconv_layer_by_level[i - 1].get_shape())
+
         num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[3]
         num_desired_columns = conv_layer_by_level[i - 1].get_shape()[3]
         num_padding_columns = num_desired_columns - num_upconv_columns
