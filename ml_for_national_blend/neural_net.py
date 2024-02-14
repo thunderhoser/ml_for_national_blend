@@ -366,6 +366,8 @@ def _read_targets_one_example(
         desired_field_names=target_field_names
     )
 
+    print(urma_table_xarray)
+
     return numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY][0, ...],
         axes=(1, 0, 2)
