@@ -1,4 +1,4 @@
-"""Interpolates NWP data from native grid to NBM grid."""
+"""Reorganizes interpolated NWP files into different directory structure."""
 
 import os
 import sys
@@ -19,15 +19,15 @@ import nwp_model_utils
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 
-INPUT_DIR_ARG_NAME = 'input_native_grid_dir_name'
+INPUT_DIR_ARG_NAME = 'input_dir_name'
 MODEL_ARG_NAME = 'model_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
-OUTPUT_DIR_ARG_NAME = 'output_nbm_grid_dir_name'
+OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIR_HELP_STRING = (
-    'Path to input directory.  Data on native model grid will be found in this '
-    'directory by `nwp_model_io.find_file`.'
+    'Path to input directory.  Data in old directory structure will be found '
+    'therein by `nwp_model_io.find_file`.'
 )
 MODEL_HELP_STRING = (
     'Name of NWP model (must be accepted by '
@@ -43,8 +43,8 @@ LAST_INIT_TIME_HELP_STRING = 'See documentation for {0:s}.'.format(
     FIRST_INIT_TIME_ARG_NAME
 )
 OUTPUT_DIR_HELP_STRING = (
-    'Path to output directory.  Data on NBM grid will be written here (one '
-    'NetCDF file per model run per lead time) by '
+    'Path to output directory.  Data in new directory structure will be '
+    'written here (one NetCDF file per model run per lead time) by '
     '`interp_nwp_model_io.write_file`, to exact locations determined by '
     '`interp_nwp_model_io.find_file`.'
 )
@@ -73,7 +73,7 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(input_dir_name, model_name, first_init_time_string,
          last_init_time_string, output_dir_name):
-    """Interpolates NWP data from native grid to NBM grid.
+    """Reorganizes interpolated NWP files into different directory structure.
 
     This is effectively the main method.
 
@@ -101,18 +101,12 @@ def _run(input_dir_name, model_name, first_init_time_string,
     )
 
     for this_input_file_name in input_file_names:
-        print('Reading data on native grid from: "{0:s}"...'.format(
+        print('Reading data in old directory structure from: "{0:s}"...'.format(
             this_input_file_name
         ))
         nwp_forecast_table_xarray = nwp_model_io.read_file(
             zarr_file_name=this_input_file_name,
             allow_tar=True
-        )
-
-        nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            model_name=model_name,
-            use_nearest_neigh=True
         )
 
         nwpft = nwp_forecast_table_xarray
@@ -136,7 +130,9 @@ def _run(input_dir_name, model_name, first_init_time_string,
                 raise_error_if_missing=False
             )
 
-            print('Writing interpolated data to: "{0:s}"...'.format(
+            print((
+                'Writing data in new directory structure to: "{0:s}"...'
+            ).format(
                 output_file_name
             ))
             interp_nwp_model_io.write_file(
