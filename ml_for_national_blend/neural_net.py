@@ -366,10 +366,8 @@ def _read_targets_one_example(
         desired_field_names=target_field_names
     )
 
-    print(urma_table_xarray)
-
     return numpy.transpose(
-        urma_table_xarray[urma_utils.DATA_KEY][0, ...],
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
         axes=(1, 0, 2)
     )
 
@@ -448,19 +446,19 @@ def _read_predictors_one_example(
 
             if nwp_downsampling_factors[i] == 1:
                 predictor_matrices_2pt5km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 4:
                 predictor_matrices_10km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 8:
                 predictor_matrices_20km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             else:
                 predictor_matrices_40km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
 
     if predictor_matrices_2pt5km is None:
