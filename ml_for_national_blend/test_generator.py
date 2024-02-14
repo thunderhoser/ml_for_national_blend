@@ -50,7 +50,7 @@ FIELD_NAMES = [
     nwp_model_utils.TEMPERATURE_2METRE_NAME,
     nwp_model_utils.DEWPOINT_2METRE_NAME,
     nwp_model_utils.U_WIND_10METRE_NAME, nwp_model_utils.V_WIND_10METRE_NAME,
-    nwp_model_utils.WIND_GUST_10METRE_NAME, nwp_model_utils.PRECIP_NAME,
+    nwp_model_utils.PRECIP_NAME,
     nwp_model_utils.HEIGHT_700MB_NAME,
     nwp_model_utils.RELATIVE_HUMIDITY_850MB_NAME,
     nwp_model_utils.U_WIND_1000MB_NAME, nwp_model_utils.V_WIND_1000MB_NAME,
