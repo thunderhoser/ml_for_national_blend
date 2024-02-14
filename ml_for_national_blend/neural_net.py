@@ -435,6 +435,8 @@ def _read_predictors_one_example(
             nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
                 this_file_name
             )
+            print(nwp_forecast_table_xarray.coords['field_name'].values)
+            print(nwp_model_to_field_names[nwp_model_names[i]])
             nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
                 nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                 desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
