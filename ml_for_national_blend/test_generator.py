@@ -27,9 +27,14 @@ TARGET_DIR_KEY = 'target_dir_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 
+# init_time_limits_unix_sec = numpy.array([
+#     time_conversion.string_to_unix_sec('2022-11-01-00', '%Y-%m-%d-%H'),
+#     time_conversion.string_to_unix_sec('2023-02-01-00', '%Y-%m-%d-%H')
+# ], dtype=int)
+
 init_time_limits_unix_sec = numpy.array([
     time_conversion.string_to_unix_sec('2022-11-01-00', '%Y-%m-%d-%H'),
-    time_conversion.string_to_unix_sec('2023-02-01-00', '%Y-%m-%d-%H')
+    time_conversion.string_to_unix_sec('2022-11-01-12', '%Y-%m-%d-%H')
 ], dtype=int)
 
 nwp_model_to_dir_name = {
