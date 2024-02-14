@@ -383,6 +383,35 @@ def model_to_nbm_downsampling_factor(model_name):
     return 1
 
 
+def model_to_nbm_grid_size(model_name):
+    """Returns NBM grid size for the given model.
+
+    "NBM grid size" = after interpolating from native NWP grid to NBM grid.
+    Some NWP models are interpolated to the full 2.5-km NBM grid, while some are
+    interpolated to a downsampled (10-, 20-, or 40-km) version.
+
+    :param model_name: Name of model.
+    :return: num_grid_rows: Number of rows in NBM grid.
+    :return: num_grid_columns: Number of columns in NBM grid.
+    """
+
+    downsampling_factor = model_to_nbm_downsampling_factor(model_name)
+    num_grid_rows_full_res = len(nbm_utils.NBM_Y_COORDS_METRES)
+    num_grid_columns_full_res = len(nbm_utils.NBM_X_COORDS_METRES)
+
+    if downsampling_factor == 1:
+        return num_grid_rows_full_res, num_grid_columns_full_res
+
+    num_grid_rows = int(numpy.floor(
+        float(num_grid_rows_full_res) / downsampling_factor
+    ))
+    num_grid_columns = int(numpy.floor(
+        float(num_grid_columns_full_res) / downsampling_factor
+    ))
+
+    return num_grid_rows, num_grid_columns
+
+
 def read_model_coords(netcdf_file_name=None, model_name=None):
     """Reads model coordinates from NetCDF file.
 
@@ -484,6 +513,19 @@ def subset_by_forecast_hour(nwp_forecast_table_xarray, desired_forecast_hours):
     return nwp_forecast_table_xarray.sel(
         {FORECAST_HOUR_DIM: desired_forecast_hours}
     )
+
+
+def subset_by_field(nwp_forecast_table_xarray, desired_field_names):
+    """Subsets NWP table by field.
+
+    :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
+    :param desired_field_names: 1-D list with names of desired fields.
+    :return: nwp_forecast_table_xarray: Same as input but maybe with fewer
+        fields.
+    """
+
+    error_checking.assert_is_string_list(desired_field_names)
+    return nwp_forecast_table_xarray.sel({FIELD_DIM: desired_field_names})
 
 
 def get_field(nwp_forecast_table_xarray, field_name):

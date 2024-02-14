@@ -91,3 +91,34 @@ def concat_over_time(urma_tables_xarray):
             urma_tables_xarray, dim=VALID_TIME_DIM, data_vars=[DATA_KEY],
             coords='minimal', compat='identical'
         )
+
+
+def subset_by_time(urma_table_xarray, desired_times_unix_sec):
+    """Subsets URMA table by valid time.
+
+    :param urma_table_xarray: xarray table with URMA data.
+    :param desired_times_unix_sec: 1-D numpy array of desired valid times.
+    :return: urma_table_xarray: Same as input but maybe with fewer times.
+    """
+
+    error_checking.assert_is_numpy_array(
+        desired_times_unix_sec, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_times_unix_sec)
+
+    return urma_table_xarray.sel(
+        {VALID_TIME_DIM: desired_times_unix_sec}
+    )
+
+
+def subset_by_field(urma_table_xarray, desired_field_names):
+    """Subsets URMA table by field.
+
+    :param urma_table_xarray: xarray table with URMA data.
+    :param desired_field_names: 1-D list with names of desired fields.
+    :return: urma_table_xarray: Same as input but maybe with fewer
+        fields.
+    """
+
+    error_checking.assert_is_string_list(desired_field_names)
+    return urma_table_xarray.sel({FIELD_DIM: desired_field_names})
