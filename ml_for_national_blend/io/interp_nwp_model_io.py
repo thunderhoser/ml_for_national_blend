@@ -36,10 +36,10 @@ def find_file(directory_name, init_time_unix_sec, forecast_hour, model_name,
     error_checking.assert_is_greater(forecast_hour, 0)
     error_checking.assert_is_boolean(raise_error_if_missing)
 
-    interp_nwp_file_name = '{0:s}/{1:s}_{2:s}_hour{3:03d}.nc'.format(
+    interp_nwp_file_name = '{0:s}/{1:s}/{2:s}_{1:s}_hour{3:03d}.nc'.format(
         directory_name,
-        model_name,
         time_conversion.unix_sec_to_string(init_time_unix_sec, TIME_FORMAT),
+        model_name,
         forecast_hour
     )
 

@@ -10,8 +10,8 @@ MODEL_NAME = nwp_model_utils.WRF_ARW_MODEL_NAME
 FORECAST_HOUR = 7
 INIT_TIMES_UNIX_SEC = numpy.array([1667260800, 1667304000], dtype=int)
 WRF_ARW_FILE_NAMES = [
-    'foo/wrf_arw_2022-11-01-00_hour007.nc',
-    'foo/wrf_arw_2022-11-01-12_hour007.nc'
+    'foo/2022-11-01-00/wrf_arw_2022-11-01-00_hour007.nc',
+    'foo/2022-11-01-12/wrf_arw_2022-11-01-12_hour007.nc'
 ]
 
 
