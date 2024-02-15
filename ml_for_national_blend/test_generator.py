@@ -199,11 +199,11 @@ predictor_matrix_20km = predictor_matrices[2][0, ...].astype(numpy.float64)
 predictor_matrix_40km = predictor_matrices[3][0, ...].astype(numpy.float64)
 target_matrix = target_matrix[0, ...].astype(numpy.float64)
 
-predictor_matrix_2pt5km[predictor_matrix_2pt5km < 9000] = numpy.nan
-predictor_matrix_10km[predictor_matrix_10km < 9000] = numpy.nan
-predictor_matrix_20km[predictor_matrix_20km < 9000] = numpy.nan
-predictor_matrix_40km[predictor_matrix_40km < 9000] = numpy.nan
-target_matrix[target_matrix < 9000] = numpy.nan
+predictor_matrix_2pt5km[predictor_matrix_2pt5km < -9000] = numpy.nan
+predictor_matrix_10km[predictor_matrix_10km < -9000] = numpy.nan
+predictor_matrix_20km[predictor_matrix_20km < -9000] = numpy.nan
+predictor_matrix_40km[predictor_matrix_40km < -9000] = numpy.nan
+target_matrix[target_matrix < -9000] = numpy.nan
 
 nwp_lead_times_hours = numpy.array([6, 12, 18], dtype=int)
 
