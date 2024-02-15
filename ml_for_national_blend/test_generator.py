@@ -97,7 +97,11 @@ nwp_model_to_field_names = {
     nwp_model_utils.GFS_MODEL_NAME: FIELD_NAMES,
     nwp_model_utils.GEFS_MODEL_NAME: FIELD_NAMES[:-1],
     nwp_model_utils.RAP_MODEL_NAME: FIELD_NAMES[:-2],
-    nwp_model_utils.GRIDDED_LAMP_MODEL_NAME: FIELD_NAMES[:-3]
+    nwp_model_utils.GRIDDED_LAMP_MODEL_NAME: [
+        nwp_model_utils.TEMPERATURE_2METRE_NAME, nwp_model_utils.DEWPOINT_2METRE_NAME,
+        nwp_model_utils.U_WIND_10METRE_NAME, nwp_model_utils.V_WIND_10METRE_NAME,
+        nwp_model_utils.WIND_GUST_10METRE_NAME
+    ]
 }
 
 option_dict = {
