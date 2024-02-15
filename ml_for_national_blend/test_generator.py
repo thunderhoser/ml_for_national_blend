@@ -193,11 +193,11 @@ predictor_matrices, target_matrix = next(generator_object)
 
 file_system_utils.mkdir_recursive_if_necessary(directory_name=FIGURE_DIR_NAME)
 
-predictor_matrix_2pt5km = predictor_matrices[0][0, ...]
-predictor_matrix_10km = predictor_matrices[1][0, ...]
-predictor_matrix_20km = predictor_matrices[2][0, ...]
-predictor_matrix_40km = predictor_matrices[3][0, ...]
-target_matrix = target_matrix[0, ...]
+predictor_matrix_2pt5km = predictor_matrices[0][0, ...].astype(numpy.float64)
+predictor_matrix_10km = predictor_matrices[1][0, ...].astype(numpy.float64)
+predictor_matrix_20km = predictor_matrices[2][0, ...].astype(numpy.float64)
+predictor_matrix_40km = predictor_matrices[3][0, ...].astype(numpy.float64)
+target_matrix = target_matrix[0, ...].astype(numpy.float64)
 
 nwp_lead_times_hours = numpy.array([6, 12, 18], dtype=int)
 
