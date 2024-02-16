@@ -35,5 +35,4 @@ python3 -u "${CODE_DIR_NAME}/interp_nwp_data_to_nbm_grid.py" \
 --model_name="gefs" \
 --first_init_time_string="${init_time_string}" \
 --last_init_time_string="${init_time_string}" \
---tar_output_files=1 \
 --output_nbm_grid_dir_name="${OUTPUT_DIR_NAME}"
