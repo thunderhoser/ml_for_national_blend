@@ -162,6 +162,7 @@ def _find_input_files_1model(
             for h in forecast_hours
         ]
 
+    print(interp_nwp_file_names)
     return interp_nwp_file_names
 
 
