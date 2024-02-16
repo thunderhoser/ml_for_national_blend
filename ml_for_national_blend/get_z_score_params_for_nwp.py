@@ -114,6 +114,13 @@ def _find_input_files_1model(
     good_indices = []
 
     for j in range(len(init_times_unix_sec)):
+        print('Looking for {0:s} data at {1:s}...'.format(
+            model_name.upper(),
+            time_conversion.unix_sec_to_string(
+                init_times_unix_sec[j], TIME_FORMAT
+            )
+        ))
+
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name,
             init_time_unix_sec=init_times_unix_sec[j]
@@ -146,6 +153,13 @@ def _find_input_files_1model(
     interp_nwp_file_names = []
 
     for j in range(len(init_times_unix_sec)):
+        print('Looking for {0:s} data at {1:s}...'.format(
+            model_name.upper(),
+            time_conversion.unix_sec_to_string(
+                init_times_unix_sec[j], TIME_FORMAT
+            )
+        ))
+
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name,
             init_time_unix_sec=init_times_unix_sec[j]
@@ -162,7 +176,6 @@ def _find_input_files_1model(
             for h in forecast_hours
         ]
 
-    print(interp_nwp_file_names)
     return interp_nwp_file_names
 
 
