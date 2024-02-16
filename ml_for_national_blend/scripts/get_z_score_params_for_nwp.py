@@ -107,11 +107,20 @@ def _find_input_files_1model(
     good_indices = []
 
     for j in range(len(init_times_unix_sec)):
+        print('Looking for {0:s} data at {1:s}...'.format(
+            model_name.upper(),
+            time_conversion.unix_sec_to_string(
+                init_times_unix_sec[j], TIME_FORMAT
+            )
+        ))
+
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name,
             init_time_unix_sec=init_times_unix_sec[j]
         )
 
+        # TODO(thunderhoser): Checking only the first and last forecast hours is
+        # a HACK to save time.
         these_file_names = [
             interp_nwp_model_io.find_file(
                 directory_name=input_dir_name,
@@ -120,7 +129,7 @@ def _find_input_files_1model(
                 model_name=model_name,
                 raise_error_if_missing=False
             )
-            for h in forecast_hours
+            for h in [forecast_hours[0], forecast_hours[-1]]
         ]
 
         if not all([os.path.isfile(f) for f in these_file_names]):
@@ -139,6 +148,13 @@ def _find_input_files_1model(
     interp_nwp_file_names = []
 
     for j in range(len(init_times_unix_sec)):
+        print('Looking for {0:s} data at {1:s}...'.format(
+            model_name.upper(),
+            time_conversion.unix_sec_to_string(
+                init_times_unix_sec[j], TIME_FORMAT
+            )
+        ))
+
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name,
             init_time_unix_sec=init_times_unix_sec[j]
