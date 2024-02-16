@@ -1,10 +1,14 @@
 """Helper methods for training a neural network."""
 
 import os
+import pickle
 import warnings
 import numpy
+import keras
+import tensorflow.keras as tf_keras
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
+from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.io import urma_io
@@ -27,6 +31,29 @@ SENTINEL_VALUE_KEY = 'sentinel_value'
 DEFAULT_GENERATOR_OPTION_DICT = {
     SENTINEL_VALUE_KEY: -10.
 }
+
+PREDICTOR_MATRICES_KEY = 'predictor_matrices_key'
+TARGET_MATRIX_KEY = 'target_matrix'
+INIT_TIMES_KEY = 'init_times_unix_sec'
+
+NUM_EPOCHS_KEY = 'num_epochs'
+NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
+TRAINING_OPTIONS_KEY = 'training_option_dict'
+NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+VALIDATION_OPTIONS_KEY = 'validation_option_dict'
+LOSS_FUNCTION_KEY = 'loss_function_string'
+OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
+METRIC_FUNCTIONS_KEY = 'metric_function_strings'
+PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
+PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
+EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
+
+METADATA_KEYS = [
+    NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
+    NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
+    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY,
+    PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
+]
 
 
 def _check_generator_args(option_dict):
@@ -360,7 +387,7 @@ def _read_targets_one_example(
     )
 
     return numpy.transpose(
-        urma_table_xarray[urma_utils.DATA_KEY][0, ...],
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
         axes=(1, 0, 2)
     )
 
@@ -439,19 +466,19 @@ def _read_predictors_one_example(
 
             if nwp_downsampling_factors[i] == 1:
                 predictor_matrices_2pt5km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 4:
                 predictor_matrices_10km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 8:
                 predictor_matrices_20km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             else:
                 predictor_matrices_40km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY][0, ...]
+                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
 
     if predictor_matrices_2pt5km is None:
@@ -486,6 +513,205 @@ def _read_predictors_one_example(
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km
     )
+
+
+def create_data(option_dict):
+    """Creates, instead of generates, neural-network inputs.
+
+    E = number of examples returned
+
+    :param option_dict: See documentation for `data_generator`.
+    :return: data_dict: Dictionary with the following keys.
+    data_dict["predictor_matrices"]: Same as output from `data_generator`.
+    data_dict["target_matrix"]: Same as output from `data_generator`.
+    data_dict["init_times_unix_sec"]: length-E numpy array of forecast-
+        initialization times.
+    """
+
+    # Check input args.
+    option_dict[BATCH_SIZE_KEY] = 32  # Dummy argument.
+
+    option_dict = _check_generator_args(option_dict)
+    init_time_limits_unix_sec = option_dict[INIT_TIME_LIMITS_KEY]
+    nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
+    nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
+    nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+    target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_dir_name = option_dict[TARGET_DIR_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+
+    first_nwp_model_names = list(nwp_model_to_dir_name.keys())
+    second_nwp_model_names = list(nwp_model_to_field_names.keys())
+    assert set(first_nwp_model_names) == set(second_nwp_model_names)
+
+    nwp_model_names = list(set(first_nwp_model_names))
+    nwp_model_names = [
+        m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
+    ]
+
+    init_time_intervals_sec = numpy.array([
+        nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
+    ], dtype=int)
+
+    init_times_unix_sec = time_periods.range_and_interval_to_list(
+        start_time_unix_sec=init_time_limits_unix_sec[0],
+        end_time_unix_sec=init_time_limits_unix_sec[-1],
+        time_interval_sec=numpy.max(init_time_intervals_sec),
+        include_endpoint=True
+    )
+
+    # Do actual stuff.
+    num_examples = len(init_times_unix_sec)
+    good_example_flags = numpy.full(num_examples, False, dtype=bool)
+
+    (
+        predictor_matrix_2pt5km, predictor_matrix_10km,
+        predictor_matrix_20km, predictor_matrix_40km,
+        target_matrix
+    ) = _init_matrices_1batch(
+        nwp_model_names=nwp_model_names,
+        nwp_model_to_field_names=nwp_model_to_field_names,
+        num_nwp_lead_times=len(nwp_lead_times_hours),
+        num_target_fields=len(target_field_names),
+        num_examples_per_batch=num_examples
+    )
+
+    for i in range(num_examples):
+        this_target_matrix = _read_targets_one_example(
+            init_time_unix_sec=init_times_unix_sec[i],
+            target_lead_time_hours=target_lead_time_hours,
+            target_field_names=target_field_names,
+            target_dir_name=target_dir_name
+        )
+
+        if this_target_matrix is None:
+            continue
+
+        target_matrix[i, ...] = this_target_matrix
+
+        (
+            this_predictor_matrix_2pt5km,
+            this_predictor_matrix_10km,
+            this_predictor_matrix_20km,
+            this_predictor_matrix_40km
+        ) = _read_predictors_one_example(
+            init_time_unix_sec=init_times_unix_sec[i],
+            nwp_model_names=nwp_model_names,
+            nwp_lead_times_hours=nwp_lead_times_hours,
+            nwp_model_to_field_names=nwp_model_to_field_names,
+            nwp_model_to_dir_name=nwp_model_to_dir_name
+        )
+
+        if predictor_matrix_2pt5km is not None:
+            good_example_flags[i] &= not numpy.all(
+                numpy.isnan(this_predictor_matrix_2pt5km)
+            )
+            predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
+        if predictor_matrix_10km is not None:
+            good_example_flags[i] &= not numpy.all(
+                numpy.isnan(this_predictor_matrix_10km)
+            )
+            predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
+        if predictor_matrix_20km is not None:
+            good_example_flags[i] &= not numpy.all(
+                numpy.isnan(this_predictor_matrix_20km)
+            )
+            predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
+        if predictor_matrix_40km is not None:
+            good_example_flags[i] &= not numpy.all(
+                numpy.isnan(this_predictor_matrix_40km)
+            )
+            predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
+
+    good_indices = numpy.where(good_example_flags)[0]
+    init_times_unix_sec = init_times_unix_sec[good_indices, ...]
+    target_matrix = target_matrix[good_indices, ...]
+    error_checking.assert_is_numpy_array_without_nan(target_matrix)
+
+    print((
+        'Shape of 2.5-km target matrix and NaN fraction: '
+        '{0:s}, {1:.04f}'
+    ).format(
+        str(target_matrix.shape),
+        numpy.mean(numpy.isnan(target_matrix))
+    ))
+
+    if predictor_matrix_2pt5km is not None:
+        predictor_matrix_2pt5km = predictor_matrix_2pt5km[good_indices, ...]
+
+        print((
+            'Shape of 2.5-km predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_2pt5km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
+        ))
+
+        predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_10km is not None:
+        predictor_matrix_10km = predictor_matrix_10km[good_indices, ...]
+
+        print((
+            'Shape of 10-km predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_10km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_10km))
+        ))
+
+        predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_20km is not None:
+        predictor_matrix_20km = predictor_matrix_20km[good_indices, ...]
+
+        print((
+            'Shape of 20-km predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_20km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_20km))
+        ))
+
+        predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_40km is not None:
+        predictor_matrix_40km = predictor_matrix_40km[good_indices, ...]
+
+        print((
+            'Shape of 40-km predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_40km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_40km))
+        ))
+
+        predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
+            sentinel_value
+        )
+
+    predictor_matrices = [
+        m for m in [
+            predictor_matrix_2pt5km, predictor_matrix_10km,
+            predictor_matrix_20km, predictor_matrix_40km
+        ]
+        if m is not None
+    ]
+
+    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+
+    return {
+        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        TARGET_MATRIX_KEY: target_matrix,
+        INIT_TIMES_KEY: init_times_unix_sec
+    }
 
 
 def data_generator(option_dict):
@@ -567,12 +793,6 @@ def data_generator(option_dict):
     # TODO(thunderhoser): Still need to do normalization!
 
     # TODO(thunderhoser): Still need to add constant fields!
-
-    # TODO(thunderhoser): According to the project proposal, target fields are
-    # supposed to include "minimum RH" and "maximum RH".  But there are two
-    # problems: (1) I don't know what we're minning/maxxing over -- is it
-    # min/max over the hour at every grid point?  (2) This variable is not
-    # available in URMA, so we have no ground truth.
 
     option_dict = _check_generator_args(option_dict)
     init_time_limits_unix_sec = option_dict[INIT_TIME_LIMITS_KEY]
@@ -658,14 +878,32 @@ def data_generator(option_dict):
                 nwp_model_to_dir_name=nwp_model_to_dir_name
             )
 
+            found_any_predictors = False
+
             if predictor_matrix_2pt5km is not None:
+                found_any_predictors &= not numpy.all(
+                    numpy.isnan(this_predictor_matrix_2pt5km)
+                )
                 predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
             if predictor_matrix_10km is not None:
+                found_any_predictors &= not numpy.all(
+                    numpy.isnan(this_predictor_matrix_10km)
+                )
                 predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
             if predictor_matrix_20km is not None:
+                found_any_predictors &= not numpy.all(
+                    numpy.isnan(this_predictor_matrix_20km)
+                )
                 predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
             if predictor_matrix_40km is not None:
+                found_any_predictors &= not numpy.all(
+                    numpy.isnan(this_predictor_matrix_40km)
+                )
                 predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
+
+            if not found_any_predictors:
+                init_time_index += 1
+                continue
 
             num_examples_in_memory += 1
             init_time_index += 1
@@ -741,3 +979,342 @@ def data_generator(option_dict):
 
         predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         yield predictor_matrices, target_matrix
+
+
+def train_model(
+        model_object, num_epochs,
+        num_training_batches_per_epoch, training_option_dict,
+        num_validation_batches_per_epoch, validation_option_dict,
+        loss_function_string, optimizer_function_string,
+        metric_function_strings, plateau_patience_epochs,
+        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
+        output_dir_name):
+    """Trains neural net with generator.
+
+    :param model_object: Untrained neural net (instance of
+        `keras.models.Model`).
+    :param num_epochs: Number of training epochs.
+    :param num_training_batches_per_epoch: Number of training batches per epoch.
+    :param training_option_dict: See doc for `data_generator`.  This dictionary
+        will be used to generate training data.
+    :param num_validation_batches_per_epoch: Number of validation batches per
+        epoch.
+    :param validation_option_dict: See doc for `data_generator`.  For validation
+        only, the following values will replace corresponding values in
+        `training_option_dict`:
+    validation_option_dict["init_time_limits_unix_sec"]
+    validation_option_dict["nwp_model_to_dir_name"]
+    validation_option_dict["target_dir_name"]
+
+    :param loss_function_string: Loss function.  This string should be formatted
+        such that `eval(loss_function_string)` returns the actual loss function.
+    :param optimizer_function_string: Optimizer.  This string should be
+        formatted such that `eval(optimizer_function_string)` returns the actual
+        optimizer.
+    :param metric_function_strings: 1-D list with names of metrics.  Each string
+        should be formatted such that `eval(metric_function_strings[i])` returns
+        the actual metric function.
+    :param plateau_patience_epochs: Training will be deemed to have reached
+        "plateau" if validation loss has not decreased in the last N epochs,
+        where N = plateau_patience_epochs.
+    :param plateau_learning_rate_multiplier: If training reaches "plateau,"
+        learning rate will be multiplied by this value in range (0, 1).
+    :param early_stopping_patience_epochs: Training will be stopped early if
+        validation loss has not decreased in the last N epochs, where N =
+        early_stopping_patience_epochs.
+    :param output_dir_name: Path to output directory (model and training history
+        will be saved here).
+    """
+
+    # TODO(thunderhoser): chiu_net_architecture.py needs to allow for metrics.
+
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
+
+    backup_dir_name = '{0:s}/backup_and_restore'.format(output_dir_name)
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=backup_dir_name
+    )
+
+    error_checking.assert_is_integer(num_epochs)
+    error_checking.assert_is_geq(num_epochs, 2)
+    error_checking.assert_is_integer(num_training_batches_per_epoch)
+    error_checking.assert_is_geq(num_training_batches_per_epoch, 2)
+    error_checking.assert_is_integer(num_validation_batches_per_epoch)
+    error_checking.assert_is_geq(num_validation_batches_per_epoch, 2)
+    error_checking.assert_is_integer(plateau_patience_epochs)
+    error_checking.assert_is_geq(plateau_patience_epochs, 2)
+    error_checking.assert_is_greater(plateau_learning_rate_multiplier, 0.)
+    error_checking.assert_is_less_than(plateau_learning_rate_multiplier, 1.)
+    error_checking.assert_is_integer(early_stopping_patience_epochs)
+    error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
+
+    validation_keys_to_keep = [
+        INIT_TIME_LIMITS_KEY, NWP_MODEL_TO_DIR_KEY, TARGET_DIR_KEY
+    ]
+    for this_key in list(training_option_dict.keys()):
+        if this_key in validation_keys_to_keep:
+            continue
+
+        validation_option_dict[this_key] = training_option_dict[this_key]
+
+    training_option_dict = _check_generator_args(training_option_dict)
+    validation_option_dict = _check_generator_args(validation_option_dict)
+
+    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+
+    history_object = keras.callbacks.CSVLogger(
+        filename='{0:s}/history.csv'.format(output_dir_name),
+        separator=',', append=False
+    )
+    checkpoint_object = keras.callbacks.ModelCheckpoint(
+        filepath=model_file_name, monitor='val_loss', verbose=1,
+        save_best_only=True, save_weights_only=False, mode='min', period=1
+    )
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=0.,
+        patience=early_stopping_patience_epochs, verbose=1, mode='min'
+    )
+    plateau_object = keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=plateau_learning_rate_multiplier,
+        patience=plateau_patience_epochs, verbose=1, mode='min',
+        min_delta=0., cooldown=0
+    )
+    backup_object = keras.callbacks.BackupAndRestore(
+        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+    )
+
+    list_of_callback_objects = [
+        history_object, checkpoint_object,
+        early_stopping_object, plateau_object,
+        backup_object
+    ]
+
+    training_generator = data_generator(training_option_dict)
+    validation_generator = data_generator(validation_option_dict)
+
+    metafile_name = find_metafile(
+        model_file_name=model_file_name, raise_error_if_missing=False
+    )
+    print('Writing metadata to: "{0:s}"...'.format(metafile_name))
+
+    write_metafile(
+        pickle_file_name=metafile_name,
+        num_epochs=num_epochs,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        training_option_dict=training_option_dict,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+        validation_option_dict=validation_option_dict,
+        loss_function_string=loss_function_string,
+        optimizer_function_string=optimizer_function_string,
+        metric_function_strings=metric_function_strings,
+        plateau_patience_epochs=plateau_patience_epochs,
+        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs=early_stopping_patience_epochs
+    )
+
+    model_object.fit_generator(
+        generator=training_generator,
+        steps_per_epoch=num_training_batches_per_epoch,
+        epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch
+    )
+
+
+def apply_model(
+        model_object, predictor_matrices, num_examples_per_batch, verbose=True):
+    """Applies trained neural net -- inference time!
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    F = number of target fields
+
+    :param model_object: Trained neural net (instance of `keras.models.Model`).
+    :param predictor_matrices: See output doc for `data_generator`.
+    :param num_examples_per_batch: Batch size.
+    :param verbose: Boolean flag.  If True, will print progress messages.
+    :return: prediction_matrix: E-by-M-by-N-by-F numpy array of predicted
+        values.
+    """
+
+    # Check input args.
+    for this_matrix in predictor_matrices:
+        error_checking.assert_is_numpy_array_without_nan(this_matrix)
+
+    error_checking.assert_is_integer(num_examples_per_batch)
+    error_checking.assert_is_geq(num_examples_per_batch, 1)
+    num_examples = predictor_matrices[0].shape[0]
+    num_examples_per_batch = min([num_examples_per_batch, num_examples])
+
+    error_checking.assert_is_boolean(verbose)
+
+    # Do actual stuff.
+    prediction_matrix = None
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        first_index = i
+        last_index = min([i + num_examples_per_batch, num_examples])
+
+        if verbose:
+            print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+                first_index + 1, last_index, num_examples
+            ))
+
+        this_prediction_matrix = model_object.predict_on_batch(
+            [a[first_index:last_index, ...] for a in predictor_matrices]
+        )
+
+        if prediction_matrix is None:
+            dimensions = (num_examples,) + this_prediction_matrix.shape[1:]
+            prediction_matrix = numpy.full(dimensions, numpy.nan)
+
+        prediction_matrix[first_index:last_index, ...] = this_prediction_matrix
+
+    if verbose:
+        print('Have applied model to all {0:d} examples!'.format(num_examples))
+
+    while len(prediction_matrix.shape) < 4:
+        prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
+
+    return prediction_matrix
+
+
+def find_metafile(model_file_name, raise_error_if_missing=True):
+    """Finds metafile for neural net.
+
+    :param model_file_name: Path to model file.
+    :param raise_error_if_missing: Boolean flag.  If file is missing and
+        `raise_error_if_missing == True`, will throw error.  If file is missing
+        and `raise_error_if_missing == False`, will return *expected* file path.
+    :return: metafile_name: Path to metafile.
+    """
+
+    error_checking.assert_is_string(model_file_name)
+    metafile_name = '{0:s}/model_metadata.p'.format(
+        os.path.split(model_file_name)[0]
+    )
+
+    if raise_error_if_missing and not os.path.isfile(metafile_name):
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            metafile_name
+        )
+        raise ValueError(error_string)
+
+    return metafile_name
+
+
+def write_metafile(
+        pickle_file_name, num_epochs, num_training_batches_per_epoch,
+        training_option_dict, num_validation_batches_per_epoch,
+        validation_option_dict, loss_function_string, optimizer_function_string,
+        metric_function_strings, plateau_patience_epochs,
+        plateau_learning_rate_multiplier, early_stopping_patience_epochs):
+    """Writes metadata to Pickle file.
+
+    :param pickle_file_name: Path to output file.
+    :param num_epochs: See doc for `train_model`.
+    :param num_training_batches_per_epoch: Same.
+    :param training_option_dict: Same.
+    :param num_validation_batches_per_epoch: Same.
+    :param validation_option_dict: Same.
+    :param loss_function_string: Same.
+    :param optimizer_function_string: Same.
+    :param metric_function_strings: Same.
+    :param plateau_patience_epochs: Same.
+    :param plateau_learning_rate_multiplier: Same.
+    :param early_stopping_patience_epochs: Same.
+    """
+
+    metadata_dict = {
+        NUM_EPOCHS_KEY: num_epochs,
+        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        TRAINING_OPTIONS_KEY: training_option_dict,
+        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
+        VALIDATION_OPTIONS_KEY: validation_option_dict,
+        LOSS_FUNCTION_KEY: loss_function_string,
+        OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
+        METRIC_FUNCTIONS_KEY: metric_function_strings,
+        PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
+        PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
+        EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs
+    }
+
+    file_system_utils.mkdir_recursive_if_necessary(file_name=pickle_file_name)
+
+    pickle_file_handle = open(pickle_file_name, 'wb')
+    pickle.dump(metadata_dict, pickle_file_handle)
+    pickle_file_handle.close()
+
+
+def read_metafile(pickle_file_name):
+    """Reads metadata from Pickle file.
+
+    :param pickle_file_name: Path to input file.
+    :return: metadata_dict: Dictionary with the following keys.
+    metadata_dict["num_epochs"]: See doc for `train_model`.
+    metadata_dict["num_training_batches_per_epoch"]: Same.
+    metadata_dict["training_option_dict"]: Same.
+    metadata_dict["num_validation_batches_per_epoch"]: Same.
+    metadata_dict["validation_option_dict"]: Same.
+    metadata_dict["loss_function_string"]: Same.
+    metadata_dict["optimizer_function_string"]: Same.
+    metadata_dict["metric_function_strings"]: Same.
+    metadata_dict["plateau_patience_epochs"]: Same.
+    metadata_dict["plateau_learning_rate_multiplier"]: Same.
+    metadata_dict["early_stopping_patience_epochs"]: Same.
+
+    :raises: ValueError: if any expected key is not found in dictionary.
+    """
+
+    error_checking.assert_file_exists(pickle_file_name)
+
+    pickle_file_handle = open(pickle_file_name, 'rb')
+    metadata_dict = pickle.load(pickle_file_handle)
+    pickle_file_handle.close()
+
+    missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
+    if len(missing_keys) == 0:
+        return metadata_dict
+
+    error_string = (
+        '\n{0:s}\nKeys listed above were expected, but not found, in file '
+        '"{1:s}".'
+    ).format(str(missing_keys), pickle_file_name)
+
+    raise ValueError(error_string)
+
+
+def read_model(hdf5_file_name):
+    """Reads model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    error_checking.assert_file_exists(hdf5_file_name)
+
+    metafile_name = find_metafile(
+        model_file_name=hdf5_file_name, raise_error_if_missing=True
+    )
+    metadata_dict = read_metafile(metafile_name)
+
+    custom_object_dict = {
+        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
+    }
+    model_object = tf_keras.models.load_model(
+        hdf5_file_name, custom_objects=custom_object_dict, compile=False
+    )
+
+    metric_function_list = [
+        eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
+    ]
+    model_object.compile(
+        loss=custom_object_dict['loss'],
+        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
+        metrics=metric_function_list
+    )
+
+    return model_object

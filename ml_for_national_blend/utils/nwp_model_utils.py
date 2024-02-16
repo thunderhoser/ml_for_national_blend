@@ -31,6 +31,10 @@ LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
 DATA_KEY = 'data_matrix'
 
+MEAN_VALUE_KEY = 'mean_value'
+MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
+STDEV_KEY = 'standard_deviation'
+
 WRF_ARW_MODEL_NAME = 'wrf_arw'
 NAM_MODEL_NAME = 'nam'
 NAM_NEST_MODEL_NAME = 'nam_nest'
