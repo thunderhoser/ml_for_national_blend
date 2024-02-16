@@ -20,6 +20,10 @@ LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
 DATA_KEY = 'data_matrix'
 
+MEAN_VALUE_KEY = 'mean_value'
+MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
+STDEV_KEY = 'standard_deviation'
+
 TEMPERATURE_2METRE_NAME = 'temperature_2m_agl_kelvins'
 DEWPOINT_2METRE_NAME = 'dewpoint_2m_agl_kelvins'
 U_WIND_10METRE_NAME = 'u_wind_10m_agl_m_s01'
