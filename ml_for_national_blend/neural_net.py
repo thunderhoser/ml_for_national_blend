@@ -17,10 +17,14 @@ import time_conversion
 import time_periods
 import file_system_utils
 import error_checking
+import nwp_model_io
 import interp_nwp_model_io
 import urma_io
 import nwp_model_utils
 import urma_utils
+import normalization
+# from ml_for_national_blend.machine_learning import custom_losses
+# from ml_for_national_blend.machine_learning import custom_metrics
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
@@ -29,9 +33,11 @@ INIT_TIME_LIMITS_KEY = 'init_time_limits_unix_sec'
 NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
 NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
+NWP_NORM_FILE_KEY = 'nwp_normalization_file_name'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_hours'
 TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_DIR_KEY = 'target_dir_name'
+TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 
@@ -117,6 +123,9 @@ def _check_generator_args(option_dict):
         for this_field_name in nwp_model_to_field_names[this_model_name]:
             nwp_model_utils.check_field_name(this_field_name)
 
+    if option_dict[NWP_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
+
     error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
     error_checking.assert_is_greater(option_dict[TARGET_LEAD_TIME_KEY], 0)
 
@@ -125,6 +134,8 @@ def _check_generator_args(option_dict):
         urma_utils.check_field_name(this_field_name)
 
     error_checking.assert_is_string(option_dict[TARGET_DIR_KEY])
+    if option_dict[TARGET_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
@@ -352,7 +363,7 @@ def _init_matrices_1batch(
 
 def _read_targets_one_example(
         init_time_unix_sec, target_lead_time_hours, target_field_names,
-        target_dir_name):
+        target_dir_name, target_norm_param_table_xarray):
     """Reads target fields for one example.
 
     NBM = National Blend of Models
@@ -365,6 +376,10 @@ def _read_targets_one_example(
     :param target_lead_time_hours: See documentation for `data_generator`.
     :param target_field_names: Same.
     :param target_dir_name: Same.
+    :param target_norm_param_table_xarray: xarray table with normalization
+        parameters for target variables.  If you do not want to normalize (or
+        if the input directory already contains normalized data), this should be
+        None.
     :return: target_matrix: M-by-N-by-F numpy array of target values.
     """
 
@@ -393,6 +408,13 @@ def _read_targets_one_example(
         desired_field_names=target_field_names
     )
 
+    if target_norm_param_table_xarray is not None:
+        print('Normalizing target variables to z-scores...')
+        urma_table_xarray = normalization.normalize_targets_to_z_scores(
+            urma_table_xarray=urma_table_xarray,
+            z_score_param_table_xarray=target_norm_param_table_xarray
+        )
+
     return numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
         axes=(1, 0, 2)
@@ -401,7 +423,8 @@ def _read_targets_one_example(
 
 def _read_predictors_one_example(
         init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
-        nwp_model_to_field_names, nwp_model_to_dir_name):
+        nwp_model_to_field_names, nwp_model_to_dir_name,
+        nwp_norm_param_table_xarray):
     """Reads predictor fields for one example.
 
     :param init_time_unix_sec: Forecast-initialization time.
@@ -410,6 +433,10 @@ def _read_predictors_one_example(
     :param nwp_lead_times_hours: See documentation for `data_generator`.
     :param nwp_model_to_field_names: Same.
     :param nwp_model_to_dir_name: Same.
+    :param nwp_norm_param_table_xarray: xarray table with normalization
+        parameters for predictor variables.  If you do not want to normalize (or
+        if the input directory already contains normalized data), this should be
+        None.
     :return: predictor_matrix_2pt5km: Same as output from `data_generator` but
         without first axis.
     :return: predictor_matrix_10km: Same as output from `data_generator` but
@@ -467,25 +494,35 @@ def _read_predictors_one_example(
                 desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
             )
 
+            if nwp_norm_param_table_xarray is not None:
+                print('Normalizing predictor variables to z-scores...')
+                nwp_forecast_table_xarray = (
+                    normalization.normalize_nwp_data_to_z_scores(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        z_score_param_table_xarray=nwp_norm_param_table_xarray
+                    )
+                )
+
             matrix_index = numpy.sum(
                 nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
             )
+            nwpft = nwp_forecast_table_xarray
 
             if nwp_downsampling_factors[i] == 1:
                 predictor_matrices_2pt5km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
+                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 4:
                 predictor_matrices_10km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
+                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             elif nwp_downsampling_factors[i] == 8:
                 predictor_matrices_20km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
+                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
             else:
                 predictor_matrices_40km[matrix_index][..., j, :] = (
-                    nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
+                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
 
     if predictor_matrices_2pt5km is None:
@@ -543,9 +580,11 @@ def create_data(option_dict):
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+    nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
@@ -556,6 +595,26 @@ def create_data(option_dict):
     nwp_model_names = [
         m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
     ]
+
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     init_time_intervals_sec = numpy.array([
         nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
@@ -589,7 +648,8 @@ def create_data(option_dict):
             init_time_unix_sec=init_times_unix_sec[i],
             target_lead_time_hours=target_lead_time_hours,
             target_field_names=target_field_names,
-            target_dir_name=target_dir_name
+            target_dir_name=target_dir_name,
+            target_norm_param_table_xarray=target_norm_param_table_xarray
         )
 
         if this_target_matrix is None:
@@ -607,7 +667,8 @@ def create_data(option_dict):
             nwp_model_names=nwp_model_names,
             nwp_lead_times_hours=nwp_lead_times_hours,
             nwp_model_to_field_names=nwp_model_to_field_names,
-            nwp_model_to_dir_name=nwp_model_to_dir_name
+            nwp_model_to_dir_name=nwp_model_to_dir_name,
+            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
         )
 
         if predictor_matrix_2pt5km is not None:
@@ -762,12 +823,18 @@ def data_generator(option_dict):
         predictors.  NWP-model names must be accepted by
         `nwp_model_utils.check_model_name`, and field names must be accepted by
         `nwp_model_utils.check_field_name`.
+    option_dict["nwp_normalization_file_name"]: Path to file with normalization
+        params for NWP data.  Will be read by
+        `nwp_model_io.read_normalization_file`.
     option_dict["target_lead_time_hours"]: Lead time for target fields.
     option_dict["target_field_names"]: length-F list with names of target
         fields.  Each must be accepted by `urma_utils.check_field_name`.
     option_dict["target_dir_name"]: Path to directory with target fields (i.e.,
         URMA data).  Files within this directory will be found by
         `urma_io.find_file` and read by `urma_io.read_file`.
+    option_dict["target_normalization_file_name"]: Path to file with
+        normalization params for target fields.  Will be read by
+        `urma_io.read_normalization_file`.
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
@@ -797,8 +864,6 @@ def data_generator(option_dict):
     # upsampling factor must be an integer.  But also, maybe I could use LSTM to
     # change the sequence length.
 
-    # TODO(thunderhoser): Still need to do normalization!
-
     # TODO(thunderhoser): Still need to add constant fields!
 
     option_dict = _check_generator_args(option_dict)
@@ -806,9 +871,11 @@ def data_generator(option_dict):
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+    nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
@@ -820,6 +887,26 @@ def data_generator(option_dict):
     nwp_model_names = [
         m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
     ]
+
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     # TODO(thunderhoser): Different NWP models are available at different init
     # times.  Currently, I handle this by using only common init times.
@@ -862,7 +949,8 @@ def data_generator(option_dict):
                 init_time_unix_sec=init_times_unix_sec[init_time_index],
                 target_lead_time_hours=target_lead_time_hours,
                 target_field_names=target_field_names,
-                target_dir_name=target_dir_name
+                target_dir_name=target_dir_name,
+                target_norm_param_table_xarray=target_norm_param_table_xarray
             )
 
             if this_target_matrix is None:
@@ -882,7 +970,8 @@ def data_generator(option_dict):
                 nwp_model_names=nwp_model_names,
                 nwp_lead_times_hours=nwp_lead_times_hours,
                 nwp_model_to_field_names=nwp_model_to_field_names,
-                nwp_model_to_dir_name=nwp_model_to_dir_name
+                nwp_model_to_dir_name=nwp_model_to_dir_name,
+                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
             )
 
             found_any_predictors = False
@@ -1032,8 +1121,6 @@ def train_model(
     :param output_dir_name: Path to output directory (model and training history
         will be saved here).
     """
-
-    # TODO(thunderhoser): chiu_net_architecture.py needs to allow for metrics.
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name

@@ -52,6 +52,7 @@ ENSEMBLE_SIZE_KEY = 'ensemble_size'
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
+METRIC_FUNCTIONS_KEY = 'metric_function_list'
 
 DEFAULT_OPTION_DICT = {
     NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
@@ -126,6 +127,7 @@ def check_input_args(option_dict):
     option_dict["num_output_channels"]: Number of output channels.
     option_dict["loss_function"]: Loss function.
     option_dict["optimizer_function"]: Optimizer function.
+    option_dict["metric_function_list"]: 1-D list of metric functions.
 
     :return: option_dict: Same as input but maybe with default values added.
     """
@@ -259,6 +261,8 @@ def check_input_args(option_dict):
     error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
     error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
 
+    error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
+
     return option_dict
 
 
@@ -289,8 +293,6 @@ def create_model(option_dict):
         `keras.models.Model`.
     """
 
-    # TODO(thunderhoser): metric_list should be an input arg.
-
     option_dict = check_input_args(option_dict)
 
     input_dimensions_2pt5km_res = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
@@ -314,6 +316,7 @@ def create_model(option_dict):
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     loss_function = option_dict[LOSS_FUNCTION_KEY]
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
+    metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
     num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
 
@@ -1055,8 +1058,8 @@ def create_model(option_dict):
     )
 
     model_object.compile(
-        loss=loss_function, optimizer=optimizer_function
-        # metrics=metric_function_list
+        loss=loss_function, optimizer=optimizer_function,
+        metrics=metric_function_list
     )
 
     model_object.summary()
