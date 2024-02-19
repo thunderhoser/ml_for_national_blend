@@ -169,6 +169,10 @@ def _run(input_dir_name, model_name,
     :param output_dir_name: Same.
     """
 
+    # start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e, and
+    # end_longitude_deg_e are used to subset the domain for global models.
+    # The only global models are GFS and GEFS.  Thus, if the model is neither
+    # GFS nor GEFS, subsetting the domain is not needed.
     if model_name not in [
             nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.GEFS_MODEL_NAME
     ]:
@@ -188,6 +192,8 @@ def _run(input_dir_name, model_name,
         start_longitude_deg_e = None
         end_longitude_deg_e = None
 
+    # For the given model, find all initialization times in the specified period
+    # (first_init_time_unix_sec to last_init_time_unix_sec).
     first_init_time_unix_sec = time_conversion.string_to_unix_sec(
         first_init_time_string, TIME_FORMAT
     )
@@ -203,13 +209,16 @@ def _run(input_dir_name, model_name,
         include_endpoint=True
     )
 
+    # For the given model, read grid coordinates and find desired grid points.
+    # If the model is global (GFS or GEFS), desired grid points may be a subset.
+    # Otherwise, desired grid points will be the entire grid.
     latitude_matrix_deg_n = nwp_model_utils.read_model_coords(
         model_name=model_name
     )[0]
     num_grid_rows = latitude_matrix_deg_n.shape[0]
     num_grid_columns = latitude_matrix_deg_n.shape[1]
 
-    if start_latitude_deg_n is None:
+    if start_latitude_deg_n is None:  # Desired grid points are entire grid.
         desired_row_indices = numpy.linspace(
             0, num_grid_rows - 1, num=num_grid_rows, dtype=int
         )
@@ -235,11 +244,19 @@ def _run(input_dir_name, model_name,
             end_longitude_deg_e=end_longitude_deg_e
         )
 
+    # Three models -- the NAM, NAM Nest, and GEFS -- store incremental precip.
+    # This means that, at forecast hour H, the precip variable (APCP) is an
+    # accumulation between H and some previous forecast hour.
+    #
+    # Other models store full-run precip, which means that at forecast hour H,
+    # the precip variable is an accumulation between forecast hours 0 and H --
+    # i.e., over the full model run.
     read_incremental_precip = model_name in [
         nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME,
         nwp_model_utils.GEFS_MODEL_NAME
     ]
 
+    # Gridded LAMP has only 5 output variables; the other models have a bunch.
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
         field_names = [
             nwp_model_utils.TEMPERATURE_2METRE_NAME,
@@ -254,18 +271,18 @@ def _run(input_dir_name, model_name,
         field_names.remove(nwp_model_utils.WIND_GUST_10METRE_NAME)
         field_names = list(field_names)
 
+    # For each initialization time (i.e., for each model run)...
     for this_init_time_unix_sec in init_times_unix_sec:
+
+        # For the given model and init time, determine which forecast hours
+        # should be available.
         forecast_hours = nwp_model_utils.model_to_forecast_hours(
             model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
         )
         num_forecast_hours = len(forecast_hours)
 
-        # TODO(thunderhoser): For test scripts, shorten forecast-hour list here.
-        # if model_name in [nwp_model_utils.GEFS_MODEL_NAME, nwp_model_utils.GRIDDED_LAMP_MODEL_NAME]:
-        #     forecast_hours = numpy.array([6, 24], dtype=int)
-        #     num_forecast_hours = len(forecast_hours)
-        #     read_incremental_precip = False
-
+        # Find all input files (one GRIB2 file per forecast hour) for this
+        # model run.
         input_file_names = [
             raw_nwp_model_io.find_file(
                 directory_name=input_dir_name,
@@ -280,6 +297,9 @@ def _run(input_dir_name, model_name,
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
+
+            # Most models store wind vectors in grid-relative coordinates.
+            # These vectors must be rotated to Earth-relative coordinates.
             this_rotate_flag = model_name not in [
                 nwp_model_utils.RAP_MODEL_NAME,
                 nwp_model_utils.GFS_MODEL_NAME,
@@ -287,6 +307,10 @@ def _run(input_dir_name, model_name,
                 nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
             ]
 
+            # raw_nwp_model_io.read_file does all the dirty work.
+            # It reads all the desired fields, converts them to SI units
+            # (if necessary), rotates wind vectors to Earth-relative
+            # (if necessary), and subsets the global grid (if necessary).
             nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
                 grib2_file_name=input_file_names[k],
                 model_name=model_name,
@@ -301,9 +325,13 @@ def _run(input_dir_name, model_name,
 
             print(SEPARATOR_STRING)
 
+        # The above for-loop creates one xarray table per forecast hour.
+        # Concatenate these all into one table.
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )
+
+        # If necessary, convert incremental precip to full-model-run precip.
         if read_incremental_precip:
             nwp_forecast_table_xarray = (
                 nwp_model_utils.precip_from_incremental_to_full_run(
@@ -313,10 +341,19 @@ def _run(input_dir_name, model_name,
                 )
             )
 
+        # This shouldn't happen, but I've experienced it in the past with GFS
+        # data in GRIB2 format.
         nwp_forecast_table_xarray = nwp_model_utils.remove_negative_precip(
             nwp_forecast_table_xarray
         )
 
+        # In general, if the model stores wind in grid-relative coordinates,
+        # I just pass `rotate_winds=True` to raw_nwp_model_io.read_file.
+        # Inside raw_nwp_model_io.read_file, I call wgrib2 to rotate all the
+        # wind vectors inside the file.
+        # However, this does not work for the RAP model, because the RAP GRIB2
+        # files do not contain proper metadata about the grid.  Thus, I have to
+        # use my own method for the RAP winds.
         if model_name == nwp_model_utils.RAP_MODEL_NAME:
             nwp_forecast_table_xarray = (
                 nwp_model_utils.rotate_rap_winds_to_earth_relative(
@@ -324,6 +361,8 @@ def _run(input_dir_name, model_name,
                 )
             )
 
+        # Write the output -- one xarray table for the whole model run -- to a
+        # zarr file.
         output_file_name = nwp_model_io.find_file(
             directory_name=output_dir_name,
             model_name=model_name,
@@ -341,6 +380,10 @@ def _run(input_dir_name, model_name,
         if not tar_output_files:
             continue
 
+        # Put the zarr file inside a tar archive.  A "zarr file" actually
+        # contains thousands of tiny files, which is hard on Hera (can easily
+        # put you over the disk quota).  But if you store the whole thing in a
+        # tar, Hera sees it as only one file, so you're in the clear!
         output_file_name_tarred = '{0:s}.tar'.format(
             os.path.splitext(output_file_name)[0]
         )
