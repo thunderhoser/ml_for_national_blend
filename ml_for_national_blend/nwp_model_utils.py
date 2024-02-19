@@ -1,23 +1,20 @@
 """Helper methods for output from any NWP model."""
 
 import os
-import sys
 import time
 import warnings
 import numpy
 import xarray
 import pyproj
 from scipy.interpolate import interp1d, RegularGridInterpolator
+from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
+from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.utils import nbm_utils
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
 ))
-sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
-
-import longitude_conversion as lng_conversion
-import time_conversion
-import error_checking
-import nbm_utils
 
 TOLERANCE = 1e-6
 
@@ -218,6 +215,11 @@ def model_to_init_time_interval(model_name):
     """
 
     check_model_name(model_name)
+
+    # TODO(thunderhoser): HACK to prevent creation of huge amounts of data.
+    if model_name == HRRR_MODEL_NAME:
+        return 6 * HOURS_TO_SECONDS
+
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
     if model_name == WRF_ARW_MODEL_NAME:
