@@ -98,6 +98,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
         desired_channel_counts[numpy.argmin(desired_channel_counts)] += 1
 
     assert numpy.sum(desired_channel_counts) == num_output_channels
+    desired_channel_counts = numpy.maximum(desired_channel_counts, 1)
 
     return desired_channel_counts
 
@@ -120,8 +121,6 @@ def _create_skip_connection(input_layer_objects, num_output_channels,
         input_layer_objects=input_layer_objects,
         num_output_channels=num_output_channels
     )
-    print(num_output_channels)
-    print(desired_input_channel_counts)
     current_width = len(input_layer_objects) - 1
 
     for j in range(current_width):
