@@ -120,6 +120,8 @@ def _create_skip_connection(input_layer_objects, num_output_channels,
         input_layer_objects=input_layer_objects,
         num_output_channels=num_output_channels
     )
+    print(num_output_channels)
+    print(desired_input_channel_counts)
     current_width = len(input_layer_objects) - 1
 
     for j in range(current_width):
