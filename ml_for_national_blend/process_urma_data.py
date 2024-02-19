@@ -113,10 +113,17 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
     :param output_dir_name: Same.
     """
 
+    # Find all days in the specified period (first_valid_date_string to
+    # last_valid_date_string).
     valid_date_strings = time_conversion.get_spc_dates_in_range(
         first_valid_date_string, last_valid_date_string
     )
 
+    # Set desired_row_indices and desired_column_indices to include all grid
+    # points.  This means that we are not subsetting the URMA grid -- which
+    # makes sense because the URMA grid = the NBM grid.
+    # I probably didn't need to make raw_urma_io.read_file so general that it
+    # allows for grid-subsetting, but alas.
     latitude_matrix_deg_n = urma_utils.read_grid_coords()[0]
     num_grid_rows = latitude_matrix_deg_n.shape[0]
     num_grid_columns = latitude_matrix_deg_n.shape[1]
@@ -127,9 +134,14 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
     desired_column_indices = numpy.linspace(
         0, num_grid_columns - 1, num=num_grid_columns, dtype=int
     )
+
+    # We will read all available fields in URMA.
     field_names = urma_utils.ALL_FIELD_NAMES
 
+    # For each day...
     for this_date_string in valid_date_strings:
+
+        # Find all valid times (24 hours) in the given day.
         this_date_unix_sec = time_conversion.string_to_unix_sec(
             this_date_string, DATE_FORMAT
         )
@@ -140,6 +152,7 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
             include_endpoint=True
         )
 
+        # Find the input (GRIB2) file for each valid time.
         input_file_names = [
             raw_urma_io.find_file(
                 directory_name=input_dir_name,
@@ -152,6 +165,10 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
         urma_tables_xarray = [None] * len(input_file_names)
 
         for k in range(len(input_file_names)):
+
+            # raw_urma_io.read_file does all the dirty work.
+            # It reads all the desired fields, converts them to SI units
+            # (if necessary), and rotates wind vectors to Earth-relative.
             urma_tables_xarray[k] = raw_urma_io.read_file(
                 grib2_file_name=input_file_names[k],
                 desired_row_indices=desired_row_indices,
@@ -163,8 +180,12 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
             )
             print(SEPARATOR_STRING)
 
+        # The above for-loop creates one xarray table per forecast hour.
+        # Concatenate these all into one table.
         urma_table_xarray = urma_utils.concat_over_time(urma_tables_xarray)
 
+        # Write the output -- one xarray table for the whole model run -- to a
+        # NetCDF file.
         output_file_name = urma_io.find_file(
             directory_name=output_dir_name,
             valid_date_string=this_date_string,
@@ -181,6 +202,7 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
         if not tar_output_files:
             continue
 
+        # Put the NetCDF file inside a tar archive.
         output_file_name_tarred = '{0:s}.tar'.format(
             os.path.splitext(output_file_name)[0]
         )
