@@ -23,43 +23,52 @@ INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
 INPUT_DIMENSIONS_20KM_RES_KEY = 'input_dimensions_20km_res'
 INPUT_DIMENSIONS_40KM_RES_KEY = 'input_dimensions_40km_res'
 
-NUM_CONV_LAYERS_KEY = 'num_conv_layers_by_level'
-POOLING_SIZE_KEY = 'pooling_size_by_level_px'
 NUM_CHANNELS_KEY = 'num_channels_by_level'
+POOLING_SIZE_KEY = 'pooling_size_by_level_px'
+ENCODER_NUM_CONV_LAYERS_KEY = 'encoder_num_conv_layers_by_level'
 ENCODER_DROPOUT_RATES_KEY = 'encoder_dropout_rate_by_level'
-DECODER_DROPOUT_RATES_KEY = 'decoder_dropout_rate_by_level'
+DECODER_NUM_CONV_LAYERS_KEY = 'decoder_num_conv_layers_by_level'
+UPSAMPLING_DROPOUT_RATES_KEY = 'upsampling_dropout_rate_by_level'
 SKIP_DROPOUT_RATES_KEY = 'skip_dropout_rate_by_level'
 
 FC_MODULE_NUM_CONV_LAYERS_KEY = 'forecast_module_num_conv_layers'
 FC_MODULE_DROPOUT_RATES_KEY = 'forecast_module_dropout_rates'
 FC_MODULE_USE_3D_CONV = 'forecast_module_use_3d_conv'
 
+INCLUDE_PENULTIMATE_KEY = 'include_penultimate_conv'
+PENULTIMATE_DROPOUT_RATE_KEY = 'penultimate_conv_dropout_rate'
 INNER_ACTIV_FUNCTION_KEY = 'inner_activ_function_name'
 INNER_ACTIV_FUNCTION_ALPHA_KEY = 'inner_activ_function_alpha'
 OUTPUT_ACTIV_FUNCTION_KEY = 'output_activ_function_name'
 OUTPUT_ACTIV_FUNCTION_ALPHA_KEY = 'output_activ_function_alpha'
+L1_WEIGHT_KEY = 'l1_weight'
 L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
+
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 METRIC_FUNCTIONS_KEY = 'metric_function_list'
 
 DEFAULT_OPTION_DICT = {
-    NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
+    ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
+    DECODER_NUM_CONV_LAYERS_KEY: numpy.full(8, 2, dtype=int),
     POOLING_SIZE_KEY: numpy.full(8, 2, dtype=int),
     NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96, 96], dtype=int),
     ENCODER_DROPOUT_RATES_KEY: numpy.full(9, 0.),
-    DECODER_DROPOUT_RATES_KEY: numpy.full(8, 0.),
+    UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(8, 0.),
     SKIP_DROPOUT_RATES_KEY: numpy.full(8, 0.),
     FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     FC_MODULE_USE_3D_CONV: True,
+    INCLUDE_PENULTIMATE_KEY: True,
+    PENULTIMATE_DROPOUT_RATE_KEY: 0.,
     INNER_ACTIV_FUNCTION_KEY: architecture_utils.RELU_FUNCTION_STRING,
     INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
     OUTPUT_ACTIV_FUNCTION_KEY: None,
     OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
+    L1_WEIGHT_KEY: 0.,
     USE_BATCH_NORM_KEY: True
 }
 
@@ -78,21 +87,23 @@ def check_input_args(option_dict):
     option_dict["input_dimensions_10km_res"]: Same but for 10-km NWP forecasts.
     option_dict["input_dimensions_20km_res"]: Same but for 20-km NWP forecasts.
     option_dict["input_dimensions_40km_res"]: Same but for 40-km NWP forecasts.
-    option_dict["num_conv_layers_by_level"]: length-B numpy array with number of
-        conv layers for each block.
-    option_dict["pooling_size_by_level_px"]: length-B numpy array with size of
-        max-pooling window for each block.  For example, if you want 2-by-2
-        pooling in the [j]th block, make pooling_size_by_level_px[j] = 2.
     option_dict["num_channels_by_level"]: length-(L + 1) numpy array with number
-        of channels (feature maps) for each level.
+        of channels (feature maps) at each level.
+    option_dict["pooling_size_by_level_px"]: length-L numpy array with size of
+        max-pooling window for each level.  For example, if you want 2-by-2
+        pooling at the [j]th level, make pooling_size_by_level_px[j] = 2.
+    option_dict["encoder_num_conv_layers_by_level"]: length-(L + 1) numpy array
+        with number of conv layers in the encoder block at each level.
     option_dict["encoder_dropout_rate_by_level"]: length-(L + 1) numpy array
         with dropout rate on encoder side for each level.  Use number <= 0 to
         indicate no-dropout.
-    option_dict["decoder_dropout_rate_by_level"]: length-L numpy array with
-        dropout rate on decoder side (in upconv layer) for each level.  Use
-        number <= 0 to indicate no-dropout.
+    option_dict["decoder_num_conv_layers_by_level"]: length-L numpy array
+        with number of conv layers in the decoder block at each level.
+    option_dict["upsampling_dropout_rate_by_level"]: length-L numpy array with
+        dropout rate in upconv layer at each level.  Use number <= 0 to indicate
+        no-dropout.
     option_dict["skip_dropout_rate_by_level"]: length-L numpy array with dropout
-        rate in skip connection for each level.  Use number <= 0 to indicate
+        rate in skip connection at each level.  Use number <= 0 to indicate
         no-dropout.
     option_dict["forecast_module_num_conv_layers"]: F in the above definitions.
     option_dict["forecast_module_dropout_rates"]: length-F numpy array with
@@ -100,6 +111,10 @@ def check_input_args(option_dict):
         <= 0 to indicate no-dropout.
     option_dict["forecast_module_use_3d_conv"]: Boolean flag.  Determines
         whether forecasting module will use 2-D or 3-D convolution.
+    option_dict["include_penultimate_conv"]: Boolean flag.  If True, will put in
+        extra conv layer (with 3 x 3 filter) before final pixelwise conv.
+    option_dict["penultimate_conv_dropout_rate"]: Dropout rate for penultimate
+        conv layer.
     option_dict["inner_activ_function_name"]: Name of activation function for
         all non-output layers.  Must be accepted by
         `architecture_utils.check_activation_function`.
@@ -111,6 +126,8 @@ def check_input_args(option_dict):
         `architecture_utils.check_activation_function`.
     option_dict["output_activ_function_alpha"]: Alpha (slope parameter) for
         activation function for all output layer.  Applies only to ReLU and eLU.
+    option_dict["l1_weight"]: Strength of L1 regularization (for conv layers
+        only).
     option_dict["l2_weight"]: Strength of L2 regularization (for conv layers
         only).
     option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
@@ -177,16 +194,12 @@ def check_input_args(option_dict):
         )
 
     error_checking.assert_is_numpy_array(
-        option_dict[NUM_CONV_LAYERS_KEY], num_dimensions=1
+        option_dict[NUM_CHANNELS_KEY], num_dimensions=1
     )
-    error_checking.assert_is_integer_numpy_array(
-        option_dict[NUM_CONV_LAYERS_KEY]
-    )
-    error_checking.assert_is_geq_numpy_array(
-        option_dict[NUM_CONV_LAYERS_KEY], 1
-    )
+    error_checking.assert_is_integer_numpy_array(option_dict[NUM_CHANNELS_KEY])
+    error_checking.assert_is_geq_numpy_array(option_dict[NUM_CHANNELS_KEY], 1)
 
-    num_levels = len(option_dict[NUM_CONV_LAYERS_KEY]) - 1
+    num_levels = len(option_dict[NUM_CHANNELS_KEY]) - 1
 
     error_checking.assert_is_numpy_array(
         option_dict[POOLING_SIZE_KEY],
@@ -200,11 +213,15 @@ def check_input_args(option_dict):
     )
 
     error_checking.assert_is_numpy_array(
-        option_dict[NUM_CHANNELS_KEY],
+        option_dict[ENCODER_NUM_CONV_LAYERS_KEY],
         exact_dimensions=numpy.array([num_levels + 1], dtype=int)
     )
-    error_checking.assert_is_integer_numpy_array(option_dict[NUM_CHANNELS_KEY])
-    error_checking.assert_is_geq_numpy_array(option_dict[NUM_CHANNELS_KEY], 1)
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
+    )
+    error_checking.assert_is_geq_numpy_array(
+        option_dict[ENCODER_NUM_CONV_LAYERS_KEY], 1
+    )
 
     error_checking.assert_is_numpy_array(
         option_dict[ENCODER_DROPOUT_RATES_KEY],
@@ -215,11 +232,22 @@ def check_input_args(option_dict):
     )
 
     error_checking.assert_is_numpy_array(
-        option_dict[DECODER_DROPOUT_RATES_KEY],
+        option_dict[DECODER_NUM_CONV_LAYERS_KEY],
+        exact_dimensions=numpy.array([num_levels], dtype=int)
+    )
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[DECODER_NUM_CONV_LAYERS_KEY]
+    )
+    error_checking.assert_is_geq_numpy_array(
+        option_dict[DECODER_NUM_CONV_LAYERS_KEY], 1
+    )
+
+    error_checking.assert_is_numpy_array(
+        option_dict[UPSAMPLING_DROPOUT_RATES_KEY],
         exact_dimensions=numpy.array([num_levels], dtype=int)
     )
     error_checking.assert_is_leq_numpy_array(
-        option_dict[DECODER_DROPOUT_RATES_KEY], 1., allow_nan=True
+        option_dict[UPSAMPLING_DROPOUT_RATES_KEY], 1., allow_nan=True
     )
 
     error_checking.assert_is_numpy_array(
@@ -246,6 +274,12 @@ def check_input_args(option_dict):
 
     error_checking.assert_is_boolean(option_dict[FC_MODULE_USE_3D_CONV])
 
+    error_checking.assert_is_boolean(option_dict[INCLUDE_PENULTIMATE_KEY])
+    error_checking.assert_is_leq(
+        option_dict[PENULTIMATE_DROPOUT_RATE_KEY], 1., allow_nan=True
+    )
+
+    error_checking.assert_is_geq(option_dict[L1_WEIGHT_KEY], 0.)
     error_checking.assert_is_geq(option_dict[L2_WEIGHT_KEY], 0.)
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
@@ -291,19 +325,23 @@ def create_model(option_dict):
     input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
     input_dimensions_40km_res = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY]
-    num_conv_layers_by_level = option_dict[NUM_CONV_LAYERS_KEY]
-    pooling_size_by_level_px = option_dict[POOLING_SIZE_KEY]
     num_channels_by_level = option_dict[NUM_CHANNELS_KEY]
+    pooling_size_by_level_px = option_dict[POOLING_SIZE_KEY]
+    num_encoder_conv_layers_by_level = option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
     encoder_dropout_rate_by_level = option_dict[ENCODER_DROPOUT_RATES_KEY]
-    decoder_dropout_rate_by_level = option_dict[DECODER_DROPOUT_RATES_KEY]
+    num_decoder_conv_layers_by_level = option_dict[DECODER_NUM_CONV_LAYERS_KEY]
+    upsampling_dropout_rate_by_level = option_dict[UPSAMPLING_DROPOUT_RATES_KEY]
     skip_dropout_rate_by_level = option_dict[SKIP_DROPOUT_RATES_KEY]
     forecast_module_num_conv_layers = option_dict[FC_MODULE_NUM_CONV_LAYERS_KEY]
     forecast_module_dropout_rates = option_dict[FC_MODULE_DROPOUT_RATES_KEY]
     forecast_module_use_3d_conv = option_dict[FC_MODULE_USE_3D_CONV]
+    include_penultimate_conv = option_dict[INCLUDE_PENULTIMATE_KEY]
+    penultimate_conv_dropout_rate = option_dict[PENULTIMATE_DROPOUT_RATE_KEY]
     inner_activ_function_name = option_dict[INNER_ACTIV_FUNCTION_KEY]
     inner_activ_function_alpha = option_dict[INNER_ACTIV_FUNCTION_ALPHA_KEY]
     output_activ_function_name = option_dict[OUTPUT_ACTIV_FUNCTION_KEY]
     output_activ_function_alpha = option_dict[OUTPUT_ACTIV_FUNCTION_ALPHA_KEY]
+    l1_weight = option_dict[L1_WEIGHT_KEY]
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     loss_function = option_dict[LOSS_FUNCTION_KEY]
@@ -356,7 +394,9 @@ def create_model(option_dict):
             dims=(3, 1, 2, 4), name='40km_put_time_first'
         )(input_layer_object_40km_res)
 
-    l2_function = architecture_utils.get_weight_regularizer(l2_weight=l2_weight)
+    l2_function = architecture_utils.get_weight_regularizer(
+        l1_weight=l1_weight, l2_weight=l2_weight
+    )
 
     num_lead_times = 0
 
@@ -370,7 +410,7 @@ def create_model(option_dict):
         for level_index in range(2):
             i = level_index
 
-            for j in range(num_conv_layers_by_level[i]):
+            for j in range(num_encoder_conv_layers_by_level[i]):
                 if j == 0:
                     if i == 0:
                         previous_layer_object = layer_object_2pt5km_res
@@ -440,7 +480,7 @@ def create_model(option_dict):
         num_lead_times = input_dimensions_10km_res[2]
         i = 0 if input_dimensions_2pt5km_res is None else 2
 
-        for j in range(num_conv_layers_by_level[i]):
+        for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 if i == 0:
                     previous_layer_object = layer_object_10km_res
@@ -512,7 +552,7 @@ def create_model(option_dict):
         i = 0 if input_dimensions_2pt5km_res is None else 2
         i += 0 if input_dimensions_10km_res is None else 1
 
-        for j in range(num_conv_layers_by_level[i]):
+        for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 if i == 0:
                     previous_layer_object = layer_object_20km_res
@@ -586,7 +626,7 @@ def create_model(option_dict):
         i += 0 if input_dimensions_10km_res is None else 1
         i += 0 if input_dimensions_20km_res is None else 1
 
-        for j in range(num_conv_layers_by_level[i]):
+        for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 if i == 0:
                     previous_layer_object = layer_object_40km_res
@@ -649,7 +689,7 @@ def create_model(option_dict):
     start_index += 0 if input_dimensions_40km_res is None else 1
 
     for i in range(start_index, num_levels + 1):
-        for j in range(num_conv_layers_by_level[i]):
+        for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 previous_layer_object = pooling_layer_by_level[i - 1]
             else:
@@ -793,14 +833,18 @@ def create_model(option_dict):
     merged_layer_by_level = [None] * num_levels
 
     this_name = 'upsampling_level{0:d}'.format(num_levels - 1)
+    size_arg = (
+        pooling_size_by_level_px[num_levels - 1],
+        pooling_size_by_level_px[num_levels - 1]
+    )
 
     try:
         this_layer_object = keras.layers.UpSampling2D(
-            size=(2, 2), interpolation='bilinear', name=this_name
+            size=size_arg, interpolation='bilinear', name=this_name
         )(forecast_module_layer_object)
     except:
         this_layer_object = keras.layers.UpSampling2D(
-            size=(2, 2), name=this_name
+            size=size_arg, name=this_name
         )(forecast_module_layer_object)
 
     this_name = 'upsampling_level{0:d}_conv'.format(num_levels - 1)
@@ -823,11 +867,11 @@ def create_model(option_dict):
         layer_name=this_name
     )(upconv_layer_by_level[i])
 
-    if decoder_dropout_rate_by_level[i] > 0:
+    if upsampling_dropout_rate_by_level[i] > 0:
         this_name = 'upsampling_level{0:d}_dropout'.format(i)
 
         upconv_layer_by_level[i] = architecture_utils.get_dropout_layer(
-            dropout_fraction=decoder_dropout_rate_by_level[i],
+            dropout_fraction=upsampling_dropout_rate_by_level[i],
             layer_name=this_name
         )(upconv_layer_by_level[i])
 
@@ -871,7 +915,7 @@ def create_model(option_dict):
     )[::-1]
 
     for i in level_indices:
-        for j in range(num_conv_layers_by_level[i]):
+        for j in range(num_decoder_conv_layers_by_level[i]):
             if j == 0:
                 this_input_layer_object = merged_layer_by_level[i]
             else:
@@ -910,7 +954,7 @@ def create_model(option_dict):
                     )(skip_layer_by_level[i])
                 )
 
-        if i == 0:
+        if i == 0 and include_penultimate_conv:
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1,
@@ -927,6 +971,12 @@ def create_model(option_dict):
                 layer_name='penultimate_conv_activation'
             )(skip_layer_by_level[i])
 
+            if penultimate_conv_dropout_rate > 0:
+                skip_layer_by_level[i] = architecture_utils.get_dropout_layer(
+                    dropout_fraction=penultimate_conv_dropout_rate,
+                    layer_name='penultimate_conv_dropout'
+                )(skip_layer_by_level[i])
+
             if use_batch_normalization:
                 skip_layer_by_level[i] = (
                     architecture_utils.get_batch_norm_layer(
@@ -937,14 +987,18 @@ def create_model(option_dict):
             break
 
         this_name = 'upsampling_level{0:d}'.format(i - 1)
+        size_arg = (
+            pooling_size_by_level_px[i - 1],
+            pooling_size_by_level_px[i - 1]
+        )
 
         try:
             this_layer_object = keras.layers.UpSampling2D(
-                size=(2, 2), interpolation='bilinear', name=this_name
+                size=size_arg, interpolation='bilinear', name=this_name
             )(skip_layer_by_level[i])
         except:
             this_layer_object = keras.layers.UpSampling2D(
-                size=(2, 2), name=this_name
+                size=size_arg, name=this_name
             )(skip_layer_by_level[i])
 
         this_name = 'upsampling_level{0:d}_conv'.format(i - 1)
@@ -965,10 +1019,10 @@ def create_model(option_dict):
             layer_name=this_name
         )(upconv_layer_by_level[i - 1])
 
-        if decoder_dropout_rate_by_level[i - 1] > 0:
+        if upsampling_dropout_rate_by_level[i - 1] > 0:
             this_name = 'upsampling_level{0:d}_dropout'.format(i - 1)
             upconv_layer_by_level[i - 1] = architecture_utils.get_dropout_layer(
-                dropout_fraction=decoder_dropout_rate_by_level[i - 1],
+                dropout_fraction=upsampling_dropout_rate_by_level[i - 1],
                 layer_name=this_name
             )(upconv_layer_by_level[i - 1])
 
@@ -1027,13 +1081,14 @@ def create_model(option_dict):
     # TODO(thunderhoser): For now, input_dimensions_2pt5km_res cannot actually
     # be None.  In other words, the model must take 2.5-km data as input.  I
     # will change this if need be.
-    new_dims = (
-        input_dimensions_2pt5km_res[0], input_dimensions_2pt5km_res[1],
-        num_output_channels, ensemble_size
-    )
-    skip_layer_by_level[0] = keras.layers.Reshape(
-        target_shape=new_dims, name='reshape_predictions'
-    )(skip_layer_by_level[0])
+    if ensemble_size > 1:
+        new_dims = (
+            input_dimensions_2pt5km_res[0], input_dimensions_2pt5km_res[1],
+            num_output_channels, ensemble_size
+        )
+        skip_layer_by_level[0] = keras.layers.Reshape(
+            target_shape=new_dims, name='reshape_predictions'
+        )(skip_layer_by_level[0])
 
     input_layer_objects = []
     if input_dimensions_2pt5km_res is not None:

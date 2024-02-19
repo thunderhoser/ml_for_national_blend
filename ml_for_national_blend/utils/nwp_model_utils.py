@@ -215,6 +215,11 @@ def model_to_init_time_interval(model_name):
     """
 
     check_model_name(model_name)
+
+    # TODO(thunderhoser): HACK to prevent creation of huge amounts of data.
+    if model_name == HRRR_MODEL_NAME:
+        return 6 * HOURS_TO_SECONDS
+
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
     if model_name == WRF_ARW_MODEL_NAME:
