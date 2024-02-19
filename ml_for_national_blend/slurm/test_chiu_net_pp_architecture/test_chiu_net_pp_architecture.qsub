@@ -20,4 +20,4 @@
 #SBATCH --output=test_chiu_net_architecture_%A.out
 
 set this_directory_name=`pwd`
-singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_chiu_net_architecture.sh"
+singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_chiu_net_pp_architecture.sh"
