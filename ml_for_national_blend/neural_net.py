@@ -1,28 +1,21 @@
 """Helper methods for training a neural network."""
 
 import os
-import sys
 import pickle
 import warnings
 import numpy
 import keras
-import tensorflow.keras as tf_keras
-
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
-
-import time_conversion
-import time_periods
-import file_system_utils
-import error_checking
-import nwp_model_io
-import interp_nwp_model_io
-import urma_io
-import nwp_model_utils
-import urma_utils
-import normalization
+from tensorflow.keras.saving import load_model
+from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import time_periods
+from gewittergefahr.gg_utils import file_system_utils
+from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.io import nwp_model_io
+from ml_for_national_blend.io import interp_nwp_model_io
+from ml_for_national_blend.io import urma_io
+from ml_for_national_blend.utils import nwp_model_utils
+from ml_for_national_blend.utils import urma_utils
+from ml_for_national_blend.utils import normalization
 # from ml_for_national_blend.machine_learning import custom_losses
 # from ml_for_national_blend.machine_learning import custom_metrics
 
@@ -1395,10 +1388,11 @@ def read_model(hdf5_file_name):
     )
     metadata_dict = read_metafile(metafile_name)
 
+    print(metadata_dict[LOSS_FUNCTION_KEY])
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = tf_keras.models.load_model(
+    model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
 

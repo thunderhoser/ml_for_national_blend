@@ -10,7 +10,6 @@ import os
 import sys
 import numpy
 import keras
-import keras.layers as layers
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -19,12 +18,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 import architecture_utils
-
-try:
-    _ = layers.Input(shape=(3, 4, 5))
-except:
-    import tensorflow.keras as keras
-    import tensorflow.keras.layers as layers
 
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'
 INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
@@ -362,10 +355,10 @@ def create_model(option_dict):
         input_layer_object_2pt5km_res = None
         layer_object_2pt5km_res = None
     else:
-        input_layer_object_2pt5km_res = layers.Input(
+        input_layer_object_2pt5km_res = keras.layers.Input(
             shape=tuple(input_dimensions_2pt5km_res.tolist())
         )
-        layer_object_2pt5km_res = layers.Permute(
+        layer_object_2pt5km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
         )(input_layer_object_2pt5km_res)
 
@@ -373,10 +366,10 @@ def create_model(option_dict):
         input_layer_object_10km_res = None
         layer_object_10km_res = None
     else:
-        input_layer_object_10km_res = layers.Input(
+        input_layer_object_10km_res = keras.layers.Input(
             shape=tuple(input_dimensions_10km_res.tolist())
         )
-        layer_object_10km_res = layers.Permute(
+        layer_object_10km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='10km_put_time_first'
         )(input_layer_object_10km_res)
 
@@ -384,10 +377,10 @@ def create_model(option_dict):
         input_layer_object_20km_res = None
         layer_object_20km_res = None
     else:
-        input_layer_object_20km_res = layers.Input(
+        input_layer_object_20km_res = keras.layers.Input(
             shape=tuple(input_dimensions_20km_res.tolist())
         )
-        layer_object_20km_res = layers.Permute(
+        layer_object_20km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='20km_put_time_first'
         )(input_layer_object_20km_res)
 
@@ -395,10 +388,10 @@ def create_model(option_dict):
         input_layer_object_40km_res = None
         layer_object_40km_res = None
     else:
-        input_layer_object_40km_res = layers.Input(
+        input_layer_object_40km_res = keras.layers.Input(
             shape=tuple(input_dimensions_40km_res.tolist())
         )
-        layer_object_40km_res = layers.Permute(
+        layer_object_40km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='40km_put_time_first'
         )(input_layer_object_40km_res)
 
@@ -437,7 +430,7 @@ def create_model(option_dict):
                     layer_name=this_name
                 )
 
-                conv_layer_by_level[i] = layers.TimeDistributed(
+                conv_layer_by_level[i] = keras.layers.TimeDistributed(
                     this_conv_layer_object, name=this_name
                 )(previous_layer_object)
 
@@ -471,14 +464,14 @@ def create_model(option_dict):
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            pooling_layer_by_level[i] = layers.TimeDistributed(
+            pooling_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
             )(conv_layer_by_level[i])
 
         if input_dimensions_10km_res is not None:
             i = 1
             this_name = 'concat_2pt5km_10km'
-            pooling_layer_by_level[i] = layers.Concatenate(
+            pooling_layer_by_level[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [pooling_layer_by_level[i], layer_object_10km_res]
@@ -507,7 +500,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            conv_layer_by_level[i] = layers.TimeDistributed(
+            conv_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -541,7 +534,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        pooling_layer_by_level[i] = layers.TimeDistributed(
+        pooling_layer_by_level[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(conv_layer_by_level[i])
 
@@ -549,7 +542,7 @@ def create_model(option_dict):
             i = 0 if input_dimensions_2pt5km_res is None else 2
 
             this_name = 'concat_10km_20km'
-            pooling_layer_by_level[i] = layers.Concatenate(
+            pooling_layer_by_level[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [pooling_layer_by_level[i], layer_object_20km_res]
@@ -579,7 +572,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            conv_layer_by_level[i] = layers.TimeDistributed(
+            conv_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -613,7 +606,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        pooling_layer_by_level[i] = layers.TimeDistributed(
+        pooling_layer_by_level[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(conv_layer_by_level[i])
 
@@ -622,7 +615,7 @@ def create_model(option_dict):
             i += 0 if input_dimensions_10km_res is None else 1
 
             this_name = 'concat_20km_40km'
-            pooling_layer_by_level[i] = layers.Concatenate(
+            pooling_layer_by_level[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [pooling_layer_by_level[i], layer_object_40km_res]
@@ -653,7 +646,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            conv_layer_by_level[i] = layers.TimeDistributed(
+            conv_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -687,7 +680,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        pooling_layer_by_level[i] = layers.TimeDistributed(
+        pooling_layer_by_level[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(conv_layer_by_level[i])
 
@@ -713,7 +706,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            conv_layer_by_level[i] = layers.TimeDistributed(
+            conv_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -748,11 +741,11 @@ def create_model(option_dict):
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            pooling_layer_by_level[i] = layers.TimeDistributed(
+            pooling_layer_by_level[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
             )(conv_layer_by_level[i])
 
-    forecast_module_layer_object = layers.Permute(
+    forecast_module_layer_object = keras.layers.Permute(
         dims=(2, 3, 1, 4), name='fc_module_put_time_last'
     )(conv_layer_by_level[-1])
 
@@ -760,7 +753,7 @@ def create_model(option_dict):
         orig_dims = forecast_module_layer_object.get_shape()
         new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
 
-        forecast_module_layer_object = layers.Reshape(
+        forecast_module_layer_object = keras.layers.Reshape(
             target_shape=new_dims, name='fc_module_remove_time_dim'
         )(forecast_module_layer_object)
 
@@ -787,7 +780,7 @@ def create_model(option_dict):
                     forecast_module_layer_object.shape[1:-2] +
                     [forecast_module_layer_object.shape[-1]]
                 )
-                forecast_module_layer_object = layers.Reshape(
+                forecast_module_layer_object = keras.layers.Reshape(
                     target_shape=new_dims, name='fc_module_remove_time_dim'
                 )(forecast_module_layer_object)
             else:

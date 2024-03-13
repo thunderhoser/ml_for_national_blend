@@ -8,7 +8,6 @@ import os
 import sys
 import numpy
 import keras
-import keras.layers as layers
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -17,12 +16,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import architecture_utils
 import chiu_net_architecture as chiu_net_arch
-
-try:
-    _ = layers.Input(shape=(3, 4, 5))
-except:
-    import tensorflow.keras as keras
-    import tensorflow.keras.layers as layers
 
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY
 INPUT_DIMENSIONS_10KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_10KM_RES_KEY
@@ -190,10 +183,10 @@ def create_model(option_dict):
         input_layer_object_2pt5km_res = None
         layer_object_2pt5km_res = None
     else:
-        input_layer_object_2pt5km_res = layers.Input(
+        input_layer_object_2pt5km_res = keras.layers.Input(
             shape=tuple(input_dimensions_2pt5km_res.tolist())
         )
-        layer_object_2pt5km_res = layers.Permute(
+        layer_object_2pt5km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
         )(input_layer_object_2pt5km_res)
 
@@ -201,10 +194,10 @@ def create_model(option_dict):
         input_layer_object_10km_res = None
         layer_object_10km_res = None
     else:
-        input_layer_object_10km_res = layers.Input(
+        input_layer_object_10km_res = keras.layers.Input(
             shape=tuple(input_dimensions_10km_res.tolist())
         )
-        layer_object_10km_res = layers.Permute(
+        layer_object_10km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='10km_put_time_first'
         )(input_layer_object_10km_res)
 
@@ -212,10 +205,10 @@ def create_model(option_dict):
         input_layer_object_20km_res = None
         layer_object_20km_res = None
     else:
-        input_layer_object_20km_res = layers.Input(
+        input_layer_object_20km_res = keras.layers.Input(
             shape=tuple(input_dimensions_20km_res.tolist())
         )
-        layer_object_20km_res = layers.Permute(
+        layer_object_20km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='20km_put_time_first'
         )(input_layer_object_20km_res)
 
@@ -223,10 +216,10 @@ def create_model(option_dict):
         input_layer_object_40km_res = None
         layer_object_40km_res = None
     else:
-        input_layer_object_40km_res = layers.Input(
+        input_layer_object_40km_res = keras.layers.Input(
             shape=tuple(input_dimensions_40km_res.tolist())
         )
-        layer_object_40km_res = layers.Permute(
+        layer_object_40km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='40km_put_time_first'
         )(input_layer_object_40km_res)
 
@@ -265,7 +258,7 @@ def create_model(option_dict):
                     layer_name=this_name
                 )
 
-                encoder_conv_layer_objects[i] = layers.TimeDistributed(
+                encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
                     this_conv_layer_object, name=this_name
                 )(previous_layer_object)
 
@@ -299,14 +292,14 @@ def create_model(option_dict):
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            encoder_pooling_layer_objects[i] = layers.TimeDistributed(
+            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
             )(encoder_conv_layer_objects[i])
 
         if input_dimensions_10km_res is not None:
             i = 1
             this_name = 'concat_2pt5km_10km'
-            encoder_pooling_layer_objects[i] = layers.Concatenate(
+            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [encoder_pooling_layer_objects[i], layer_object_10km_res]
@@ -335,7 +328,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            encoder_conv_layer_objects[i] = layers.TimeDistributed(
+            encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -369,7 +362,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = layers.TimeDistributed(
+        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
@@ -377,7 +370,7 @@ def create_model(option_dict):
             i = 0 if input_dimensions_2pt5km_res is None else 2
 
             this_name = 'concat_10km_20km'
-            encoder_pooling_layer_objects[i] = layers.Concatenate(
+            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [encoder_pooling_layer_objects[i], layer_object_20km_res]
@@ -407,7 +400,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            encoder_conv_layer_objects[i] = layers.TimeDistributed(
+            encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -441,7 +434,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = layers.TimeDistributed(
+        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
@@ -450,7 +443,7 @@ def create_model(option_dict):
             i += 0 if input_dimensions_10km_res is None else 1
 
             this_name = 'concat_20km_40km'
-            encoder_pooling_layer_objects[i] = layers.Concatenate(
+            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
                 axis=-1, name=this_name
             )(
                 [encoder_pooling_layer_objects[i], layer_object_40km_res]
@@ -481,7 +474,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            encoder_conv_layer_objects[i] = layers.TimeDistributed(
+            encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -515,7 +508,7 @@ def create_model(option_dict):
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = layers.TimeDistributed(
+        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
@@ -541,7 +534,7 @@ def create_model(option_dict):
                 layer_name=this_name
             )
 
-            encoder_conv_layer_objects[i] = layers.TimeDistributed(
+            encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
                 this_conv_layer_object, name=this_name
             )(previous_layer_object)
 
@@ -576,7 +569,7 @@ def create_model(option_dict):
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            encoder_pooling_layer_objects[i] = layers.TimeDistributed(
+            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
             )(encoder_conv_layer_objects[i])
 

@@ -1,0 +1,40 @@
+#!/bin/bash
+
+#SBATCH --job-name="determine_loss_function_weights_5vars"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=determine_loss_function_weights_5vars_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/urma_data/processed"
+NORMALIZATION_FILE_ARG_NAME="${INPUT_DIR_NAME}/normalization_params_20221101-20230531.nc"
+
+python3 -u "${CODE_DIR_NAME}/determine_loss_function_weights.py" \
+--input_target_dir_name="${INPUT_DIR_NAME}" \
+--input_normalization_file_name="${NORMALIZATION_FILE_ARG_NAME}" \
+--first_valid_date_strings "20221101" "20221105" "20221109" "20221113" "20221117" "20221121" "20221125" "20221129" "20221203" "20221207" "20221211" "20221215" "20221219" "20221223" "20221227" "20221231" "20230104" "20230108" "20230112" "20230116" "20230120" "20230124" "20230128" "20230201" "20230205" "20230209" "20230213" "20230217" "20230221" "20230225" "20230301" "20230305" "20230309" "20230313" "20230317" "20230321" "20230325" "20230329" "20230402" "20230406" "20230410" "20230414" "20230418" "20230422" "20230426" "20230430" "20230504" "20230508" "20230512" "20230516" "20230520" "20230524" "20230528" \
+--last_valid_date_strings "20221101" "20221105" "20221109" "20221113" "20221117" "20221121" "20221125" "20221129" "20221203" "20221207" "20221211" "20221215" "20221219" "20221223" "20221227" "20221231" "20230104" "20230108" "20230112" "20230116" "20230120" "20230124" "20230128" "20230201" "20230205" "20230209" "20230213" "20230217" "20230221" "20230225" "20230301" "20230305" "20230309" "20230313" "20230317" "20230321" "20230325" "20230329" "20230402" "20230406" "20230410" "20230414" "20230418" "20230422" "20230426" "20230430" "20230504" "20230508" "20230512" "20230516" "20230520" "20230524" "20230528" \
+--target_field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "wind_gust_10m_agl_m_s01" \
+--use_dwmse=1 \
+--num_sample_values_per_file=4000
