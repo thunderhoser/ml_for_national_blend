@@ -5,7 +5,7 @@ import pickle
 import warnings
 import numpy
 import keras
-import tensorflow.keras as tf_keras
+from tensorflow.keras.saving import load_model
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
 from gewittergefahr.gg_utils import file_system_utils
@@ -1388,10 +1388,11 @@ def read_model(hdf5_file_name):
     )
     metadata_dict = read_metafile(metafile_name)
 
+    print(metadata_dict[LOSS_FUNCTION_KEY])
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = tf_keras.models.load_model(
+    model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
 
