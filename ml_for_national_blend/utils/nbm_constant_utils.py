@@ -1,0 +1,36 @@
+"""Helper methods for NBM constant fields."""
+
+from gewittergefahr.gg_utils import error_checking
+
+ROW_DIM = 'row'
+COLUMN_DIM = 'column'
+FIELD_DIM = 'field_name'
+
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
+DATA_KEY = 'data_matrix'
+
+LAND_SEA_MASK_NAME = 'land_sea_mask_land1'
+OROGRAPHIC_HEIGHT_NAME = 'orographic_height_m_asl'
+ALL_FIELD_NAMES = [LAND_SEA_MASK_NAME, OROGRAPHIC_HEIGHT_NAME]
+
+
+def check_field_name(field_name):
+    """Ensures that field name is valid.
+
+    :param field_name: String (must be in list `ALL_FIELD_NAMES`).
+    :raises: ValueError: if `field_name not in ALL_FIELD_NAMES`.
+    """
+
+    error_checking.assert_is_string(field_name)
+    if field_name in ALL_FIELD_NAMES:
+        return
+
+    error_string = (
+        'Field name "{0:s}" is not in the list of accepted field names '
+        '(below):\n{1:s}'
+    ).format(
+        field_name, str(ALL_FIELD_NAMES)
+    )
+
+    raise ValueError(error_string)

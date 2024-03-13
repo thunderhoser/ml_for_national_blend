@@ -49,10 +49,10 @@ ALL_MODEL_NAMES = [
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
-SURFACE_PRESSURE_NAME = 'pressure_surface_pascals'
+SURFACE_PRESSURE_NAME = 'pressure_surface_pascals'  # ECMWFE control missing this.
 TEMPERATURE_2METRE_NAME = 'temperature_2m_agl_kelvins'
 DEWPOINT_2METRE_NAME = 'dewpoint_2m_agl_kelvins'
-RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'
+RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'  # ECMWF(D/E) has this at 1000 mb, not 2 m.
 U_WIND_10METRE_NAME = 'u_wind_10m_agl_m_s01'
 V_WIND_10METRE_NAME = 'v_wind_10m_agl_m_s01'
 WIND_GUST_10METRE_NAME = 'wind_gust_10m_agl_m_s01'
@@ -69,7 +69,7 @@ V_WIND_500MB_NAME = 'v_wind_500mb_m_s01'
 V_WIND_700MB_NAME = 'v_wind_700mb_m_s01'
 V_WIND_1000MB_NAME = 'v_wind_1000mb_m_s01'
 TEMPERATURE_850MB_NAME = 'temperature_850mb_kelvins'
-TEMPERATURE_950MB_NAME = 'temperature_950mb_kelvins'
+TEMPERATURE_950MB_NAME = 'temperature_950mb_kelvins'  # ECMWF has this at 925 mb.
 MIN_RELATIVE_HUMIDITY_2METRE_NAME = 'hourly_min_relative_humidity_2m_agl'
 MAX_RELATIVE_HUMIDITY_2METRE_NAME = 'hourly_max_relative_humidity_2m_agl'
 
