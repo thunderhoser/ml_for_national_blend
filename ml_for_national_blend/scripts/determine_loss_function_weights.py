@@ -8,6 +8,7 @@ that the loss function is MSE or dual-weighted MSE.
 import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.utils import urma_utils
 
@@ -102,6 +103,12 @@ def _increment_dwmse_one_field(urma_table_xarray, field_name,
         numpy.absolute(climo_mean),
         numpy.absolute(real_data_values)
     )
+
+    if field_name in [
+            urma_utils.TEMPERATURE_2METRE_NAME, urma_utils.DEWPOINT_2METRE_NAME
+    ]:
+        sample_weights = temperature_conv.kelvins_to_celsius(sample_weights)
+
     # sample_weights = numpy.minimum(sample_weights, extreme_threshold)
     error_values = sample_weights * (climo_mean - real_data_values) ** 2
 

@@ -8,6 +8,7 @@ import keras
 from tensorflow.keras.saving import load_model
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
+from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import nwp_model_io
@@ -401,7 +402,39 @@ def _read_targets_one_example(
         desired_field_names=target_field_names
     )
 
-    if target_norm_param_table_xarray is not None:
+    if target_norm_param_table_xarray is None:
+        data_matrix = urma_table_xarray[urma_utils.DATA_KEY].values
+
+        if urma_utils.TEMPERATURE_2METRE_NAME in target_field_names:
+            print('Converting target temperatures from K to deg C...')
+
+            k = numpy.where(
+                urma_table_xarray.coords[urma_utils.FIELD_DIM].values ==
+                urma_utils.TEMPERATURE_2METRE_NAME
+            )[0][0]
+
+            data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
+                data_matrix[..., k]
+            )
+
+        if urma_utils.DEWPOINT_2METRE_NAME in target_field_names:
+            print('Converting target dewpoints from K to deg C...')
+
+            k = numpy.where(
+                urma_table_xarray.coords[urma_utils.FIELD_DIM].values ==
+                urma_utils.DEWPOINT_2METRE_NAME
+            )[0][0]
+
+            data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
+                data_matrix[..., k]
+            )
+
+        urma_table_xarray = urma_table_xarray.assign({
+            urma_utils.DATA_KEY: (
+                urma_table_xarray[urma_utils.DATA_KEY].dims, data_matrix
+            )
+        })
+    else:
         print('Normalizing target variables to z-scores...')
         urma_table_xarray = normalization.normalize_targets_to_z_scores(
             urma_table_xarray=urma_table_xarray,
