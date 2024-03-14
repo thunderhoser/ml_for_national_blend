@@ -57,7 +57,7 @@ echo $output_dir_name
 python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --input_template_file_name="${template_file_name}" \
 --output_model_dir_name="${output_dir_name}" \
---nwp_lead_times_hours 0 48 \
+--nwp_lead_times_hours 6 48 \
 --nwp_model_names ${nwp_model_name_set} \
 --nwp_field_names ${nwp_field_name_set} \
 --nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
