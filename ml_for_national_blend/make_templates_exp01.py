@@ -23,7 +23,9 @@ OUTPUT_DIR_NAME = (
     'experiment01_ablation/templates'
 )
 
-CHANNEL_WEIGHTS = numpy.array([0.2, 0.2, 0.2, 0.2, 0.2])
+CHANNEL_WEIGHTS = numpy.array([
+    0.02056336, 0.03271094, 0.40520461, 0.33582517, 0.20569591
+])
 
 LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_gust(
     channel_weights=CHANNEL_WEIGHTS,
@@ -34,10 +36,13 @@ LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_gust(
 
 LOSS_FUNCTION_STRING = (
     'custom_losses.dual_weighted_mse_constrained_gust('
-    'channel_weights=numpy.array([0.2, 0.2, 0.2, 0.2, 0.2]), '
+    'channel_weights=numpy.array([{0:.8f}, {1:.8f}, {2:.8f}, {3:.8f}, {4:.8f}]), '
     'u_wind_index=2, v_wind_index=3, gust_factor_index=4, '
     'expect_ensemble=False, '
     'function_name="loss_dwmse")'
+).format(
+    CHANNEL_WEIGHTS[0], CHANNEL_WEIGHTS[1], CHANNEL_WEIGHTS[2],
+    CHANNEL_WEIGHTS[3], CHANNEL_WEIGHTS[4]
 )
 
 # TODO(thunderhoser): Make metrics convert gust factor to gust speed.
@@ -82,10 +87,10 @@ METRIC_FUNCTION_STRINGS = [
     'custom_metrics.dual_weighted_mse(channel_index=1, expect_ensemble=False, function_name="dewpoint_dwmse_celsius3")',
     'custom_metrics.dual_weighted_mse(channel_index=2, expect_ensemble=False, function_name="u_wind_dwmse_m3_s03")',
     'custom_metrics.dual_weighted_mse(channel_index=3, expect_ensemble=False, function_name="v_wind_dwmse_m3_s03")',
-    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight={0:.10f}, expect_ensemble=False, function_name="temp_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[0]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight={0:.10f}, expect_ensemble=False, function_name="dewpoint_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[1]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight={0:.10f}, expect_ensemble=False, function_name="u_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[2]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight={0:.10f}, expect_ensemble=False, function_name="v_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[3])
+    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight={0:.8f}, expect_ensemble=False, function_name="temp_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[0]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight={0:.8f}, expect_ensemble=False, function_name="dewpoint_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[1]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight={0:.8f}, expect_ensemble=False, function_name="u_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[2]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight={0:.8f}, expect_ensemble=False, function_name="v_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[3])
 ]
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
