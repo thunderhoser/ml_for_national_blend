@@ -48,6 +48,7 @@ USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
+PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 METRIC_FUNCTIONS_KEY = 'metric_function_list'
@@ -135,6 +136,8 @@ def check_input_args(option_dict):
         batch normalization after each non-output layer.
     option_dict["ensemble_size"]: Number of ensemble members.
     option_dict["num_output_channels"]: Number of output channels.
+    option_dict["predict_gust_factor"]: Boolean flag.  If True, the model needs
+        to predict gust factor.
     option_dict["loss_function"]: Loss function.
     option_dict["optimizer_function"]: Optimizer function.
     option_dict["metric_function_list"]: 1-D list of metric functions.
@@ -287,6 +290,7 @@ def check_input_args(option_dict):
     error_checking.assert_is_geq(option_dict[ENSEMBLE_SIZE_KEY], 1)
     error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
     error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
+    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
 
     error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
 
@@ -350,6 +354,7 @@ def create_model(option_dict):
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
     num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
+    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
 
     if input_dimensions_2pt5km_res is None:
         input_layer_object_2pt5km_res = None
@@ -1062,22 +1067,62 @@ def create_model(option_dict):
             [conv_layer_by_level[i - 1], upconv_layer_by_level[i - 1]]
         )
 
-    skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
-        num_kernel_rows=1, num_kernel_columns=1,
-        num_rows_per_stride=1, num_columns_per_stride=1,
-        num_filters=ensemble_size * num_output_channels,
-        padding_type_string=architecture_utils.YES_PADDING_STRING,
-        weight_regularizer=l2_function,
-        layer_name='last_conv'
-    )(skip_layer_by_level[0])
-
-    if output_activ_function_name is not None:
-        skip_layer_by_level[0] = architecture_utils.get_activation_layer(
-            activation_function_string=output_activ_function_name,
-            alpha_for_relu=output_activ_function_alpha,
-            alpha_for_elu=output_activ_function_alpha,
-            layer_name='last_conv_activation'
+    if predict_gust_factor:
+        non_gf_output_layer_object = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=1, num_kernel_columns=1,
+            num_rows_per_stride=1, num_columns_per_stride=1,
+            num_filters=(num_output_channels - 1) * ensemble_size,
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=l2_function,
+            layer_name='last_conv_not_gust_factor'
         )(skip_layer_by_level[0])
+
+        gf_output_layer_object = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=1, num_kernel_columns=1,
+            num_rows_per_stride=1, num_columns_per_stride=1,
+            num_filters=ensemble_size,
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=l2_function,
+            layer_name='last_conv_gust_factor'
+        )(skip_layer_by_level[0])
+
+        if output_activ_function_name is not None:
+            non_gf_output_layer_object = architecture_utils.get_activation_layer(
+                activation_function_string=output_activ_function_name,
+                alpha_for_relu=output_activ_function_alpha,
+                alpha_for_elu=output_activ_function_alpha,
+                layer_name='last_conv_activation_not_gf'
+            )(non_gf_output_layer_object)
+
+        gf_output_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=architecture_utils.RELU_FUNCTION_STRING,
+            alpha_for_relu=0.,
+            alpha_for_elu=0.,
+            layer_name='last_conv_activation_gf'
+        )(gf_output_layer_object)
+
+        output_layer_object = keras.layers.Concatenate(
+            axis=-1, name='last_conv_concat'
+        )([
+            non_gf_output_layer_object, gf_output_layer_object
+        ])
+    else:
+        output_layer_object = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=1, num_kernel_columns=1,
+            num_rows_per_stride=1, num_columns_per_stride=1,
+            num_filters=ensemble_size * num_output_channels,
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=l2_function,
+            layer_name='last_conv'
+        )(skip_layer_by_level[0])
+
+        if output_activ_function_name is not None:
+            output_layer_object = architecture_utils.get_activation_layer(
+                activation_function_string=output_activ_function_name,
+                alpha_for_relu=output_activ_function_alpha,
+                alpha_for_elu=output_activ_function_alpha,
+                layer_name='last_conv_activation'
+            )(output_layer_object)
 
     # TODO(thunderhoser): For now, input_dimensions_2pt5km_res cannot actually
     # be None.  In other words, the model must take 2.5-km data as input.  I
@@ -1087,9 +1132,9 @@ def create_model(option_dict):
             input_dimensions_2pt5km_res[0], input_dimensions_2pt5km_res[1],
             num_output_channels, ensemble_size
         )
-        skip_layer_by_level[0] = keras.layers.Reshape(
+        output_layer_object = keras.layers.Reshape(
             target_shape=new_dims, name='reshape_predictions'
-        )(skip_layer_by_level[0])
+        )(output_layer_object)
 
     input_layer_objects = []
     if input_dimensions_2pt5km_res is not None:
@@ -1102,7 +1147,7 @@ def create_model(option_dict):
         input_layer_objects.append(input_layer_object_40km_res)
 
     model_object = keras.models.Model(
-        inputs=input_layer_objects, outputs=skip_layer_by_level[0]
+        inputs=input_layer_objects, outputs=output_layer_object
     )
 
     model_object.compile(

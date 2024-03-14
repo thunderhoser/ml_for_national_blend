@@ -16,6 +16,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import temperature_conversions as temperature_conv
 import urma_io
 import urma_utils
 
@@ -110,6 +111,12 @@ def _increment_dwmse_one_field(urma_table_xarray, field_name,
         numpy.absolute(climo_mean),
         numpy.absolute(real_data_values)
     )
+
+    if field_name in [
+            urma_utils.TEMPERATURE_2METRE_NAME, urma_utils.DEWPOINT_2METRE_NAME
+    ]:
+        sample_weights = temperature_conv.kelvins_to_celsius(sample_weights)
+
     # sample_weights = numpy.minimum(sample_weights, extreme_threshold)
     error_values = sample_weights * (climo_mean - real_data_values) ** 2
 
