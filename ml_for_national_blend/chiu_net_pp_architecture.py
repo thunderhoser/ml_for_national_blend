@@ -304,7 +304,7 @@ def create_model(option_dict):
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
-        this_name = 'concat_2pt5km_10km'
+        this_name = 'concat_with_10km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
@@ -384,17 +384,16 @@ def create_model(option_dict):
 
         num_levels_filled += num_levels_to_fill
 
-        if input_dimensions_20km_res is not None:
-            i = num_levels_filled - 1
-
-            this_name = 'concat_10km_20km'
-            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
-                axis=-1, name=this_name
-            )(
-                [encoder_pooling_layer_objects[i], layer_object_20km_res]
-            )
-
     if input_dimensions_20km_res is not None:
+        i = num_levels_filled - 1
+
+        this_name = 'concat_with_20km'
+        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+            axis=-1, name=this_name
+        )(
+            [encoder_pooling_layer_objects[i], layer_object_20km_res]
+        )
+
         i = num_levels_filled
 
         for j in range(num_encoder_conv_layers_by_level[i]):
@@ -456,17 +455,16 @@ def create_model(option_dict):
 
         num_levels_filled += 1
 
-        if input_dimensions_40km_res is not None:
-            i = num_levels_filled - 1
-
-            this_name = 'concat_20km_40km'
-            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
-                axis=-1, name=this_name
-            )(
-                [encoder_pooling_layer_objects[i], layer_object_40km_res]
-            )
-
     if input_dimensions_40km_res is not None:
+        i = num_levels_filled - 1
+
+        this_name = 'concat_with_40km'
+        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+            axis=-1, name=this_name
+        )(
+            [encoder_pooling_layer_objects[i], layer_object_40km_res]
+        )
+
         i = num_levels_filled
 
         for j in range(num_encoder_conv_layers_by_level[i]):
