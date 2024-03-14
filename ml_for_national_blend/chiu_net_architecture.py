@@ -149,17 +149,16 @@ def check_input_args(option_dict):
     option_dict = DEFAULT_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
-    if option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
-        )
+    error_checking.assert_is_numpy_array(
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY],
+        exact_dimensions=numpy.array([4], dtype=int)
+    )
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
+    )
+    error_checking.assert_is_greater_numpy_array(
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
+    )
 
     if option_dict[INPUT_DIMENSIONS_10KM_RES_KEY] is not None:
         error_checking.assert_is_numpy_array(

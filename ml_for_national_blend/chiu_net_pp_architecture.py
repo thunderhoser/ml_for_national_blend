@@ -181,16 +181,12 @@ def create_model(option_dict):
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
 
-    if input_dimensions_2pt5km_res is None:
-        input_layer_object_2pt5km_res = None
-        layer_object_2pt5km_res = None
-    else:
-        input_layer_object_2pt5km_res = keras.layers.Input(
-            shape=tuple(input_dimensions_2pt5km_res.tolist())
-        )
-        layer_object_2pt5km_res = keras.layers.Permute(
-            dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
-        )(input_layer_object_2pt5km_res)
+    input_layer_object_2pt5km_res = keras.layers.Input(
+        shape=tuple(input_dimensions_2pt5km_res.tolist())
+    )
+    layer_object_2pt5km_res = keras.layers.Permute(
+        dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
+    )(input_layer_object_2pt5km_res)
 
     if input_dimensions_10km_res is None:
         input_layer_object_10km_res = None
@@ -229,98 +225,28 @@ def create_model(option_dict):
         l1_weight=l1_weight, l2_weight=l2_weight
     )
 
-    num_lead_times = 0
+    num_lead_times = input_dimensions_2pt5km_res[2]
 
     num_levels = len(pooling_size_by_level_px)
     encoder_conv_layer_objects = [None] * (num_levels + 1)
     encoder_pooling_layer_objects = [None] * num_levels
 
-    if input_dimensions_2pt5km_res is not None:
-        num_lead_times = input_dimensions_2pt5km_res[2]
-
-        for level_index in range(2):
-            i = level_index
-
-            for j in range(num_encoder_conv_layers_by_level[i]):
-                if j == 0:
-                    if i == 0:
-                        previous_layer_object = layer_object_2pt5km_res
-                    else:
-                        previous_layer_object = encoder_pooling_layer_objects[i - 1]
-                else:
-                    previous_layer_object = encoder_conv_layer_objects[i]
-
-                this_name = 'encoder_level{0:d}_conv{1:d}'.format(i, j)
-                this_conv_layer_object = architecture_utils.get_2d_conv_layer(
-                    num_kernel_rows=3, num_kernel_columns=3,
-                    num_rows_per_stride=1, num_columns_per_stride=1,
-                    num_filters=num_channels_by_level[i],
-                    padding_type_string=architecture_utils.YES_PADDING_STRING,
-                    weight_regularizer=regularizer_object,
-                    layer_name=this_name
-                )
-
-                encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
-                    this_conv_layer_object, name=this_name
-                )(previous_layer_object)
-
-                this_name = 'encoder_level{0:d}_activation{1:d}'.format(i, j)
-                encoder_conv_layer_objects[i] = architecture_utils.get_activation_layer(
-                    activation_function_string=inner_activ_function_name,
-                    alpha_for_relu=inner_activ_function_alpha,
-                    alpha_for_elu=inner_activ_function_alpha,
-                    layer_name=this_name
-                )(encoder_conv_layer_objects[i])
-
-                if encoder_dropout_rate_by_level[i] > 0:
-                    this_name = 'encoder_level{0:d}_dropout{1:d}'.format(i, j)
-                    encoder_conv_layer_objects[i] = architecture_utils.get_dropout_layer(
-                        dropout_fraction=encoder_dropout_rate_by_level[i],
-                        layer_name=this_name
-                    )(encoder_conv_layer_objects[i])
-
-                if use_batch_normalization:
-                    this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
-                    encoder_conv_layer_objects[i] = architecture_utils.get_batch_norm_layer(
-                        layer_name=this_name
-                    )(encoder_conv_layer_objects[i])
-
-            this_name = 'encoder_level{0:d}_pooling'.format(i)
-            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-                num_rows_in_window=pooling_size_by_level_px[i],
-                num_columns_in_window=pooling_size_by_level_px[i],
-                num_rows_per_stride=pooling_size_by_level_px[i],
-                num_columns_per_stride=pooling_size_by_level_px[i],
-                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
-                layer_name=this_name
-            )
-            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
-                this_pooling_layer_object, name=this_name
-            )(encoder_conv_layer_objects[i])
-
-            print('FOO1')
-            print(encoder_pooling_layer_objects[i].shape)
-
-        if input_dimensions_10km_res is not None:
-            i = 1
-            this_name = 'concat_2pt5km_10km'
-            encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
-                axis=-1, name=this_name
-            )(
-                [encoder_pooling_layer_objects[i], layer_object_10km_res]
-            )
-
-            print('FOO2')
-            print(encoder_pooling_layer_objects[i].shape)
-
     if input_dimensions_10km_res is not None:
-        num_lead_times = input_dimensions_10km_res[2]
-        i = 0 if input_dimensions_2pt5km_res is None else 2
+        num_levels_to_fill = 2
+    elif input_dimensions_20km_res is not None:
+        num_levels_to_fill = 3
+    elif input_dimensions_40km_res is not None:
+        num_levels_to_fill = 4
+    else:
+        num_levels_to_fill = 2
+
+    for level_index in range(num_levels_to_fill):
+        i = level_index
 
         for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 if i == 0:
-                    previous_layer_object = layer_object_10km_res
+                    previous_layer_object = layer_object_2pt5km_res
                 else:
                     previous_layer_object = encoder_pooling_layer_objects[i - 1]
             else:
@@ -374,11 +300,92 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
-        print('FOO3')
-        print(encoder_pooling_layer_objects[i].shape)
+    num_levels_filled = num_levels_to_fill + 0
+
+    if input_dimensions_10km_res is not None:
+        i = num_levels_filled - 1
+        this_name = 'concat_2pt5km_10km'
+        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+            axis=-1, name=this_name
+        )(
+            [encoder_pooling_layer_objects[i], layer_object_10km_res]
+        )
 
         if input_dimensions_20km_res is not None:
-            i = 0 if input_dimensions_2pt5km_res is None else 2
+            num_levels_to_fill = 1
+        elif input_dimensions_40km_res is not None:
+            num_levels_to_fill = 2
+        else:
+            num_levels_to_fill = 1
+
+        for level_index in range(
+                num_levels_filled, num_levels_filled + num_levels_to_fill
+        ):
+            i = level_index
+
+            for j in range(num_encoder_conv_layers_by_level[i]):
+                if j == 0:
+                    if i == 0:
+                        previous_layer_object = layer_object_10km_res
+                    else:
+                        previous_layer_object = (
+                            encoder_pooling_layer_objects[i - 1]
+                        )
+                else:
+                    previous_layer_object = encoder_conv_layer_objects[i]
+
+                this_name = 'encoder_level{0:d}_conv{1:d}'.format(i, j)
+                this_conv_layer_object = architecture_utils.get_2d_conv_layer(
+                    num_kernel_rows=3, num_kernel_columns=3,
+                    num_rows_per_stride=1, num_columns_per_stride=1,
+                    num_filters=num_channels_by_level[i],
+                    padding_type_string=architecture_utils.YES_PADDING_STRING,
+                    weight_regularizer=regularizer_object,
+                    layer_name=this_name
+                )
+
+                encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
+                    this_conv_layer_object, name=this_name
+                )(previous_layer_object)
+
+                this_name = 'encoder_level{0:d}_activation{1:d}'.format(i, j)
+                encoder_conv_layer_objects[i] = architecture_utils.get_activation_layer(
+                    activation_function_string=inner_activ_function_name,
+                    alpha_for_relu=inner_activ_function_alpha,
+                    alpha_for_elu=inner_activ_function_alpha,
+                    layer_name=this_name
+                )(encoder_conv_layer_objects[i])
+
+                if encoder_dropout_rate_by_level[i] > 0:
+                    this_name = 'encoder_level{0:d}_dropout{1:d}'.format(i, j)
+                    encoder_conv_layer_objects[i] = architecture_utils.get_dropout_layer(
+                        dropout_fraction=encoder_dropout_rate_by_level[i],
+                        layer_name=this_name
+                    )(encoder_conv_layer_objects[i])
+
+                if use_batch_normalization:
+                    this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
+                    encoder_conv_layer_objects[i] = architecture_utils.get_batch_norm_layer(
+                        layer_name=this_name
+                    )(encoder_conv_layer_objects[i])
+
+            this_name = 'encoder_level{0:d}_pooling'.format(i)
+            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+                num_rows_in_window=pooling_size_by_level_px[i],
+                num_columns_in_window=pooling_size_by_level_px[i],
+                num_rows_per_stride=pooling_size_by_level_px[i],
+                num_columns_per_stride=pooling_size_by_level_px[i],
+                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+                layer_name=this_name
+            )
+            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+                this_pooling_layer_object, name=this_name
+            )(encoder_conv_layer_objects[i])
+
+        num_levels_filled += num_levels_to_fill
+
+        if input_dimensions_20km_res is not None:
+            i = num_levels_filled - 1
 
             this_name = 'concat_10km_20km'
             encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
@@ -387,13 +394,8 @@ def create_model(option_dict):
                 [encoder_pooling_layer_objects[i], layer_object_20km_res]
             )
 
-            print('FOO4')
-            print(encoder_pooling_layer_objects[i].shape)
-
     if input_dimensions_20km_res is not None:
-        num_lead_times = input_dimensions_20km_res[2]
-        i = 0 if input_dimensions_2pt5km_res is None else 2
-        i += 0 if input_dimensions_10km_res is None else 1
+        i = num_levels_filled
 
         for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
@@ -452,12 +454,10 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
-        print('FOO5')
-        print(encoder_pooling_layer_objects[i].shape)
+        num_levels_filled += 1
 
         if input_dimensions_40km_res is not None:
-            i = 0 if input_dimensions_2pt5km_res is None else 2
-            i += 0 if input_dimensions_10km_res is None else 1
+            i = num_levels_filled - 1
 
             this_name = 'concat_20km_40km'
             encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
@@ -466,14 +466,8 @@ def create_model(option_dict):
                 [encoder_pooling_layer_objects[i], layer_object_40km_res]
             )
 
-            print('FOO6')
-            print(encoder_pooling_layer_objects[i].shape)
-
     if input_dimensions_40km_res is not None:
-        num_lead_times = input_dimensions_40km_res[2]
-        i = 0 if input_dimensions_2pt5km_res is None else 2
-        i += 0 if input_dimensions_10km_res is None else 1
-        i += 0 if input_dimensions_20km_res is None else 1
+        i = num_levels_filled
 
         for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
@@ -532,12 +526,9 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
-    start_index = 0 if input_dimensions_2pt5km_res is None else 2
-    start_index += 0 if input_dimensions_10km_res is None else 1
-    start_index += 0 if input_dimensions_20km_res is None else 1
-    start_index += 0 if input_dimensions_40km_res is None else 1
+        num_levels_filled += 1
 
-    for i in range(start_index, num_levels + 1):
+    for i in range(num_levels_filled, num_levels + 1):
         for j in range(num_encoder_conv_layers_by_level[i]):
             if j == 0:
                 previous_layer_object = encoder_pooling_layer_objects[i - 1]
@@ -905,9 +896,7 @@ def create_model(option_dict):
             target_shape=new_dims, name='reshape_predictions'
         )(output_layer_object)
 
-    input_layer_objects = []
-    if input_dimensions_2pt5km_res is not None:
-        input_layer_objects.append(input_layer_object_2pt5km_res)
+    input_layer_objects = [input_layer_object_2pt5km_res]
     if input_dimensions_10km_res is not None:
         input_layer_objects.append(input_layer_object_10km_res)
     if input_dimensions_20km_res is not None:
