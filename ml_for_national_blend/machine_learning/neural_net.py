@@ -17,8 +17,8 @@ from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import normalization
-# from ml_for_national_blend.machine_learning import custom_losses
-# from ml_for_national_blend.machine_learning import custom_metrics
+from ml_for_national_blend.machine_learning import custom_losses
+from ml_for_national_blend.machine_learning import custom_metrics
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
