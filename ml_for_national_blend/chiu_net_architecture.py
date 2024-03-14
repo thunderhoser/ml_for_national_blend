@@ -755,7 +755,7 @@ def create_model(option_dict):
     )(conv_layer_by_level[-1])
 
     if not forecast_module_use_3d_conv:
-        orig_dims = forecast_module_layer_object.get_shape()
+        orig_dims = forecast_module_layer_object.shape
         new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
 
         forecast_module_layer_object = keras.layers.Reshape(
@@ -893,12 +893,12 @@ def create_model(option_dict):
         this_function, name=this_name
     )(conv_layer_by_level[i])
 
-    num_upconv_rows = upconv_layer_by_level[i].get_shape()[1]
-    num_desired_rows = conv_layer_by_level[i].get_shape()[1]
+    num_upconv_rows = upconv_layer_by_level[i].shape[1]
+    num_desired_rows = conv_layer_by_level[i].shape[1]
     num_padding_rows = num_desired_rows - num_upconv_rows
 
-    num_upconv_columns = upconv_layer_by_level[i].get_shape()[2]
-    num_desired_columns = conv_layer_by_level[i].get_shape()[2]
+    num_upconv_columns = upconv_layer_by_level[i].shape[2]
+    num_desired_columns = conv_layer_by_level[i].shape[2]
     num_padding_columns = num_desired_columns - num_upconv_columns
 
     if num_padding_rows + num_padding_columns > 0:
@@ -1044,12 +1044,12 @@ def create_model(option_dict):
             this_function, name=this_name
         )(conv_layer_by_level[i - 1])
 
-        num_upconv_rows = upconv_layer_by_level[i - 1].get_shape()[1]
-        num_desired_rows = conv_layer_by_level[i - 1].get_shape()[1]
+        num_upconv_rows = upconv_layer_by_level[i - 1].shape[1]
+        num_desired_rows = conv_layer_by_level[i - 1].shape[1]
         num_padding_rows = num_desired_rows - num_upconv_rows
 
-        num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[2]
-        num_desired_columns = conv_layer_by_level[i - 1].get_shape()[2]
+        num_upconv_columns = upconv_layer_by_level[i - 1].shape[2]
+        num_desired_columns = conv_layer_by_level[i - 1].shape[2]
         num_padding_columns = num_desired_columns - num_upconv_columns
 
         if num_padding_rows + num_padding_columns > 0:

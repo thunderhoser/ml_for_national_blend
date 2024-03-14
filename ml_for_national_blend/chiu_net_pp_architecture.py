@@ -66,7 +66,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """
 
     current_channel_counts = numpy.array(
-        [l.get_shape()[-1] for l in input_layer_objects], dtype=float
+        [l.shape[-1] for l in input_layer_objects], dtype=float
     )
 
     num_input_layers = len(input_layer_objects)
@@ -584,7 +584,7 @@ def create_model(option_dict):
         )(encoder_conv_layer_objects[i])
 
         if not forecast_module_use_3d_conv:
-            orig_dims = fcst_module_layer_objects[i].get_shape()
+            orig_dims = fcst_module_layer_objects[i].shape
             new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
 
             this_name = 'fcst_level{0:d}_remove-time-dim'.format(i)
@@ -711,13 +711,13 @@ def create_model(option_dict):
                     layer_name=this_name
                 )(this_layer_object)
 
-            num_upconv_rows = this_layer_object.get_shape()[1]
-            num_desired_rows = last_conv_layer_matrix[i_new, 0].get_shape()[1]
+            num_upconv_rows = this_layer_object.shape[1]
+            num_desired_rows = last_conv_layer_matrix[i_new, 0].shape[1]
             num_padding_rows = num_desired_rows - num_upconv_rows
 
-            num_upconv_columns = this_layer_object.get_shape()[2]
+            num_upconv_columns = this_layer_object.shape[2]
             num_desired_columns = (
-                last_conv_layer_matrix[i_new, 0].get_shape()[2]
+                last_conv_layer_matrix[i_new, 0].shape[2]
             )
             num_padding_columns = num_desired_columns - num_upconv_columns
 
