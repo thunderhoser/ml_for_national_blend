@@ -135,8 +135,7 @@ DEFAULT_OPTION_DICT = {
 
 # TODO: I can request different fields from different NWP models in the generator args, but feeding these args into a Python script from Bash will be hairy.
 
-# NWP_MODEL_COUNTS_AXIS1 = numpy.array([1, 2, 3, 4], dtype=int)
-NWP_MODEL_COUNTS_AXIS1 = numpy.array([3], dtype=int)
+NWP_MODEL_COUNTS_AXIS1 = numpy.array([1, 2, 3, 4], dtype=int)
 NWP_VARIABLE_COUNTS_AXIS2 = numpy.array([7, 12, 16, 20], dtype=int)
 
 
