@@ -1189,7 +1189,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
 
     history_object = keras.callbacks.CSVLogger(
         filename='{0:s}/history.csv'.format(output_dir_name),
