@@ -613,7 +613,7 @@ def create_model(option_dict):
 
                     new_dims = (
                         fcst_module_layer_objects[i].shape[1:3] +
-                        [fcst_module_layer_objects[i].shape[-1]]
+                        (fcst_module_layer_objects[i].shape[-1],)
                     )
 
                     this_name = 'fcst_level{0:d}_remove-time-dim'.format(i)

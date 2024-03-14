@@ -783,7 +783,7 @@ def create_model(option_dict):
 
                 new_dims = (
                     forecast_module_layer_object.shape[1:-2] +
-                    [forecast_module_layer_object.shape[-1]]
+                    (forecast_module_layer_object.shape[-1],)
                 )
                 forecast_module_layer_object = keras.layers.Reshape(
                     target_shape=new_dims, name='fc_module_remove_time_dim'
