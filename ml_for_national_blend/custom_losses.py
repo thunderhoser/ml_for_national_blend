@@ -73,7 +73,7 @@ def process_dewpoint_predictions(prediction_tensor, temperature_index,
         prediction_tensor[:, :, :, :dewpoint_index, ...],
         K.expand_dims(new_dewpoint_tensor, axis=3),
         prediction_tensor[:, :, :, (dewpoint_index + 1):, ...]
-    ], axis=-2)
+    ], axis=3)
 
     return prediction_tensor
 
@@ -123,7 +123,7 @@ def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
         prediction_tensor[:, :, :, :gust_index, ...],
         K.expand_dims(gust_speed_prediction_tensor, axis=3),
         prediction_tensor[:, :, :, (gust_index + 1):, ...]
-    ], axis=-2)
+    ], axis=3)
 
     return prediction_tensor
 
