@@ -106,9 +106,9 @@ METRIC_FUNCTION_STRINGS = [
 NUM_CONV_LAYERS_PER_BLOCK = 1
 NUM_NWP_LEAD_TIMES = 2
 
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=6)
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=24)
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.Nadam(gradient_accumulation_steps=6)'
+    'keras.optimizers.Nadam(gradient_accumulation_steps=24)'
 )
 
 DEFAULT_OPTION_DICT = {
