@@ -57,8 +57,11 @@ def _run(template_file_name, output_dir_name, nwp_lead_times_hours,
     if target_normalization_file_name == '':
         target_normalization_file_name = None
 
-    assert len(nwp_model_names) == len(nwp_dir_names_for_training)
-    assert len(nwp_model_names) == len(nwp_dir_names_for_validation)
+    # assert len(nwp_model_names) == len(nwp_dir_names_for_training)
+    # assert len(nwp_model_names) == len(nwp_dir_names_for_validation)
+
+    nwp_dir_names_for_training = nwp_dir_names_for_training[:len(nwp_model_names)]
+    nwp_dir_names_for_validation = nwp_dir_names_for_validation[:len(nwp_model_names)]
 
     nwp_model_to_training_dir_name = dict(
         zip(nwp_model_names, nwp_dir_names_for_training)

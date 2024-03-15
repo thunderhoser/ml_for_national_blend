@@ -948,6 +948,24 @@ def data_generator(option_dict):
         include_endpoint=True
     )
 
+    # TODO(thunderhoser): HACK because I have data for only every 5th day right
+    # now.
+    init_date_strings = [
+        time_conversion.unix_sec_to_string(t, '%Y-%j')
+        for t in init_times_unix_sec
+    ]
+    init_dates_julian = numpy.array(
+        [int(t.split('-')[1]) for t in init_date_strings],
+        dtype=int
+    )
+    good_indices = numpy.where(
+        numpy.mod(init_dates_julian, 5) == 0
+    )[0]
+
+    init_times_unix_sec = init_times_unix_sec[good_indices]
+    del init_date_strings
+    del init_dates_julian
+
     # Do actual stuff.
     init_time_index = len(init_times_unix_sec)
 
@@ -1182,7 +1200,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
 
     history_object = keras.callbacks.CSVLogger(
         filename='{0:s}/history.csv'.format(output_dir_name),
@@ -1190,7 +1208,8 @@ def train_model(
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min', period=1
+        save_best_only=True, save_weights_only=False, mode='min',
+        save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=0.,
@@ -1234,8 +1253,8 @@ def train_model(
         early_stopping_patience_epochs=early_stopping_patience_epochs
     )
 
-    model_object.fit_generator(
-        generator=training_generator,
+    model_object.fit(
+        x=training_generator,
         steps_per_epoch=num_training_batches_per_epoch,
         epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
         validation_data=validation_generator,
