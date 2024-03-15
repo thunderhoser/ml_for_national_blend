@@ -1109,15 +1109,24 @@ def data_generator(option_dict):
                 sentinel_value
             )
 
-        predictor_matrices = [
-            m for m in [
-                predictor_matrix_2pt5km, predictor_matrix_10km,
-                predictor_matrix_20km, predictor_matrix_40km
-            ]
-            if m is not None
-        ]
+        predictor_matrices = {}
+        if predictor_matrix_2pt5km is not None:
+            predictor_matrices.update({
+                '2pt5km_inputs': predictor_matrix_2pt5km.astype('float32')
+            })
+        if predictor_matrix_10km is not None:
+            predictor_matrices.update({
+                '10km_inputs': predictor_matrix_10km.astype('float32')
+            })
+        if predictor_matrix_20km is not None:
+            predictor_matrices.update({
+                '20km_inputs': predictor_matrix_20km.astype('float32')
+            })
+        if predictor_matrix_40km is not None:
+            predictor_matrices.update({
+                '40km_inputs': predictor_matrix_40km.astype('float32')
+            })
 
-        predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         yield predictor_matrices, target_matrix
 
 

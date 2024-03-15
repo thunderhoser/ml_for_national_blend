@@ -177,7 +177,8 @@ def create_model(option_dict):
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
 
     input_layer_object_2pt5km_res = keras.layers.Input(
-        shape=tuple(input_dimensions_2pt5km_res.tolist())
+        shape=tuple(input_dimensions_2pt5km_res.tolist()),
+        name='2pt5km_inputs'
     )
     layer_object_2pt5km_res = keras.layers.Permute(
         dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
@@ -188,7 +189,8 @@ def create_model(option_dict):
         layer_object_10km_res = None
     else:
         input_layer_object_10km_res = keras.layers.Input(
-            shape=tuple(input_dimensions_10km_res.tolist())
+            shape=tuple(input_dimensions_10km_res.tolist()),
+            name='10km_inputs'
         )
         layer_object_10km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='10km_put_time_first'
@@ -199,7 +201,8 @@ def create_model(option_dict):
         layer_object_20km_res = None
     else:
         input_layer_object_20km_res = keras.layers.Input(
-            shape=tuple(input_dimensions_20km_res.tolist())
+            shape=tuple(input_dimensions_20km_res.tolist()),
+            name='20km_inputs'
         )
         layer_object_20km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='20km_put_time_first'
@@ -210,7 +213,8 @@ def create_model(option_dict):
         layer_object_40km_res = None
     else:
         input_layer_object_40km_res = keras.layers.Input(
-            shape=tuple(input_dimensions_40km_res.tolist())
+            shape=tuple(input_dimensions_40km_res.tolist()),
+            name='40km_inputs'
         )
         layer_object_40km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='40km_put_time_first'
