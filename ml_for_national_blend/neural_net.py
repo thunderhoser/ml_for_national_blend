@@ -1025,40 +1025,28 @@ def data_generator(option_dict):
                 nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
             )
 
-            found_any_predictors = True
+            found_any_predictors = False
 
             if predictor_matrix_2pt5km is not None:
                 found_any_predictors &= not numpy.all(
                     numpy.isnan(this_predictor_matrix_2pt5km)
                 )
                 predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
-
-                print('FOO1')
-                print(found_any_predictors)
             if predictor_matrix_10km is not None:
                 found_any_predictors &= not numpy.all(
                     numpy.isnan(this_predictor_matrix_10km)
                 )
                 predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
-
-                print('FOO2')
-                print(found_any_predictors)
             if predictor_matrix_20km is not None:
                 found_any_predictors &= not numpy.all(
                     numpy.isnan(this_predictor_matrix_20km)
                 )
                 predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
-
-                print('FOO3')
-                print(found_any_predictors)
             if predictor_matrix_40km is not None:
                 found_any_predictors &= not numpy.all(
                     numpy.isnan(this_predictor_matrix_40km)
                 )
                 predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
-
-                print('FOO3')
-                print(found_any_predictors)
 
             if not found_any_predictors:
                 init_time_index += 1
@@ -1128,15 +1116,24 @@ def data_generator(option_dict):
                 sentinel_value
             )
 
-        predictor_matrices = [
-            m for m in [
-                predictor_matrix_2pt5km, predictor_matrix_10km,
-                predictor_matrix_20km, predictor_matrix_40km
-            ]
-            if m is not None
-        ]
+        predictor_matrices = {}
+        if predictor_matrix_2pt5km is not None:
+            predictor_matrices.update({
+                '2pt5km_inputs': predictor_matrix_2pt5km.astype('float32')
+            })
+        if predictor_matrix_10km is not None:
+            predictor_matrices.update({
+                '10km_inputs': predictor_matrix_10km.astype('float32')
+            })
+        if predictor_matrix_20km is not None:
+            predictor_matrices.update({
+                '20km_inputs': predictor_matrix_20km.astype('float32')
+            })
+        if predictor_matrix_40km is not None:
+            predictor_matrices.update({
+                '40km_inputs': predictor_matrix_40km.astype('float32')
+            })
 
-        predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         yield predictor_matrices, target_matrix
 
 
