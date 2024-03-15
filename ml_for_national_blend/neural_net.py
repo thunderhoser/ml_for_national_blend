@@ -955,6 +955,24 @@ def data_generator(option_dict):
         include_endpoint=True
     )
 
+    # TODO(thunderhoser): HACK because I have data for only every 5th day right
+    # now.
+    init_date_strings = [
+        time_conversion.unix_sec_to_string(t, '%Y-%j')
+        for t in init_times_unix_sec
+    ]
+    init_dates_julian = numpy.array(
+        [int(t.split('-')[1]) for t in init_date_strings],
+        dtype=int
+    )
+    good_indices = numpy.where(
+        numpy.mod(init_dates_julian, 5) == 0
+    )[0]
+
+    init_times_unix_sec = init_times_unix_sec[good_indices]
+    del init_date_strings
+    del init_dates_julian
+
     # Do actual stuff.
     init_time_index = len(init_times_unix_sec)
 
