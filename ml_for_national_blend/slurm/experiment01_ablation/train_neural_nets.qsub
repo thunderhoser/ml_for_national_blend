@@ -64,7 +64,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --target_lead_time_hours=48 \
 --target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
 --target_normalization_file_name="${TARGET_NORMALIZATION_FILE_NAME}" \
---num_examples_per_batch=8 \
+--num_examples_per_batch=4 \
 --sentinel_value=-10 \
 --init_time_limit_strings_for_training "2022-11-01-00" "2023-05-31-00" \
 --nwp_dir_names_for_training "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/hrrr/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam_nest/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gfs/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gefs/processed/interp_to_nbm_grid" \
@@ -73,5 +73,5 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --nwp_dir_names_for_validation "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/hrrr/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam_nest/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gfs/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gefs/processed/interp_to_nbm_grid" \
 --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
 --num_epochs=1000 \
---num_training_batches_per_epoch=24 \
---num_validation_batches_per_epoch=6
+--num_training_batches_per_epoch=48 \
+--num_validation_batches_per_epoch=12
