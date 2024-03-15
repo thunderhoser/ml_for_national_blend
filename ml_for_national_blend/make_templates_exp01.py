@@ -116,7 +116,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
-    chiu_net_pp_arch.NUM_CHANNELS_KEY: numpy.array([8, 10, 12, 14, 16, 18, 20, 22, 24], dtype=int),
+    chiu_net_pp_arch.NUM_CHANNELS_KEY: numpy.array([15, 20, 25, 30, 35, 40, 45, 50, 55], dtype=int),
     # chiu_net_pp_arch.NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96, 96], dtype=int),
     chiu_net_pp_arch.POOLING_SIZE_KEY: numpy.full(8, 2, dtype=int),
     chiu_net_pp_arch.ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(9, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
