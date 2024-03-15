@@ -62,7 +62,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --nwp_field_names ${nwp_field_name_set} \
 --nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
 --target_lead_time_hours=48 \
---target_field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "wind_gust_10m_agl_m_s01" \
+--target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
 --target_normalization_file_name="${TARGET_NORMALIZATION_FILE_NAME}" \
 --num_examples_per_batch=8 \
 --sentinel_value=-10 \

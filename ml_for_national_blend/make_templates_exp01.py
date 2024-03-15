@@ -24,73 +24,83 @@ OUTPUT_DIR_NAME = (
 )
 
 CHANNEL_WEIGHTS = numpy.array([
-    0.02056336, 0.03271094, 0.40520461, 0.33582517, 0.20569591
+    0.02056336, 0.40520461, 0.33582517, 0.03271094, 0.20569591
 ])
 
-LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_gust(
+LOSS_FUNCTION = custom_losses.dual_weighted_mse_with_constraints(
     channel_weights=CHANNEL_WEIGHTS,
-    u_wind_index=2, v_wind_index=3, gust_factor_index=4,
+    temperature_index=0, u_wind_index=1, v_wind_index=2,
+    dewpoint_index=3, gust_index=4,
     expect_ensemble=False,
     function_name='loss_dwmse'
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_mse_constrained_gust('
+    'custom_losses.dual_weighted_mse_with_constraints('
     'channel_weights=numpy.array([{0:.8f}, {1:.8f}, {2:.8f}, {3:.8f}, {4:.8f}]), '
-    'u_wind_index=2, v_wind_index=3, gust_factor_index=4, '
-    'expect_ensemble=False, '
+    'temperature_index=0, u_wind_index=1, v_wind_index=2,'
+    'dewpoint_index=3, gust_index=4,'
+    'expect_ensemble=False,'
     'function_name="loss_dwmse")'
 ).format(
     CHANNEL_WEIGHTS[0], CHANNEL_WEIGHTS[1], CHANNEL_WEIGHTS[2],
     CHANNEL_WEIGHTS[3], CHANNEL_WEIGHTS[4]
 )
 
-# TODO(thunderhoser): Make metrics convert gust factor to gust speed.
-# TODO(thunderhoser): Also, enforce temp >= dewpoint in all losses/metrics.
 METRIC_FUNCTIONS = [
-    custom_metrics.max_prediction(channel_index=0, expect_ensemble=False, function_name='temp_max_prediction_celsius'),
-    custom_metrics.max_prediction(channel_index=1, expect_ensemble=False, function_name='dewpoint_max_prediction_celsius'),
-    custom_metrics.max_prediction(channel_index=2, expect_ensemble=False, function_name='u_wind_max_prediction_m_s01'),
-    custom_metrics.max_prediction(channel_index=3, expect_ensemble=False, function_name='v_wind_max_prediction_m_s01'),
-    custom_metrics.min_prediction(channel_index=0, expect_ensemble=False, function_name='temp_min_prediction_celsius'),
-    custom_metrics.min_prediction(channel_index=1, expect_ensemble=False, function_name='dewpoint_min_prediction_celsius'),
-    custom_metrics.min_prediction(channel_index=2, expect_ensemble=False, function_name='u_wind_min_prediction_m_s01'),
-    custom_metrics.min_prediction(channel_index=3, expect_ensemble=False, function_name='v_wind_min_prediction_m_s01'),
-    custom_metrics.mean_squared_error(channel_index=0, expect_ensemble=False, function_name='temp_mse_celsius2'),
-    custom_metrics.mean_squared_error(channel_index=1, expect_ensemble=False, function_name='dewpoint_mse_celsius2'),
-    custom_metrics.mean_squared_error(channel_index=2, expect_ensemble=False, function_name='u_wind_mse_m2_s02'),
-    custom_metrics.mean_squared_error(channel_index=3, expect_ensemble=False, function_name='v_wind_mse_m2_s02'),
-    custom_metrics.dual_weighted_mse(channel_index=0, expect_ensemble=False, function_name='temp_dwmse_celsius3'),
-    custom_metrics.dual_weighted_mse(channel_index=1, expect_ensemble=False, function_name='dewpoint_dwmse_celsius3'),
-    custom_metrics.dual_weighted_mse(channel_index=2, expect_ensemble=False, function_name='u_wind_dwmse_m3_s03'),
-    custom_metrics.dual_weighted_mse(channel_index=3, expect_ensemble=False, function_name='v_wind_dwmse_m3_s03'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=CHANNEL_WEIGHTS[0], expect_ensemble=False, function_name='temp_dwmse_in_loss'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=CHANNEL_WEIGHTS[1], expect_ensemble=False, function_name='dewpoint_dwmse_in_loss'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight=CHANNEL_WEIGHTS[2], expect_ensemble=False, function_name='u_wind_dwmse_in_loss'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight=CHANNEL_WEIGHTS[3], expect_ensemble=False, function_name='v_wind_dwmse_in_loss')
+    custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='temp_max_prediction_celsius'),
+    custom_metrics.max_prediction(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='u_wind_max_prediction_m_s01'),
+    custom_metrics.max_prediction(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='v_wind_max_prediction_m_s01'),
+    custom_metrics.max_prediction(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='dewpoint_max_prediction_celsius'),
+    custom_metrics.max_prediction(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='gust_max_prediction_m_s01'),
+    custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='temp_min_prediction_celsius'),
+    custom_metrics.min_prediction(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='u_wind_min_prediction_m_s01'),
+    custom_metrics.min_prediction(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='v_wind_min_prediction_m_s01'),
+    custom_metrics.min_prediction(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='dewpoint_min_prediction_celsius'),
+    custom_metrics.min_prediction(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='gust_min_prediction_m_s01'),
+    custom_metrics.mean_squared_error(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='temp_mse_celsius2'),
+    custom_metrics.mean_squared_error(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='u_wind_mse_m2_s02'),
+    custom_metrics.mean_squared_error(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='v_wind_mse_m2_s02'),
+    custom_metrics.mean_squared_error(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='dewpoint_mse_celsius2'),
+    custom_metrics.mean_squared_error(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='gust_mse_m2_s02'),
+    custom_metrics.dual_weighted_mse(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='temp_dwmse_celsius3'),
+    custom_metrics.dual_weighted_mse(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='u_wind_dwmse_m3_s03'),
+    custom_metrics.dual_weighted_mse(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='v_wind_dwmse_m3_s03'),
+    custom_metrics.dual_weighted_mse(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='dewpoint_dwmse_celsius3'),
+    custom_metrics.dual_weighted_mse(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='gust_dwmse_m3_s03'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=CHANNEL_WEIGHTS[0], temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='temp_dwmse_in_loss'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=CHANNEL_WEIGHTS[1], temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='u_wind_dwmse_in_loss'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight=CHANNEL_WEIGHTS[2], temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='v_wind_dwmse_in_loss'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight=CHANNEL_WEIGHTS[3], temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='dewpoint_dwmse_in_loss'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=4, channel_weight=CHANNEL_WEIGHTS[4], temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name='gust_dwmse_in_loss')
 ]
 
 METRIC_FUNCTION_STRINGS = [
-    'custom_metrics.max_prediction(channel_index=0, expect_ensemble=False, function_name="temp_max_prediction_celsius")',
-    'custom_metrics.max_prediction(channel_index=1, expect_ensemble=False, function_name="dewpoint_max_prediction_celsius")',
-    'custom_metrics.max_prediction(channel_index=2, expect_ensemble=False, function_name="u_wind_max_prediction_m_s01")',
-    'custom_metrics.max_prediction(channel_index=3, expect_ensemble=False, function_name="v_wind_max_prediction_m_s01")',
-    'custom_metrics.min_prediction(channel_index=0, expect_ensemble=False, function_name="temp_min_prediction_celsius")',
-    'custom_metrics.min_prediction(channel_index=1, expect_ensemble=False, function_name="dewpoint_min_prediction_celsius")',
-    'custom_metrics.min_prediction(channel_index=2, expect_ensemble=False, function_name="u_wind_min_prediction_m_s01")',
-    'custom_metrics.min_prediction(channel_index=3, expect_ensemble=False, function_name="v_wind_min_prediction_m_s01")',
-    'custom_metrics.mean_squared_error(channel_index=0, expect_ensemble=False, function_name="temp_mse_celsius2")',
-    'custom_metrics.mean_squared_error(channel_index=1, expect_ensemble=False, function_name="dewpoint_mse_celsius2")',
-    'custom_metrics.mean_squared_error(channel_index=2, expect_ensemble=False, function_name="u_wind_mse_m2_s02")',
-    'custom_metrics.mean_squared_error(channel_index=3, expect_ensemble=False, function_name="v_wind_mse_m2_s02")',
-    'custom_metrics.dual_weighted_mse(channel_index=0, expect_ensemble=False, function_name="temp_dwmse_celsius3")',
-    'custom_metrics.dual_weighted_mse(channel_index=1, expect_ensemble=False, function_name="dewpoint_dwmse_celsius3")',
-    'custom_metrics.dual_weighted_mse(channel_index=2, expect_ensemble=False, function_name="u_wind_dwmse_m3_s03")',
-    'custom_metrics.dual_weighted_mse(channel_index=3, expect_ensemble=False, function_name="v_wind_dwmse_m3_s03")',
-    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight={0:.8f}, expect_ensemble=False, function_name="temp_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[0]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight={0:.8f}, expect_ensemble=False, function_name="dewpoint_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[1]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight={0:.8f}, expect_ensemble=False, function_name="u_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[2]),
-    'custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight={0:.8f}, expect_ensemble=False, function_name="v_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[3])
+    'custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="temp_max_prediction_celsius")',
+    'custom_metrics.max_prediction(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="u_wind_max_prediction_m_s01")',
+    'custom_metrics.max_prediction(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="v_wind_max_prediction_m_s01")',
+    'custom_metrics.max_prediction(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="dewpoint_max_prediction_celsius")',
+    'custom_metrics.max_prediction(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="gust_max_prediction_m_s01")',
+    'custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="temp_min_prediction_celsius")',
+    'custom_metrics.min_prediction(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="u_wind_min_prediction_m_s01")',
+    'custom_metrics.min_prediction(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="v_wind_min_prediction_m_s01")',
+    'custom_metrics.min_prediction(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="dewpoint_min_prediction_celsius")',
+    'custom_metrics.min_prediction(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="gust_min_prediction_m_s01")',
+    'custom_metrics.mean_squared_error(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="temp_mse_celsius2")',
+    'custom_metrics.mean_squared_error(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="u_wind_mse_m2_s02")',
+    'custom_metrics.mean_squared_error(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="v_wind_mse_m2_s02")',
+    'custom_metrics.mean_squared_error(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="dewpoint_mse_celsius2")',
+    'custom_metrics.mean_squared_error(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="gust_mse_m2_s02")',
+    'custom_metrics.dual_weighted_mse(channel_index=0, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="temp_dwmse_celsius3")',
+    'custom_metrics.dual_weighted_mse(channel_index=1, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="u_wind_dwmse_m3_s03")',
+    'custom_metrics.dual_weighted_mse(channel_index=2, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="v_wind_dwmse_m3_s03")',
+    'custom_metrics.dual_weighted_mse(channel_index=3, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="dewpoint_dwmse_celsius3")',
+    'custom_metrics.dual_weighted_mse(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="gust_dwmse_m3_s03")',
+    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight={0:.8f}, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="temp_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[0]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight={0:.8f}, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="u_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[1]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight={0:.8f}, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="v_wind_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[2]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight={0:.8f}, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="dewpoint_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[3]),
+    'custom_losses.dual_weighted_mse_1channel(channel_index=4, channel_weight={0:.8f}, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=False, function_name="gust_dwmse_in_loss")'.format(CHANNEL_WEIGHTS[4])
 ]
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
