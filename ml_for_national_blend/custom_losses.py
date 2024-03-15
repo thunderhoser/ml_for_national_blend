@@ -60,10 +60,20 @@ def process_dewpoint_predictions(prediction_tensor, temperature_index,
     error_checking.assert_is_geq(dewpoint_index, 0)
     assert temperature_index != dewpoint_index
 
-    prediction_tensor[:, :, :, dewpoint_index, ...] = (
+    new_dewpoint_tensor = (
         prediction_tensor[:, :, :, temperature_index, ...] -
         prediction_tensor[:, :, :, dewpoint_index, ...]
     )
+
+    print(prediction_tensor[:, :, :, :dewpoint_index, ...].shape)
+    print(K.expand_dims(new_dewpoint_tensor, axis=3).shape)
+    print(prediction_tensor[:, :, :, (dewpoint_index + 1):, ...].shape)
+
+    prediction_tensor = K.concatenate([
+        prediction_tensor[:, :, :, :dewpoint_index, ...],
+        K.expand_dims(new_dewpoint_tensor, axis=3),
+        prediction_tensor[:, :, :, (dewpoint_index + 1):, ...]
+    ], axis=-2)
 
     return prediction_tensor
 
@@ -104,9 +114,16 @@ def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
         prediction_tensor[:, :, :, u_wind_index, ...] ** 2 +
         prediction_tensor[:, :, :, v_wind_index, ...] ** 2
     )
-    prediction_tensor[:, :, :, gust_index, ...] = (
-        gust_speed_prediction_tensor
-    )
+
+    print(prediction_tensor[:, :, :, :gust_index, ...].shape)
+    print(K.expand_dims(gust_speed_prediction_tensor, axis=3).shape)
+    print(prediction_tensor[:, :, :, (gust_index + 1):, ...].shape)
+
+    prediction_tensor = K.concatenate([
+        prediction_tensor[:, :, :, :gust_index, ...],
+        K.expand_dims(gust_speed_prediction_tensor, axis=3),
+        prediction_tensor[:, :, :, (gust_index + 1):, ...]
+    ], axis=-2)
 
     return prediction_tensor
 
