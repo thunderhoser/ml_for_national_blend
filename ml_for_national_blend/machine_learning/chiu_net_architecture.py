@@ -41,6 +41,7 @@ ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
 PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
+PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 METRIC_FUNCTIONS_KEY = 'metric_function_list'
@@ -130,6 +131,8 @@ def check_input_args(option_dict):
     option_dict["num_output_channels"]: Number of output channels.
     option_dict["predict_gust_factor"]: Boolean flag.  If True, the model needs
         to predict gust factor.
+    option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the
+        model needs to predict dewpoint depression.
     option_dict["loss_function"]: Loss function.
     option_dict["optimizer_function"]: Optimizer function.
     option_dict["metric_function_list"]: 1-D list of metric functions.
@@ -282,6 +285,9 @@ def check_input_args(option_dict):
     error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
     error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
     error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
+    error_checking.assert_is_boolean(
+        option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    )
 
     error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
 
@@ -346,6 +352,7 @@ def create_model(option_dict):
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
     num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
     predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
 
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist())
@@ -1063,62 +1070,75 @@ def create_model(option_dict):
             [conv_layer_by_level[i - 1], upconv_layer_by_level[i - 1]]
         )
 
-    if predict_gust_factor:
-        non_gf_output_layer_object = architecture_utils.get_2d_conv_layer(
+    this_offset = int(predict_gust_factor) + int(predict_dewpoint_depression)
+
+    simple_output_layer_object = architecture_utils.get_2d_conv_layer(
+        num_kernel_rows=1, num_kernel_columns=1,
+        num_rows_per_stride=1, num_columns_per_stride=1,
+        num_filters=(num_output_channels - this_offset) * ensemble_size,
+        padding_type_string=architecture_utils.YES_PADDING_STRING,
+        weight_regularizer=l2_function,
+        layer_name='last_conv_simple'
+    )(skip_layer_by_level[0])
+
+    if output_activ_function_name is not None:
+        simple_output_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=output_activ_function_name,
+            alpha_for_relu=output_activ_function_alpha,
+            alpha_for_elu=output_activ_function_alpha,
+            layer_name='last_conv_simple_activation'
+        )(simple_output_layer_object)
+
+    if predict_dewpoint_depression:
+        dd_output_layer_object = architecture_utils.get_2d_conv_layer(
             num_kernel_rows=1, num_kernel_columns=1,
             num_rows_per_stride=1, num_columns_per_stride=1,
-            num_filters=(num_output_channels - 1) * ensemble_size,
+            num_filters=ensemble_size,
             padding_type_string=architecture_utils.YES_PADDING_STRING,
             weight_regularizer=l2_function,
-            layer_name='last_conv_not_gust_factor'
+            layer_name='last_conv_dd'
         )(skip_layer_by_level[0])
 
+        dd_output_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=architecture_utils.RELU_FUNCTION_STRING,
+            alpha_for_relu=0.,
+            alpha_for_elu=0.,
+            layer_name='last_conv_dd_activation'
+        )(dd_output_layer_object)
+    else:
+        dd_output_layer_object = None
+
+    if predict_gust_factor:
         gf_output_layer_object = architecture_utils.get_2d_conv_layer(
             num_kernel_rows=1, num_kernel_columns=1,
             num_rows_per_stride=1, num_columns_per_stride=1,
             num_filters=ensemble_size,
             padding_type_string=architecture_utils.YES_PADDING_STRING,
             weight_regularizer=l2_function,
-            layer_name='last_conv_gust_factor'
+            layer_name='last_conv_gf'
         )(skip_layer_by_level[0])
-
-        if output_activ_function_name is not None:
-            non_gf_output_layer_object = architecture_utils.get_activation_layer(
-                activation_function_string=output_activ_function_name,
-                alpha_for_relu=output_activ_function_alpha,
-                alpha_for_elu=output_activ_function_alpha,
-                layer_name='last_conv_activation_not_gf'
-            )(non_gf_output_layer_object)
 
         gf_output_layer_object = architecture_utils.get_activation_layer(
             activation_function_string=architecture_utils.RELU_FUNCTION_STRING,
             alpha_for_relu=0.,
             alpha_for_elu=0.,
-            layer_name='last_conv_activation_gf'
+            layer_name='last_conv_gf_activation'
         )(gf_output_layer_object)
+    else:
+        gf_output_layer_object = None
 
+    these_layer_objects = [
+        simple_output_layer_object, dd_output_layer_object,
+        gf_output_layer_object
+    ]
+    these_layer_objects = [l for l in these_layer_objects if l is not None]
+
+    if len(these_layer_objects) == 1:
+        output_layer_object = simple_output_layer_object
+    else:
         output_layer_object = keras.layers.Concatenate(
             axis=-1, name='last_conv_concat'
-        )([
-            non_gf_output_layer_object, gf_output_layer_object
-        ])
-    else:
-        output_layer_object = architecture_utils.get_2d_conv_layer(
-            num_kernel_rows=1, num_kernel_columns=1,
-            num_rows_per_stride=1, num_columns_per_stride=1,
-            num_filters=ensemble_size * num_output_channels,
-            padding_type_string=architecture_utils.YES_PADDING_STRING,
-            weight_regularizer=l2_function,
-            layer_name='last_conv'
-        )(skip_layer_by_level[0])
-
-        if output_activ_function_name is not None:
-            output_layer_object = architecture_utils.get_activation_layer(
-                activation_function_string=output_activ_function_name,
-                alpha_for_relu=output_activ_function_alpha,
-                alpha_for_elu=output_activ_function_alpha,
-                layer_name='last_conv_activation'
-            )(output_layer_object)
+        )(these_layer_objects)
 
     # TODO(thunderhoser): For now, input_dimensions_2pt5km_res cannot actually
     # be None.  In other words, the model must take 2.5-km data as input.  I

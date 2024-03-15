@@ -20,6 +20,89 @@ def _log2(input_tensor):
     )
 
 
+def process_dewpoint_predictions(prediction_tensor, temperature_index,
+                                 dewpoint_index):
+    """Processes dewpoint predictions.
+
+    Specifically, this method assumes that raw dewpoint predictions are actually
+    dewpoint-depression predictions -- and then converts them to actual
+    dewpoint.
+
+    E = number of examples
+    M = number of grid rows
+    N = number of grid columns
+    T = number of target variables (channels)
+    S = ensemble size
+
+    :param prediction_tensor: Tensor of predicted values.  If
+        expect_ensemble == True, will expect dimensions E x M x N x T x S.
+        Otherwise, will expect E x M x N x T.
+    :param temperature_index: Array index for temperature.  This tells the
+        method that temperature predictions can be found in
+        prediction_tensor[:, :, :, temperature_index, ...].
+    :param dewpoint_index: Same but for dewpoint.
+    :return: prediction_tensor: Same as input, except that
+        prediction_tensor[:, :, :, dewpoint_index, ...] now contains dewpoints
+        and not dewpoint depressions.
+    """
+
+    error_checking.assert_is_integer(temperature_index)
+    error_checking.assert_is_geq(temperature_index, 0)
+    error_checking.assert_is_integer(dewpoint_index)
+    error_checking.assert_is_geq(dewpoint_index, 0)
+    assert temperature_index != dewpoint_index
+
+    prediction_tensor[:, :, :, dewpoint_index, ...] = (
+        prediction_tensor[:, :, :, temperature_index, ...] -
+        prediction_tensor[:, :, :, dewpoint_index, ...]
+    )
+
+    return prediction_tensor
+
+
+def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
+                             gust_index):
+    """Processes wind-gust predictions.
+
+    Specifically, this method assumes that raw gust predictions are actually
+    (gust factor - 1) -- and then converts them to actual gust speeds.
+
+    :param prediction_tensor: See doc for `process_dewpoint_predictions`.
+    :param u_wind_index: Array index for u-wind.  This tells the method that
+        u-wind predictions can be found in
+        prediction_tensor[:, :, :, u_wind_index, ...].
+    :param v_wind_index: Same but for v-wind.
+    :param gust_index: Same but for gust (factor).
+    :return: prediction_tensor: Same as input, except that
+        prediction_tensor[:, :, :, gust_index, ...] now contains gust speeds
+        and not gust factors.
+    """
+
+    error_checking.assert_is_integer(u_wind_index)
+    error_checking.assert_is_geq(u_wind_index, 0)
+    error_checking.assert_is_integer(v_wind_index)
+    error_checking.assert_is_geq(v_wind_index, 0)
+    error_checking.assert_is_integer(gust_index)
+    error_checking.assert_is_geq(gust_index, 0)
+
+    assert u_wind_index != v_wind_index
+    assert u_wind_index != gust_index
+    assert v_wind_index != gust_index
+
+    gust_factor_prediction_tensor = (
+        prediction_tensor[:, :, :, gust_index, ...] + 1.
+    )
+    gust_speed_prediction_tensor = gust_factor_prediction_tensor * K.sqrt(
+        prediction_tensor[:, :, :, u_wind_index, ...] ** 2 +
+        prediction_tensor[:, :, :, v_wind_index, ...] ** 2
+    )
+    prediction_tensor[:, :, :, gust_index, ...] = (
+        gust_speed_prediction_tensor
+    )
+
+    return prediction_tensor
+
+
 def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
     """Creates mean squared error (MSE) loss function.
 
@@ -134,12 +217,26 @@ def dual_weighted_mse(
 
 
 def dual_weighted_mse_1channel(
-        channel_weight, channel_index, function_name,
-        expect_ensemble=True, test_mode=False):
+        channel_weight, channel_index,
+        u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index,
+        function_name, expect_ensemble=True, test_mode=False):
     """Creates DWMSE loss function for one channel (target variable).
+
+    For the following input args -- u_wind_index, v_wind_index, gust_index,
+    temperature_index, dewpoint_index -- if said quantity is not a target
+    variable, just make the argument negative!
 
     :param channel_weight: Channel weight.
     :param channel_index: Channel index.
+    :param u_wind_index: Array index for sustained u-wind.  This tells the
+        method that u-wind predictions and targets can be found in
+        prediction_tensor[:, :, :, u_wind_index, ...] and
+        target_tensor[:, :, :, u_wind_index, ...], respectively.
+    :param v_wind_index: Same but for v-wind.
+    :param gust_index: Same but for wind gust.
+    :param temperature_index: Same but for temperature.
+    :param dewpoint_index: Same but for dewpoint.
     :param function_name: See doc for `mean_squared_error`.
     :param expect_ensemble: Same.
     :param test_mode: Same.
@@ -153,6 +250,21 @@ def dual_weighted_mse_1channel(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
+    error_checking.assert_is_integer(u_wind_index)
+    error_checking.assert_is_integer(v_wind_index)
+    error_checking.assert_is_integer(gust_index)
+    error_checking.assert_is_integer(temperature_index)
+    error_checking.assert_is_integer(dewpoint_index)
+
+    all_indices = [
+        u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index
+    ]
+    all_indices = [i for i in all_indices if i >= 0]
+    all_indices = numpy.array(all_indices, dtype=int)
+
+    assert len(all_indices) == len(numpy.unique(all_indices))
+
     def loss(target_tensor, prediction_tensor):
         """Computes loss (one-channel DWMSE).
 
@@ -162,6 +274,21 @@ def dual_weighted_mse_1channel(
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
+        if channel_index == dewpoint_index:
+            prediction_tensor = process_dewpoint_predictions(
+                prediction_tensor=prediction_tensor,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+
+        if channel_index == gust_index:
+            prediction_tensor = process_gust_predictions(
+                prediction_tensor=prediction_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                gust_index=gust_index
+            )
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
@@ -193,13 +320,19 @@ def dual_weighted_mse_1channel(
     return loss
 
 
-def dual_weighted_mse_constrained_gust(
-        channel_weights, u_wind_index, v_wind_index, gust_factor_index,
-        function_name, expect_ensemble=True, test_mode=False):
-    """Creates DWMSE loss function with constrained gust speed.
+def dual_weighted_mse_with_constraints(
+        channel_weights, u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index, function_name,
+        expect_ensemble=True, test_mode=False):
+    """Creates DWMSE loss function with constrained dewpoint and wind gust.
 
-    "Constrained gust speed" means that gust speed is computed from 3
-    quantities: sustained u-wind, sustained v-wind, and gust factor.
+    "Constrained dewpoint": We assume that the model's raw dewpoint prediction
+    is actually dewpoint depression, then use temperature to convert this to
+    real dewpoint.
+
+    "Constrained wind gust": We assume that the model's raw gust prediction is
+    actually gust factor, then use sustained wind speed to convert this to real
+    gust speed.
 
     :param channel_weights: length-K numpy array of channel weights.
     :param u_wind_index: Array index for sustained u-wind.  This tells the
@@ -207,59 +340,60 @@ def dual_weighted_mse_constrained_gust(
         prediction_tensor[:, :, :, u_wind_index, ...] and
         target_tensor[:, :, :, u_wind_index, ...], respectively.
     :param v_wind_index: Same but for v-wind.
-    :param gust_factor_index: Same but for gust factor.
+    :param gust_index: Same but for wind gust.
+    :param temperature_index: Same but for temperature.
+    :param dewpoint_index: Same but for dewpoint.
     :param function_name: See doc for `mean_squared_error`.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
 
-    # TODO(thunderhoser): This method assumes that the strict ReLU activation
-    # function is used, meaning that gust-factor predictions are contrained only
-    # to be non-negative.  Thus, we add 1 to the gust-factor prediction here.
-    # In other words, we assume that the NN model outputs (gust_factor - 1).
-
     error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
     error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
     error_checking.assert_is_integer(u_wind_index)
     error_checking.assert_is_geq(u_wind_index, 0)
     error_checking.assert_is_integer(v_wind_index)
     error_checking.assert_is_geq(v_wind_index, 0)
-    error_checking.assert_is_integer(gust_factor_index)
-    error_checking.assert_is_geq(gust_factor_index, 0)
+    error_checking.assert_is_integer(gust_index)
+    error_checking.assert_is_geq(gust_index, 0)
+    error_checking.assert_is_integer(temperature_index)
+    error_checking.assert_is_geq(temperature_index, 0)
+    error_checking.assert_is_integer(dewpoint_index)
+    error_checking.assert_is_geq(dewpoint_index, 0)
+
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    assert u_wind_index != v_wind_index
-    assert u_wind_index != gust_factor_index
-    assert v_wind_index != gust_factor_index
+    all_indices = numpy.array([
+        u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index
+    ], dtype=int)
 
-    error_checking.assert_is_numpy_array(
-        channel_weights,
-        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
-    )
-    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    assert len(all_indices) == len(numpy.unique(all_indices))
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (DWMSE).
 
         :param target_tensor: See doc for `mean_squared_error`.
         :param prediction_tensor: Same.
-        :return: loss: Mean squared error.
+        :return: loss: DWMSE.
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        gust_factor_prediction_tensor = (
-            prediction_tensor[:, :, :, gust_factor_index, ...] + 1.
+        prediction_tensor = process_dewpoint_predictions(
+            prediction_tensor=prediction_tensor,
+            temperature_index=temperature_index,
+            dewpoint_index=dewpoint_index
         )
-        gust_speed_prediction_tensor = gust_factor_prediction_tensor * K.sqrt(
-            prediction_tensor[:, :, :, u_wind_index, ...] ** 2 +
-            prediction_tensor[:, :, :, v_wind_index, ...] ** 2
-        )
-        prediction_tensor[:, :, :, gust_factor_index, ...] = (
-            gust_speed_prediction_tensor
+        prediction_tensor = process_gust_predictions(
+            prediction_tensor=prediction_tensor,
+            u_wind_index=u_wind_index,
+            v_wind_index=v_wind_index,
+            gust_index=gust_index
         )
 
         if expect_ensemble:
