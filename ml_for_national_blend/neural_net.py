@@ -1025,7 +1025,7 @@ def data_generator(option_dict):
                 nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
             )
 
-            found_any_predictors = False
+            found_any_predictors = True
 
             if predictor_matrix_2pt5km is not None:
                 found_any_predictors &= not numpy.all(
