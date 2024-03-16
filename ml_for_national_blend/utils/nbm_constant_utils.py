@@ -5,10 +5,16 @@ from gewittergefahr.gg_utils import error_checking
 ROW_DIM = 'row'
 COLUMN_DIM = 'column'
 FIELD_DIM = 'field_name'
+QUANTILE_LEVEL_DIM = 'quantile_level'
 
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
 DATA_KEY = 'data_matrix'
+
+MEAN_VALUE_KEY = 'mean_value'
+MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
+STDEV_KEY = 'standard_deviation'
+QUANTILE_KEY = 'quantile'
 
 LAND_SEA_MASK_NAME = 'land_sea_mask_land1'
 OROGRAPHIC_HEIGHT_NAME = 'orographic_height_m_asl'

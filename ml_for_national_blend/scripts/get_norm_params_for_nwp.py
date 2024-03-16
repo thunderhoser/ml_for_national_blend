@@ -1,6 +1,6 @@
-"""Computes z-score parameters for NWP forecasts.
+"""Computes normalization parameters for NWP data.
 
-z-score parameters = mean and standard deviation for each variable
+Normalization parameters = mean, stdev, and quantiles for each variable.
 """
 
 import os
@@ -21,6 +21,8 @@ INPUT_DIRS_ARG_NAME = 'input_dir_name_by_model'
 FIRST_TIME_ARG_NAME = 'first_init_time_string'
 LAST_TIME_ARG_NAME = 'last_init_time_string'
 INIT_TIME_COUNTS_ARG_NAME = 'num_init_times_by_model'
+NUM_QUANTILES_ARG_NAME = 'num_quantiles'
+NUM_SAMPLE_VALUES_ARG_NAME = 'num_sample_values_per_file'
 OUTPUT_FILE_ARG_NAME = 'output_norm_file_name'
 
 MODELS_HELP_STRING = (
@@ -49,6 +51,14 @@ INIT_TIME_COUNTS_HELP_STRING = (
     'from the period {1:s}...{2:s}.'
 ).format(MODELS_ARG_NAME, FIRST_TIME_ARG_NAME, LAST_TIME_ARG_NAME)
 
+NUM_QUANTILES_HELP_STRING = (
+    'Number of quantiles to store for each variable.  The quantile levels will '
+    'be evenly spaced from 0 to 1 (i.e., the 0th to 100th percentile).'
+)
+NUM_SAMPLE_VALUES_HELP_STRING = (
+    'Number of sample values per file to use for computing quantiles.  This '
+    'value will be applied to each variable.'
+)
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Will be written by '
     '`nwp_model_io.write_normalization_file`.'
@@ -74,6 +84,14 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_TIME_COUNTS_ARG_NAME, type=int, nargs='+', required=True,
     help=INIT_TIME_COUNTS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + NUM_QUANTILES_ARG_NAME, type=int, required=False, default=1001,
+    help=NUM_QUANTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + NUM_SAMPLE_VALUES_ARG_NAME, type=int, required=True,
+    help=NUM_SAMPLE_VALUES_ARG_NAME
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
@@ -208,8 +226,9 @@ def _get_all_precip_forecast_hours():
 
 def _run(model_names, input_dir_name_by_model,
          first_init_time_string, last_init_time_string,
-         num_init_times_by_model, output_file_name):
-    """Computes z-score parameters for NWP forecasts.
+         num_init_times_by_model, num_quantiles, num_sample_values_per_file,
+         output_file_name):
+    """Computes normalization parameters for NWP data.
 
     This is effectively the main method.
 
@@ -218,6 +237,8 @@ def _run(model_names, input_dir_name_by_model,
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
     :param num_init_times_by_model: Same.
+    :param num_quantiles: Same.
+    :param num_sample_values_per_file: Same.
     :param output_file_name: Same.
     """
 
@@ -263,10 +284,12 @@ def _run(model_names, input_dir_name_by_model,
         )
 
     # Compute z-score parameters.
-    norm_param_table_xarray = normalization.get_z_score_params_for_nwp(
+    norm_param_table_xarray = normalization.get_normalization_params_for_nwp(
         interp_nwp_file_names=interp_nwp_file_names,
         field_names=nwp_model_utils.ALL_FIELD_NAMES,
-        precip_forecast_hours=_get_all_precip_forecast_hours()
+        precip_forecast_hours=_get_all_precip_forecast_hours(),
+        num_quantiles=num_quantiles,
+        num_sample_values_per_file=num_sample_values_per_file
     )
 
     print('Writing z-score params to: "{0:s}"...'.format(output_file_name))
@@ -286,6 +309,10 @@ if __name__ == '__main__':
         last_init_time_string=getattr(INPUT_ARG_OBJECT, LAST_TIME_ARG_NAME),
         num_init_times_by_model=numpy.array(
             getattr(INPUT_ARG_OBJECT, INIT_TIME_COUNTS_ARG_NAME), dtype=int
+        ),
+        num_quantiles=getattr(INPUT_ARG_OBJECT, NUM_QUANTILES_ARG_NAME),
+        num_sample_values_per_file=getattr(
+            INPUT_ARG_OBJECT, NUM_SAMPLE_VALUES_ARG_NAME
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

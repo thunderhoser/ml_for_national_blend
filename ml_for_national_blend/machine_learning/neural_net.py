@@ -436,9 +436,10 @@ def _read_targets_one_example(
         })
     else:
         print('Normalizing target variables to z-scores...')
-        urma_table_xarray = normalization.normalize_targets_to_z_scores(
+        urma_table_xarray = normalization.normalize_targets(
             urma_table_xarray=urma_table_xarray,
-            z_score_param_table_xarray=target_norm_param_table_xarray
+            norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=True
         )
 
     return numpy.transpose(
@@ -523,9 +524,10 @@ def _read_predictors_one_example(
             if nwp_norm_param_table_xarray is not None:
                 print('Normalizing predictor variables to z-scores...')
                 nwp_forecast_table_xarray = (
-                    normalization.normalize_nwp_data_to_z_scores(
+                    normalization.normalize_nwp_data(
                         nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        z_score_param_table_xarray=nwp_norm_param_table_xarray
+                        norm_param_table_xarray=nwp_norm_param_table_xarray,
+                        use_quantile_norm=True
                     )
                 )
 
