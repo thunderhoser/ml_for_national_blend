@@ -19,10 +19,6 @@ import time_conversion
 import error_checking
 import nbm_utils
 
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-
 TOLERANCE = 1e-6
 
 HOURS_TO_SECONDS = 3600
@@ -33,6 +29,7 @@ FORECAST_HOUR_DIM = 'forecast_hour'
 ROW_DIM = 'row'
 COLUMN_DIM = 'column'
 FIELD_DIM = 'field_name'
+QUANTILE_LEVEL_DIM = 'quantile_level'
 
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
@@ -41,6 +38,7 @@ DATA_KEY = 'data_matrix'
 MEAN_VALUE_KEY = 'mean_value'
 MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
 STDEV_KEY = 'standard_deviation'
+QUANTILE_KEY = 'quantile'
 
 WRF_ARW_MODEL_NAME = 'wrf_arw'
 NAM_MODEL_NAME = 'nam'
