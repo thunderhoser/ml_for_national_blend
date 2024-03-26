@@ -50,7 +50,14 @@ def _run():
                     this_record_object.id[1] == variable_id_word2 and
                     this_record_object.id[2] == variable_id_word3
             ):
-                print(this_record_object.id[3])
+                for thing in this_record_object.id:
+                    print(thing)
+                print('\n\n')
+
+                for thing in this_record_object.is1:
+                    print(thing)
+                print('\n\n')
+
                 desired_record_object = this_record_object
                 desired_record_object.unpack(data=True)
                 break
