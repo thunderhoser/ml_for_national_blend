@@ -50,6 +50,7 @@ def _run():
                     this_record_object.id[1] == variable_id_word2 and
                     this_record_object.id[2] == variable_id_word3
             ):
+                print(this_record_object.id[3])
                 desired_record_object = this_record_object
                 desired_record_object.unpack(data=True)
                 break
