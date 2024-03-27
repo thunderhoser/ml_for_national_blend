@@ -35,4 +35,6 @@ python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --first_init_time_string="2022-11-01-00" \
 --last_init_time_string="2023-05-31-23" \
 --num_init_times_by_model 35 210 35 35 210 18 \
+--num_quantiles=1001 \
+--num_sample_values_per_file=4000 \
 --output_norm_file_name="${OUTPUT_FILE_NAME}"
