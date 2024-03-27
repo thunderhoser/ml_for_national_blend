@@ -314,7 +314,7 @@ def get_normalization_params_for_nwp(
             continue
 
         for this_forecast_hour in precip_forecast_hours:
-            norm_param_dict_dict[this_field_name] = {
+            norm_param_dict_dict[this_field_name, this_forecast_hour] = {
                 NUM_VALUES_KEY: 0,
                 MEAN_VALUE_KEY: 0.,
                 MEAN_OF_SQUARES_KEY: 0.,
