@@ -28,7 +28,7 @@ NUM_QUANTILES_HELP_STRING = (
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Will be written by '
-    '`era5_constant_io.write_normalization_file`.'
+    '`nbm_constant_io.write_normalization_file`.'
 )
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()

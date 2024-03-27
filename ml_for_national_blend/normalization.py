@@ -941,7 +941,7 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
-def normalize_era5_constants(
+def normalize_nbm_constants(
         nbm_constant_table_xarray, norm_param_table_xarray, use_quantile_norm):
     """Normalizes NBM time-constant variables.
 
