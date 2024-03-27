@@ -853,9 +853,12 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
     nbm_constant_table_xarray = nbm_constant_io.read_file(
         nbm_constant_file_name
     )
-
     nbmct = nbm_constant_table_xarray
+
     field_names = nbmct.coords[nbm_constant_utils.FIELD_DIM].values.tolist()
+    if nbm_constant_utils.LAND_SEA_MASK_NAME in field_names:
+        field_names.remove(nbm_constant_utils.LAND_SEA_MASK_NAME)
+
     num_sample_values_total = (
         nbmct[nbm_constant_utils.DATA_KEY].values[..., 0].size
     )
@@ -872,9 +875,14 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
     quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
 
     for j in range(len(field_names)):
+        j_new = numpy.where(
+            nbmct.coords[nbm_constant_utils.FIELD_DIM].values == field_names[j]
+        )[0][0]
+
         norm_param_dict_dict[field_names[j]] = _update_norm_params_1var_1file(
             norm_param_dict=norm_param_dict_dict[field_names[j]],
-            new_data_matrix=nbmct[nbm_constant_utils.DATA_KEY].values[..., j],
+            new_data_matrix=
+            nbmct[nbm_constant_utils.DATA_KEY].values[..., j_new],
             num_sample_values_per_file=num_sample_values_total,
             file_index=0
         )
@@ -956,6 +964,9 @@ def normalize_era5_constants(
     data_matrix = nbmct[nbm_constant_utils.DATA_KEY].values
 
     for j in range(num_fields):
+        if field_names[j] == nbm_constant_utils.LAND_SEA_MASK_NAME:
+            continue
+
         j_new = numpy.where(
             npt.coords[nbm_constant_utils.FIELD_DIM].values == field_names[j]
         )[0][0]
