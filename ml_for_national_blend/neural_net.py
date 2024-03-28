@@ -1506,7 +1506,8 @@ def train_model(
 
 
 def apply_model(
-        model_object, predictor_matrices, num_examples_per_batch, verbose=True):
+        model_object, predictor_matrices, num_examples_per_batch,
+        nn_uses_phys_constraints, verbose=True, target_field_names=None):
     """Applies trained neural net -- inference time!
 
     E = number of examples
@@ -1517,7 +1518,16 @@ def apply_model(
     :param model_object: Trained neural net (instance of `keras.models.Model`).
     :param predictor_matrices: See output doc for `data_generator`.
     :param num_examples_per_batch: Batch size.
+    :param nn_uses_phys_constraints: Boolean flag.  If True, the model uses
+        physical constraints, which means that it predicts only dewpoint
+        *depression* and gust *factor* directly -- which must be converted to
+        dewpoint and gust speed, respectively.  If False, the model does not use
+        physical constraints, which means that it predicts dewpoint and gust
+        speed directly, with no need for post-processing.
     :param verbose: Boolean flag.  If True, will print progress messages.
+    :param target_field_names: length-F list of target fields (each must be
+        accepted by `urma_utils.check_field_name`).  If
+        nn_uses_phys_constraints = False, leave this argument alone.
     :return: prediction_matrix: E-by-M-by-N-by-F numpy array of predicted
         values.
     """
@@ -1531,7 +1541,13 @@ def apply_model(
     num_examples = predictor_matrices[0].shape[0]
     num_examples_per_batch = min([num_examples_per_batch, num_examples])
 
+    error_checking.assert_is_boolean(nn_uses_phys_constraints)
     error_checking.assert_is_boolean(verbose)
+
+    if nn_uses_phys_constraints:
+        error_checking.assert_is_string_list(target_field_names)
+        for this_name in target_field_names:
+            urma_utils.check_field_name(this_name)
 
     # Do actual stuff.
     prediction_matrix = None
@@ -1560,6 +1576,46 @@ def apply_model(
 
     while len(prediction_matrix.shape) < 4:
         prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
+
+    # TODO(thunderhoser): This conversion should be in a separate method.
+    if nn_uses_phys_constraints:
+        num_target_fields = prediction_matrix.shape[-1]
+        target_field_names = numpy.array(target_field_names)
+
+        error_checking.assert_is_numpy_array(
+            target_field_names,
+            exact_dimensions=numpy.array([num_target_fields], dtype=int)
+        )
+
+        dewp_index = numpy.where(
+            target_field_names == urma_utils.DEWPOINT_2METRE_NAME
+        )[0][0]
+        temp_index = numpy.where(
+            target_field_names == urma_utils.TEMPERATURE_2METRE_NAME
+        )[0][0]
+        prediction_matrix[..., dewp_index] = (
+            prediction_matrix[..., temp_index] -
+            prediction_matrix[..., dewp_index]
+        )
+
+        u_index = numpy.where(
+            target_field_names == urma_utils.U_WIND_10METRE_NAME
+        )[0][0]
+        v_index = numpy.where(
+            target_field_names == urma_utils.V_WIND_10METRE_NAME
+        )[0][0]
+        gust_index = numpy.where(
+            target_field_names == urma_utils.WIND_GUST_10METRE_NAME
+        )[0][0]
+
+        gust_factor_matrix = prediction_matrix[..., gust_index] + 1.
+        sustained_speed_matrix = numpy.sqrt(
+            prediction_matrix[..., u_index] ** 2 +
+            prediction_matrix[..., v_index] ** 2
+        )
+        prediction_matrix[..., gust_index] = (
+            gust_factor_matrix * sustained_speed_matrix
+        )
 
     return prediction_matrix
 

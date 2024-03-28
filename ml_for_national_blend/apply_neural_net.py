@@ -1,19 +1,11 @@
 """Applies trained neural net -- inference time!"""
 
-import os
-import sys
 import argparse
 import numpy
-
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
-
-import time_conversion
-import prediction_io
-import nbm_utils
-import neural_net
+from gewittergefahr.gg_utils import time_conversion
+from ml_for_national_blend.io import prediction_io
+from ml_for_national_blend.utils import nbm_utils
+from ml_for_national_blend.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -136,7 +128,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         model_object=model_object,
         predictor_matrices=predictor_matrices,
         num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
-        verbose=True
+        verbose=True,
+        nn_uses_phys_constraints=(
+            'with_constraints' in
+            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY]
+        ),
+        target_field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY]
     )
 
     output_file_name = prediction_io.find_file(
