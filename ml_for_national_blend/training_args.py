@@ -18,9 +18,13 @@ NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
 NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_FIELDS_ARG_NAME = 'nwp_field_names'
 NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'
+NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
+TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
+NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
+NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
@@ -73,6 +77,11 @@ NWP_NORMALIZATION_FILE_HELP_STRING = (
 ).format(
     TRAINING_NWP_DIRS_ARG_NAME, VALIDATION_NWP_DIRS_ARG_NAME
 )
+NWP_USE_QUANTILE_NORM_HELP_STRING = (
+    'Boolean flag.  If 1, will do two-step normalization: conversion to '
+    'quantiles and then normal distribution (using inverse CDF).  If 0, will '
+    'do simple z-score normalization.'
+)
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target variables.'
 TARGET_FIELDS_HELP_STRING = (
     'List of target fields (i.e., variables to predict).  Each field name must '
@@ -87,6 +96,18 @@ TARGET_NORMALIZATION_FILE_HELP_STRING = (
     'unnormalized data, but you want to train with normalized targets.'
 ).format(
     TRAINING_TARGET_DIR_ARG_NAME, VALIDATION_TARGET_DIR_ARG_NAME
+)
+TARGETS_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for targets.'.format(
+    NWP_USE_QUANTILE_NORM_ARG_NAME
+)
+NBM_CONSTANT_FIELDS_HELP_STRING = (
+    'List of NBM constant fields to be used as predictors.  Each must be '
+    'accepted by `nbm_constant_utils.check_field_name`.'
+)
+NBM_CONSTANT_FILE_HELP_STRING = (
+    'Path to file with NBM constant fields (readable by '
+    '`nbm_constant_io.read_file`).  If you do not want NBM-constant '
+    'predictors, make this an empty string.'
 )
 BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
@@ -180,6 +201,10 @@ def add_input_args(parser_object):
         default='', help=NWP_NORMALIZATION_FILE_HELP_STRING
     )
     parser_object.add_argument(
+        '--' + NWP_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
+        default=1, help=NWP_USE_QUANTILE_NORM_HELP_STRING
+    )
+    parser_object.add_argument(
         '--' + TARGET_LEAD_TIME_ARG_NAME, type=int, required=True,
         help=TARGET_LEAD_TIME_HELP_STRING
     )
@@ -190,6 +215,18 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_NORMALIZATION_FILE_ARG_NAME, type=str, required=False,
         default='', help=TARGET_NORMALIZATION_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + TARGETS_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
+        default=1, help=TARGETS_USE_QUANTILE_NORM_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + NBM_CONSTANT_FIELDS_ARG_NAME, type=str, nargs='+',
+        required=False, default=[''], help=NBM_CONSTANT_FIELDS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + NBM_CONSTANT_FILE_ARG_NAME, type=str, required=True,
+        help=NBM_CONSTANT_FILE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + BATCH_SIZE_ARG_NAME, type=int, required=True,
@@ -249,7 +286,7 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + EARLY_STOPPING_PATIENCE_ARG_NAME, type=int, required=False,
-        default=50, help=EARLY_STOPPING_PATIENCE_HELP_STRING
+        default=100, help=EARLY_STOPPING_PATIENCE_HELP_STRING
     )
 
     return parser_object
