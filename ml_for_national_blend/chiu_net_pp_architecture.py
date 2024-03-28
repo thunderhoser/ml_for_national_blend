@@ -339,6 +339,24 @@ def create_model(option_dict):
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
+
+        num_current_rows = encoder_pooling_layer_objects[i].shape[2]
+        num_desired_rows = layer_object_10km_res.shape[2]
+        num_padding_rows = num_desired_rows - num_current_rows
+
+        num_current_columns = encoder_pooling_layer_objects[i].shape[3]
+        num_desired_columns = layer_object_10km_res.shape[3]
+        num_padding_columns = num_desired_columns - num_current_columns
+
+        if num_padding_rows + num_padding_columns > 0:
+            padding_arg = (
+                (0, 0), (0, num_padding_rows), (0, num_padding_columns)
+            )
+
+            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
+                padding=padding_arg
+            )(encoder_pooling_layer_objects[i])
+
         this_name = 'concat_with_10km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
@@ -422,6 +440,23 @@ def create_model(option_dict):
     if input_dimensions_20km_res is not None:
         i = num_levels_filled - 1
 
+        num_current_rows = encoder_pooling_layer_objects[i].shape[2]
+        num_desired_rows = layer_object_20km_res.shape[2]
+        num_padding_rows = num_desired_rows - num_current_rows
+
+        num_current_columns = encoder_pooling_layer_objects[i].shape[3]
+        num_desired_columns = layer_object_20km_res.shape[3]
+        num_padding_columns = num_desired_columns - num_current_columns
+
+        if num_padding_rows + num_padding_columns > 0:
+            padding_arg = (
+                (0, 0), (0, num_padding_rows), (0, num_padding_columns)
+            )
+
+            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
+                padding=padding_arg
+            )(encoder_pooling_layer_objects[i])
+
         this_name = 'concat_with_20km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
@@ -492,6 +527,23 @@ def create_model(option_dict):
 
     if input_dimensions_40km_res is not None:
         i = num_levels_filled - 1
+
+        num_current_rows = encoder_pooling_layer_objects[i].shape[2]
+        num_desired_rows = layer_object_40km_res.shape[2]
+        num_padding_rows = num_desired_rows - num_current_rows
+
+        num_current_columns = encoder_pooling_layer_objects[i].shape[3]
+        num_desired_columns = layer_object_40km_res.shape[3]
+        num_padding_columns = num_desired_columns - num_current_columns
+
+        if num_padding_rows + num_padding_columns > 0:
+            padding_arg = (
+                (0, 0), (0, num_padding_rows), (0, num_padding_columns)
+            )
+
+            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
+                padding=padding_arg
+            )(encoder_pooling_layer_objects[i])
 
         this_name = 'concat_with_40km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
