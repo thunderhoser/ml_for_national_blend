@@ -186,6 +186,7 @@ def create_model(option_dict):
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
 
     num_lead_times = input_dimensions_2pt5km_res.shape[2]
+    print(input_dimensions_2pt5km_res)
 
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist()),
