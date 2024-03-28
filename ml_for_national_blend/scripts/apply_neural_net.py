@@ -128,7 +128,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         model_object=model_object,
         predictor_matrices=predictor_matrices,
         num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
-        verbose=True
+        verbose=True,
+        nn_uses_phys_constraints=(
+            'with_constraints' in
+            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY]
+        ),
+        target_field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY]
     )
 
     output_file_name = prediction_io.find_file(
