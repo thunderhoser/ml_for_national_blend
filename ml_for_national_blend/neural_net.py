@@ -95,7 +95,7 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_integer_numpy_array(
         option_dict[INIT_TIME_LIMITS_KEY]
     )
-    error_checking.assert_is_greater_numpy_array(
+    error_checking.assert_is_geq_numpy_array(
         numpy.diff(option_dict[INIT_TIME_LIMITS_KEY]),
         0
     )
