@@ -12,10 +12,13 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
 
-def _run(template_file_name, output_dir_name, nwp_lead_times_hours,
-         nwp_model_names, nwp_field_names, nwp_normalization_file_name,
+def _run(template_file_name, output_dir_name,
+         nwp_lead_times_hours, nwp_model_names, nwp_field_names,
+         nwp_normalization_file_name, nwp_use_quantile_norm,
          target_lead_time_hours, target_field_names,
-         target_normalization_file_name, num_examples_per_batch, sentinel_value,
+         target_normalization_file_name, targets_use_quantile_norm,
+         nbm_constant_field_names, nbm_constant_file_name,
+         num_examples_per_batch, sentinel_value,
          init_time_limit_strings_for_training, nwp_dir_names_for_training,
          target_dir_name_for_training, init_time_limit_strings_for_validation,
          nwp_dir_names_for_validation, target_dir_name_for_validation,
@@ -33,9 +36,13 @@ def _run(template_file_name, output_dir_name, nwp_lead_times_hours,
     :param nwp_model_names: Same.
     :param nwp_field_names: Same.
     :param nwp_normalization_file_name: Same.
+    :param nwp_use_quantile_norm: Same.
     :param target_lead_time_hours: Same.
     :param target_field_names: Same.
     :param target_normalization_file_name: Same.
+    :param targets_use_quantile_norm: Same.
+    :param nbm_constant_field_names: Same.
+    :param nbm_constant_file_name: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param init_time_limit_strings_for_training: Same.
@@ -56,6 +63,13 @@ def _run(template_file_name, output_dir_name, nwp_lead_times_hours,
         nwp_normalization_file_name = None
     if target_normalization_file_name == '':
         target_normalization_file_name = None
+
+    if nbm_constant_file_name == '':
+        nbm_constant_file_name = None
+        nbm_constant_field_names = []
+    if len(nbm_constant_field_names) == 1 and nbm_constant_field_names[0] == '':
+        nbm_constant_file_name = None
+        nbm_constant_field_names = []
 
     # assert len(nwp_model_names) == len(nwp_dir_names_for_training)
     # assert len(nwp_model_names) == len(nwp_dir_names_for_validation)
@@ -90,10 +104,14 @@ def _run(template_file_name, output_dir_name, nwp_lead_times_hours,
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
         neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
         neural_net.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
+        neural_net.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
+        neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
+        neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
+        neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value
     }
@@ -156,6 +174,9 @@ if __name__ == '__main__':
         nwp_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.NWP_NORMALIZATION_FILE_ARG_NAME
         ),
+        nwp_use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.NWP_USE_QUANTILE_NORM_ARG_NAME
+        )),
         target_lead_time_hours=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME
         ),
@@ -164,6 +185,15 @@ if __name__ == '__main__':
         ),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORMALIZATION_FILE_ARG_NAME
+        ),
+        targets_use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.TARGETS_USE_QUANTILE_NORM_ARG_NAME
+        )),
+        nbm_constant_field_names=getattr(
+            INPUT_ARG_OBJECT, training_args.NBM_CONSTANT_FIELDS_ARG_NAME
+        ),
+        nbm_constant_file_name=getattr(
+            INPUT_ARG_OBJECT, training_args.NBM_CONSTANT_FILE_ARG_NAME
         ),
         num_examples_per_batch=getattr(
             INPUT_ARG_OBJECT, training_args.BATCH_SIZE_ARG_NAME

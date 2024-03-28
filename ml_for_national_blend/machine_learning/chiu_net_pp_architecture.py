@@ -10,6 +10,7 @@ from gewittergefahr.deep_learning import architecture_utils
 from ml_for_national_blend.machine_learning import \
     chiu_net_architecture as chiu_net_arch
 
+INPUT_DIMENSIONS_CONST_KEY = chiu_net_arch.INPUT_DIMENSIONS_CONST_KEY
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY
 INPUT_DIMENSIONS_10KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_10KM_RES_KEY
 INPUT_DIMENSIONS_20KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_20KM_RES_KEY
@@ -141,6 +142,7 @@ def create_model(option_dict):
 
     option_dict = chiu_net_arch.check_input_args(option_dict)
 
+    input_dimensions_const = option_dict[INPUT_DIMENSIONS_CONST_KEY]
     input_dimensions_2pt5km_res = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
     input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
@@ -176,6 +178,8 @@ def create_model(option_dict):
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
 
+    num_lead_times = input_dimensions_2pt5km_res.shape[2]
+
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist()),
         name='2pt5km_inputs'
@@ -183,6 +187,31 @@ def create_model(option_dict):
     layer_object_2pt5km_res = keras.layers.Permute(
         dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
     )(input_layer_object_2pt5km_res)
+
+    if input_dimensions_const is None:
+        input_layer_object_const = None
+    else:
+        input_layer_object_const = keras.layers.Input(
+            shape=tuple(input_dimensions_const.tolist()),
+            name='constant_inputs'
+        )
+
+        new_dims = (1,) + tuple(input_dimensions_const.tolist())
+        layer_object_const = keras.layers.Reshape(
+            target_shape=new_dims, name='constants_add-time-dim'
+        )(input_layer_object_const)
+
+        this_layer_object = keras.layers.Concatenate(
+            axis=-4, name='constants_add-2pt5km-times'
+        )(
+            num_lead_times * [layer_object_const]
+        )
+
+        layer_object_2pt5km_res = keras.layers.Concatenate(
+            axis=-1, name='concat_with_constants'
+        )(
+            [layer_object_2pt5km_res, this_layer_object]
+        )
 
     if input_dimensions_10km_res is None:
         input_layer_object_10km_res = None
@@ -907,13 +936,13 @@ def create_model(option_dict):
             target_shape=new_dims, name='reshape_predictions'
         )(output_layer_object)
 
-    input_layer_objects = [input_layer_object_2pt5km_res]
-    if input_dimensions_10km_res is not None:
-        input_layer_objects.append(input_layer_object_10km_res)
-    if input_dimensions_20km_res is not None:
-        input_layer_objects.append(input_layer_object_20km_res)
-    if input_dimensions_40km_res is not None:
-        input_layer_objects.append(input_layer_object_40km_res)
+    input_layer_objects = [
+        l for l in [
+            input_layer_object_2pt5km_res, input_layer_object_const,
+            input_layer_object_10km_res, input_layer_object_20km_res,
+            input_layer_object_40km_res
+        ] if l is not None
+    ]
 
     model_object = keras.models.Model(
         inputs=input_layer_objects, outputs=output_layer_object

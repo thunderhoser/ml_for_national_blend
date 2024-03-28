@@ -13,9 +13,11 @@ from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import interp_nwp_model_io
+from ml_for_national_blend.io import nbm_constant_io
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
+from ml_for_national_blend.utils import nbm_constant_utils
 from ml_for_national_blend.utils import normalization
 from ml_for_national_blend.machine_learning import custom_losses
 from ml_for_national_blend.machine_learning import custom_metrics
@@ -28,10 +30,14 @@ NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
 NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
 NWP_NORM_FILE_KEY = 'nwp_normalization_file_name'
+NWP_USE_QUANTILE_NORM_KEY = 'nwp_use_quantile_norm'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_hours'
 TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_DIR_KEY = 'target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
+TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
+NBM_CONSTANT_FIELDS_KEY = 'nbm_constant_field_names'
+NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 
@@ -120,9 +126,10 @@ def _check_generator_args(option_dict):
     if option_dict[NWP_NORM_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
 
+    error_checking.assert_is_boolean(option_dict[NWP_USE_QUANTILE_NORM_KEY])
+
     error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
     error_checking.assert_is_greater(option_dict[TARGET_LEAD_TIME_KEY], 0)
-
     error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         urma_utils.check_field_name(this_field_name)
@@ -131,9 +138,22 @@ def _check_generator_args(option_dict):
     if option_dict[TARGET_NORM_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
 
+    error_checking.assert_is_boolean(option_dict[TARGETS_USE_QUANTILE_NORM_KEY])
+
+    if (
+            option_dict[NBM_CONSTANT_FILE_KEY] is None
+            or len(option_dict[NBM_CONSTANT_FIELDS_KEY]) == 0
+    ):
+        option_dict[NBM_CONSTANT_FILE_KEY] = None
+        option_dict[NBM_CONSTANT_FIELDS_KEY] = []
+
+    if option_dict[NBM_CONSTANT_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[NBM_CONSTANT_FILE_KEY])
+    for this_field_name in option_dict[NBM_CONSTANT_FIELDS_KEY]:
+        nbm_constant_utils.check_field_name(this_field_name)
+
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
-
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
 
     return option_dict
@@ -356,8 +376,9 @@ def _init_matrices_1batch(
 
 
 def _read_targets_one_example(
-        init_time_unix_sec, target_lead_time_hours, target_field_names,
-        target_dir_name, target_norm_param_table_xarray):
+        init_time_unix_sec, target_lead_time_hours,
+        target_field_names, target_dir_name,
+        target_norm_param_table_xarray, use_quantile_norm):
     """Reads target fields for one example.
 
     NBM = National Blend of Models
@@ -374,6 +395,7 @@ def _read_targets_one_example(
         parameters for target variables.  If you do not want to normalize (or
         if the input directory already contains normalized data), this should be
         None.
+    :param use_quantile_norm: See documentation for `data_generator`.
     :return: target_matrix: M-by-N-by-F numpy array of target values.
     """
 
@@ -439,7 +461,7 @@ def _read_targets_one_example(
         urma_table_xarray = normalization.normalize_targets(
             urma_table_xarray=urma_table_xarray,
             norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=True
+            use_quantile_norm=use_quantile_norm
         )
 
     return numpy.transpose(
@@ -451,7 +473,7 @@ def _read_targets_one_example(
 def _read_predictors_one_example(
         init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
         nwp_model_to_field_names, nwp_model_to_dir_name,
-        nwp_norm_param_table_xarray):
+        nwp_norm_param_table_xarray, use_quantile_norm):
     """Reads predictor fields for one example.
 
     :param init_time_unix_sec: Forecast-initialization time.
@@ -464,6 +486,7 @@ def _read_predictors_one_example(
         parameters for predictor variables.  If you do not want to normalize (or
         if the input directory already contains normalized data), this should be
         None.
+    :param use_quantile_norm: See documentation for `data_generator`.
     :return: predictor_matrix_2pt5km: Same as output from `data_generator` but
         without first axis.
     :return: predictor_matrix_10km: Same as output from `data_generator` but
@@ -527,7 +550,7 @@ def _read_predictors_one_example(
                     normalization.normalize_nwp_data(
                         nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                         norm_param_table_xarray=nwp_norm_param_table_xarray,
-                        use_quantile_norm=True
+                        use_quantile_norm=use_quantile_norm
                     )
                 )
 
@@ -609,10 +632,14 @@ def create_data(option_dict):
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
+    nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
@@ -657,6 +684,28 @@ def create_data(option_dict):
 
     # Do actual stuff.
     num_examples = len(init_times_unix_sec)
+
+    # Do actual stuff.
+    if nbm_constant_file_name is None:
+        nbm_constant_matrix = None
+    else:
+        print('Reading data from: "{0:s}"...'.format(nbm_constant_file_name))
+        nbm_constant_table_xarray = nbm_constant_io.read_file(
+            nbm_constant_file_name
+        )
+        nbmct = nbm_constant_table_xarray
+
+        field_indices = numpy.array([
+            numpy.where(
+                nbmct.coords[nbm_constant_utils.FIELD_DIM].values == f
+            )[0][0]
+            for f in nbm_constant_field_names
+        ], dtype=int)
+
+        nbm_constant_matrix = (
+            nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
+        )
+
     good_example_flags = numpy.full(num_examples, False, dtype=bool)
 
     (
@@ -677,7 +726,8 @@ def create_data(option_dict):
             target_lead_time_hours=target_lead_time_hours,
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
-            target_norm_param_table_xarray=target_norm_param_table_xarray
+            target_norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=targets_use_quantile_norm
         )
 
         if this_target_matrix is None:
@@ -696,7 +746,8 @@ def create_data(option_dict):
             nwp_lead_times_hours=nwp_lead_times_hours,
             nwp_model_to_field_names=nwp_model_to_field_names,
             nwp_model_to_dir_name=nwp_model_to_dir_name,
-            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
+            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+            use_quantile_norm=nwp_use_quantile_norm
         )
 
         if predictor_matrix_2pt5km is not None:
@@ -748,6 +799,15 @@ def create_data(option_dict):
             sentinel_value
         )
 
+    if nbm_constant_matrix is not None:
+        nbm_constant_matrix = numpy.repeat(
+            numpy.expand_dims(nbm_constant_matrix, axis=0),
+            axis=0, repeats=len(good_indices)
+        )
+        print('Shape of NBM-constant matrix: {0:s}'.format(
+            str(predictor_matrix_2pt5km.shape)
+        ))
+
     if predictor_matrix_10km is not None:
         predictor_matrix_10km = predictor_matrix_10km[good_indices, ...]
 
@@ -795,8 +855,9 @@ def create_data(option_dict):
 
     predictor_matrices = [
         m for m in [
-            predictor_matrix_2pt5km, predictor_matrix_10km,
-            predictor_matrix_20km, predictor_matrix_40km
+            predictor_matrix_2pt5km, nbm_constant_matrix,
+            predictor_matrix_10km, predictor_matrix_20km,
+            predictor_matrix_40km
         ]
         if m is not None
     ]
@@ -821,6 +882,7 @@ def data_generator(option_dict):
     M = number of rows in NBM grid (2.5-km target grid)
     N = number of columns in NBM grid (2.5-km target grid)
     P = number of NWP fields (predictor variables) at 2.5-km resolution
+    C = number of constant fields (at 2.5-km resolution)
     L = number of NWP lead times
     F = number of target fields
 
@@ -852,8 +914,12 @@ def data_generator(option_dict):
         `nwp_model_utils.check_model_name`, and field names must be accepted by
         `nwp_model_utils.check_field_name`.
     option_dict["nwp_normalization_file_name"]: Path to file with normalization
-        params for NWP data.  Will be read by
-        `nwp_model_io.read_normalization_file`.
+        params for NWP data (readable by
+        `nwp_model_io.read_normalization_file`).  If you do not want to
+        normalize NWP predictors, make this None.
+    option_dict["nwp_use_quantile_norm"]: Boolean flag.  If True, will normalize
+        NWP predictors in two steps: quantiles, then z-scores.  If False, will
+        do simple z-score normalization.
     option_dict["target_lead_time_hours"]: Lead time for target fields.
     option_dict["target_field_names"]: length-F list with names of target
         fields.  Each must be accepted by `urma_utils.check_field_name`.
@@ -861,8 +927,18 @@ def data_generator(option_dict):
         URMA data).  Files within this directory will be found by
         `urma_io.find_file` and read by `urma_io.read_file`.
     option_dict["target_normalization_file_name"]: Path to file with
-        normalization params for target fields.  Will be read by
-        `urma_io.read_normalization_file`.
+        normalization params for target fields (readable by
+        `urma_io.read_normalization_file`).  If you do not want to normalize
+        targets, make this None.
+    option_dict["targets_use_quantile_norm"]: Same as "nwp_use_quantile_norm"
+        but for target fields.
+    option_dict["nbm_constant_field_names"]: length-C list with names of NBM
+        constant fields, to be used as predictors.  Each must be accepted by
+        `nbm_constant_utils.check_field_name`.  If you do not want NBM-constant
+        predictors, make this an empty list.
+    option_dict["nbm_constant_file_name"]: Path to file with NBM constant
+        fields (readable by `nbm_constant_io.read_file`).  If you do not want
+        NBM-constant predictors, make this None.
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
@@ -872,11 +948,13 @@ def data_generator(option_dict):
 
     predictor_matrices[0]: E-by-M-by-N-by-L-by-P numpy array of predictors at
         2.5-km resolution.
-    predictor_matrices[1]: E-by-m-by-n-by-L-by-p numpy array of predictors at
+    predictor_matrices[1]: E-by-M-by-N-by-C numpy array of NBM-constant
+        predictors, also at 2.5-km resolution.
+    predictor_matrices[2]: E-by-m-by-n-by-L-by-p numpy array of predictors at
         10-km resolution.
-    predictor_matrices[2]: E-by-mm-by-nn-by-L-by-pp numpy array of predictors at
+    predictor_matrices[3]: E-by-mm-by-nn-by-L-by-pp numpy array of predictors at
         20-km resolution.
-    predictor_matrices[3]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
+    predictor_matrices[4]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
         at 40-km resolution.
 
     :return: target_matrix: E-by-M-by-N-by-F numpy array of targets at 2.5-km
@@ -892,18 +970,20 @@ def data_generator(option_dict):
     # upsampling factor must be an integer.  But also, maybe I could use LSTM to
     # change the sequence length.
 
-    # TODO(thunderhoser): Still need to add constant fields!
-
     option_dict = _check_generator_args(option_dict)
     init_time_limits_unix_sec = option_dict[INIT_TIME_LIMITS_KEY]
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
+    nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
@@ -969,6 +1049,30 @@ def data_generator(option_dict):
     del init_dates_julian
 
     # Do actual stuff.
+    if nbm_constant_file_name is None:
+        nbm_constant_matrix = None
+    else:
+        print('Reading data from: "{0:s}"...'.format(nbm_constant_file_name))
+        nbm_constant_table_xarray = nbm_constant_io.read_file(
+            nbm_constant_file_name
+        )
+        nbmct = nbm_constant_table_xarray
+
+        field_indices = numpy.array([
+            numpy.where(
+                nbmct.coords[nbm_constant_utils.FIELD_DIM].values == f
+            )[0][0]
+            for f in nbm_constant_field_names
+        ], dtype=int)
+
+        nbm_constant_matrix = (
+            nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
+        )
+        nbm_constant_matrix = numpy.repeat(
+            numpy.expand_dims(nbm_constant_matrix, axis=0),
+            axis=0, repeats=num_examples_per_batch
+        )
+
     init_time_index = len(init_times_unix_sec)
 
     while True:
@@ -996,7 +1100,8 @@ def data_generator(option_dict):
                 target_lead_time_hours=target_lead_time_hours,
                 target_field_names=target_field_names,
                 target_dir_name=target_dir_name,
-                target_norm_param_table_xarray=target_norm_param_table_xarray
+                target_norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm
             )
 
             if this_target_matrix is None:
@@ -1017,7 +1122,8 @@ def data_generator(option_dict):
                 nwp_lead_times_hours=nwp_lead_times_hours,
                 nwp_model_to_field_names=nwp_model_to_field_names,
                 nwp_model_to_dir_name=nwp_model_to_dir_name,
-                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray
+                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                use_quantile_norm=nwp_use_quantile_norm
             )
 
             found_any_predictors = True
@@ -1072,6 +1178,11 @@ def data_generator(option_dict):
                 sentinel_value
             )
 
+        if nbm_constant_matrix is not None:
+            print('Shape of NBM-constant predictor matrix: {0:s}'.format(
+                str(nbm_constant_matrix.shape)
+            ))
+
         if predictor_matrix_10km is not None:
             print((
                 'Shape of 10-km predictor matrix and NaN fraction: '
@@ -1115,6 +1226,10 @@ def data_generator(option_dict):
         if predictor_matrix_2pt5km is not None:
             predictor_matrices.update({
                 '2pt5km_inputs': predictor_matrix_2pt5km.astype('float32')
+            })
+        if nbm_constant_matrix is not None:
+            predictor_matrices.update({
+                'constant_inputs': nbm_constant_matrix.astype('float32')
             })
         if predictor_matrix_10km is not None:
             predictor_matrices.update({

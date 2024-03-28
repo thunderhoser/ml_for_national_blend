@@ -11,6 +11,7 @@ import keras
 from gewittergefahr.gg_utils import error_checking
 from gewittergefahr.deep_learning import architecture_utils
 
+INPUT_DIMENSIONS_CONST_KEY = 'input_dimensions_const'
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'
 INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
 INPUT_DIMENSIONS_20KM_RES_KEY = 'input_dimensions_20km_res'
@@ -79,6 +80,7 @@ def check_input_args(option_dict):
         numpy array with input dimensions for 2.5-km NWP forecasts:
         [num_grid_rows, num_grid_columns, num_lead_times, num_channels].
         If you are not including 2.5-km data, make this None.
+    option_dict["input_dimensions_const"]: Same but for 2.5-km constant fields.
     option_dict["input_dimensions_10km_res"]: Same but for 10-km NWP forecasts.
     option_dict["input_dimensions_20km_res"]: Same but for 20-km NWP forecasts.
     option_dict["input_dimensions_40km_res"]: Same but for 40-km NWP forecasts.
@@ -154,6 +156,18 @@ def check_input_args(option_dict):
     error_checking.assert_is_greater_numpy_array(
         option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
     )
+
+    if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
+        error_checking.assert_is_numpy_array(
+            option_dict[INPUT_DIMENSIONS_CONST_KEY],
+            exact_dimensions=numpy.array([3], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[INPUT_DIMENSIONS_CONST_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[INPUT_DIMENSIONS_CONST_KEY], 0
+        )
 
     if option_dict[INPUT_DIMENSIONS_10KM_RES_KEY] is not None:
         error_checking.assert_is_numpy_array(
@@ -324,6 +338,7 @@ def create_model(option_dict):
     option_dict = check_input_args(option_dict)
 
     input_dimensions_2pt5km_res = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
+    input_dimensions_const = option_dict[INPUT_DIMENSIONS_CONST_KEY]
     input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
     input_dimensions_40km_res = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY]
@@ -354,6 +369,8 @@ def create_model(option_dict):
     predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
 
+    num_lead_times = input_dimensions_2pt5km_res.shape[2]
+
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist()),
         name='2pt5km_inputs'
@@ -361,6 +378,31 @@ def create_model(option_dict):
     layer_object_2pt5km_res = keras.layers.Permute(
         dims=(3, 1, 2, 4), name='2pt5km_put_time_first'
     )(input_layer_object_2pt5km_res)
+
+    if input_dimensions_const is None:
+        input_layer_object_const = None
+    else:
+        input_layer_object_const = keras.layers.Input(
+            shape=tuple(input_dimensions_const.tolist()),
+            name='constant_inputs'
+        )
+
+        new_dims = (1,) + tuple(input_dimensions_const.tolist())
+        layer_object_const = keras.layers.Reshape(
+            target_shape=new_dims, name='constants_add-time-dim'
+        )(input_layer_object_const)
+
+        this_layer_object = keras.layers.Concatenate(
+            axis=-4, name='constants_add-2pt5km-times'
+        )(
+            num_lead_times * [layer_object_const]
+        )
+
+        layer_object_2pt5km_res = keras.layers.Concatenate(
+            axis=-1, name='concat_with_constants'
+        )(
+            [layer_object_2pt5km_res, this_layer_object]
+        )
 
     if input_dimensions_10km_res is None:
         input_layer_object_10km_res = None
@@ -1156,15 +1198,13 @@ def create_model(option_dict):
             target_shape=new_dims, name='reshape_predictions'
         )(output_layer_object)
 
-    input_layer_objects = []
-    if input_dimensions_2pt5km_res is not None:
-        input_layer_objects.append(input_layer_object_2pt5km_res)
-    if input_dimensions_10km_res is not None:
-        input_layer_objects.append(input_layer_object_10km_res)
-    if input_dimensions_20km_res is not None:
-        input_layer_objects.append(input_layer_object_20km_res)
-    if input_dimensions_40km_res is not None:
-        input_layer_objects.append(input_layer_object_40km_res)
+    input_layer_objects = [
+        l for l in [
+            input_layer_object_2pt5km_res, input_layer_object_const,
+            input_layer_object_10km_res, input_layer_object_20km_res,
+            input_layer_object_40km_res
+        ] if l is not None
+    ]
 
     model_object = keras.models.Model(
         inputs=input_layer_objects, outputs=output_layer_object
