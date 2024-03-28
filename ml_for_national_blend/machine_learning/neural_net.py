@@ -88,7 +88,7 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_integer_numpy_array(
         option_dict[INIT_TIME_LIMITS_KEY]
     )
-    error_checking.assert_is_greater_numpy_array(
+    error_checking.assert_is_geq_numpy_array(
         numpy.diff(option_dict[INIT_TIME_LIMITS_KEY]),
         0
     )
@@ -804,7 +804,7 @@ def create_data(option_dict):
         if subset_grid:
             nbm_constant_matrix = nbm_constant_matrix[544:993, 752:1201]
 
-    good_example_flags = numpy.full(num_examples, False, dtype=bool)
+    good_example_flags = numpy.full(num_examples, True, dtype=bool)
 
     (
         predictor_matrix_2pt5km, predictor_matrix_10km,
