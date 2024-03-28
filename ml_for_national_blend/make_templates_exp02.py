@@ -113,10 +113,10 @@ OPTIMIZER_FUNCTION_STRING = (
 
 DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([449, 449, 2], dtype=int),
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: None,
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
+    chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: None,
+    chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
+    chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
+    chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
     chiu_net_pp_arch.NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192, 256], dtype=int),
     chiu_net_pp_arch.POOLING_SIZE_KEY: numpy.full(6, 2, dtype=int),
     chiu_net_pp_arch.ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
