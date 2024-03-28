@@ -811,7 +811,7 @@ def create_data(option_dict):
         if subset_grid:
             nbm_constant_matrix = nbm_constant_matrix[544:993, 752:1201]
 
-    good_example_flags = numpy.full(num_examples, False, dtype=bool)
+    good_example_flags = numpy.full(num_examples, True, dtype=bool)
 
     (
         predictor_matrix_2pt5km, predictor_matrix_10km,
