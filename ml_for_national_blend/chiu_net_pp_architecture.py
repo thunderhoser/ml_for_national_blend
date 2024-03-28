@@ -185,8 +185,8 @@ def create_model(option_dict):
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
 
-    num_lead_times = input_dimensions_2pt5km_res.shape[2]
     print(input_dimensions_2pt5km_res)
+    num_lead_times = input_dimensions_2pt5km_res.shape[2]
 
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist()),
