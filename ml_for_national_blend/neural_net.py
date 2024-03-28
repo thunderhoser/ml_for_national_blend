@@ -47,6 +47,7 @@ NBM_CONSTANT_FIELDS_KEY = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
+SUBSET_GRID_KEY = 'subset_grid'
 
 DEFAULT_GENERATOR_OPTION_DICT = {
     SENTINEL_VALUE_KEY: -10.
@@ -162,18 +163,22 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
+    error_checking.assert_is_boolean(option_dict[SUBSET_GRID_KEY])
 
     return option_dict
 
 
 def _init_predictor_matrices_1example(
-        nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times):
+        nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
+        subset_grid):
     """Initializes predictor matrices for one example.
 
     :param nwp_model_names: 1-D list with names of NWP models.
     :param nwp_model_to_field_names: Dictionary.  For details, see documentation
         for `data_generator`.
     :param num_nwp_lead_times: Number of lead times.
+    :param subset_grid: Boolean flag.  If True, will subset grid to smaller
+        domain.
     :return: predictor_matrices_2pt5km: 1-D list of numpy arrays for 2.5-km
         resolution.  One array per 2.5-km model.  If there are no 2.5-km models,
         this is None instead of a list.
@@ -191,6 +196,10 @@ def _init_predictor_matrices_1example(
     num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
         nwp_model_utils.HRRR_MODEL_NAME
     )
+
+    if subset_grid:
+        num_rows = 449
+        num_columns = 449
 
     if len(model_indices) == 0:
         predictor_matrices_2pt5km = None
@@ -210,6 +219,10 @@ def _init_predictor_matrices_1example(
         nwp_model_utils.RAP_MODEL_NAME
     )
 
+    if subset_grid:
+        num_rows = 113
+        num_columns = 113
+
     if len(model_indices) == 0:
         predictor_matrices_10km = None
     else:
@@ -228,6 +241,10 @@ def _init_predictor_matrices_1example(
         nwp_model_utils.GFS_MODEL_NAME
     )
 
+    if subset_grid:
+        num_rows = 57
+        num_columns = 57
+
     if len(model_indices) == 0:
         predictor_matrices_20km = None
     else:
@@ -245,6 +262,10 @@ def _init_predictor_matrices_1example(
     num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
         nwp_model_utils.GEFS_MODEL_NAME
     )
+
+    if subset_grid:
+        num_rows = 29
+        num_columns = 29
 
     if len(model_indices) == 0:
         predictor_matrices_40km = None
@@ -267,7 +288,7 @@ def _init_predictor_matrices_1example(
 
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
-        num_target_fields, num_examples_per_batch):
+        num_target_fields, num_examples_per_batch, subset_grid):
     """Initializes predictor and target matrices for one batch.
 
     :param nwp_model_names: 1-D list with names of NWP models.
@@ -276,6 +297,8 @@ def _init_matrices_1batch(
     :param num_nwp_lead_times: Number of lead times.
     :param num_target_fields: Number of target fields.
     :param num_examples_per_batch: Batch size.
+    :param subset_grid: Boolean flag.  If True, will subset grid to smaller
+        domain.
     :return: predictor_matrix_2pt5km: numpy array for NWP data with 2.5-km
         resolution.  If there are no 2.5-km models, this is None instead of an
         array.
@@ -294,6 +317,10 @@ def _init_matrices_1batch(
     num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
         nwp_model_utils.HRRR_MODEL_NAME
     )
+
+    if subset_grid:
+        num_rows = 449
+        num_columns = 449
 
     target_matrix = numpy.full(
         (num_examples_per_batch, num_rows, num_columns, num_target_fields),
@@ -320,6 +347,10 @@ def _init_matrices_1batch(
         nwp_model_utils.RAP_MODEL_NAME
     )
 
+    if subset_grid:
+        num_rows = 113
+        num_columns = 113
+
     if len(model_indices) == 0:
         predictor_matrix_10km = None
     else:
@@ -340,6 +371,10 @@ def _init_matrices_1batch(
         nwp_model_utils.GFS_MODEL_NAME
     )
 
+    if subset_grid:
+        num_rows = 57
+        num_columns = 57
+
     if len(model_indices) == 0:
         predictor_matrix_20km = None
     else:
@@ -359,6 +394,10 @@ def _init_matrices_1batch(
     num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
         nwp_model_utils.GEFS_MODEL_NAME
     )
+
+    if subset_grid:
+        num_rows = 29
+        num_columns = 29
 
     if len(model_indices) == 0:
         predictor_matrix_40km = None
@@ -385,7 +424,7 @@ def _init_matrices_1batch(
 def _read_targets_one_example(
         init_time_unix_sec, target_lead_time_hours,
         target_field_names, target_dir_name,
-        target_norm_param_table_xarray, use_quantile_norm):
+        target_norm_param_table_xarray, use_quantile_norm, subset_grid):
     """Reads target fields for one example.
 
     NBM = National Blend of Models
@@ -403,6 +442,8 @@ def _read_targets_one_example(
         if the input directory already contains normalized data), this should be
         None.
     :param use_quantile_norm: See documentation for `data_generator`.
+    :param subset_grid: Boolean flag.  If True, will subset grid to smaller
+        domain.
     :return: target_matrix: M-by-N-by-F numpy array of target values.
     """
 
@@ -471,16 +512,21 @@ def _read_targets_one_example(
             use_quantile_norm=use_quantile_norm
         )
 
-    return numpy.transpose(
+    target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
         axes=(1, 0, 2)
     )
+
+    if subset_grid:
+        target_matrix = target_matrix[544:993, 752:1201]
+
+    return target_matrix
 
 
 def _read_predictors_one_example(
         init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
         nwp_model_to_field_names, nwp_model_to_dir_name,
-        nwp_norm_param_table_xarray, use_quantile_norm):
+        nwp_norm_param_table_xarray, use_quantile_norm, subset_grid):
     """Reads predictor fields for one example.
 
     :param init_time_unix_sec: Forecast-initialization time.
@@ -494,6 +540,8 @@ def _read_predictors_one_example(
         if the input directory already contains normalized data), this should be
         None.
     :param use_quantile_norm: See documentation for `data_generator`.
+    :param subset_grid: Boolean flag.  If True, will subset grid to smaller
+        domain.
     :return: predictor_matrix_2pt5km: Same as output from `data_generator` but
         without first axis.
     :return: predictor_matrix_10km: Same as output from `data_generator` but
@@ -518,7 +566,8 @@ def _read_predictors_one_example(
     ) = _init_predictor_matrices_1example(
         nwp_model_names=nwp_model_names,
         nwp_model_to_field_names=nwp_model_to_field_names,
-        num_nwp_lead_times=num_nwp_lead_times
+        num_nwp_lead_times=num_nwp_lead_times,
+        subset_grid=subset_grid
     )
 
     for i in range(num_nwp_models):
@@ -551,6 +600,55 @@ def _read_predictors_one_example(
                 desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
             )
 
+            matrix_index = numpy.sum(
+                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
+            )
+
+            if nwp_downsampling_factors[i] == 1:
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_row_indices=
+                    numpy.linspace(544, 992, num=449, dtype=int)
+                )
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_column_indices=
+                    numpy.linspace(752, 1200, num=449, dtype=int)
+                )
+            elif nwp_downsampling_factors[i] == 4:
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_row_indices=
+                    numpy.linspace(136, 248, num=113, dtype=int)
+                )
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_column_indices=
+                    numpy.linspace(188, 300, num=113, dtype=int)
+                )
+            elif nwp_downsampling_factors[i] == 8:
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_row_indices=
+                    numpy.linspace(68, 124, num=57, dtype=int)
+                )
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_column_indices=
+                    numpy.linspace(94, 150, num=57, dtype=int)
+                )
+            else:
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_row_indices=
+                    numpy.linspace(34, 62, num=29, dtype=int)
+                )
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_column_indices=
+                    numpy.linspace(47, 75, num=29, dtype=int)
+                )
+
             if nwp_norm_param_table_xarray is not None:
                 print('Normalizing predictor variables to z-scores...')
                 nwp_forecast_table_xarray = (
@@ -561,9 +659,6 @@ def _read_predictors_one_example(
                     )
                 )
 
-            matrix_index = numpy.sum(
-                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
-            )
             nwpft = nwp_forecast_table_xarray
 
             if nwp_downsampling_factors[i] == 1:
@@ -648,6 +743,7 @@ def create_data(option_dict):
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    subset_grid = option_dict[SUBSET_GRID_KEY]
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
@@ -712,6 +808,8 @@ def create_data(option_dict):
         nbm_constant_matrix = (
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
+        if subset_grid:
+            nbm_constant_matrix = nbm_constant_matrix[544:993, 752:1201]
 
     good_example_flags = numpy.full(num_examples, False, dtype=bool)
 
@@ -724,7 +822,8 @@ def create_data(option_dict):
         nwp_model_to_field_names=nwp_model_to_field_names,
         num_nwp_lead_times=len(nwp_lead_times_hours),
         num_target_fields=len(target_field_names),
-        num_examples_per_batch=num_examples
+        num_examples_per_batch=num_examples,
+        subset_grid=subset_grid
     )
 
     for i in range(num_examples):
@@ -734,7 +833,8 @@ def create_data(option_dict):
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
             target_norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=targets_use_quantile_norm
+            use_quantile_norm=targets_use_quantile_norm,
+            subset_grid=subset_grid
         )
 
         if this_target_matrix is None:
@@ -754,7 +854,8 @@ def create_data(option_dict):
             nwp_model_to_field_names=nwp_model_to_field_names,
             nwp_model_to_dir_name=nwp_model_to_dir_name,
             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-            use_quantile_norm=nwp_use_quantile_norm
+            use_quantile_norm=nwp_use_quantile_norm,
+            subset_grid=subset_grid
         )
 
         if predictor_matrix_2pt5km is not None:
@@ -949,6 +1050,8 @@ def data_generator(option_dict):
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
+    option_dict["subset_grid"]: Boolean flag.  If True, will subset full grid to
+        smaller domain.
 
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
@@ -993,6 +1096,7 @@ def data_generator(option_dict):
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    subset_grid = option_dict[SUBSET_GRID_KEY]
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
@@ -1075,6 +1179,9 @@ def data_generator(option_dict):
         nbm_constant_matrix = (
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
+        if subset_grid:
+            nbm_constant_matrix = nbm_constant_matrix[544:993, 752:1201]
+
         nbm_constant_matrix = numpy.repeat(
             numpy.expand_dims(nbm_constant_matrix, axis=0),
             axis=0, repeats=num_examples_per_batch
@@ -1092,7 +1199,8 @@ def data_generator(option_dict):
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
             num_target_fields=len(target_field_names),
-            num_examples_per_batch=num_examples_per_batch
+            num_examples_per_batch=num_examples_per_batch,
+            subset_grid=subset_grid
         )
 
         num_examples_in_memory = 0
@@ -1108,7 +1216,8 @@ def data_generator(option_dict):
                 target_field_names=target_field_names,
                 target_dir_name=target_dir_name,
                 target_norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=targets_use_quantile_norm
+                use_quantile_norm=targets_use_quantile_norm,
+                subset_grid=subset_grid
             )
 
             if this_target_matrix is None:
@@ -1130,7 +1239,8 @@ def data_generator(option_dict):
                 nwp_model_to_field_names=nwp_model_to_field_names,
                 nwp_model_to_dir_name=nwp_model_to_dir_name,
                 nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-                use_quantile_norm=nwp_use_quantile_norm
+                use_quantile_norm=nwp_use_quantile_norm,
+                subset_grid=subset_grid
             )
 
             found_any_predictors = True

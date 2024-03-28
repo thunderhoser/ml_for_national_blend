@@ -121,7 +121,10 @@ def _run(template_file_name, output_dir_name,
         neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
         neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
-        neural_net.SENTINEL_VALUE_KEY: sentinel_value
+        neural_net.SENTINEL_VALUE_KEY: sentinel_value,
+
+        # TODO(thunderhoser): Make this an actual input arg.
+        neural_net.SUBSET_GRID_KEY: True
     }
 
     validation_option_dict = {
