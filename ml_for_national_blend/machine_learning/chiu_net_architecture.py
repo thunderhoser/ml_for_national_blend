@@ -369,7 +369,7 @@ def create_model(option_dict):
     predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
 
-    num_lead_times = input_dimensions_2pt5km_res.shape[2]
+    num_lead_times = input_dimensions_2pt5km_res[2]
 
     input_layer_object_2pt5km_res = keras.layers.Input(
         shape=tuple(input_dimensions_2pt5km_res.tolist()),
