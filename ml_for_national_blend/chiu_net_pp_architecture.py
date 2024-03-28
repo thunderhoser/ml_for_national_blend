@@ -349,13 +349,13 @@ def create_model(option_dict):
         num_padding_columns = num_desired_columns - num_current_columns
 
         if num_padding_rows + num_padding_columns > 0:
-            padding_arg = (
+            cropping_arg = (
                 (0, 0), (0, num_padding_rows), (0, num_padding_columns)
             )
 
-            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
-                padding=padding_arg
-            )(encoder_pooling_layer_objects[i])
+            layer_object_10km_res = keras.layers.Cropping3D(
+                cropping=cropping_arg, data_format='channels_last'
+            )(layer_object_10km_res)
 
         this_name = 'concat_with_10km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
@@ -449,13 +449,13 @@ def create_model(option_dict):
         num_padding_columns = num_desired_columns - num_current_columns
 
         if num_padding_rows + num_padding_columns > 0:
-            padding_arg = (
+            cropping_arg = (
                 (0, 0), (0, num_padding_rows), (0, num_padding_columns)
             )
 
-            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
-                padding=padding_arg
-            )(encoder_pooling_layer_objects[i])
+            layer_object_20km_res = keras.layers.Cropping3D(
+                cropping=cropping_arg, data_format='channels_last'
+            )(layer_object_20km_res)
 
         this_name = 'concat_with_20km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
@@ -537,13 +537,13 @@ def create_model(option_dict):
         num_padding_columns = num_desired_columns - num_current_columns
 
         if num_padding_rows + num_padding_columns > 0:
-            padding_arg = (
+            cropping_arg = (
                 (0, 0), (0, num_padding_rows), (0, num_padding_columns)
             )
 
-            encoder_pooling_layer_objects[i] = keras.layers.ZeroPadding3D(
-                padding=padding_arg
-            )(encoder_pooling_layer_objects[i])
+            layer_object_40km_res = keras.layers.Cropping3D(
+                cropping=cropping_arg, data_format='channels_last'
+            )(layer_object_40km_res)
 
         this_name = 'concat_with_40km'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
