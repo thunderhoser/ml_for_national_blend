@@ -51,7 +51,7 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
 --input_model_file_name="${model_dir_name}/model.keras" \
---init_time_string="2023-10-01-00" \
+--init_time_string="2023-10-02-00" \
 --nwp_model_names ${nwp_model_name_set} \
 --input_nwp_directory_names "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/hrrr/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam_nest/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gfs/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gefs/processed/interp_to_nbm_grid" \
 --input_target_dir_name="${TARGET_DIR_NAME}" \
