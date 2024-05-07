@@ -157,6 +157,8 @@ target_matrix[target_matrix < -9000] = numpy.nan
 nwp_lead_times_hours = numpy.array([6, 48], dtype=int)
 
 full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = nbm_utils.read_coords()
+full_latitude_matrix_deg_n = full_latitude_matrix_deg_n[544:993, 752:1201]
+full_longitude_matrix_deg_e = full_longitude_matrix_deg_e[544:993, 752:1201]
 
 for i in range(len(nwp_lead_times_hours)):
     field_names = nwp_model_to_field_names[nwp_model_utils.HRRR_MODEL_NAME]
