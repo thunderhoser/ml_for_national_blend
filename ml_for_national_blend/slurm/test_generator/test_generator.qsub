@@ -1,4 +1,4 @@
-#!/bin/tcsh
+#!/bin/bash
 
 #SBATCH --job-name="test_generator"
 #SBATCH --partition="fge"
@@ -19,5 +19,17 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=test_generator_%A.out
 
-set this_directory_name=`pwd`
-singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_generator.sh"
+module load cuda/12.1.0
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+
+python3 -u "${CODE_DIR_NAME}/test_generator.py"
