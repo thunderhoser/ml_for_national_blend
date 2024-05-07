@@ -31,7 +31,7 @@ DIVERGING_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
 
 FIGURE_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/'
-    'test_generator'
+    'test_generator/unnormalized'
 )
 
 DEFAULT_FONT_SIZE = 30
@@ -115,10 +115,10 @@ option_dict = {
     NWP_LEAD_TIMES_KEY: numpy.array([6, 48], dtype=int),
     NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
     NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
-    NWP_NORM_FILE_KEY:
-        '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/'
-        'ml_for_national_blend_project/nwp_model_data/'
-        'normalization_params_20221101-20230531.nc',
+    NWP_NORM_FILE_KEY: None,
+        # '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/'
+        # 'ml_for_national_blend_project/nwp_model_data/'
+        # 'normalization_params_20221101-20230531.nc',
     NWP_USE_QUANTILE_NORM_KEY: True,
     TARGET_LEAD_TIME_KEY: 24,
     TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
@@ -132,9 +132,10 @@ option_dict = {
         nbm_constant_utils.OROGRAPHIC_HEIGHT_NAME
     ],
     NBM_CONSTANT_FILE_KEY:
-        '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/'
-        'ml_for_national_blend_project/nbm_constants/'
-        'nbm_constants_quantile_normalized.nc',
+        '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nbm_constants/nbm_constants.nc',
+        # '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/'
+        # 'ml_for_national_blend_project/nbm_constants/'
+        # 'nbm_constants_quantile_normalized.nc',
     BATCH_SIZE_KEY: 4,
     SENTINEL_VALUE_KEY: -9999.,
     SUBSET_GRID_KEY: True
