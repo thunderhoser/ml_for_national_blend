@@ -154,55 +154,25 @@ def _quantile_normalize_1var(data_values, reference_values_1d):
 
     # TODO(thunderhoser): Still need unit test.
 
-    data_values_1d = numpy.ravel(data_values)
-    data_values_1d[numpy.invert(numpy.isfinite(data_values_1d))] = numpy.nan
-
-    real_indices = numpy.where(
-        numpy.invert(numpy.isnan(data_values_1d))
-    )[0]
-
-    if len(real_indices) == 0:
-        return data_values
-
     if numpy.all(numpy.isnan(reference_values_1d)):
-        data_values_1d[real_indices] = 0.
-        return numpy.reshape(data_values_1d, data_values.shape)
-
-    # The code below might fail due to non-unique values in reference_values_1d.
-
-    # num_quantiles = len(reference_values_1d)
-    # quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
-    #
-    # interp_object = interp1d(
-    #     x=reference_values_1d, y=quantile_levels, kind='linear',
-    #     bounds_error=False, fill_value='extrapolate', assume_sorted=True
-    # )
-    # data_values_1d[real_indices] = interp_object(data_values_1d[real_indices])
+        data_values[numpy.isfinite(data_values)] = 0.
+        return data_values
 
     real_reference_values_1d = reference_values_1d[
         numpy.invert(numpy.isnan(reference_values_1d))
     ]
 
     search_indices = numpy.searchsorted(
-        numpy.sort(real_reference_values_1d),
-        data_values_1d[real_indices],
-        side='left'
+        a=numpy.sort(real_reference_values_1d), v=data_values, side='left'
     ).astype(float)
 
+    search_indices[numpy.invert(numpy.isfinite(data_values))] = numpy.nan
     num_reference_vals = len(real_reference_values_1d)
-    data_values_1d[real_indices] = search_indices / (num_reference_vals - 1)
+    data_values = search_indices / (num_reference_vals - 1)
 
-    data_values_1d[real_indices] = numpy.minimum(
-        data_values_1d[real_indices], MAX_CUMULATIVE_DENSITY
-    )
-    data_values_1d[real_indices] = numpy.maximum(
-        data_values_1d[real_indices], MIN_CUMULATIVE_DENSITY
-    )
-    data_values_1d[real_indices] = scipy.stats.norm.ppf(
-        data_values_1d[real_indices], loc=0., scale=1.
-    )
-
-    return numpy.reshape(data_values_1d, data_values.shape)
+    data_values = numpy.minimum(data_values, MAX_CUMULATIVE_DENSITY)
+    data_values = numpy.maximum(data_values, MIN_CUMULATIVE_DENSITY)
+    return scipy.stats.norm.ppf(data_values, loc=0., scale=1.)
 
 
 def _quantile_denormalize_1var(data_values, reference_values_1d):
@@ -216,33 +186,25 @@ def _quantile_denormalize_1var(data_values, reference_values_1d):
 
     # TODO(thunderhoser): Still need unit test.
 
-    data_values_1d = numpy.ravel(data_values)
-    real_indices = numpy.where(
-        numpy.invert(numpy.isnan(data_values_1d))
-    )[0]
-
-    if len(real_indices) == 0:
-        return data_values
     if numpy.all(numpy.isnan(reference_values_1d)):
         return data_values
 
-    data_values_1d[real_indices] = scipy.stats.norm.cdf(
-        data_values_1d[real_indices], loc=0., scale=1.
-    )
+    data_values = scipy.stats.norm.cdf(data_values, loc=0., scale=1.)
     real_reference_values_1d = reference_values_1d[
         numpy.invert(numpy.isnan(reference_values_1d))
     ]
 
     # Linear produces biased estimates (range of 0...0.1 in my test), while
     # lower produces unbiased estimates (range of -0.1...+0.1 in my test).
-    data_values_1d[real_indices] = numpy.percentile(
+    real_flags = numpy.isfinite(data_values)
+    data_values[real_flags] = numpy.percentile(
         numpy.ravel(real_reference_values_1d),
-        100 * data_values_1d[real_indices],
+        100 * data_values[real_flags],
         interpolation='linear'
         # interpolation='lower'
     )
 
-    return numpy.reshape(data_values_1d, data_values.shape)
+    return data_values
 
 
 def get_normalization_params_for_nwp(
