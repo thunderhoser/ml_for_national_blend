@@ -5,6 +5,7 @@ import sys
 import numpy
 import xarray
 import scipy.stats
+from scipy.interpolate import interp1d
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -168,12 +169,15 @@ def _quantile_normalize_1var(data_values, reference_values_1d):
 
     num_quantiles = len(reference_values_1d)
     quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
-
-    from scipy.interpolate import interp1d
+    _, unique_indices = numpy.unique(reference_values_1d, return_index=True)
 
     interp_object = interp1d(
-        x=reference_values_1d, y=quantile_levels, kind='linear',
-        bounds_error=False, fill_value='extrapolate', assume_sorted=True
+        x=reference_values_1d[unique_indices],
+        y=quantile_levels[unique_indices],
+        kind='linear',
+        bounds_error=False,
+        fill_value='extrapolate',
+        assume_sorted=True
     )
     data_values = interp_object(data_values)
 
