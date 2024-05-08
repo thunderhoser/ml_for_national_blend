@@ -166,17 +166,28 @@ def _quantile_normalize_1var(data_values, reference_values_1d):
         data_values[numpy.isfinite(data_values)] = 0.
         return data_values
 
-    real_reference_values_1d = reference_values_1d[
-        numpy.invert(numpy.isnan(reference_values_1d))
-    ]
+    num_quantiles = len(reference_values_1d)
+    quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
 
-    search_indices = numpy.searchsorted(
-        a=numpy.sort(real_reference_values_1d), v=data_values, side='left'
-    ).astype(float)
+    from scipy.interpolate import interp1d
 
-    search_indices[numpy.invert(numpy.isfinite(data_values))] = numpy.nan
-    num_reference_vals = len(real_reference_values_1d)
-    data_values = search_indices / (num_reference_vals - 1)
+    interp_object = interp1d(
+        x=reference_values_1d, y=quantile_levels, kind='linear',
+        bounds_error=False, fill_value='extrapolate', assume_sorted=True
+    )
+    data_values = interp_object(data_values)
+
+    # real_reference_values_1d = reference_values_1d[
+    #     numpy.invert(numpy.isnan(reference_values_1d))
+    # ]
+    #
+    # search_indices = numpy.searchsorted(
+    #     a=numpy.sort(real_reference_values_1d), v=data_values, side='left'
+    # ).astype(float)
+    #
+    # search_indices[numpy.invert(numpy.isfinite(data_values))] = numpy.nan
+    # num_reference_vals = len(real_reference_values_1d)
+    # data_values = search_indices / (num_reference_vals - 1)
 
     data_values = numpy.minimum(data_values, MAX_CUMULATIVE_DENSITY)
     data_values = numpy.maximum(data_values, MIN_CUMULATIVE_DENSITY)
