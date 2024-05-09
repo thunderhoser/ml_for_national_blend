@@ -122,6 +122,33 @@ def __nwp_2m_dewpoint_to_depression(nwp_forecast_table_xarray):
     })
 
 
+def __nwp_2m_temp_to_celsius(nwp_forecast_table_xarray):
+    """Converts 2-metre NWP temperatures from Kelvins to Celsius.
+
+    :param nwp_forecast_table_xarray: xarray table in format returned by
+        `interp_nwp_model_io.read_file`.
+    :return: nwp_forecast_table_xarray: Same, except that temperatures have been
+        converted to Celsius.
+    """
+
+    k = numpy.where(
+        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.TEMPERATURE_2METRE_NAME
+    )[0][0]
+
+    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
+        data_matrix[..., k]
+    )
+
+    return nwp_forecast_table_xarray.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
 def __predicted_2m_depression_to_dewpoint(prediction_matrix,
                                           target_field_names):
     """Converts 2-metre dewpoint depression in predictions to dewpoint temp.
@@ -826,6 +853,10 @@ def _read_residual_baseline_one_example(
         nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
             nwp_forecast_table_xarray
         )
+
+    nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
+        nwp_forecast_table_xarray
+    )
 
     these_matrices = [
         nwp_model_utils.get_field(
