@@ -697,7 +697,7 @@ def create_model(option_dict):
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [this_layer_object, layer_object_10km_res]
+            [encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         if input_dimensions_20km_res is not None:
@@ -760,7 +760,7 @@ def create_model(option_dict):
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [this_layer_object, layer_object_20km_res]
+            [encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         i = num_levels_filled
@@ -812,7 +812,7 @@ def create_model(option_dict):
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [this_layer_object, layer_object_40km_res]
+            [encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         i = num_levels_filled
