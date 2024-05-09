@@ -24,6 +24,8 @@ INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'
 INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
 INPUT_DIMENSIONS_20KM_RES_KEY = 'input_dimensions_20km_res'
 INPUT_DIMENSIONS_40KM_RES_KEY = 'input_dimensions_40km_res'
+PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
+USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
 
 NUM_CHANNELS_KEY = 'num_channels_by_level'
 POOLING_SIZE_KEY = 'pooling_size_by_level_px'
@@ -92,6 +94,10 @@ def check_input_args(option_dict):
     option_dict["input_dimensions_10km_res"]: Same but for 10-km NWP forecasts.
     option_dict["input_dimensions_20km_res"]: Same but for 20-km NWP forecasts.
     option_dict["input_dimensions_40km_res"]: Same but for 40-km NWP forecasts.
+    option_dict["input_dimensions_predn_baseline"]: Same but for prediction
+        baseline.
+    option_dict["use_residual_blocks"]: Boolean flag.  If True (False), the NN
+        will use residual (simple conv) blocks.
     option_dict["num_channels_by_level"]: length-(L + 1) numpy array with number
         of channels (feature maps) at each level.
     option_dict["pooling_size_by_level_px"]: length-L numpy array with size of
@@ -164,6 +170,21 @@ def check_input_args(option_dict):
     error_checking.assert_is_greater_numpy_array(
         option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
     )
+
+    if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
+        num_rows = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
+        num_columns = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
+        num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
+        expected_array = numpy.array(
+            [num_rows, num_columns, num_channels], dtype=int
+        )
+
+        assert numpy.array_equal(
+            option_dict[PREDN_BASELINE_DIMENSIONS_KEY],
+            expected_array
+        )
+
+    error_checking.assert_is_boolean(option_dict[USE_RESIDUAL_BLOCKS_KEY])
 
     if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
         error_checking.assert_is_numpy_array(
@@ -350,6 +371,12 @@ def create_model(option_dict):
     input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
     input_dimensions_40km_res = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY]
+    input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
+    use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
+
+    assert input_dimensions_predn_baseline is None
+    assert not use_residual_blocks
+
     num_channels_by_level = option_dict[NUM_CHANNELS_KEY]
     pooling_size_by_level_px = option_dict[POOLING_SIZE_KEY]
     num_encoder_conv_layers_by_level = option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
@@ -392,16 +419,16 @@ def create_model(option_dict):
     else:
         input_layer_object_const = keras.layers.Input(
             shape=tuple(input_dimensions_const.tolist()),
-            name='constant_inputs'
+            name='const_inputs'
         )
 
         new_dims = (1,) + tuple(input_dimensions_const.tolist())
         layer_object_const = keras.layers.Reshape(
-            target_shape=new_dims, name='constants_add-time-dim'
+            target_shape=new_dims, name='const_add-time-dim'
         )(input_layer_object_const)
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-4, name='constants_add-2pt5km-times'
+            axis=-4, name='const_add-2pt5km-times'
         )(
             num_lead_times * [layer_object_const]
         )
