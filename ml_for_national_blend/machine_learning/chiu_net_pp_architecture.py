@@ -1131,77 +1131,88 @@ def create_model(option_dict):
             output_layer_object, layer_object_predn_baseline
         ])
 
-        if ensemble_size == 1:
-            new_dims = (
-                input_dimensions_predn_baseline[0],
-                input_dimensions_predn_baseline[1],
-                input_dimensions_predn_baseline[2],
-                1
+        if num_constrained_output_channels > 0:
+            if ensemble_size == 1:
+                new_dims = (
+                    input_dimensions_predn_baseline[0],
+                    input_dimensions_predn_baseline[1],
+                    input_dimensions_predn_baseline[2],
+                    1
+                )
+
+                output_layer_object = keras.layers.Reshape(
+                    target_shape=new_dims,
+                    name='output_expand_dims'
+                )(output_layer_object)
+
+            cropping_arg = (
+                (0, 0),
+                (0, 0),
+                (num_output_channels - num_constrained_output_channels, 0)
             )
 
-            output_layer_object = keras.layers.Reshape(
-                target_shape=new_dims,
-                name='output_expand_dims'
+            constrained_output_layer_object = keras.layers.Cropping3D(
+                cropping=cropping_arg,
+                name='output_get_constrained'
             )(output_layer_object)
 
-        # TODO(thunderhoser): Might need to specially handle case where
-        # num_constrained_output_channels = 0.
-        cropping_arg = (
-            (0, 0),
-            (0, 0),
-            (num_output_channels - num_constrained_output_channels, 0)
-        )
-
-        constrained_output_layer_object = keras.layers.Cropping3D(
-            cropping=cropping_arg,
-            name='output_get_constrained'
-        )(output_layer_object)
-
-        constrained_output_layer_object = (
-            architecture_utils.get_activation_layer(
-                activation_function_string=
-                architecture_utils.RELU_FUNCTION_STRING,
-                alpha_for_relu=0.,
-                alpha_for_elu=0.,
-                layer_name='output_activ_constrained'
-            )(constrained_output_layer_object)
-        )
-
-        cropping_arg = (
-            (0, 0),
-            (0, 0),
-            (0, num_constrained_output_channels)
-        )
-
-        basic_output_layer_object = keras.layers.Cropping3D(
-            cropping=cropping_arg,
-            name='output_get_basic'
-        )(output_layer_object)
-
-        if output_activ_function_name is not None:
-            basic_output_layer_object = architecture_utils.get_activation_layer(
-                activation_function_string=output_activ_function_name,
-                alpha_for_relu=output_activ_function_alpha,
-                alpha_for_elu=output_activ_function_alpha,
-                layer_name='output_activ_basic'
-            )(basic_output_layer_object)
-
-        this_name = 'output' if ensemble_size > 1 else 'output_concat'
-        output_layer_object = keras.layers.Concatenate(axis=3, name=this_name)(
-            [basic_output_layer_object, constrained_output_layer_object]
-        )
-
-        if ensemble_size == 1:
-            new_dims = (
-                input_dimensions_predn_baseline[0],
-                input_dimensions_predn_baseline[1],
-                input_dimensions_predn_baseline[2]
+            constrained_output_layer_object = (
+                architecture_utils.get_activation_layer(
+                    activation_function_string=
+                    architecture_utils.RELU_FUNCTION_STRING,
+                    alpha_for_relu=0.,
+                    alpha_for_elu=0.,
+                    layer_name='output_activ_constrained'
+                )(constrained_output_layer_object)
             )
 
-            output_layer_object = keras.layers.Reshape(
-                target_shape=new_dims,
-                name='output'
+            cropping_arg = (
+                (0, 0),
+                (0, 0),
+                (0, num_constrained_output_channels)
+            )
+
+            basic_output_layer_object = keras.layers.Cropping3D(
+                cropping=cropping_arg,
+                name='output_get_basic'
             )(output_layer_object)
+
+            if output_activ_function_name is not None:
+                basic_output_layer_object = (
+                    architecture_utils.get_activation_layer(
+                        activation_function_string=output_activ_function_name,
+                        alpha_for_relu=output_activ_function_alpha,
+                        alpha_for_elu=output_activ_function_alpha,
+                        layer_name='output_activ_basic'
+                    )(basic_output_layer_object)
+                )
+
+            this_name = 'output' if ensemble_size > 1 else 'output_concat'
+            output_layer_object = keras.layers.Concatenate(
+                axis=3, name=this_name
+            )(
+                [basic_output_layer_object, constrained_output_layer_object]
+            )
+
+            if ensemble_size == 1:
+                new_dims = (
+                    input_dimensions_predn_baseline[0],
+                    input_dimensions_predn_baseline[1],
+                    input_dimensions_predn_baseline[2]
+                )
+
+                output_layer_object = keras.layers.Reshape(
+                    target_shape=new_dims,
+                    name='output'
+                )(output_layer_object)
+        else:
+            if output_activ_function_name is not None:
+                output_layer_object = architecture_utils.get_activation_layer(
+                    activation_function_string=output_activ_function_name,
+                    alpha_for_relu=output_activ_function_alpha,
+                    alpha_for_elu=output_activ_function_alpha,
+                    layer_name='output'
+                )(output_layer_object)
 
     input_layer_objects = [
         l for l in [
