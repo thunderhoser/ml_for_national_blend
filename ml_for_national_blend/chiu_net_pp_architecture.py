@@ -493,7 +493,7 @@ def _crop_layer(source_layer_object, target_layer_object, cropping_layer_name,
             (0, num_cropping_heights)
         )
 
-        return keras.layers.ZeroCropping3D(
+        return keras.layers.Cropping3D(
             cropping=cropping_arg, name=cropping_layer_name
         )(source_layer_object)
 
