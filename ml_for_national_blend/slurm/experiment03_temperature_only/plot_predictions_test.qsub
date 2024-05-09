@@ -1,0 +1,57 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_predictions_test"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=01:00:00
+#SBATCH --array=0-15
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_predictions_test_%A_%a.out
+
+module load cuda/12.1.0
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment03_temperature_only"
+
+NWP_MODEL_NAME_SETS=("hrrr" "hrrr-nam_nest" "hrrr-nam_nest-gfs" "hrrr-nam_nest-gfs-gefs" "hrrr" "hrrr-nam_nest" "hrrr-nam_nest-gfs" "hrrr-nam_nest-gfs-gefs" "hrrr" "hrrr-nam_nest" "hrrr-nam_nest-gfs" "hrrr-nam_nest-gfs-gefs" "hrrr" "hrrr-nam_nest" "hrrr-nam_nest-gfs" "hrrr-nam_nest-gfs-gefs")
+NWP_FIELD_NAME_SETS=("pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01-geopotential_height_500mb_m_asl-relative_humidity_500mb-u_wind_500mb_m_s01-v_wind_500mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01-geopotential_height_500mb_m_asl-relative_humidity_500mb-u_wind_500mb_m_s01-v_wind_500mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01-geopotential_height_500mb_m_asl-relative_humidity_500mb-u_wind_500mb_m_s01-v_wind_500mb_m_s01" "pressure_mean_sea_level_pascals-pressure_surface_pascals-temperature_2m_agl_kelvins-dewpoint_2m_agl_kelvins-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-u_wind_1000mb_m_s01-v_wind_1000mb_m_s01-temperature_950mb_kelvins-relative_humidity_850mb-temperature_850mb_kelvins-geopotential_height_700mb_m_asl-relative_humidity_700mb-u_wind_700mb_m_s01-v_wind_700mb_m_s01-geopotential_height_500mb_m_asl-relative_humidity_500mb-u_wind_500mb_m_s01-v_wind_500mb_m_s01")
+
+nwp_model_name_set=${NWP_MODEL_NAME_SETS[$SLURM_ARRAY_TASK_ID]}
+nwp_field_name_set=${NWP_FIELD_NAME_SETS[$SLURM_ARRAY_TASK_ID]}
+
+nwp_model_name_set=$(echo $nwp_model_name_set | tr "-" " ")
+nwp_field_name_set=$(echo $nwp_field_name_set | tr "-" " ")
+
+num_models=`echo "$nwp_model_name_set" | wc -w`
+num_fields=`echo "$nwp_field_name_set" | wc -w`
+num_fields=$(printf "%02d" "$num_fields")
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-models=${num_models}_num-nwp-variables=${num_fields}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
+--input_prediction_dir_name="${model_dir_name}/inference_test" \
+--init_time_string="2023-10-02-00" \
+--field_names "temperature_2m_agl_kelvins"  \
+--min_colour_percentiles 0.1 \
+--max_colour_percentiles 99.9 \
+--output_dir_name="${model_dir_name}/inference_test/2023-10-02-00"
