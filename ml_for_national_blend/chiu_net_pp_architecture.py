@@ -451,6 +451,55 @@ def _pad_layer(source_layer_object, target_layer_object, padding_layer_name,
     return source_layer_object
 
 
+def _crop_layer(source_layer_object, target_layer_object, cropping_layer_name,
+                num_spatiotemporal_dims):
+    """Crops layer spatially.
+
+    :param source_layer_object: Source layer.
+    :param target_layer_object: Target layer.  The source layer will be cropped,
+        if necessary, to have the same dimensions as the target layer.
+    :param cropping_layer_name: Name of cropping layer.
+    :param num_spatiotemporal_dims: Number of dimensions.
+    :return: source_layer_object: Same as input, except maybe with different
+        spatial dimensions.
+    """
+
+    num_source_rows = source_layer_object.shape[1]
+    num_target_rows = target_layer_object.shape[1]
+    num_cropping_rows = num_source_rows - num_target_rows
+
+    num_source_columns = source_layer_object.shape[2]
+    num_target_columns = target_layer_object.shape[2]
+    num_cropping_columns = num_source_columns - num_target_columns
+
+    if num_spatiotemporal_dims == 2:
+        if num_cropping_rows + num_cropping_columns > 0:
+            cropping_arg = ((0, num_cropping_rows), (0, num_cropping_columns))
+
+            return keras.layers.Cropping2D(
+                cropping=cropping_arg, name=cropping_layer_name
+            )(source_layer_object)
+
+        return source_layer_object
+
+    num_source_heights = source_layer_object.shape[3]
+    num_target_heights = target_layer_object.shape[3]
+    num_cropping_heights = num_source_heights - num_target_heights
+
+    if num_cropping_rows + num_cropping_columns + num_cropping_heights > 0:
+        cropping_arg = (
+            (0, num_cropping_rows),
+            (0, num_cropping_columns),
+            (0, num_cropping_heights)
+        )
+
+        return keras.layers.ZeroCropping3D(
+            cropping=cropping_arg, name=cropping_layer_name
+        )(source_layer_object)
+
+    return source_layer_object
+
+
 def create_model(option_dict):
     """Creates CNN.
 
@@ -637,10 +686,10 @@ def create_model(option_dict):
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _pad_layer(
-            source_layer_object=encoder_pooling_layer_objects[i],
-            target_layer_object=layer_object_10km_res,
-            padding_layer_name='10km_concat-padding',
+        this_layer_object = _crop_layer(
+            target_layer_object=encoder_pooling_layer_objects[i],
+            source_layer_object=layer_object_10km_res,
+            cropping_layer_name='10km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
@@ -700,10 +749,10 @@ def create_model(option_dict):
 
     if input_dimensions_20km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _pad_layer(
-            source_layer_object=encoder_pooling_layer_objects[i],
-            target_layer_object=layer_object_20km_res,
-            padding_layer_name='20km_concat-padding',
+        this_layer_object = _crop_layer(
+            target_layer_object=encoder_pooling_layer_objects[i],
+            source_layer_object=layer_object_20km_res,
+            cropping_layer_name='20km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
@@ -752,10 +801,10 @@ def create_model(option_dict):
 
     if input_dimensions_40km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _pad_layer(
-            source_layer_object=encoder_pooling_layer_objects[i],
-            target_layer_object=layer_object_40km_res,
-            padding_layer_name='40km_concat-padding',
+        this_layer_object = _crop_layer(
+            target_layer_object=encoder_pooling_layer_objects[i],
+            source_layer_object=layer_object_40km_res,
+            cropping_layer_name='40km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
