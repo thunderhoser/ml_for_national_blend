@@ -1103,7 +1103,7 @@ def create_model(option_dict):
             )(basic_output_layer_object)
 
         this_name = 'output' if ensemble_size > 1 else 'output_concat'
-        output_layer_object = keras.layers.Concatenate(axis=-2, name=this_name)(
+        output_layer_object = keras.layers.Concatenate(axis=3, name=this_name)(
             [basic_output_layer_object, constrained_output_layer_object]
         )
 
