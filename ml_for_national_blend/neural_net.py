@@ -542,12 +542,12 @@ def _init_matrices_1batch(
     )
 
     if do_residual_prediction:
-        predictor_matrix_resid_baseline = None
-    else:
         predictor_matrix_resid_baseline = numpy.full(
             (num_examples_per_batch, num_rows, num_columns, num_target_fields),
             numpy.nan
         )
+    else:
+        predictor_matrix_resid_baseline = None
 
     if len(model_indices) == 0:
         predictor_matrix_2pt5km = None
