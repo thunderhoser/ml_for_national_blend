@@ -402,13 +402,15 @@ def _get_3d_conv_block(
     return current_layer_object
 
 
-def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
-    """Pads layer with 2 spatial dimensions.
+def _pad_layer(source_layer_object, target_layer_object, padding_layer_name,
+               num_spatiotemporal_dims):
+    """Pads layer spatially.
 
     :param source_layer_object: Source layer.
     :param target_layer_object: Target layer.  The source layer will be padded,
         if necessary, to have the same dimensions as the target layer.
     :param padding_layer_name: Name of padding layer.
+    :param num_spatiotemporal_dims: Number of dimensions.
     :return: source_layer_object: Same as input, except maybe with different
         spatial dimensions.
     """
@@ -420,11 +422,29 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
     num_source_columns = source_layer_object.shape[2]
     num_target_columns = target_layer_object.shape[2]
     num_padding_columns = num_target_columns - num_source_columns
+    
+    if num_spatiotemporal_dims == 2:
+        if num_padding_rows + num_padding_columns > 0:
+            padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
+    
+            return keras.layers.ZeroPadding2D(
+                padding=padding_arg, name=padding_layer_name
+            )(source_layer_object)
+    
+        return source_layer_object
 
-    if num_padding_rows + num_padding_columns > 0:
-        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
+    num_source_heights = source_layer_object.shape[3]
+    num_target_heights = target_layer_object.shape[3]
+    num_padding_heights = num_target_heights - num_source_heights
 
-        return keras.layers.ZeroPadding2D(
+    if num_padding_rows + num_padding_columns + num_padding_heights > 0:
+        padding_arg = (
+            (0, num_padding_rows),
+            (0, num_padding_columns),
+            (0, num_padding_heights)
+        )
+
+        return keras.layers.ZeroPadding3D(
             padding=padding_arg, name=padding_layer_name
         )(source_layer_object)
 
@@ -617,11 +637,18 @@ def create_model(option_dict):
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
+        this_layer_object = _pad_layer(
+            source_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=layer_object_10km_res,
+            padding_layer_name='10km_concat-padding',
+            num_spatiotemporal_dims=3
+        )
+
         this_name = '10km_concat-with-finer'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], layer_object_10km_res]
+            [this_layer_object, layer_object_10km_res]
         )
 
         if input_dimensions_20km_res is not None:
@@ -673,11 +700,18 @@ def create_model(option_dict):
 
     if input_dimensions_20km_res is not None:
         i = num_levels_filled - 1
+        this_layer_object = _pad_layer(
+            source_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=layer_object_20km_res,
+            padding_layer_name='20km_concat-padding',
+            num_spatiotemporal_dims=3
+        )
+
         this_name = '20km_concat-with-finer'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], layer_object_20km_res]
+            [this_layer_object, layer_object_20km_res]
         )
 
         i = num_levels_filled
@@ -718,11 +752,18 @@ def create_model(option_dict):
 
     if input_dimensions_40km_res is not None:
         i = num_levels_filled - 1
+        this_layer_object = _pad_layer(
+            source_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=layer_object_40km_res,
+            padding_layer_name='40km_concat-padding',
+            num_spatiotemporal_dims=3
+        )
+
         this_name = '40km_concat-with-finer'
         encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], layer_object_40km_res]
+            [this_layer_object, layer_object_40km_res]
         )
 
         i = num_levels_filled
@@ -854,10 +895,11 @@ def create_model(option_dict):
                 size=(2, 2), name=this_name
             )(last_conv_layer_matrix[i_new + 1, j - 1])
 
-            this_layer_object = _pad_2d_layer(
+            this_layer_object = _pad_layer(
                 source_layer_object=this_layer_object,
                 target_layer_object=last_conv_layer_matrix[i_new, 0],
-                padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j)
+                padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j),
+                num_spatiotemporal_dims=2
             )
 
             this_num_channels = int(numpy.round(
