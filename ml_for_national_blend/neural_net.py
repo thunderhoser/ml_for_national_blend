@@ -878,7 +878,7 @@ def _read_residual_baseline_one_example(
     gust_idx = target_field_names.index(urma_utils.WIND_GUST_10METRE_NAME)
 
     if predict_gust_factor:
-        residual_baseline_matrix[..., gust_idx] = DEFAULT_GUST_FACTOR
+        residual_baseline_matrix[..., gust_idx] = DEFAULT_GUST_FACTOR - 1.
         return residual_baseline_matrix
 
     u_idx = target_field_names.index(urma_utils.U_WIND_10METRE_NAME)
