@@ -129,10 +129,10 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         predictor_matrices=predictor_matrices,
         num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
         verbose=True,
-        nn_uses_phys_constraints=(
-            'with_constraints' in
-            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY]
-        ),
+        predict_dewpoint_depression=
+        validation_option_dict[neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY],
+        predict_gust_factor=
+        validation_option_dict[neural_net.PREDICT_GUST_FACTOR_KEY],
         target_field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY]
     )
 

@@ -19,6 +19,9 @@ def _run(template_file_name, output_dir_name,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
          num_examples_per_batch, sentinel_value,
+         predict_dewpoint_depression, predict_gust_factor,
+         do_residual_prediction, resid_baseline_model_name,
+         resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
          init_time_limit_strings_for_training, nwp_dir_names_for_training,
          target_dir_name_for_training, init_time_limit_strings_for_validation,
          nwp_dir_names_for_validation, target_dir_name_for_validation,
@@ -45,6 +48,12 @@ def _run(template_file_name, output_dir_name,
     :param nbm_constant_file_name: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
+    :param predict_dewpoint_depression: Same.
+    :param predict_gust_factor: Same.
+    :param do_residual_prediction: Same.
+    :param resid_baseline_model_name: Same.
+    :param resid_baseline_lead_time_hours: Same.
+    :param resid_baseline_model_dir_name: Same.
     :param init_time_limit_strings_for_training: Same.
     :param nwp_dir_names_for_training: Same.
     :param target_dir_name_for_training: Same.
@@ -63,6 +72,12 @@ def _run(template_file_name, output_dir_name,
         nwp_normalization_file_name = None
     if target_normalization_file_name == '':
         target_normalization_file_name = None
+    if resid_baseline_model_name == '':
+        resid_baseline_model_name = None
+    if resid_baseline_model_dir_name == '':
+        resid_baseline_model_dir_name = None
+    if resid_baseline_lead_time_hours <= 0:
+        resid_baseline_lead_time_hours = None
 
     if nbm_constant_file_name == '':
         nbm_constant_file_name = None
@@ -116,7 +131,13 @@ def _run(template_file_name, output_dir_name,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
 
         # TODO(thunderhoser): Make this an actual input arg.
-        neural_net.SUBSET_GRID_KEY: True
+        neural_net.SUBSET_GRID_KEY: True,
+        neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY: predict_dewpoint_depression,
+        neural_net.PREDICT_GUST_FACTOR_KEY: predict_gust_factor,
+        neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
+        neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
+        neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
+        neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name
     }
 
     validation_option_dict = {
@@ -203,6 +224,24 @@ if __name__ == '__main__':
         ),
         sentinel_value=getattr(
             INPUT_ARG_OBJECT, training_args.SENTINEL_VALUE_ARG_NAME
+        ),
+        predict_dewpoint_depression=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.PREDICT_DEWPOINT_DEPRESSION_ARG_NAME
+        )),
+        predict_gust_factor=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.PREDICT_GUST_FACTOR_ARG_NAME
+        )),
+        do_residual_prediction=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.DO_RESIDUAL_PREDICTION_ARG_NAME
+        )),
+        resid_baseline_model_name=getattr(
+            INPUT_ARG_OBJECT, training_args.RESID_BASELINE_MODEL_ARG_NAME
+        ),
+        resid_baseline_lead_time_hours=getattr(
+            INPUT_ARG_OBJECT, training_args.RESID_BASELINE_LEAD_TIME_ARG_NAME
+        ),
+        resid_baseline_model_dir_name=getattr(
+            INPUT_ARG_OBJECT, training_args.RESID_BASELINE_MODEL_DIR_ARG_NAME
         ),
         init_time_limit_strings_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.TRAINING_TIME_LIMITS_ARG_NAME

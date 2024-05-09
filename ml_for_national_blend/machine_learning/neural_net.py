@@ -24,6 +24,7 @@ from ml_for_national_blend.machine_learning import custom_metrics
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
+DEFAULT_GUST_FACTOR = 1.5
 
 INIT_TIME_LIMITS_KEY = 'init_time_limits_unix_sec'
 NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
@@ -41,6 +42,13 @@ NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 SUBSET_GRID_KEY = 'subset_grid'
+
+PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
+PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
+DO_RESIDUAL_PREDICTION_KEY = 'do_residual_prediction'
+RESID_BASELINE_MODEL_KEY = 'resid_baseline_model_name'
+RESID_BASELINE_LEAD_TIME_KEY = 'resid_baseline_lead_time_hours'
+RESID_BASELINE_MODEL_DIR_KEY = 'resid_baseline_model_dir_name'
 
 DEFAULT_GENERATOR_OPTION_DICT = {
     SENTINEL_VALUE_KEY: -10.
@@ -68,6 +76,163 @@ METADATA_KEYS = [
     OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY,
     PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
+
+
+def __nwp_2m_dewpoint_to_depression(nwp_forecast_table_xarray):
+    """Converts 2-metre NWP dewpoints to dewpoint depressions.
+
+    :param nwp_forecast_table_xarray: xarray table in format returned by
+        `interp_nwp_model_io.read_file`.
+    :return: nwp_forecast_table_xarray: Same, except that dewpoints have been
+        replaced with dewpoint depressions.
+    """
+
+    dewpoint_matrix_kelvins = nwp_model_utils.get_field(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        field_name=nwp_model_utils.DEWPOINT_2METRE_NAME
+    )
+    temperature_matrix_kelvins = nwp_model_utils.get_field(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        field_name=nwp_model_utils.TEMPERATURE_2METRE_NAME
+    )
+    dewp_depression_matrix_kelvins = (
+        temperature_matrix_kelvins - dewpoint_matrix_kelvins
+    )
+
+    k = numpy.where(
+        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.DEWPOINT_2METRE_NAME
+    )[0][0]
+
+    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., k] = dewp_depression_matrix_kelvins
+
+    return nwp_forecast_table_xarray.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
+def __predicted_2m_depression_to_dewpoint(prediction_matrix,
+                                          target_field_names):
+    """Converts 2-metre dewpoint depression in predictions to dewpoint temp.
+
+    :param prediction_matrix: See documentation for `apply_model`.
+    :param target_field_names: Same.
+    :return: prediction_matrix: Same as input, except that dewpoint depressions
+        have been replaced with dewpoint temperatures.
+    """
+
+    num_target_fields = prediction_matrix.shape[-1]
+    target_field_names = numpy.array(target_field_names)
+
+    error_checking.assert_is_numpy_array(
+        target_field_names,
+        exact_dimensions=numpy.array([num_target_fields], dtype=int)
+    )
+
+    dewp_index = numpy.where(
+        target_field_names == urma_utils.DEWPOINT_2METRE_NAME
+    )[0][0]
+    temp_index = numpy.where(
+        target_field_names == urma_utils.TEMPERATURE_2METRE_NAME
+    )[0][0]
+    prediction_matrix[..., dewp_index] = (
+        prediction_matrix[..., temp_index] -
+        prediction_matrix[..., dewp_index]
+    )
+
+    return prediction_matrix
+
+
+def __nwp_10m_gust_speed_to_factor(nwp_forecast_table_xarray):
+    """Converts 10-metre NWP gust speeds to gust factors.
+
+    *** Actually, gust factors minus one. ***
+
+    :param nwp_forecast_table_xarray: xarray table in format returned by
+        `interp_nwp_model_io.read_file`.
+    :return: nwp_forecast_table_xarray: Same, except that gust speeds have been
+        replaced with gust factors.
+    """
+
+    k_inds = numpy.where(
+        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.WIND_GUST_10METRE_NAME
+    )[0]
+
+    if len(k_inds) == 0:
+        return nwp_forecast_table_xarray
+
+    u_wind_matrix_m_s01 = nwp_model_utils.get_field(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        field_name=nwp_model_utils.U_WIND_10METRE_NAME
+    )
+    v_wind_matrix_m_s01 = nwp_model_utils.get_field(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        field_name=nwp_model_utils.V_WIND_10METRE_NAME
+    )
+    sustained_speed_matrix_m_s01 = numpy.sqrt(
+        u_wind_matrix_m_s01 ** 2 + v_wind_matrix_m_s01 ** 2
+    )
+    gust_speed_matrix_m_s01 = nwp_model_utils.get_field(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        field_name=nwp_model_utils.WIND_GUST_10METRE_NAME
+    )
+
+    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
+    k = k_inds[0]
+    data_matrix[..., k] = (
+        gust_speed_matrix_m_s01 / sustained_speed_matrix_m_s01 - 1.
+    )
+
+    return nwp_forecast_table_xarray.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
+def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
+    """Converts 10-metre gust factor in predictions to gust speed.
+
+    :param prediction_matrix: See documentation for `apply_model`.
+    :param target_field_names: Same.
+    :return: prediction_matrix: Same as input, except that gust factors have
+        been replaced with gust speeds.
+    """
+
+    num_target_fields = prediction_matrix.shape[-1]
+    target_field_names = numpy.array(target_field_names)
+
+    error_checking.assert_is_numpy_array(
+        target_field_names,
+        exact_dimensions=numpy.array([num_target_fields], dtype=int)
+    )
+
+    u_index = numpy.where(
+        target_field_names == urma_utils.U_WIND_10METRE_NAME
+    )[0][0]
+    v_index = numpy.where(
+        target_field_names == urma_utils.V_WIND_10METRE_NAME
+    )[0][0]
+    gust_index = numpy.where(
+        target_field_names == urma_utils.WIND_GUST_10METRE_NAME
+    )[0][0]
+
+    gust_factor_matrix = prediction_matrix[..., gust_index] + 1.
+    sustained_speed_matrix = numpy.sqrt(
+        prediction_matrix[..., u_index] ** 2 +
+        prediction_matrix[..., v_index] ** 2
+    )
+    prediction_matrix[..., gust_index] = (
+        gust_factor_matrix * sustained_speed_matrix
+    )
+
+    return prediction_matrix
 
 
 def _check_generator_args(option_dict):
@@ -157,6 +322,50 @@ def _check_generator_args(option_dict):
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
     error_checking.assert_is_boolean(option_dict[SUBSET_GRID_KEY])
+
+    error_checking.assert_is_boolean(
+        option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    )
+    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
+
+    if option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]:
+        assert option_dict[TARGET_NORM_FILE_KEY] is None
+
+        assert (
+            urma_utils.DEWPOINT_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        )
+        option_dict[TARGET_FIELDS_KEY].remove(urma_utils.DEWPOINT_2METRE_NAME)
+        option_dict[TARGET_FIELDS_KEY].append(urma_utils.DEWPOINT_2METRE_NAME)
+
+    if option_dict[PREDICT_GUST_FACTOR_KEY]:
+        assert option_dict[TARGET_NORM_FILE_KEY] is None
+
+        assert (
+            urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        )
+        option_dict[TARGET_FIELDS_KEY].remove(urma_utils.WIND_GUST_10METRE_NAME)
+        option_dict[TARGET_FIELDS_KEY].append(urma_utils.WIND_GUST_10METRE_NAME)
+
+    error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
+    if not option_dict[DO_RESIDUAL_PREDICTION_KEY]:
+        assert option_dict[TARGET_NORM_FILE_KEY] is None
+
+        option_dict[RESID_BASELINE_MODEL_KEY] = None
+        option_dict[RESID_BASELINE_MODEL_DIR_KEY] = None
+        option_dict[RESID_BASELINE_LEAD_TIME_KEY] = -1
+        return option_dict
+
+    error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_KEY])
+    error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_DIR_KEY])
+    error_checking.assert_is_integer(option_dict[RESID_BASELINE_LEAD_TIME_KEY])
+    error_checking.assert_is_greater(
+        option_dict[RESID_BASELINE_LEAD_TIME_KEY], 0
+    )
+
+    resid_baseline_ds_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+        option_dict[RESID_BASELINE_MODEL_KEY]
+    )
+    error_checking.assert_equals(resid_baseline_ds_factor, 1)
 
     return option_dict
 
@@ -281,7 +490,8 @@ def _init_predictor_matrices_1example(
 
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
-        num_target_fields, num_examples_per_batch, subset_grid):
+        num_target_fields, num_examples_per_batch, subset_grid,
+        do_residual_prediction):
     """Initializes predictor and target matrices for one batch.
 
     :param nwp_model_names: 1-D list with names of NWP models.
@@ -292,12 +502,16 @@ def _init_matrices_1batch(
     :param num_examples_per_batch: Batch size.
     :param subset_grid: Boolean flag.  If True, will subset grid to smaller
         domain.
+    :param do_residual_prediction: Boolean flag.  If True, the NN is predicting
+        difference between a given NWP forecast and the URMA truth.  If True,
+        the NN is predicting the URMA truth directly.
     :return: predictor_matrix_2pt5km: numpy array for NWP data with 2.5-km
         resolution.  If there are no 2.5-km models, this is None instead of an
         array.
     :return: predictor_matrix_10km: Same but for 10-km models.
     :return: predictor_matrix_20km: Same but for 20-km models.
     :return: predictor_matrix_40km: Same but for 40-km models.
+    :return: predictor_matrix_resid_baseline: Same but for residual baseline.
     :return: target_matrix: Same but for target fields.
     """
 
@@ -319,6 +533,14 @@ def _init_matrices_1batch(
         (num_examples_per_batch, num_rows, num_columns, num_target_fields),
         numpy.nan
     )
+
+    if do_residual_prediction:
+        predictor_matrix_resid_baseline = None
+    else:
+        predictor_matrix_resid_baseline = numpy.full(
+            (num_examples_per_batch, num_rows, num_columns, num_target_fields),
+            numpy.nan
+        )
 
     if len(model_indices) == 0:
         predictor_matrix_2pt5km = None
@@ -410,7 +632,7 @@ def _init_matrices_1batch(
     return (
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        target_matrix
+        predictor_matrix_resid_baseline, target_matrix
     )
 
 
@@ -516,6 +738,125 @@ def _read_targets_one_example(
     return target_matrix
 
 
+def _read_residual_baseline_one_example(
+        init_time_unix_sec, nwp_model_name, nwp_lead_time_hours,
+        nwp_directory_name, target_field_names, subset_grid,
+        predict_dewpoint_depression, predict_gust_factor):
+    """Reads residual baseline for one example.
+
+    M = number of rows in NBM grid (2.5-km target grid)
+    N = number of columns in NBM grid (2.5-km target grid)
+    F = number of target fields
+
+    Should be used only if the NN is doing residual prediction, i.e., predicting
+    the departure between the URMA truth and an NWP forecast.
+
+    :param init_time_unix_sec: Forecast-initialization time.
+    :param nwp_model_name: Name of NWP model used to create residual baseline.
+    :param nwp_lead_time_hours: NWP lead time used to create residual baseline.
+    :param nwp_directory_name: Path to NWP data.  Relevant files therein will be
+        found by `interp_nwp_model_io.find_file`.
+    :param target_field_names: See documentation for `data_generator`.
+    :param subset_grid: Boolean flag.  If True, will subset grid to smaller
+        domain.
+    :param predict_dewpoint_depression: Boolean flag.  If True, the NN is
+        predicting dewpoint depression instead of dewpoint.
+    :param predict_gust_factor: Boolean flag.  If True, the NN is predicting
+        gust factor instead of gust speed.
+    :return: residual_baseline_matrix: M-by-N-by-F numpy array of baseline
+        predictions.  These are all unnormalized.
+    """
+
+    target_field_to_baseline_nwp_field = {
+        urma_utils.TEMPERATURE_2METRE_NAME:
+            nwp_model_utils.TEMPERATURE_2METRE_NAME,
+        urma_utils.DEWPOINT_2METRE_NAME: nwp_model_utils.DEWPOINT_2METRE_NAME,
+        urma_utils.U_WIND_10METRE_NAME: nwp_model_utils.U_WIND_10METRE_NAME,
+        urma_utils.V_WIND_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME,
+        urma_utils.WIND_GUST_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME
+    }
+
+    if nwp_model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
+        target_field_to_baseline_nwp_field[
+            urma_utils.WIND_GUST_10METRE_NAME
+        ] = nwp_model_utils.WIND_GUST_10METRE_NAME
+
+    input_file_name = interp_nwp_model_io.find_file(
+        directory_name=nwp_directory_name,
+        init_time_unix_sec=init_time_unix_sec,
+        forecast_hour=nwp_lead_time_hours,
+        model_name=nwp_model_name,
+        raise_error_if_missing=False
+    )
+
+    if not os.path.isfile(input_file_name):
+        warning_string = (
+            'POTENTIAL ERROR: Could not find file expected at: "{0:s}".  This '
+            'is needed for residual baseline.'
+        ).format(input_file_name)
+
+        warnings.warn(warning_string)
+        return None
+
+    print('Reading data from: "{0:s}"...'.format(input_file_name))
+    nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
+
+    if subset_grid:
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_row_indices=numpy.linspace(544, 992, num=449, dtype=int)
+        )
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_column_indices=numpy.linspace(752, 1200, num=449, dtype=int)
+        )
+
+    if predict_dewpoint_depression:
+        nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
+            nwp_forecast_table_xarray
+        )
+    if predict_gust_factor:
+        nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
+            nwp_forecast_table_xarray
+        )
+
+    these_matrices = [
+        nwp_model_utils.get_field(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            field_name=target_field_to_baseline_nwp_field[f]
+        )[0, ...]
+        for f in target_field_names
+    ]
+    residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
+
+    need_fake_gust_data = (
+        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
+        and nwp_model_name != nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
+    )
+
+    if not need_fake_gust_data:
+        return residual_baseline_matrix
+
+    gust_idx = target_field_names.index(urma_utils.WIND_GUST_10METRE_NAME)
+
+    if predict_gust_factor:
+        residual_baseline_matrix[..., gust_idx] = DEFAULT_GUST_FACTOR
+        return residual_baseline_matrix
+
+    u_idx = target_field_names.index(urma_utils.U_WIND_10METRE_NAME)
+    v_idx = target_field_names.index(urma_utils.V_WIND_10METRE_NAME)
+
+    speed_matrix = numpy.sqrt(
+        residual_baseline_matrix[..., u_idx] ** 2 +
+        residual_baseline_matrix[..., v_idx] ** 2
+    )
+    residual_baseline_matrix[..., gust_idx] = (
+        DEFAULT_GUST_FACTOR * speed_matrix
+    )
+
+    return residual_baseline_matrix
+
+
 def _read_predictors_one_example(
         init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
         nwp_model_to_field_names, nwp_model_to_dir_name,
@@ -593,54 +934,51 @@ def _read_predictors_one_example(
                 desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
             )
 
-            matrix_index = numpy.sum(
-                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
-            )
-
-            if nwp_downsampling_factors[i] == 1:
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_row_indices=
-                    numpy.linspace(544, 992, num=449, dtype=int)
-                )
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_column_indices=
-                    numpy.linspace(752, 1200, num=449, dtype=int)
-                )
-            elif nwp_downsampling_factors[i] == 4:
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_row_indices=
-                    numpy.linspace(136, 248, num=113, dtype=int)
-                )
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_column_indices=
-                    numpy.linspace(188, 300, num=113, dtype=int)
-                )
-            elif nwp_downsampling_factors[i] == 8:
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_row_indices=
-                    numpy.linspace(68, 124, num=57, dtype=int)
-                )
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_column_indices=
-                    numpy.linspace(94, 150, num=57, dtype=int)
-                )
-            else:
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_row_indices=
-                    numpy.linspace(34, 62, num=29, dtype=int)
-                )
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_column_indices=
-                    numpy.linspace(47, 75, num=29, dtype=int)
-                )
+            if subset_grid:
+                if nwp_downsampling_factors[i] == 1:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(544, 992, num=449, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(752, 1200, num=449, dtype=int)
+                    )
+                elif nwp_downsampling_factors[i] == 4:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(136, 248, num=113, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(188, 300, num=113, dtype=int)
+                    )
+                elif nwp_downsampling_factors[i] == 8:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(68, 124, num=57, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(94, 150, num=57, dtype=int)
+                    )
+                else:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(34, 62, num=29, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(47, 75, num=29, dtype=int)
+                    )
 
             if nwp_norm_param_table_xarray is not None:
                 print('Normalizing predictor variables to z-scores...')
@@ -653,6 +991,9 @@ def _read_predictors_one_example(
                 )
 
             nwpft = nwp_forecast_table_xarray
+            matrix_index = numpy.sum(
+                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
+            )
 
             if nwp_downsampling_factors[i] == 1:
                 predictor_matrices_2pt5km[matrix_index][..., j, :] = (
@@ -738,6 +1079,13 @@ def create_data(option_dict):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     subset_grid = option_dict[SUBSET_GRID_KEY]
 
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
+    resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
+    resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
@@ -809,14 +1157,15 @@ def create_data(option_dict):
     (
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        target_matrix
+        predictor_matrix_resid_baseline, target_matrix
     ) = _init_matrices_1batch(
         nwp_model_names=nwp_model_names,
         nwp_model_to_field_names=nwp_model_to_field_names,
         num_nwp_lead_times=len(nwp_lead_times_hours),
         num_target_fields=len(target_field_names),
         num_examples_per_batch=num_examples,
-        subset_grid=subset_grid
+        subset_grid=subset_grid,
+        do_residual_prediction=do_residual_prediction
     )
 
     for i in range(num_examples):
@@ -831,9 +1180,28 @@ def create_data(option_dict):
         )
 
         if this_target_matrix is None:
+            good_example_flags[i] = False
             continue
 
         target_matrix[i, ...] = this_target_matrix
+
+        if do_residual_prediction:
+            this_baseline_matrix = _read_residual_baseline_one_example(
+                init_time_unix_sec=init_times_unix_sec[i],
+                nwp_model_name=resid_baseline_model_name,
+                nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                nwp_directory_name=resid_baseline_model_dir_name,
+                target_field_names=target_field_names,
+                subset_grid=subset_grid,
+                predict_dewpoint_depression=predict_dewpoint_depression,
+                predict_gust_factor=predict_gust_factor
+            )
+
+            if this_baseline_matrix is None:
+                good_example_flags[i] = False
+                continue
+
+            predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
 
         (
             this_predictor_matrix_2pt5km,
@@ -900,13 +1268,30 @@ def create_data(option_dict):
             sentinel_value
         )
 
+    if predictor_matrix_resid_baseline is not None:
+        predictor_matrix_resid_baseline = predictor_matrix_resid_baseline[
+            good_indices, ...
+        ]
+
+        print((
+            'Shape of residual baseline matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_resid_baseline.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
+        ))
+
+        error_checking.assert_is_numpy_array_without_nan(
+            predictor_matrix_resid_baseline
+        )
+
     if nbm_constant_matrix is not None:
         nbm_constant_matrix = numpy.repeat(
             numpy.expand_dims(nbm_constant_matrix, axis=0),
             axis=0, repeats=len(good_indices)
         )
         print('Shape of NBM-constant matrix: {0:s}'.format(
-            str(predictor_matrix_2pt5km.shape)
+            str(nbm_constant_matrix.shape)
         ))
 
     if predictor_matrix_10km is not None:
@@ -958,7 +1343,7 @@ def create_data(option_dict):
         m for m in [
             predictor_matrix_2pt5km, nbm_constant_matrix,
             predictor_matrix_10km, predictor_matrix_20km,
-            predictor_matrix_40km
+            predictor_matrix_40km, predictor_matrix_resid_baseline
         ]
         if m is not None
     ]
@@ -1045,6 +1430,25 @@ def data_generator(option_dict):
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
     option_dict["subset_grid"]: Boolean flag.  If True, will subset full grid to
         smaller domain.
+    option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the NN
+        is trained to predict dewpoint depression, rather than predicting
+        dewpoint temperature directly.
+    option_dict["predict_gust_factor"]: Boolean flag.  If True, the NN is
+        trained to predict gust factor, rather than predicting gust speed
+        directly.
+    option_dict["do_residual_prediction"]: Boolean flag.  If True, the NN is
+        trained to predict a residual -- i.e., the departure between URMA truth
+        and a single NWP forecast.  If False, the NN is trained to predict the
+        URMA target fields directly.
+    option_dict["resid_baseline_model_name"]: Name of NWP model used to
+        generate residual baseline fields.  If do_residual_prediction == False,
+        make this argument None.
+    option_dict["resid_baseline_lead_time_hours"]: Lead time used to generate
+        residual baseline fields.  If do_residual_prediction == False, make this
+        argument None.
+    option_dict["resid_baseline_model_dir_name"]: Directory path for residual
+        baseline fields.  Within this directory, relevant files will be found by
+        `interp_nwp_model_io.find_file`.
 
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
@@ -1059,6 +1463,8 @@ def data_generator(option_dict):
         20-km resolution.
     predictor_matrices[4]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
         at 40-km resolution.
+    predictor_matrices[5]: E-by-M-by-N-by-F numpy array of baseline values for
+        residual prediction.
 
     :return: target_matrix: E-by-M-by-N-by-F numpy array of targets at 2.5-km
         resolution.
@@ -1090,6 +1496,13 @@ def data_generator(option_dict):
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     subset_grid = option_dict[SUBSET_GRID_KEY]
+
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
+    resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
+    resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
@@ -1186,14 +1599,15 @@ def data_generator(option_dict):
         (
             predictor_matrix_2pt5km, predictor_matrix_10km,
             predictor_matrix_20km, predictor_matrix_40km,
-            target_matrix
+            predictor_matrix_resid_baseline, target_matrix
         ) = _init_matrices_1batch(
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
             num_target_fields=len(target_field_names),
             num_examples_per_batch=num_examples_per_batch,
-            subset_grid=subset_grid
+            subset_grid=subset_grid,
+            do_residual_prediction=do_residual_prediction
         )
 
         num_examples_in_memory = 0
@@ -1219,6 +1633,24 @@ def data_generator(option_dict):
 
             i = num_examples_in_memory + 0
             target_matrix[i, ...] = this_target_matrix
+
+            if do_residual_prediction:
+                this_baseline_matrix = _read_residual_baseline_one_example(
+                    init_time_unix_sec=init_times_unix_sec[init_time_index],
+                    nwp_model_name=resid_baseline_model_name,
+                    nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                    nwp_directory_name=resid_baseline_model_dir_name,
+                    target_field_names=target_field_names,
+                    subset_grid=subset_grid,
+                    predict_dewpoint_depression=predict_dewpoint_depression,
+                    predict_gust_factor=predict_gust_factor
+                )
+
+                if this_baseline_matrix is None:
+                    init_time_index += 1
+                    continue
+
+                predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
 
             (
                 this_predictor_matrix_2pt5km,
@@ -1293,6 +1725,26 @@ def data_generator(option_dict):
                 str(nbm_constant_matrix.shape)
             ))
 
+        if predictor_matrix_resid_baseline is not None:
+            print((
+                'Shape of residual baseline matrix and NaN fraction: '
+                '{0:s}, {1:.04f}'
+            ).format(
+                str(predictor_matrix_resid_baseline.shape),
+                numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
+            ))
+
+            print('Min values in residual baseline matrix: {0:s}'.format(
+                str(numpy.nanmin(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
+            ))
+            print('Max values in residual baseline matrix: {0:s}'.format(
+                str(numpy.nanmax(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
+            ))
+
+            error_checking.assert_is_numpy_array_without_nan(
+                predictor_matrix_resid_baseline
+            )
+
         if predictor_matrix_10km is not None:
             print((
                 'Shape of 10-km predictor matrix and NaN fraction: '
@@ -1339,7 +1791,7 @@ def data_generator(option_dict):
             })
         if nbm_constant_matrix is not None:
             predictor_matrices.update({
-                'constant_inputs': nbm_constant_matrix.astype('float32')
+                'const_inputs': nbm_constant_matrix.astype('float32')
             })
         if predictor_matrix_10km is not None:
             predictor_matrices.update({
@@ -1352,6 +1804,11 @@ def data_generator(option_dict):
         if predictor_matrix_40km is not None:
             predictor_matrices.update({
                 '40km_inputs': predictor_matrix_40km.astype('float32')
+            })
+        if predictor_matrix_resid_baseline is not None:
+            predictor_matrices.update({
+                'resid_baseline_inputs':
+                    predictor_matrix_resid_baseline.astype('float32')
             })
 
         yield predictor_matrices, target_matrix
@@ -1500,7 +1957,8 @@ def train_model(
 
 def apply_model(
         model_object, predictor_matrices, num_examples_per_batch,
-        nn_uses_phys_constraints, verbose=True, target_field_names=None):
+        predict_dewpoint_depression, predict_gust_factor,
+        verbose=True, target_field_names=None):
     """Applies trained neural net -- inference time!
 
     E = number of examples
@@ -1511,16 +1969,15 @@ def apply_model(
     :param model_object: Trained neural net (instance of `keras.models.Model`).
     :param predictor_matrices: See output doc for `data_generator`.
     :param num_examples_per_batch: Batch size.
-    :param nn_uses_phys_constraints: Boolean flag.  If True, the model uses
-        physical constraints, which means that it predicts only dewpoint
-        *depression* and gust *factor* directly -- which must be converted to
-        dewpoint and gust speed, respectively.  If False, the model does not use
-        physical constraints, which means that it predicts dewpoint and gust
-        speed directly, with no need for post-processing.
+    :param predict_dewpoint_depression: Boolean flag.  If True, the NN predicts
+        dewpoint depression, which will be converted to dewpoint temperature.
+    :param predict_gust_factor: Boolean flag.  If True, the NN predicts gust
+        factor, which will be converted to gust speed.
     :param verbose: Boolean flag.  If True, will print progress messages.
-    :param target_field_names: length-F list of target fields (each must be
-        accepted by `urma_utils.check_field_name`).  If
-        nn_uses_phys_constraints = False, leave this argument alone.
+    :param target_field_names:
+        [used only if predict_dewpoint_depression or predict_gust_factor]
+        length-F list of target fields (each must be accepted by
+        `urma_utils.check_field_name`).
     :return: prediction_matrix: E-by-M-by-N-by-F numpy array of predicted
         values.
     """
@@ -1534,10 +1991,11 @@ def apply_model(
     num_examples = predictor_matrices[0].shape[0]
     num_examples_per_batch = min([num_examples_per_batch, num_examples])
 
-    error_checking.assert_is_boolean(nn_uses_phys_constraints)
+    error_checking.assert_is_boolean(predict_dewpoint_depression)
+    error_checking.assert_is_boolean(predict_gust_factor)
     error_checking.assert_is_boolean(verbose)
 
-    if nn_uses_phys_constraints:
+    if predict_dewpoint_depression or predict_gust_factor:
         error_checking.assert_is_string_list(target_field_names)
         for this_name in target_field_names:
             urma_utils.check_field_name(this_name)
@@ -1570,44 +2028,16 @@ def apply_model(
     while len(prediction_matrix.shape) < 4:
         prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
-    # TODO(thunderhoser): This conversion should be in a separate method.
-    if nn_uses_phys_constraints:
-        num_target_fields = prediction_matrix.shape[-1]
-        target_field_names = numpy.array(target_field_names)
-
-        error_checking.assert_is_numpy_array(
-            target_field_names,
-            exact_dimensions=numpy.array([num_target_fields], dtype=int)
+    if predict_dewpoint_depression:
+        prediction_matrix = __predicted_2m_depression_to_dewpoint(
+            prediction_matrix=prediction_matrix,
+            target_field_names=target_field_names
         )
 
-        dewp_index = numpy.where(
-            target_field_names == urma_utils.DEWPOINT_2METRE_NAME
-        )[0][0]
-        temp_index = numpy.where(
-            target_field_names == urma_utils.TEMPERATURE_2METRE_NAME
-        )[0][0]
-        prediction_matrix[..., dewp_index] = (
-            prediction_matrix[..., temp_index] -
-            prediction_matrix[..., dewp_index]
-        )
-
-        u_index = numpy.where(
-            target_field_names == urma_utils.U_WIND_10METRE_NAME
-        )[0][0]
-        v_index = numpy.where(
-            target_field_names == urma_utils.V_WIND_10METRE_NAME
-        )[0][0]
-        gust_index = numpy.where(
-            target_field_names == urma_utils.WIND_GUST_10METRE_NAME
-        )[0][0]
-
-        gust_factor_matrix = prediction_matrix[..., gust_index] + 1.
-        sustained_speed_matrix = numpy.sqrt(
-            prediction_matrix[..., u_index] ** 2 +
-            prediction_matrix[..., v_index] ** 2
-        )
-        prediction_matrix[..., gust_index] = (
-            gust_factor_matrix * sustained_speed_matrix
+    if predict_gust_factor:
+        prediction_matrix = __predicted_10m_gust_factor_to_speed(
+            prediction_matrix=prediction_matrix,
+            target_field_names=target_field_names
         )
 
     return prediction_matrix

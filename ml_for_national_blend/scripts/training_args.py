@@ -20,6 +20,13 @@ NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
+PREDICT_DEWPOINT_DEPRESSION_ARG_NAME = 'predict_dewpoint_depression'
+PREDICT_GUST_FACTOR_ARG_NAME = 'predict_gust_factor'
+DO_RESIDUAL_PREDICTION_ARG_NAME = 'do_residual_prediction'
+RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'
+RESID_BASELINE_LEAD_TIME_ARG_NAME = 'resid_baseline_lead_time_hours'
+RESID_BASELINE_MODEL_DIR_ARG_NAME = 'resid_baseline_model_dir_name'
+
 TRAINING_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings_for_training'
 TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'
 TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'
@@ -104,6 +111,32 @@ NBM_CONSTANT_FILE_HELP_STRING = (
 BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
     'All NaN predictors will be replaced with this value.'
+)
+
+PREDICT_DEWPOINT_DEPRESSION_HELP_STRING = (
+    'Boolean flag.  If True, the NN is trained to predict dewpoint depression, '
+    'rather than predicting dewpoint temperature directly.'
+)
+PREDICT_GUST_FACTOR_HELP_STRING = (
+    'Boolean flag.  If True, the NN is trained to predict gust factor, rather '
+    'than predicting gust speed directly.'
+)
+DO_RESIDUAL_PREDICTION_HELP_STRING = (
+    'Boolean flag.  If True, the NN is trained to predict a residual -- i.e., '
+    'the departure between URMA truth and a single NWP forecast.  If False, '
+    'the NN is trained to predict the URMA target fields directly.'
+)
+RESID_BASELINE_MODEL_HELP_STRING = (
+    'Name of NWP model used to generate residual baseline fields.  If '
+    'do_residual_prediction == False, make this argument None.'
+)
+RESID_BASELINE_LEAD_TIME_HELP_STRING = (
+    'Lead time used to generate residual baseline fields.  If '
+    'do_residual_prediction == False, make this argument None.'
+)
+RESID_BASELINE_MODEL_DIR_HELP_STRING = (
+    'Directory path for residual baseline fields.  Within this directory,'
+    'relevant files will be found by `interp_nwp_model_io.find_file`.'
 )
 
 TRAINING_TIME_LIMITS_HELP_STRING = (
@@ -227,6 +260,31 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + SENTINEL_VALUE_ARG_NAME, type=float, required=False,
         default=-10., help=SENTINEL_VALUE_HELP_STRING
+    )
+
+    parser_object.add_argument(
+        '--' + PREDICT_DEWPOINT_DEPRESSION_ARG_NAME, type=int, required=True,
+        help=PREDICT_DEWPOINT_DEPRESSION_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PREDICT_GUST_FACTOR_ARG_NAME, type=int, required=True,
+        help=PREDICT_GUST_FACTOR_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + DO_RESIDUAL_PREDICTION_ARG_NAME, type=int, required=True,
+        help=DO_RESIDUAL_PREDICTION_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + RESID_BASELINE_MODEL_ARG_NAME, type=str, required=False,
+        default='', help=RESID_BASELINE_MODEL_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + RESID_BASELINE_LEAD_TIME_ARG_NAME, type=int, required=False,
+        default=-1, help=RESID_BASELINE_LEAD_TIME_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + RESID_BASELINE_MODEL_DIR_ARG_NAME, type=str, required=False,
+        default='', help=RESID_BASELINE_MODEL_DIR_HELP_STRING
     )
 
     parser_object.add_argument(
