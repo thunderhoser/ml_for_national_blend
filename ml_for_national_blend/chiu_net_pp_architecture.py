@@ -1094,12 +1094,13 @@ def create_model(option_dict):
             name='output_get_basic'
         )(output_layer_object)
 
-        basic_output_layer_object = architecture_utils.get_activation_layer(
-            activation_function_string=output_activ_function_name,
-            alpha_for_relu=output_activ_function_alpha,
-            alpha_for_elu=output_activ_function_alpha,
-            layer_name='output_activ_basic'
-        )(basic_output_layer_object)
+        if output_activ_function_name is not None:
+            basic_output_layer_object = architecture_utils.get_activation_layer(
+                activation_function_string=output_activ_function_name,
+                alpha_for_relu=output_activ_function_alpha,
+                alpha_for_elu=output_activ_function_alpha,
+                layer_name='output_activ_basic'
+            )(basic_output_layer_object)
 
         this_name = 'output' if ensemble_size > 1 else 'output_concat'
         output_layer_object = keras.layers.Concatenate(axis=-2, name=this_name)(
