@@ -22,8 +22,11 @@ def _run(template_file_name, output_dir_name,
          predict_dewpoint_depression, predict_gust_factor,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
-         init_time_limit_strings_for_training, nwp_dir_names_for_training,
-         target_dir_name_for_training, init_time_limit_strings_for_validation,
+         first_init_time_strings_for_training,
+         last_init_time_strings_for_training,
+         nwp_dir_names_for_training, target_dir_name_for_training,
+         first_init_time_strings_for_validation,
+         last_init_time_strings_for_validation,
          nwp_dir_names_for_validation, target_dir_name_for_validation,
          num_epochs, num_training_batches_per_epoch,
          num_validation_batches_per_epoch,
@@ -54,10 +57,12 @@ def _run(template_file_name, output_dir_name,
     :param resid_baseline_model_name: Same.
     :param resid_baseline_lead_time_hours: Same.
     :param resid_baseline_model_dir_name: Same.
-    :param init_time_limit_strings_for_training: Same.
+    :param first_init_time_strings_for_training: Same.
+    :param last_init_time_strings_for_training: Same.
     :param nwp_dir_names_for_training: Same.
     :param target_dir_name_for_training: Same.
-    :param init_time_limit_strings_for_validation: Same.
+    :param first_init_time_strings_for_validation: Same.
+    :param last_init_time_strings_for_validation: Same.
     :param nwp_dir_names_for_validation: Same.
     :param target_dir_name_for_validation: Same.
     :param num_epochs: Same.
@@ -103,18 +108,26 @@ def _run(template_file_name, output_dir_name,
     for this_model in nwp_model_names:
         nwp_model_to_field_names[this_model] = nwp_field_names
 
-    init_time_limits_for_training_unix_sec = numpy.array([
+    first_init_times_for_training_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
-        for t in init_time_limit_strings_for_training
+        for t in first_init_time_strings_for_training
     ], dtype=int)
-
-    init_time_limits_for_validation_unix_sec = numpy.array([
+    last_init_times_for_training_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
-        for t in init_time_limit_strings_for_validation
+        for t in last_init_time_strings_for_training
+    ], dtype=int)
+    first_init_times_for_validation_unix_sec = numpy.array([
+        time_conversion.string_to_unix_sec(t, TIME_FORMAT)
+        for t in first_init_time_strings_for_validation
+    ], dtype=int)
+    last_init_times_for_validation_unix_sec = numpy.array([
+        time_conversion.string_to_unix_sec(t, TIME_FORMAT)
+        for t in last_init_time_strings_for_validation
     ], dtype=int)
 
     training_option_dict = {
-        neural_net.INIT_TIME_LIMITS_KEY: init_time_limits_for_training_unix_sec,
+        neural_net.FIRST_INIT_TIMES_KEY: first_init_times_for_training_unix_sec,
+        neural_net.LAST_INIT_TIMES_KEY: last_init_times_for_training_unix_sec,
         neural_net.NWP_LEAD_TIMES_KEY: nwp_lead_times_hours,
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
         neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
@@ -141,8 +154,9 @@ def _run(template_file_name, output_dir_name,
     }
 
     validation_option_dict = {
-        neural_net.INIT_TIME_LIMITS_KEY:
-            init_time_limits_for_validation_unix_sec,
+        neural_net.FIRST_INIT_TIMES_KEY:
+            first_init_times_for_validation_unix_sec,
+        neural_net.LAST_INIT_TIMES_KEY: last_init_times_for_validation_unix_sec,
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_validation_dir_name,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_validation
     }
@@ -243,8 +257,11 @@ if __name__ == '__main__':
         resid_baseline_model_dir_name=getattr(
             INPUT_ARG_OBJECT, training_args.RESID_BASELINE_MODEL_DIR_ARG_NAME
         ),
-        init_time_limit_strings_for_training=getattr(
-            INPUT_ARG_OBJECT, training_args.TRAINING_TIME_LIMITS_ARG_NAME
+        first_init_time_strings_for_training=getattr(
+            INPUT_ARG_OBJECT, training_args.FIRST_TRAINING_TIMES_ARG_NAME
+        ),
+        last_init_time_strings_for_training=getattr(
+            INPUT_ARG_OBJECT, training_args.LAST_TRAINING_TIMES_ARG_NAME
         ),
         nwp_dir_names_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.TRAINING_NWP_DIRS_ARG_NAME
@@ -252,8 +269,11 @@ if __name__ == '__main__':
         target_dir_name_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.TRAINING_TARGET_DIR_ARG_NAME
         ),
-        init_time_limit_strings_for_validation=getattr(
-            INPUT_ARG_OBJECT, training_args.VALIDATION_TIME_LIMITS_ARG_NAME
+        first_init_time_strings_for_validation=getattr(
+            INPUT_ARG_OBJECT, training_args.FIRST_VALIDATION_TIMES_ARG_NAME
+        ),
+        last_init_time_strings_for_validation=getattr(
+            INPUT_ARG_OBJECT, training_args.LAST_VALIDATION_TIMES_ARG_NAME
         ),
         nwp_dir_names_for_validation=getattr(
             INPUT_ARG_OBJECT, training_args.VALIDATION_NWP_DIRS_ARG_NAME

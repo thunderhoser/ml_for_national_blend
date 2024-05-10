@@ -10,6 +10,7 @@ from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.io import prediction_io
+from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.plotting import target_plotting
@@ -29,6 +30,11 @@ MIN_VALUES_ARG_NAME = 'min_colour_values'
 MAX_VALUES_ARG_NAME = 'max_colour_values'
 MIN_PERCENTILES_ARG_NAME = 'min_colour_percentiles'
 MAX_PERCENTILES_ARG_NAME = 'max_colour_percentiles'
+PLOT_DIFFS_ARG_NAME = 'plot_diffs'
+MAX_DIFF_VALUES_ARG_NAME = 'max_colour_values_for_diff'
+MAX_DIFF_PERCENTILES_ARG_NAME = 'max_colour_percentiles_for_diff'
+BASELINE_MODEL_ARG_NAME = 'baseline_nwp_model_name'
+BASELINE_MODEL_DIR_ARG_NAME = 'baseline_nwp_model_dir_name'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -60,6 +66,29 @@ MIN_PERCENTILES_HELP_STRING = (
 MAX_PERCENTILES_HELP_STRING = 'Same as {0:s} but for max values.'.format(
     MIN_PERCENTILES_ARG_NAME
 )
+PLOT_DIFFS_HELP_STRING = (
+    'Boolean flag.  If 1, will plot difference fields (predicted minus actual) '
+    'in addition to fundamental fields (predicted and actual).  If 0, will '
+    'plot only predicted and actual.'
+)
+MAX_DIFF_VALUES_HELP_STRING = 'Same as {0:s} but for difference fields.'.format(
+    MAX_DIFF_VALUES_ARG_NAME
+)
+MAX_DIFF_PERCENTILES_HELP_STRING = (
+    'Same as {0:s} but for difference fields.'
+).format(
+    MAX_DIFF_PERCENTILES_ARG_NAME
+)
+BASELINE_MODEL_HELP_STRING = (
+    'Name of baseline model (must be accepted by '
+    '`nwp_model_utils.check_model_name`).  If you do not want a baseline '
+    'model, leave this argument alone.'
+)
+BASELINE_MODEL_DIR_HELP_STRING = (
+    '[used only if {0:s} is non-empty] Path to directory for baseline model.  '
+    'Files therein will be found by `interp_nwp_model_io.find_file` and read '
+    'by `interp_nwp_model_io.read_file`.'
+).format(BASELINE_MODEL_ARG_NAME)
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Figures will be saved here.'
 )
@@ -92,6 +121,26 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + MAX_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
     default=[-1.], help=MAX_PERCENTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PLOT_DIFFS_ARG_NAME, type=int, required=True,
+    help=PLOT_DIFFS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_DIFF_VALUES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1.], help=MAX_DIFF_VALUES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_DIFF_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1.], help=MAX_DIFF_PERCENTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BASELINE_MODEL_ARG_NAME, type=str, required=False, default='',
+    help=BASELINE_MODEL_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BASELINE_MODEL_DIR_ARG_NAME, type=str, required=False, default='',
+    help=BASELINE_MODEL_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -172,31 +221,21 @@ def _plot_one_field(
     pyplot.close(figure_object)
 
 
-def _run(prediction_dir_name, init_time_string, field_names,
-         min_colour_values, max_colour_values,
-         min_colour_percentiles, max_colour_percentiles,
-         output_dir_name):
-    """Plots NN-based predictions and targets (actual values).
+def _check_colour_limit_args(
+        min_colour_values, max_colour_values,
+        min_colour_percentiles, max_colour_percentiles, num_fields):
+    """Error-checks arguments pertaining to colour limits.
 
-    This is effectively the main method.
-
-    :param prediction_dir_name: See documentation at top of this script.
-    :param init_time_string: Same.
-    :param field_names: Same.
-    :param min_colour_values: Same.
+    :param min_colour_values: See documentation at top of this script.
     :param max_colour_values: Same.
     :param min_colour_percentiles: Same.
     :param max_colour_percentiles: Same.
-    :param output_dir_name: Same.
+    :param num_fields: Number of fields to plot.
+    :return: min_colour_values: Same as input but might be modified.
+    :return: max_colour_values: Same as input but might be modified.
+    :return: min_colour_percentiles: Same as input but might be modified.
+    :return: max_colour_percentiles: Same as input but might be modified.
     """
-
-    # Check input args.
-    init_time_unix_sec = time_conversion.string_to_unix_sec(
-        init_time_string, TIME_FORMAT
-    )
-
-    assert all([f in urma_utils.ALL_FIELD_NAMES for f in field_names])
-    num_fields = len(field_names)
 
     if (
             len(min_colour_values) == len(max_colour_values) == 1 and
@@ -234,6 +273,88 @@ def _run(prediction_dir_name, init_time_string, field_names,
             max_colour_percentiles - min_colour_percentiles, 0.
         )
 
+    return (
+        min_colour_values, max_colour_values,
+        min_colour_percentiles, max_colour_percentiles
+    )
+
+
+def _run(prediction_dir_name, init_time_string, field_names,
+         min_colour_values, max_colour_values,
+         min_colour_percentiles, max_colour_percentiles, plot_diffs,
+         max_colour_values_for_diff, max_colour_percentiles_for_diff,
+         baseline_nwp_model_name, baseline_nwp_model_dir_name,
+         output_dir_name):
+    """Plots NN-based predictions and targets (actual values).
+
+    This is effectively the main method.
+
+    :param prediction_dir_name: See documentation at top of this script.
+    :param init_time_string: Same.
+    :param field_names: Same.
+    :param min_colour_values: Same.
+    :param max_colour_values: Same.
+    :param min_colour_percentiles: Same.
+    :param max_colour_percentiles: Same.
+    :param plot_diffs: Same.
+    :param max_colour_values_for_diff: Same.
+    :param max_colour_percentiles_for_diff: Same.
+    :param baseline_nwp_model_name: Same.
+    :param baseline_nwp_model_dir_name: Same.
+    :param output_dir_name: Same.
+    """
+
+    # Check input args.
+    init_time_unix_sec = time_conversion.string_to_unix_sec(
+        init_time_string, TIME_FORMAT
+    )
+    assert all([f in urma_utils.ALL_FIELD_NAMES for f in field_names])
+
+    if baseline_nwp_model_name == '':
+        baseline_nwp_model_name = None
+
+    (
+        min_colour_values,
+        max_colour_values,
+        min_colour_percentiles,
+        max_colour_percentiles
+    ) = _check_colour_limit_args(
+        min_colour_values=min_colour_values,
+        max_colour_values=max_colour_values,
+        min_colour_percentiles=min_colour_percentiles,
+        max_colour_percentiles=max_colour_percentiles,
+        num_fields=len(field_names)
+    )
+
+    if (
+            len(max_colour_values_for_diff) == 1
+            and max_colour_values_for_diff[0] < 0
+    ):
+        min_colour_values_for_diff = numpy.array([1.])
+    else:
+        min_colour_values_for_diff = -1 * max_colour_values_for_diff
+
+    if (
+            len(max_colour_percentiles_for_diff) == 1
+            and max_colour_percentiles_for_diff[0] < 0
+    ):
+        min_colour_percentiles_for_diff = numpy.array([1.])
+    else:
+        min_colour_percentiles_for_diff = 100. - max_colour_percentiles_for_diff
+
+    (
+        min_colour_values_for_diff,
+        max_colour_values_for_diff,
+        min_colour_percentiles_for_diff,
+        max_colour_percentiles_for_diff
+    ) = _check_colour_limit_args(
+        min_colour_values=min_colour_values_for_diff,
+        max_colour_values=max_colour_values_for_diff,
+        min_colour_percentiles=min_colour_percentiles_for_diff,
+        max_colour_percentiles=max_colour_percentiles_for_diff,
+        num_fields=len(field_names)
+    )
+
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
     )
@@ -251,6 +372,13 @@ def _run(prediction_dir_name, init_time_string, field_names,
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
     ptx = prediction_table_xarray
 
+    subset_grid = not (
+        len(ptx.coords[prediction_io.ROW_DIM].values) ==
+        len(nbm_utils.NBM_Y_COORDS_METRES)
+        and len(ptx.coords[prediction_io.COLUMN_DIM].values) ==
+        len(nbm_utils.NBM_X_COORDS_METRES)
+    )
+
     model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
@@ -267,6 +395,22 @@ def _run(prediction_dir_name, init_time_string, field_names,
     valid_time_string = time_conversion.unix_sec_to_string(
         valid_time_unix_sec, TIME_FORMAT
     )
+
+    if baseline_nwp_model_name is not None:
+        baseline_prediction_matrix = (
+            neural_net._read_residual_baseline_one_example(
+                init_time_unix_sec=init_time_unix_sec,
+                nwp_model_name=baseline_nwp_model_name,
+                nwp_lead_time_hours=lead_time_hours,
+                nwp_directory_name=baseline_nwp_model_dir_name,
+                target_field_names=field_names,
+                subset_grid=subset_grid,
+                predict_dewpoint_depression=False,
+                predict_gust_factor=False
+            )
+        )
+    else:
+        baseline_prediction_matrix = None
 
     for j in range(len(field_names)):
         this_field_name_fancy = target_plotting.FIELD_NAME_TO_FANCY[
@@ -299,9 +443,16 @@ def _run(prediction_dir_name, init_time_string, field_names,
         )
 
         if min_colour_values is None:
-            concat_matrix = numpy.stack(
-                [prediction_matrix, target_matrix], axis=-1
-            )
+            if baseline_prediction_matrix is None:
+                these_matrices = [prediction_matrix, target_matrix]
+            else:
+                these_matrices = [
+                    prediction_matrix,
+                    target_matrix,
+                    baseline_prediction_matrix[..., j]
+                ]
+
+            concat_matrix = numpy.stack(these_matrices, axis=-1)
 
             (
                 colour_map_object, colour_norm_object
@@ -358,6 +509,117 @@ def _run(prediction_dir_name, init_time_string, field_names,
             output_file_name=output_file_name
         )
 
+        if baseline_prediction_matrix is not None:
+            title_string = 'Baseline {0:s}\nValid {1:s}'.format(
+                this_field_name_fancy, valid_time_string
+            )
+
+            output_file_name = (
+                '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline.jpg'
+            ).format(
+                output_dir_name,
+                init_time_string,
+                valid_time_string,
+                field_names[j].replace('_', '-')
+            )
+
+            _plot_one_field(
+                data_matrix=baseline_prediction_matrix[..., j],
+                latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+                longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                colour_map_object=colour_map_object,
+                colour_norm_object=colour_norm_object,
+                title_string=title_string,
+                output_file_name=output_file_name
+            )
+
+        if not plot_diffs:
+            continue
+
+        if max_colour_values_for_diff is None:
+            if baseline_prediction_matrix is None:
+                relevant_matrix = prediction_matrix - target_matrix
+            else:
+                relevant_matrix = numpy.stack([
+                    prediction_matrix - target_matrix,
+                    baseline_prediction_matrix[..., j] - target_matrix
+                ], axis=-1)
+
+            this_max = numpy.nanpercentile(
+                numpy.absolute(relevant_matrix), max_colour_percentiles[j]
+            )
+
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=urma_utils.U_WIND_10METRE_NAME,
+                min_value=-1 * this_max,
+                max_value=this_max,
+            )
+        else:
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=min_colour_values_for_diff[j],
+                max_value=max_colour_values_for_diff[j]
+            )
+
+        title_string = 'Error in {0:s}\nValid {1:s}'.format(
+            this_field_name_fancy, valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_error.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-')
+        )
+
+        _plot_one_field(
+            data_matrix=prediction_matrix - target_matrix,
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        if baseline_prediction_matrix is None:
+            continue
+
+        title_string = 'Baseline error in {0:s}\nValid {1:s}'.format(
+            this_field_name_fancy, valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline-error.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-')
+        )
+
+        _plot_one_field(
+            data_matrix=baseline_prediction_matrix[..., j] - target_matrix,
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
 
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
@@ -377,6 +639,20 @@ if __name__ == '__main__':
         ),
         max_colour_percentiles=numpy.array(
             getattr(INPUT_ARG_OBJECT, MAX_PERCENTILES_ARG_NAME), dtype=float
+        ),
+        plot_diffs=bool(getattr(INPUT_ARG_OBJECT, PLOT_DIFFS_ARG_NAME)),
+        max_colour_values_for_diff=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_DIFF_VALUES_ARG_NAME), dtype=float
+        ),
+        max_colour_percentiles_for_diff=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_DIFF_PERCENTILES_ARG_NAME),
+            dtype=float
+        ),
+        baseline_nwp_model_name=getattr(
+            INPUT_ARG_OBJECT, BASELINE_MODEL_ARG_NAME
+        ),
+        baseline_nwp_model_dir_name=getattr(
+            INPUT_ARG_OBJECT, BASELINE_MODEL_DIR_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

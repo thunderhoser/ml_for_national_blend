@@ -114,6 +114,78 @@ def max_prediction(
     return metric
 
 
+def spatial_max_bias(
+        channel_index, u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index,
+        function_name, expect_ensemble=True, test_mode=False):
+    """Creates metric to return bias in spatial maximum.
+
+    :param channel_index: See doc for `max_prediction`.
+    :param u_wind_index: Same.
+    :param v_wind_index: Same.
+    :param gust_index: Same.
+    :param temperature_index: Same.
+    :param dewpoint_index: Same.
+    :param function_name: Same.
+    :param expect_ensemble: Same.
+    :param test_mode: Same.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(test_mode)
+
+    _check_index_args(
+        u_wind_index=u_wind_index,
+        v_wind_index=v_wind_index,
+        gust_index=gust_index,
+        temperature_index=temperature_index,
+        dewpoint_index=dewpoint_index
+    )
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (bias in spatial maximum).
+
+        :param target_tensor: See doc for `max_prediction`.
+        :param prediction_tensor: See doc for `max_prediction`.
+        :return: metric: Bias in spatial max.
+        """
+
+        if channel_index == dewpoint_index:
+            prediction_tensor = custom_losses.process_dewpoint_predictions(
+                prediction_tensor=prediction_tensor,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+
+        if channel_index == gust_index:
+            prediction_tensor = custom_losses.process_gust_predictions(
+                prediction_tensor=prediction_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                gust_index=gust_index
+            )
+
+        if expect_ensemble:
+            relevant_prediction_tensor = K.mean(
+                prediction_tensor[..., channel_index, :], axis=-1
+            )
+        else:
+            relevant_prediction_tensor = prediction_tensor[..., channel_index]
+
+        relevant_target_tensor = target_tensor[..., channel_index]
+
+        max_predictions = K.max(relevant_prediction_tensor, axis=(1, 2))
+        max_targets = K.max(relevant_target_tensor, axis=(1, 2))
+        return K.mean(max_predictions - max_targets)
+
+    metric.__name__ = function_name
+    return metric
+
+
 def min_prediction(
         channel_index, u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index,
@@ -170,6 +242,78 @@ def min_prediction(
             )
 
         return K.min(prediction_tensor[:, :, :, channel_index, ...])
+
+    metric.__name__ = function_name
+    return metric
+
+
+def spatial_min_bias(
+        channel_index, u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index,
+        function_name, expect_ensemble=True, test_mode=False):
+    """Creates metric to return bias in spatial minimum.
+
+    :param channel_index: See doc for `max_prediction`.
+    :param u_wind_index: Same.
+    :param v_wind_index: Same.
+    :param gust_index: Same.
+    :param temperature_index: Same.
+    :param dewpoint_index: Same.
+    :param function_name: Same.
+    :param expect_ensemble: Same.
+    :param test_mode: Same.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(test_mode)
+
+    _check_index_args(
+        u_wind_index=u_wind_index,
+        v_wind_index=v_wind_index,
+        gust_index=gust_index,
+        temperature_index=temperature_index,
+        dewpoint_index=dewpoint_index
+    )
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (bias in spatial minimum).
+
+        :param target_tensor: See doc for `max_prediction`.
+        :param prediction_tensor: See doc for `max_prediction`.
+        :return: metric: Bias in spatial minimum.
+        """
+
+        if channel_index == dewpoint_index:
+            prediction_tensor = custom_losses.process_dewpoint_predictions(
+                prediction_tensor=prediction_tensor,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+
+        if channel_index == gust_index:
+            prediction_tensor = custom_losses.process_gust_predictions(
+                prediction_tensor=prediction_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                gust_index=gust_index
+            )
+
+        if expect_ensemble:
+            relevant_prediction_tensor = K.mean(
+                prediction_tensor[..., channel_index, :], axis=-1
+            )
+        else:
+            relevant_prediction_tensor = prediction_tensor[..., channel_index]
+
+        relevant_target_tensor = target_tensor[..., channel_index]
+
+        min_predictions = K.min(relevant_prediction_tensor, axis=(1, 2))
+        min_targets = K.min(relevant_target_tensor, axis=(1, 2))
+        return K.mean(min_predictions - min_targets)
 
     metric.__name__ = function_name
     return metric
