@@ -115,8 +115,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         init_time_string, TIME_FORMAT
     )
     validation_option_dict.update({
-        neural_net.INIT_TIME_LIMITS_KEY:
-            numpy.full(2, init_time_unix_sec, dtype=int),
+        neural_net.FIRST_INIT_TIMES_KEY: numpy.array(
+            [init_time_unix_sec], dtype=int
+        ),
+        neural_net.LAST_INIT_TIMES_KEY: numpy.array(
+            [init_time_unix_sec], dtype=int
+        ),
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
         neural_net.TARGET_DIR_KEY: target_dir_name
     })

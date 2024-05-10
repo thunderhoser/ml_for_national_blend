@@ -54,4 +54,8 @@ python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
 --field_names "temperature_2m_agl_kelvins"  \
 --min_colour_percentiles 0.1 \
 --max_colour_percentiles 99.9 \
+--plot_diffs=1 \
+--max_colour_percentiles_for_diff 99.9 \
+--baseline_nwp_model_name="hrrr" \
+--baseline_nwp_model_dir_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/hrrr/processed/interp_to_nbm_grid" \
 --output_dir_name="${model_dir_name}/inference_test/2023-10-02-00"

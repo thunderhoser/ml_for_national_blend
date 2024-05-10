@@ -35,11 +35,13 @@ RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'
 RESID_BASELINE_LEAD_TIME_ARG_NAME = 'resid_baseline_lead_time_hours'
 RESID_BASELINE_MODEL_DIR_ARG_NAME = 'resid_baseline_model_dir_name'
 
-TRAINING_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings_for_training'
+FIRST_TRAINING_TIMES_ARG_NAME = 'first_init_time_strings_for_training'
+LAST_TRAINING_TIMES_ARG_NAME = 'last_init_time_strings_for_training'
 TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'
 TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'
 
-VALIDATION_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings_for_validation'
+FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'
+LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'
 VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'
 VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'
 
@@ -147,9 +149,15 @@ RESID_BASELINE_MODEL_DIR_HELP_STRING = (
     'relevant files will be found by `interp_nwp_model_io.find_file`.'
 )
 
-TRAINING_TIME_LIMITS_HELP_STRING = (
-    'Length-2 list with first and last NWP-model runs (init times in format '
-    '"yyyy-mm-dd-HH") to be used for training.'
+FIRST_TRAINING_TIMES_HELP_STRING = (
+    'length-P list (where P = number of continuous training periods), where '
+    'each item is the start of a continuous training period (format '
+    '"yyyy-mm-dd-HH").'
+)
+LAST_TRAINING_TIMES_HELP_STRING = (
+    'Same as {0:s} but for ends of continuous training periods.'
+).format(
+    FIRST_TRAINING_TIMES_ARG_NAME
 )
 TRAINING_NWP_DIRS_HELP_STRING = (
     'List of directory paths with NWP data for training period.  This list '
@@ -165,10 +173,15 @@ TRAINING_TARGET_DIR_HELP_STRING = (
     '`urma_io.read_file`.'
 )
 
-VALIDATION_TIME_LIMITS_HELP_STRING = (
-    'Same as `{0:s}` but for validation data.'
+FIRST_VALIDATION_TIMES_HELP_STRING = (
+    'length-P list (where P = number of continuous validation periods), where '
+    'each item is the start of a continuous validation period (format '
+    '"yyyy-mm-dd-HH").'
+)
+LAST_VALIDATION_TIMES_HELP_STRING = (
+    'Same as {0:s} but for ends of continuous validation periods.'
 ).format(
-    TRAINING_TIME_LIMITS_ARG_NAME
+    FIRST_VALIDATION_TIMES_ARG_NAME
 )
 VALIDATION_NWP_DIRS_HELP_STRING = (
     'Same as `{0:s}` but for validation data.'
@@ -296,8 +309,12 @@ def add_input_args(parser_object):
     )
 
     parser_object.add_argument(
-        '--' + TRAINING_TIME_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
-        help=TRAINING_TIME_LIMITS_HELP_STRING
+        '--' + FIRST_TRAINING_TIMES_ARG_NAME, type=str, nargs='+',
+        required=True, help=FIRST_TRAINING_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + LAST_TRAINING_TIMES_ARG_NAME, type=str, nargs='+',
+        required=True, help=LAST_TRAINING_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TRAINING_NWP_DIRS_ARG_NAME, type=str, nargs='+', required=True,
@@ -309,8 +326,12 @@ def add_input_args(parser_object):
     )
 
     parser_object.add_argument(
-        '--' + VALIDATION_TIME_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
-        help=VALIDATION_TIME_LIMITS_HELP_STRING
+        '--' + FIRST_VALIDATION_TIMES_ARG_NAME, type=str, nargs='+',
+        required=True, help=FIRST_VALIDATION_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + LAST_VALIDATION_TIMES_ARG_NAME, type=str, nargs='+',
+        required=True, help=LAST_VALIDATION_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + VALIDATION_NWP_DIRS_ARG_NAME, type=str, nargs='+', required=True,

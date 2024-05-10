@@ -33,7 +33,8 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
 DEFAULT_GUST_FACTOR = 1.5
 
-INIT_TIME_LIMITS_KEY = 'init_time_limits_unix_sec'
+FIRST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
+LAST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
 NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
 NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
@@ -281,14 +282,24 @@ def _check_generator_args(option_dict):
     option_dict.update(orig_option_dict)
 
     error_checking.assert_is_numpy_array(
-        option_dict[INIT_TIME_LIMITS_KEY],
-        exact_dimensions=numpy.array([2], dtype=int)
+        option_dict[FIRST_INIT_TIMES_KEY], num_dimensions=1
     )
     error_checking.assert_is_integer_numpy_array(
-        option_dict[INIT_TIME_LIMITS_KEY]
+        option_dict[FIRST_INIT_TIMES_KEY]
     )
+
+    expected_dim = numpy.array(
+        [len(option_dict[FIRST_INIT_TIMES_KEY])], dtype=int
+    )
+    error_checking.assert_is_numpy_array(
+        option_dict[LAST_INIT_TIMES_KEY], exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[LAST_INIT_TIMES_KEY]
+    )
+
     error_checking.assert_is_geq_numpy_array(
-        numpy.diff(option_dict[INIT_TIME_LIMITS_KEY]),
+        option_dict[LAST_INIT_TIMES_KEY] - option_dict[FIRST_INIT_TIMES_KEY],
         0
     )
 
@@ -1101,7 +1112,8 @@ def create_data(option_dict):
     option_dict[BATCH_SIZE_KEY] = 32  # Dummy argument.
 
     option_dict = _check_generator_args(option_dict)
-    init_time_limits_unix_sec = option_dict[INIT_TIME_LIMITS_KEY]
+    first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
+    last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
@@ -1157,12 +1169,15 @@ def create_data(option_dict):
         nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
     ], dtype=int)
 
-    init_times_unix_sec = time_periods.range_and_interval_to_list(
-        start_time_unix_sec=init_time_limits_unix_sec[0],
-        end_time_unix_sec=init_time_limits_unix_sec[-1],
-        time_interval_sec=numpy.max(init_time_intervals_sec),
-        include_endpoint=True
-    )
+    init_times_unix_sec = numpy.concatenate([
+        time_periods.range_and_interval_to_list(
+            start_time_unix_sec=f,
+            end_time_unix_sec=l,
+            time_interval_sec=numpy.max(init_time_intervals_sec),
+            include_endpoint=True
+        )
+        for f, l in zip(first_init_times_unix_sec, last_init_times_unix_sec)
+    ])
 
     # Do actual stuff.
     num_examples = len(init_times_unix_sec)
@@ -1421,8 +1436,12 @@ def data_generator(option_dict):
     ppp = number of NWP fields at 40-km resolution
 
     :param option_dict: Dictionary with the following keys.
-    option_dict["init_time_limits_unix_sec"]: length-2 numpy array with first
-        and last init times to be used.
+    option_dict["first_init_times_unix_sec"]: length-P numpy array (where P =
+        number of continuous periods in dataset), containing start time of each
+        continuous period.
+    option_dict["last_init_times_unix_sec"]: length-P numpy array (where P =
+        number of continuous periods in dataset), containing end time of each
+        continuous period.
     option_dict["nwp_lead_times_hours"]: 1-D numpy array of lead times for
         NWP-based predictors.
     option_dict["nwp_model_to_dir_name"]: Dictionary, where each key is the name
@@ -1518,7 +1537,8 @@ def data_generator(option_dict):
     # change the sequence length.
 
     option_dict = _check_generator_args(option_dict)
-    init_time_limits_unix_sec = option_dict[INIT_TIME_LIMITS_KEY]
+    first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
+    last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
@@ -1578,12 +1598,15 @@ def data_generator(option_dict):
         nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
     ], dtype=int)
 
-    init_times_unix_sec = time_periods.range_and_interval_to_list(
-        start_time_unix_sec=init_time_limits_unix_sec[0],
-        end_time_unix_sec=init_time_limits_unix_sec[-1],
-        time_interval_sec=numpy.max(init_time_intervals_sec),
-        include_endpoint=True
-    )
+    init_times_unix_sec = numpy.concatenate([
+        time_periods.range_and_interval_to_list(
+            start_time_unix_sec=f,
+            end_time_unix_sec=l,
+            time_interval_sec=numpy.max(init_time_intervals_sec),
+            include_endpoint=True
+        )
+        for f, l in zip(first_init_times_unix_sec, last_init_times_unix_sec)
+    ])
 
     # TODO(thunderhoser): HACK because I have data for only every 5th day right
     # now.
@@ -1873,7 +1896,8 @@ def train_model(
     :param validation_option_dict: See doc for `data_generator`.  For validation
         only, the following values will replace corresponding values in
         `training_option_dict`:
-    validation_option_dict["init_time_limits_unix_sec"]
+    validation_option_dict["first_init_times_unix_sec"]
+    validation_option_dict["last_init_times_unix_sec"]
     validation_option_dict["nwp_model_to_dir_name"]
     validation_option_dict["target_dir_name"]
 
@@ -1920,7 +1944,8 @@ def train_model(
     error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
 
     validation_keys_to_keep = [
-        INIT_TIME_LIMITS_KEY, NWP_MODEL_TO_DIR_KEY, TARGET_DIR_KEY
+        FIRST_INIT_TIMES_KEY, LAST_INIT_TIMES_KEY,
+        NWP_MODEL_TO_DIR_KEY, TARGET_DIR_KEY
     ]
     for this_key in list(training_option_dict.keys()):
         if this_key in validation_keys_to_keep:
