@@ -62,8 +62,10 @@ NUM_CONV_LAYERS_PER_BLOCK = 1
 # NUM_NWP_LEAD_TIMES = 2
 NUM_NWP_LEAD_TIMES = 2
 
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam()
-OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.Nadam()'
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=8)
+OPTIMIZER_FUNCTION_STRING = (
+    'keras.optimizers.Nadam(gradient_accumulation_steps=8)'
+)
 
 DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([449, 449, 2], dtype=int),

@@ -68,7 +68,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --targets_use_quantile_norm=0 \
 --nbm_constant_field_names "orographic_height_m_asl" "land_sea_mask_land1" \
 --nbm_constant_file_name="${NBM_CONSTANT_FILE_NAME}" \
---num_examples_per_batch=24 \
+--num_examples_per_batch=3 \
 --sentinel_value=-10 \
 --predict_dewpoint_depression=0 \
 --predict_gust_factor=0 \
@@ -85,5 +85,5 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --nwp_dir_names_for_validation "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/hrrr/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/nam_nest/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gfs/processed/interp_to_nbm_grid" "/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data/gefs/processed/interp_to_nbm_grid" \
 --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
 --num_epochs=1000 \
---num_training_batches_per_epoch=8 \
---num_validation_batches_per_epoch=4
+--num_training_batches_per_epoch=64 \
+--num_validation_batches_per_epoch=32
