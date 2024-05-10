@@ -162,6 +162,8 @@ def spatial_max_bias(
         :return: metric: Bias in spatial max.
         """
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -294,6 +296,8 @@ def spatial_min_bias(
         :param prediction_tensor: See doc for `max_prediction`.
         :return: metric: Bias in spatial minimum.
         """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
