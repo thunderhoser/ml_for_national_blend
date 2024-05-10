@@ -167,13 +167,18 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
 
 
 def dual_weighted_mse(
-        channel_weights, function_name, expect_ensemble=True, test_mode=False):
+        channel_weights, function_name, dual_weight_exponent=1.,
+        expect_ensemble=True, test_mode=False):
     """Creates dual-weighted mean squared error (DWMSE) loss function.
 
     K = number of output channels (target variables)
 
     :param channel_weights: length-K numpy array of channel weights.
     :param function_name: See doc for `mean_squared_error`.
+    :param dual_weight_exponent: Exponent for dual weight.  If 1, the weight for
+        every data point will be max(abs(target), abs(prediction)).  If the
+        exponent is E, this weight will be
+        max(abs(target), abs(prediction)) ** E.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -182,6 +187,7 @@ def dual_weighted_mse(
     error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
     error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_geq(dual_weight_exponent, 1.)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
@@ -206,7 +212,7 @@ def dual_weighted_mse(
         else:
             relevant_target_tensor = target_tensor
 
-        dual_weight_tensor = K.maximum(
+        dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
             K.abs(prediction_tensor)
         )
@@ -237,7 +243,8 @@ def dual_weighted_mse_1channel(
         channel_weight, channel_index,
         u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index,
-        function_name, expect_ensemble=True, test_mode=False):
+        function_name, dual_weight_exponent=1.,
+        expect_ensemble=True, test_mode=False):
     """Creates DWMSE loss function for one channel (target variable).
 
     For the following input args -- u_wind_index, v_wind_index, gust_index,
@@ -255,6 +262,7 @@ def dual_weighted_mse_1channel(
     :param temperature_index: Same but for temperature.
     :param dewpoint_index: Same but for dewpoint.
     :param function_name: See doc for `mean_squared_error`.
+    :param dual_weight_exponent: See doc for `dual_weighted_mse`.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -272,6 +280,7 @@ def dual_weighted_mse_1channel(
     error_checking.assert_is_integer(gust_index)
     error_checking.assert_is_integer(temperature_index)
     error_checking.assert_is_integer(dewpoint_index)
+    error_checking.assert_is_geq(dual_weight_exponent, 1.)
 
     all_indices = [
         u_wind_index, v_wind_index, gust_index,
@@ -320,7 +329,7 @@ def dual_weighted_mse_1channel(
                 prediction_tensor[:, :, :, channel_index]
             )
 
-        dual_weight_tensor = K.maximum(
+        dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
             K.abs(relevant_prediction_tensor)
         )
@@ -340,7 +349,7 @@ def dual_weighted_mse_1channel(
 def dual_weighted_mse_with_constraints(
         channel_weights, u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index, function_name,
-        expect_ensemble=True, test_mode=False):
+        dual_weight_exponent=1., expect_ensemble=True, test_mode=False):
     """Creates DWMSE loss function with constrained dewpoint and wind gust.
 
     "Constrained dewpoint": We assume that the model's raw dewpoint prediction
@@ -361,6 +370,7 @@ def dual_weighted_mse_with_constraints(
     :param temperature_index: Same but for temperature.
     :param dewpoint_index: Same but for dewpoint.
     :param function_name: See doc for `mean_squared_error`.
+    :param dual_weight_exponent: See doc for `dual_weighted_mse`.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -379,6 +389,7 @@ def dual_weighted_mse_with_constraints(
     error_checking.assert_is_geq(temperature_index, 0)
     error_checking.assert_is_integer(dewpoint_index)
     error_checking.assert_is_geq(dewpoint_index, 0)
+    error_checking.assert_is_geq(dual_weight_exponent, 1.)
 
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
@@ -418,7 +429,7 @@ def dual_weighted_mse_with_constraints(
         else:
             relevant_target_tensor = target_tensor
 
-        dual_weight_tensor = K.maximum(
+        dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
             K.abs(prediction_tensor)
         )
