@@ -40,6 +40,8 @@ KS_P_VALUE_KEY = 'kolmogorov_smirnov_p_value'
 MAE_KEY = 'mean_absolute_error'
 MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 BIAS_KEY = 'bias'
+SPATIAL_MIN_BIAS_KEY = 'spatial_min_bias'
+SPATIAL_MAX_BIAS_KEY = 'spatial_max_bias'
 CORRELATION_KEY = 'correlation'
 KGE_KEY = 'kling_gupta_efficiency'
 RELIABILITY_KEY = 'reliability'
@@ -215,6 +217,36 @@ def _get_bias_one_scalar(target_values, predicted_values, per_grid_cell):
         return numpy.mean(predicted_values - target_values, axis=0)
 
     return numpy.mean(predicted_values - target_values)
+
+
+def _get_spatial_min_bias_one_field(target_matrix, prediction_matrix):
+    """Computes bias in spatial minimum for one target field.
+
+    E = number of examples (time steps)
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param target_matrix: E-by-M-by-N numpy array of actual values.
+    :param prediction_matrix: E-by-M-by-N numpy array of predicted values.
+    :return: spatial_min_bias: Self-explanatory.
+    """
+
+    min_target_values = numpy.min(target_matrix, axis=(1, 2))
+    min_predicted_values = numpy.min(prediction_matrix, axis=(1, 2))
+    return numpy.mean(min_predicted_values - min_target_values)
+
+
+def _get_spatial_max_bias_one_field(target_matrix, prediction_matrix):
+    """Computes bias in spatial maximum for one target field.
+
+    :param target_matrix: See doc for `_get_spatial_min_bias_one_field`.
+    :param prediction_matrix: Same.
+    :return: spatial_max_bias: Self-explanatory.
+    """
+
+    max_target_values = numpy.max(target_matrix, axis=(1, 2))
+    max_predicted_values = numpy.max(prediction_matrix, axis=(1, 2))
+    return numpy.mean(max_predicted_values - max_target_values)
 
 
 def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell):
@@ -468,6 +500,18 @@ def _get_scores_one_replicate(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
             per_grid_cell=per_grid_cell
+        )
+        t[SPATIAL_MIN_BIAS_KEY].values[k, rep_idx] = (
+            _get_spatial_min_bias_one_field(
+                target_matrix=target_matrix[..., k],
+                prediction_matrix=prediction_matrix[..., k]
+            )
+        )
+        t[SPATIAL_MAX_BIAS_KEY].values[k, rep_idx] = (
+            _get_spatial_max_bias_one_field(
+                target_matrix=target_matrix[..., k],
+                prediction_matrix=prediction_matrix[..., k]
+            )
         )
         t[CORRELATION_KEY].values[..., k, rep_idx] = (
             _get_correlation_one_scalar(
@@ -980,6 +1024,18 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         )
     }
+
+    these_dimensions = (num_target_fields, num_bootstrap_reps)
+    these_dim_keys = (FIELD_DIM, BOOTSTRAP_REP_DIM)
+    new_dict = {
+        SPATIAL_MIN_BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        SPATIAL_MAX_BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+    main_data_dict.update(new_dict)
 
     if per_grid_cell:
         these_dimensions = (
