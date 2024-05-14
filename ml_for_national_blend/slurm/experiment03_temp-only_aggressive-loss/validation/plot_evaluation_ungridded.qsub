@@ -48,7 +48,7 @@ num_fields=$(printf "%02d" "$num_fields")
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-models=${num_models}_num-nwp-variables=${num_fields}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_evaluation_ungridded.py" \
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
 --input_eval_file_names "${model_dir_name}/validation/ungridded_evaluation.nc" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
 --line_styles "solid" \
