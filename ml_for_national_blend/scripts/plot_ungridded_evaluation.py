@@ -173,6 +173,10 @@ def _plot_attributes_diagram(
         etx[evaluation.RELIABILITY_COUNT_KEY].values[k, :]
         for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
+    inverted_bin_centers_by_set = [
+        etx[evaluation.INV_RELIABILITY_BIN_CENTER_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
+    ]
     inverted_example_counts_by_set = [
         etx[evaluation.INV_RELIABILITY_COUNT_KEY].values[k, :]
         for etx, k in zip(evaluation_tables_xarray, target_indices)
@@ -252,21 +256,21 @@ def _plot_attributes_diagram(
             bar_colour=line_colours[main_index]
         )
 
-        # eval_plotting.plot_inset_histogram(
-        #     figure_object=figure_object,
-        #     bin_centers=inverted_bin_centers_by_set[main_index],
-        #     bin_counts=inverted_example_counts_by_set[main_index],
-        #     has_predictions=False,
-        #     bar_colour=line_colours[main_index]
-        # )
-
         eval_plotting.plot_inset_histogram(
             figure_object=figure_object,
-            bin_centers=bin_centers_by_set[main_index],
+            bin_centers=inverted_bin_centers_by_set[main_index],
             bin_counts=inverted_example_counts_by_set[main_index],
             has_predictions=False,
             bar_colour=line_colours[main_index]
         )
+
+        # eval_plotting.plot_inset_histogram(
+        #     figure_object=figure_object,
+        #     bin_centers=bin_centers_by_set[main_index],
+        #     bin_counts=inverted_example_counts_by_set[main_index],
+        #     has_predictions=False,
+        #     bar_colour=line_colours[main_index]
+        # )
 
         axes_object.set_xlabel('Prediction')
         axes_object.set_ylabel('Conditional mean observation')
@@ -558,9 +562,11 @@ def _run(evaluation_file_names, target_normalization_file_name,
                     target_field_names=target_field_names
                 )[:2]
             )
-            this_prediction_matrix = numpy.nanmean(
-                this_prediction_matrix, axis=-1
-            )
+
+            if len(this_prediction_matrix.shape) > len(this_target_matrix.shape):
+                this_prediction_matrix = numpy.nanmean(
+                    this_prediction_matrix, axis=-1
+                )
 
             if error_matrix.size == 0:
                 error_matrix = numpy.full(
