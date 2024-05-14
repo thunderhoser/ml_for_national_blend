@@ -566,9 +566,12 @@ def _run(evaluation_file_names, target_normalization_file_name,
                     target_field_names=target_field_names
                 )[:2]
             )
+            print(this_target_matrix.shape)
+            print(this_prediction_matrix.shape)
             this_prediction_matrix = numpy.nanmean(
                 this_prediction_matrix, axis=-1
             )
+            print(this_prediction_matrix.shape)
 
             if error_matrix.size == 0:
                 error_matrix = numpy.full(
