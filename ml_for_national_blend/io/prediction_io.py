@@ -5,12 +5,16 @@ import numpy
 import xarray
 import netCDF4
 from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import time_periods
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 
 TOLERANCE = 1e-6
 TIME_FORMAT = '%Y-%m-%d-%H'
+
+# TODO(thunderhoser): This will change.
+DEFAULT_INIT_TIME_INTERVAL_SEC = 6 * 3600
 
 ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
@@ -57,6 +61,64 @@ def find_file(directory_name, init_time_unix_sec, raise_error_if_missing=True):
         raise ValueError(error_string)
 
     return prediction_file_name
+
+
+def find_files_for_period(
+        directory_name, first_init_time_unix_sec, last_init_time_unix_sec,
+        raise_error_if_any_missing=False, raise_error_if_all_missing=True):
+    """Finds files with predictions over a time period, one per init time.
+
+    :param directory_name: Path to input directory.
+    :param first_init_time_unix_sec: First init time in period.
+    :param last_init_time_unix_sec: Last init time in period.
+    :param raise_error_if_any_missing: Boolean flag.  If any file is missing and
+        `raise_error_if_any_missing == True`, will throw error.
+    :param raise_error_if_all_missing: Boolean flag.  If all files are missing
+        and `raise_error_if_all_missing == True`, will throw error.
+    :return: prediction_file_names: 1-D list of paths to NetCDF files with
+        predictions, one per daily model run.
+    :raises: ValueError: if all files are missing and
+        `raise_error_if_all_missing == True`.
+    """
+
+    error_checking.assert_is_boolean(raise_error_if_any_missing)
+    error_checking.assert_is_boolean(raise_error_if_all_missing)
+
+    init_times_unix_sec = time_periods.range_and_interval_to_list(
+        start_time_unix_sec=first_init_time_unix_sec,
+        end_time_unix_sec=last_init_time_unix_sec,
+        time_interval_sec=DEFAULT_INIT_TIME_INTERVAL_SEC,
+        include_endpoint=True
+    )
+
+    prediction_file_names = []
+
+    for this_init_time_unix_sec in init_times_unix_sec:
+        this_file_name = find_file(
+            directory_name=directory_name,
+            init_time_unix_sec=this_init_time_unix_sec,
+            raise_error_if_missing=raise_error_if_any_missing
+        )
+
+        if os.path.isfile(this_file_name):
+            prediction_file_names.append(this_file_name)
+
+    if raise_error_if_all_missing and len(prediction_file_names) == 0:
+        error_string = (
+            'Cannot find any file in directory "{0:s}" from times {1:s} to '
+            '{2:s}.'
+        ).format(
+            directory_name,
+            time_conversion.unix_sec_to_string(
+                first_init_time_unix_sec, TIME_FORMAT
+            ),
+            time_conversion.unix_sec_to_string(
+                last_init_time_unix_sec, TIME_FORMAT
+            )
+        )
+        raise ValueError(error_string)
+
+    return prediction_file_names
 
 
 def file_name_to_init_time(prediction_file_name):
