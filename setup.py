@@ -5,7 +5,8 @@ from setuptools import setup
 PACKAGE_NAMES = [
     'ml_for_national_blend', 'ml_for_national_blend.io',
     'ml_for_national_blend.utils', 'ml_for_national_blend.machine_learning',
-    'ml_for_national_blend.scripts'
+    'ml_for_national_blend.plotting', 'ml_for_national_blend.scripts',
+    'ml_for_national_blend.outside_code'
 ]
 KEYWORDS = [
     'machine learning', 'deep learning', 'artificial intelligence',
@@ -32,6 +33,7 @@ CLASSIFIERS = [
 
 PACKAGE_REQUIREMENTS = [
     'numpy',
+    'xarray',
     'scipy',
     'tensorflow',
     'keras',
