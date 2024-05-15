@@ -20,6 +20,9 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=process_nam_data_2022_%A_%a.out
 
+module load gnu/9.2.0
+module load wgrib2/3.1.1_ncep
+
 conda init
 conda activate base
 
