@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="process_nam_data_2021"
+#SBATCH --job-name="process_hrrr_data_2021"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=process_nam_data_2021_%A_%a.out
+#SBATCH --output=process_hrrr_data_2021_%A_%a.out
 
 module load gnu/9.2.0
 module load wgrib2/3.1.2_ncep
