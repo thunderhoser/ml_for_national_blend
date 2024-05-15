@@ -27,7 +27,7 @@ HOURS_TO_SECONDS = 3600
 DEFAULT_GUST_FACTOR = 1.5
 
 FIRST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
-LAST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
+LAST_INIT_TIMES_KEY = 'last_init_times_unix_sec'
 NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
 NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
