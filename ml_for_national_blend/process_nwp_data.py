@@ -207,12 +207,19 @@ def _run(input_dir_name, model_name,
     last_init_time_unix_sec = time_conversion.string_to_unix_sec(
         last_init_time_string, TIME_FORMAT
     )
+    init_time_interval_sec = nwp_model_utils.model_to_init_time_interval(
+        model_name
+    )
+
+    # TODO(thunderhoser): This is a HACK, because currently I don't want to
+    # process all the data.
+    init_time_interval_sec = numpy.maximum(
+        init_time_interval_sec, 6 * HOURS_TO_SECONDS
+    )
     init_times_unix_sec = time_periods.range_and_interval_to_list(
         start_time_unix_sec=first_init_time_unix_sec,
         end_time_unix_sec=last_init_time_unix_sec,
-        time_interval_sec=nwp_model_utils.model_to_init_time_interval(
-            model_name
-        ),
+        time_interval_sec=init_time_interval_sec,
         include_endpoint=True
     )
 
