@@ -22,7 +22,7 @@
 
 module load cuda/10.1
 module load gnu/9.2.0
-module load wgrib2/3.1.1_ncep
+module load wgrib2/3.1.2_ncep
 
 source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
