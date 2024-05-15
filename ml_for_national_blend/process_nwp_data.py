@@ -18,6 +18,7 @@ import sys
 import copy
 import shutil
 import argparse
+import warnings
 import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -303,10 +304,23 @@ def _run(input_dir_name, model_name,
                 model_name=model_name,
                 init_time_unix_sec=this_init_time_unix_sec,
                 forecast_hour=h,
-                raise_error_if_missing=True
+                raise_error_if_missing=False
             )
             for h in forecast_hours
         ]
+
+        found_all_inputs = all([os.path.isfile(f) for f in input_file_names])
+        if not found_all_inputs:
+            bad_file_names = [
+                f for f in input_file_names if not os.path.isfile(f)
+            ]
+            warning_string = (
+                'POTENTIAL ERROR: Could not find all input files for the given '
+                'init time.  The following files are missing:\n{0:s}'
+            ).format(str(bad_file_names))
+
+            warnings.warn(warning_string)
+            continue
 
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
 
