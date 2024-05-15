@@ -1608,9 +1608,6 @@ def data_generator(option_dict):
         for f, l in zip(first_init_times_unix_sec, last_init_times_unix_sec)
     ])
 
-    print('first_init_times_unix_sec = {0:s}'.format(str(first_init_times_unix_sec)))
-    print('last_init_times_unix_sec = {0:s}'.format(str(last_init_times_unix_sec)))
-
     # TODO(thunderhoser): HACK because I have data for only every 5th day right
     # now.
     init_date_strings = [

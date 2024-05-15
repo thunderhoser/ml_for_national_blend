@@ -435,7 +435,7 @@ def _run(evaluation_file_names, target_normalization_file_name,
             evaluation_file_names[i]
         )
 
-        if evaluation.LATITUDE_DIM in evaluation_tables_xarray[i].coords:
+        if evaluation.ROW_DIM in evaluation_tables_xarray[i].coords:
             error_string = (
                 'File "{0:s}" contains gridded evaluation.  This script '
                 'handles only ungridded evaluation.'

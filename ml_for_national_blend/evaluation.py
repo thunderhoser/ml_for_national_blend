@@ -26,9 +26,12 @@ TOLERANCE = 1e-6
 
 RELIABILITY_BIN_DIM = 'reliability_bin'
 BOOTSTRAP_REP_DIM = 'bootstrap_replicate'
-LATITUDE_DIM = 'grid_row'
-LONGITUDE_DIM = 'grid_column'
+ROW_DIM = 'grid_row'
+COLUMN_DIM = 'grid_column'
 FIELD_DIM = 'field'
+
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
 
 TARGET_STDEV_KEY = 'target_standard_deviation'
 PREDICTION_STDEV_KEY = 'prediction_standard_deviation'
@@ -553,8 +556,8 @@ def _get_scores_one_replicate(
         num_bins = num_relia_bins_by_target[k]
 
         if per_grid_cell:
-            num_grid_rows = len(t.coords[LATITUDE_DIM].values)
-            num_grid_columns = len(t.coords[LONGITUDE_DIM].values)
+            num_grid_rows = len(t.coords[ROW_DIM].values)
+            num_grid_columns = len(t.coords[COLUMN_DIM].values)
 
             for i in range(num_grid_rows):
                 print((
@@ -976,7 +979,7 @@ def get_scores_with_bootstrapping(
             num_bootstrap_reps
         )
         these_dim_keys = (
-            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM, BOOTSTRAP_REP_DIM
+            ROW_DIM, COLUMN_DIM, FIELD_DIM, BOOTSTRAP_REP_DIM
         )
     else:
         these_dimensions = (num_target_fields, num_bootstrap_reps)
@@ -1051,7 +1054,7 @@ def get_scores_with_bootstrapping(
             numpy.max(num_relia_bins_by_target), num_bootstrap_reps
         )
         these_dim_keys = (
-            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM,
+            ROW_DIM, COLUMN_DIM, FIELD_DIM,
             RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM
         )
     else:
@@ -1077,7 +1080,7 @@ def get_scores_with_bootstrapping(
             numpy.max(num_relia_bins_by_target)
         )
         these_dim_keys = (
-            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM, RELIABILITY_BIN_DIM
+            ROW_DIM, COLUMN_DIM, FIELD_DIM, RELIABILITY_BIN_DIM
         )
     else:
         these_dimensions = (
@@ -1103,7 +1106,7 @@ def get_scores_with_bootstrapping(
 
     if per_grid_cell:
         these_dimensions = (num_grid_rows, num_grid_columns, num_target_fields)
-        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM)
+        these_dim_keys = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
     else:
         these_dimensions = (num_target_fields,)
         these_dim_keys = (FIELD_DIM,)
@@ -1117,6 +1120,23 @@ def get_scores_with_bootstrapping(
         )
     }
     main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        this_prediction_table_xarray = prediction_io.read_file(
+            prediction_file_names[0]
+        )
+        tpt = this_prediction_table_xarray
+        these_dim_keys = (ROW_DIM, COLUMN_DIM)
+
+        new_dict = {
+            LATITUDE_KEY: (
+                these_dim_keys, tpt[prediction_io.LATITUDE_KEY].values
+            ),
+            LONGITUDE_KEY: (
+                these_dim_keys, tpt[prediction_io.LONGITUDE_KEY].values
+            )
+        }
+        main_data_dict.update(new_dict)
 
     reliability_bin_indices = numpy.linspace(
         0, numpy.max(num_relia_bins_by_target) - 1,
@@ -1132,14 +1152,13 @@ def get_scores_with_bootstrapping(
     }
 
     if per_grid_cell:
-        this_prediction_table_xarray = prediction_io.read_file(
-            prediction_file_names[0]
-        )
-        tpt = this_prediction_table_xarray
-
         metadata_dict.update({
-            LATITUDE_DIM: tpt[prediction_io.LATITUDE_KEY].values,
-            LONGITUDE_DIM: tpt[prediction_io.LONGITUDE_KEY].values
+            ROW_DIM: numpy.linspace(
+                0, num_grid_rows - 1, num=num_grid_rows, dtype=int
+            ),
+            COLUMN_DIM: numpy.linspace(
+                0, num_grid_columns - 1, num=num_grid_columns, dtype=int
+            )
         })
 
     result_table_xarray = xarray.Dataset(
