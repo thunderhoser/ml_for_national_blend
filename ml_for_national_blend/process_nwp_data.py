@@ -341,6 +341,8 @@ def _run(input_dir_name, model_name,
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
+            if not os.path.isfile(input_file_names[k]):
+                continue
 
             # Most models store wind vectors in grid-relative coordinates.
             # These vectors must be rotated to Earth-relative coordinates.
