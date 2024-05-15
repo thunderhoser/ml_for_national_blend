@@ -1,0 +1,55 @@
+#!/bin/bash
+
+#SBATCH --job-name="process_nam_data_2018"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=0-72
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_nam_data_2018_%A_%a.out
+
+module load gnu/9.2.0
+module load wgrib2/3.1.2_ncep
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Allison.Layne/firewx_data/hrrr/grib2"
+OUTPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed"
+WGRIB2_EXE_NAME="wgrib2"
+
+FIRST_INIT_TIME_STRINGS=("2018-01-01-00" "2018-01-06-00" "2018-01-11-00" "2018-01-16-00" "2018-01-21-00" "2018-01-26-00" "2018-01-31-00" "2018-02-05-00" "2018-02-10-00" "2018-02-15-00" "2018-02-20-00" "2018-02-25-00" "2018-03-02-00" "2018-03-07-00" "2018-03-12-00" "2018-03-17-00" "2018-03-22-00" "2018-03-27-00" "2018-04-01-00" "2018-04-06-00" "2018-04-11-00" "2018-04-16-00" "2018-04-21-00" "2018-04-26-00" "2018-05-01-00" "2018-05-06-00" "2018-05-11-00" "2018-05-16-00" "2018-05-21-00" "2018-05-26-00" "2018-05-31-00" "2018-06-05-00" "2018-06-10-00" "2018-06-15-00" "2018-06-20-00" "2018-06-25-00" "2018-06-30-00" "2018-07-05-00" "2018-07-10-00" "2018-07-15-00" "2018-07-20-00" "2018-07-25-00" "2018-07-30-00" "2018-08-04-00" "2018-08-09-00" "2018-08-14-00" "2018-08-19-00" "2018-08-24-00" "2018-08-29-00" "2018-09-03-00" "2018-09-08-00" "2018-09-13-00" "2018-09-18-00" "2018-09-23-00" "2018-09-28-00" "2018-10-03-00" "2018-10-08-00" "2018-10-13-00" "2018-10-18-00" "2018-10-23-00" "2018-10-28-00" "2018-11-02-00" "2018-11-07-00" "2018-11-12-00" "2018-11-17-00" "2018-11-22-00" "2018-11-27-00" "2018-12-02-00" "2018-12-07-00" "2018-12-12-00" "2018-12-17-00" "2018-12-22-00" "2018-12-27-00")
+LAST_INIT_TIME_STRINGS=("2018-01-01-18" "2018-01-06-18" "2018-01-11-18" "2018-01-16-18" "2018-01-21-18" "2018-01-26-18" "2018-01-31-18" "2018-02-05-18" "2018-02-10-18" "2018-02-15-18" "2018-02-20-18" "2018-02-25-18" "2018-03-02-18" "2018-03-07-18" "2018-03-12-18" "2018-03-17-18" "2018-03-22-18" "2018-03-27-18" "2018-04-01-18" "2018-04-06-18" "2018-04-11-18" "2018-04-16-18" "2018-04-21-18" "2018-04-26-18" "2018-05-01-18" "2018-05-06-18" "2018-05-11-18" "2018-05-16-18" "2018-05-21-18" "2018-05-26-18" "2018-05-31-18" "2018-06-05-18" "2018-06-10-18" "2018-06-15-18" "2018-06-20-18" "2018-06-25-18" "2018-06-30-18" "2018-07-05-18" "2018-07-10-18" "2018-07-15-18" "2018-07-20-18" "2018-07-25-18" "2018-07-30-18" "2018-08-04-18" "2018-08-09-18" "2018-08-14-18" "2018-08-19-18" "2018-08-24-18" "2018-08-29-18" "2018-09-03-18" "2018-09-08-18" "2018-09-13-18" "2018-09-18-18" "2018-09-23-18" "2018-09-28-18" "2018-10-03-18" "2018-10-08-18" "2018-10-13-18" "2018-10-18-18" "2018-10-23-18" "2018-10-28-18" "2018-11-02-18" "2018-11-07-18" "2018-11-12-18" "2018-11-17-18" "2018-11-22-18" "2018-11-27-18" "2018-12-02-18" "2018-12-07-18" "2018-12-12-18" "2018-12-17-18" "2018-12-22-18" "2018-12-27-18")
+
+first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_nwp_data.py" \
+--input_grib2_dir_name="${INPUT_DIR_NAME}" \
+--model_name="hrrr" \
+--first_init_time_string="${first_init_time_string}" \
+--last_init_time_string="${last_init_time_string}" \
+--wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
+--tar_output_files=1 \
+--output_zarr_dir_name="${OUTPUT_DIR_NAME}"
