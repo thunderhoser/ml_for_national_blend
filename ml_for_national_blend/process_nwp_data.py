@@ -224,6 +224,11 @@ def _run(input_dir_name, model_name,
         include_endpoint=True
     )
 
+    # TODO(thunderhoser): This is a HACK, because I want to use off-synoptic
+    # times for the RAP.
+    if model_name == nwp_model_utils.RAP_MODEL_NAME:
+        init_times_unix_sec += 3 * HOURS_TO_SECONDS
+
     # For the given model, read grid coordinates and find desired grid points.
     # If the model is global (GFS or GEFS), desired grid points may be a subset.
     # Otherwise, desired grid points will be the entire grid.
@@ -337,6 +342,16 @@ def _run(input_dir_name, model_name,
 
             if model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
                 short_range_indices = numpy.where(forecast_hours <= 24)[0]
+                found_all_short_range_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in short_range_indices
+                ])
+
+                if found_all_short_range_inputs:
+                    continue_flag = False
+
+            if model_name == nwp_model_utils.RAP_MODEL_NAME:
+                short_range_indices = numpy.where(forecast_hours <= 21)[0]
                 found_all_short_range_inputs = all([
                     os.path.isfile(input_file_names[k])
                     for k in short_range_indices
