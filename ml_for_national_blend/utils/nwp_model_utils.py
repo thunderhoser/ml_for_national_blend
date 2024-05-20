@@ -286,6 +286,25 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
     return numpy.linspace(1, 48, num=48, dtype=int)
 
 
+def model_to_old_forecast_hours(model_name):
+    """Same as model_to_forecast_hours but for old GFS and GEFS data.
+
+    :param model_name: See doc for `model_to_forecast_hours`.
+    :return: all_forecast_hours: Same.
+    """
+
+    check_model_name(model_name)
+    assert model_name in [GFS_MODEL_NAME, GEFS_MODEL_NAME]
+
+    if model_name == GFS_MODEL_NAME:
+        return numpy.concatenate([
+            numpy.linspace(3, 240, num=80, dtype=int),
+            numpy.linspace(252, 384, num=12, dtype=int)
+        ])
+
+    return numpy.linspace(6, 384, num=64, dtype=int)
+
+
 def model_to_maybe_missing_fields(model_name):
     """Returns list of acceptably missing fields for the given model.
 
@@ -934,10 +953,22 @@ def precip_from_incremental_to_full_run(
     all_forecast_hours = model_to_forecast_hours(
         model_name=model_name, init_time_unix_sec=init_time_unix_sec
     )
+
     if be_lenient_with_forecast_hours:
         all_forecast_hours = all_forecast_hours[
             all_forecast_hours <= numpy.max(forecast_hours)
         ]
+
+        found_all_hours = numpy.all(numpy.isin(
+            element=all_forecast_hours,
+            test_elements=forecast_hours
+        ))
+
+        if model_name == NAM_NEST_MODEL_NAME and not found_all_hours:
+            all_forecast_hours = numpy.concatenate([
+                numpy.linspace(1, 24, num=24, dtype=int),
+                numpy.linspace(27, 48, num=8, dtype=int)
+            ])
 
     assert numpy.all(numpy.isin(
         element=all_forecast_hours,
@@ -970,6 +1001,62 @@ def precip_from_incremental_to_full_run(
             addend_indices = numpy.where(addend_flags)[0]
         else:
             addend_indices = None
+
+        for this_field_name in [PRECIP_NAME]:
+            k = numpy.where(
+                nwp_forecast_table_xarray.coords[FIELD_DIM].values ==
+                this_field_name
+            )[0][0]
+
+            data_matrix[j, ..., k] = numpy.sum(
+                data_matrix[addend_indices, ..., k], axis=0
+            )
+
+    try:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+            DATA_KEY: (
+                nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+            )
+        })
+    except:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign(
+            DATA_KEY=(nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix)
+        )
+
+    return nwp_forecast_table_xarray
+
+
+def old_gfs_or_gefs_precip_from_incr_to_full(nwp_forecast_table_xarray,
+                                             model_name):
+    """Same as precip_from_incremental_to_full_run but for old GFS or GEFS data.
+
+    :param nwp_forecast_table_xarray: See doc for
+        `precip_from_incremental_to_full_run`.
+    :param model_name: Same.
+    :return: nwp_forecast_table_xarray: Same.
+    """
+
+    assert model_name in [GFS_MODEL_NAME, GEFS_MODEL_NAME]
+
+    forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
+    all_forecast_hours = model_to_old_forecast_hours(model_name)
+    assert numpy.all(numpy.isin(
+        element=all_forecast_hours,
+        test_elements=forecast_hours
+    ))
+
+    data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
+    num_forecast_hours = len(forecast_hours)
+
+    for j in range(num_forecast_hours)[::-1]:
+        addend_flags = numpy.logical_or(
+            numpy.mod(forecast_hours, 6) == 0,
+            forecast_hours == forecast_hours[j]
+        )
+        addend_flags = numpy.logical_and(
+            addend_flags, forecast_hours <= forecast_hours[j]
+        )
+        addend_indices = numpy.where(addend_flags)[0]
 
         for this_field_name in [PRECIP_NAME]:
             k = numpy.where(
