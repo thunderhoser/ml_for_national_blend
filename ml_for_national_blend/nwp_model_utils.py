@@ -1,23 +1,16 @@
 """Helper methods for output from any NWP model."""
 
 import os
-import sys
 import time
 import warnings
 import numpy
 import xarray
 import pyproj
 from scipy.interpolate import interp1d, RegularGridInterpolator
-
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
-
-import longitude_conversion as lng_conversion
-import time_conversion
-import error_checking
-import nbm_utils
+from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
+from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.utils import nbm_utils
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
