@@ -126,20 +126,6 @@ def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
     )
 
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
-        # init_time_string = time_conversion.unix_sec_to_string(
-        #     init_time_unix_sec, '%Y-%m-%d-%H'
-        # )
-        # fake_init_year = int(init_time_string[:4]) + 1
-        # fake_init_time_string = '{0:04d}{1:s}'.format(
-        #     fake_init_year, init_time_string[4:]
-        # )
-        # fake_init_time_unix_sec = time_conversion.string_to_unix_sec(
-        #     fake_init_time_string, '%Y-%m-%d-%H'
-        # )
-        # fake_init_time_string_julian = time_conversion.unix_sec_to_string(
-        #     fake_init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
-        # )
-
         init_time_string_julian = time_conversion.unix_sec_to_string(
             init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
         )
@@ -148,9 +134,16 @@ def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
             directory_name,
             init_date_string,
             init_time_string_julian,
-            # fake_init_time_string_julian,
             forecast_hour
         )
+
+        if not os.path.isfile(nwp_forecast_file_name):
+            nwp_forecast_file_name = '{0:s}/{1:s}/{2:s}{3:06d}'.format(
+                directory_name,
+                init_date_string,
+                init_time_string_julian,
+                forecast_hour
+            )
     else:
         init_time_string_julian = time_conversion.unix_sec_to_string(
             init_time_unix_sec, INIT_TIME_FORMAT_JULIAN
