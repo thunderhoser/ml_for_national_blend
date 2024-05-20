@@ -316,6 +316,7 @@ def _run(input_dir_name, model_name,
 
         found_all_inputs = all([os.path.isfile(f) for f in input_file_names])
         continue_flag = False
+        be_lenient_with_forecast_hours = False
 
         if not found_all_inputs:
             continue_flag = True
@@ -339,6 +340,7 @@ def _run(input_dir_name, model_name,
 
                 if found_all_short_range_inputs:
                     continue_flag = False
+                    be_lenient_with_forecast_hours = True
 
             if model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
                 short_range_indices = numpy.where(forecast_hours <= 24)[0]
@@ -349,6 +351,7 @@ def _run(input_dir_name, model_name,
 
                 if found_all_short_range_inputs:
                     continue_flag = False
+                    be_lenient_with_forecast_hours = True
 
             if model_name == nwp_model_utils.RAP_MODEL_NAME:
                 short_range_indices = numpy.where(forecast_hours <= 21)[0]
@@ -359,6 +362,7 @@ def _run(input_dir_name, model_name,
 
                 if found_all_short_range_inputs:
                     continue_flag = False
+                    be_lenient_with_forecast_hours = True
 
         if continue_flag:
             continue
@@ -411,7 +415,9 @@ def _run(input_dir_name, model_name,
                 nwp_model_utils.precip_from_incremental_to_full_run(
                     nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                     model_name=model_name,
-                    init_time_unix_sec=this_init_time_unix_sec
+                    init_time_unix_sec=this_init_time_unix_sec,
+                    be_lenient_with_forecast_hours=
+                    be_lenient_with_forecast_hours
                 )
             )
 

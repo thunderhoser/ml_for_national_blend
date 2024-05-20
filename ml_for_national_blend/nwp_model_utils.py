@@ -918,8 +918,9 @@ def read_24hour_precip_different_times(
     return interp_24hour_precip_matrix_metres
 
 
-def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
-                                        init_time_unix_sec):
+def precip_from_incremental_to_full_run(
+        nwp_forecast_table_xarray, model_name, init_time_unix_sec,
+        be_lenient_with_forecast_hours=False):
     """Converts precip from incremental values to full-run values.
 
     "Incremental value" = an accumulation between two forecast hours
@@ -929,23 +930,29 @@ def precip_from_incremental_to_full_run(nwp_forecast_table_xarray, model_name,
     :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
     :param model_name: Name of NWP model.
     :param init_time_unix_sec: Initialization time.
+    :param be_lenient_with_forecast_hours: Boolean flag.
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
 
     assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME]
+    error_checking.assert_is_boolean(be_lenient_with_forecast_hours)
 
     forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
-    num_forecast_hours = len(forecast_hours)
-
     all_forecast_hours = model_to_forecast_hours(
         model_name=model_name, init_time_unix_sec=init_time_unix_sec
     )
+    if be_lenient_with_forecast_hours:
+        all_forecast_hours = all_forecast_hours[
+            all_forecast_hours <= numpy.max(forecast_hours)
+        ]
+
     assert numpy.all(numpy.isin(
         element=all_forecast_hours,
         test_elements=forecast_hours
     ))
 
     data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
+    num_forecast_hours = len(forecast_hours)
 
     for j in range(num_forecast_hours)[::-1]:
         if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, RAP_MODEL_NAME]:
