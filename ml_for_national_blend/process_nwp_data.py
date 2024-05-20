@@ -373,6 +373,9 @@ def _run(input_dir_name, model_name,
 
         # The above for-loop creates one xarray table per forecast hour.
         # Concatenate these all into one table.
+        nwp_forecast_tables_xarray = [
+            t for t in nwp_forecast_tables_xarray if t is not None
+        ]
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )
