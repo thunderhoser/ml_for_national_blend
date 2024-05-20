@@ -317,6 +317,7 @@ def _run(input_dir_name, model_name,
         found_all_inputs = all([os.path.isfile(f) for f in input_file_names])
         continue_flag = False
         be_lenient_with_forecast_hours = False
+        using_old_gfs_or_gefs = False
 
         if not found_all_inputs:
             continue_flag = True
@@ -342,7 +343,10 @@ def _run(input_dir_name, model_name,
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
 
-            if model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
+            if model_name in [
+                    nwp_model_utils.NAM_NEST_MODEL_NAME,
+                    nwp_model_utils.WRF_ARW_MODEL_NAME
+            ]:
                 short_range_indices = numpy.where(forecast_hours <= 24)[0]
                 found_all_short_range_inputs = all([
                     os.path.isfile(input_file_names[k])
@@ -364,11 +368,13 @@ def _run(input_dir_name, model_name,
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
 
-            if model_name == nwp_model_utils.GFS_MODEL_NAME:
-                old_forecast_hours = numpy.concatenate([
-                    numpy.linspace(3, 240, num=80, dtype=int),
-                    numpy.linspace(252, 384, num=12, dtype=int)
-                ])
+            if model_name in [
+                    nwp_model_utils.GFS_MODEL_NAME,
+                    nwp_model_utils.GEFS_MODEL_NAME
+            ]:
+                old_forecast_hours = (
+                    nwp_model_utils.model_to_old_forecast_hours(model_name)
+                )
                 essential_indices = numpy.where(numpy.isin(
                     element=forecast_hours, test_elements=old_forecast_hours
                 ))[0]
@@ -380,6 +386,9 @@ def _run(input_dir_name, model_name,
                 if found_all_essential_inputs:
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
+
+                read_incremental_precip = True
+                using_old_gfs_or_gefs = True
 
         if continue_flag:
             continue
@@ -403,17 +412,31 @@ def _run(input_dir_name, model_name,
             # It reads all the desired fields, converts them to SI units
             # (if necessary), rotates wind vectors to Earth-relative
             # (if necessary), and subsets the global grid (if necessary).
-            nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
-                grib2_file_name=input_file_names[k],
-                model_name=model_name,
-                desired_row_indices=desired_row_indices,
-                desired_column_indices=desired_column_indices,
-                wgrib2_exe_name=wgrib2_exe_name,
-                temporary_dir_name=temporary_dir_name,
-                field_names=field_names,
-                rotate_winds=this_rotate_flag,
-                read_incremental_precip=read_incremental_precip
-            )
+            if using_old_gfs_or_gefs:
+                nwp_forecast_tables_xarray[k] = (
+                    raw_nwp_model_io.read_old_gfs_or_gefs_file(
+                        grib2_file_name=input_file_names[k],
+                        model_name=model_name,
+                        desired_row_indices=desired_row_indices,
+                        desired_column_indices=desired_column_indices,
+                        wgrib2_exe_name=wgrib2_exe_name,
+                        temporary_dir_name=temporary_dir_name,
+                        field_names=field_names,
+                        rotate_winds=this_rotate_flag
+                    )
+                )
+            else:
+                nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
+                    grib2_file_name=input_file_names[k],
+                    model_name=model_name,
+                    desired_row_indices=desired_row_indices,
+                    desired_column_indices=desired_column_indices,
+                    wgrib2_exe_name=wgrib2_exe_name,
+                    temporary_dir_name=temporary_dir_name,
+                    field_names=field_names,
+                    rotate_winds=this_rotate_flag,
+                    read_incremental_precip=read_incremental_precip
+                )
 
             print(SEPARATOR_STRING)
 
@@ -428,15 +451,23 @@ def _run(input_dir_name, model_name,
 
         # If necessary, convert incremental precip to full-model-run precip.
         if read_incremental_precip:
-            nwp_forecast_table_xarray = (
-                nwp_model_utils.precip_from_incremental_to_full_run(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    model_name=model_name,
-                    init_time_unix_sec=this_init_time_unix_sec,
-                    be_lenient_with_forecast_hours=
-                    be_lenient_with_forecast_hours
+            if using_old_gfs_or_gefs:
+                nwp_forecast_table_xarray = (
+                    nwp_model_utils.old_gfs_or_gefs_precip_from_incr_to_full(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        model_name=model_name
+                    )
                 )
-            )
+            else:
+                nwp_forecast_table_xarray = (
+                    nwp_model_utils.precip_from_incremental_to_full_run(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        model_name=model_name,
+                        init_time_unix_sec=this_init_time_unix_sec,
+                        be_lenient_with_forecast_hours=
+                        be_lenient_with_forecast_hours
+                    )
+                )
 
         # This shouldn't happen, but I've experienced it in the past with GFS
         # data in GRIB2 format.

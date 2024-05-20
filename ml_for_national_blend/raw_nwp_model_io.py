@@ -30,6 +30,10 @@ import error_checking
 import misc_utils
 import nwp_model_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 SENTINEL_VALUE = 9.999e20
 DAYS_TO_HOURS = 24
 
@@ -515,6 +519,201 @@ def read_file(
             this_data_matrix = numpy.reshape(
                 numpy.ravel(this_data_matrix), orig_dimensions, order='F'
             )
+
+        this_data_matrix = this_data_matrix[desired_row_indices, :]
+        this_data_matrix = this_data_matrix[:, desired_column_indices]
+        # assert not numpy.any(numpy.isnan(this_data_matrix))
+
+        data_matrix[..., f] = (
+            this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
+        )
+
+    if rotate_winds:
+        os.remove(new_grib2_file_name)
+
+    coord_dict = {
+        nwp_model_utils.FORECAST_HOUR_DIM:
+            numpy.array([forecast_hour], dtype=int),
+        nwp_model_utils.ROW_DIM: desired_row_indices,
+        nwp_model_utils.COLUMN_DIM: desired_column_indices,
+        nwp_model_utils.FIELD_DIM: field_names
+    }
+
+    these_dim = (
+        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
+        nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+    )
+    main_data_dict = {
+        nwp_model_utils.DATA_KEY: (
+            these_dim, numpy.expand_dims(data_matrix, axis=0)
+        )
+    }
+
+    these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
+    main_data_dict.update({
+        nwp_model_utils.LATITUDE_KEY: (
+            these_dim,
+            latitude_matrix_deg_n[desired_row_indices, :][:, desired_column_indices]
+        ),
+        nwp_model_utils.LONGITUDE_KEY: (
+            these_dim,
+            longitude_matrix_deg_e[desired_row_indices, :][:, desired_column_indices]
+        )
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
+def read_old_gfs_or_gefs_file(
+        grib2_file_name, model_name,
+        desired_row_indices, desired_column_indices,
+        wgrib2_exe_name, temporary_dir_name,
+        rotate_winds, field_names=ALL_FIELD_NAMES):
+    """Same as read_file but for old GFS or GEFS data.
+
+    Old GFS and GEFS data have fewer lead times and incremental precip, which
+    makes things complicated.
+
+    :param grib2_file_name: See documentation for `read_file`.
+    :param model_name: Same.
+    :param desired_row_indices: Same.
+    :param desired_column_indices: Same.
+    :param wgrib2_exe_name: Same.
+    :param temporary_dir_name: Same.
+    :param rotate_winds: Same.
+    :param field_names: Same.
+    :return: nwp_forecast_table_xarray: Same.
+    """
+
+    # Check input args.
+    assert model_name in [
+        nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.GEFS_MODEL_NAME
+    ]
+
+    latitude_matrix_deg_n, longitude_matrix_deg_e = (
+        nwp_model_utils.read_model_coords(model_name=model_name)
+    )
+    longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
+        longitude_matrix_deg_e
+    )
+
+    num_grid_rows = latitude_matrix_deg_n.shape[0]
+    num_grid_columns = latitude_matrix_deg_n.shape[1]
+
+    error_checking.assert_is_numpy_array(
+        desired_column_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_column_indices)
+    error_checking.assert_is_geq_numpy_array(desired_column_indices, 0)
+    error_checking.assert_is_less_than_numpy_array(
+        desired_column_indices, num_grid_columns
+    )
+
+    error_checking.assert_is_numpy_array(
+        desired_row_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_row_indices)
+    error_checking.assert_is_geq_numpy_array(desired_row_indices, 0)
+    error_checking.assert_is_less_than_numpy_array(
+        desired_row_indices, num_grid_rows
+    )
+    error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
+
+    error_checking.assert_is_boolean(rotate_winds)
+    error_checking.assert_is_string_list(field_names)
+    for this_field_name in field_names:
+        nwp_model_utils.check_field_name(this_field_name)
+
+    # Do actual stuff.
+    forecast_hour = file_name_to_forecast_hour(grib2_file_name)
+
+    num_grid_rows = len(desired_row_indices)
+    num_grid_columns = len(desired_column_indices)
+    num_fields = len(field_names)
+    data_matrix = numpy.full(
+        (num_grid_rows, num_grid_columns, num_fields), numpy.nan
+    )
+
+    if rotate_winds:
+        grid_definition_file_name = '{0:s}/grid_defn.pl'.format(
+            THIS_DIRECTORY_NAME
+        )
+        error_checking.assert_file_exists(grid_definition_file_name)
+
+        file_system_utils.mkdir_recursive_if_necessary(
+            directory_name=temporary_dir_name
+        )
+        new_grib2_file_name = '{0:s}/{1:s}'.format(
+            temporary_dir_name,
+            os.path.split(grib2_file_name)[1]
+        )
+        grib_io.rotate_winds_in_grib_file(
+            input_grib_file_name=grib2_file_name,
+            output_grib_file_name=new_grib2_file_name,
+            grid_definition_file_name=grid_definition_file_name,
+            wgrib2_exe_name=wgrib2_exe_name,
+            raise_error_if_fails=True
+        )
+
+        grib2_file_name_to_use = new_grib2_file_name
+    else:
+        new_grib2_file_name = None
+        grib2_file_name_to_use = grib2_file_name
+
+    for f in range(num_fields):
+        if field_names[f] in [nwp_model_utils.PRECIP_NAME]:
+            if model_name == nwp_model_utils.GFS_MODEL_NAME:
+                if forecast_hour <= 240:
+                    grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
+                        int(number_rounding.floor_to_nearest(
+                            forecast_hour - 3, 6
+                        )),
+                        forecast_hour
+                    )
+                else:
+                    grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
+                        forecast_hour - 12,
+                        forecast_hour
+                    )
+            else:
+                grib_search_string = '{0:s}:{1:d}-{2:d} hour acc'.format(
+                    FIELD_NAME_TO_GRIB_NAME[field_names[f]],
+                    forecast_hour - 6,
+                    forecast_hour
+                )
+        else:
+            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
+
+        print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
+            grib_search_string, grib2_file_name_to_use
+        ))
+        this_data_matrix = grib_io.read_field_from_grib_file(
+            grib_file_name=grib2_file_name_to_use,
+            field_name_grib1=grib_search_string,
+            num_grid_rows=latitude_matrix_deg_n.shape[0],
+            num_grid_columns=latitude_matrix_deg_n.shape[1],
+            wgrib_exe_name=wgrib2_exe_name,
+            wgrib2_exe_name=wgrib2_exe_name,
+            temporary_dir_name=temporary_dir_name,
+            sentinel_value=SENTINEL_VALUE,
+            raise_error_if_fails=(
+                field_names[f] not in
+                nwp_model_utils.model_to_maybe_missing_fields(model_name)
+            )
+        )
+
+        if this_data_matrix is None:
+            warning_string = (
+                'POTENTIAL ERROR: Cannot find line "{0:s}" in GRIB2 file: '
+                '"{1:s}"'
+            ).format(
+                grib_search_string, grib2_file_name_to_use
+            )
+
+            warnings.warn(warning_string)
+            continue
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
