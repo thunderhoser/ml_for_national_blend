@@ -17,6 +17,7 @@ import os
 import copy
 import shutil
 import argparse
+import warnings
 import numpy
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import time_periods
@@ -296,14 +297,55 @@ def _run(input_dir_name, model_name,
                 model_name=model_name,
                 init_time_unix_sec=this_init_time_unix_sec,
                 forecast_hour=h,
-                raise_error_if_missing=True
+                raise_error_if_missing=False
             )
             for h in forecast_hours
         ]
 
+        found_all_inputs = all([os.path.isfile(f) for f in input_file_names])
+        continue_flag = False
+
+        if not found_all_inputs:
+            continue_flag = True
+
+            bad_file_names = [
+                f for f in input_file_names if not os.path.isfile(f)
+            ]
+            warning_string = (
+                'POTENTIAL ERROR: Could not find all input files for the given '
+                'init time.  The following files are missing:\n{0:s}'
+            ).format(str(bad_file_names))
+
+            warnings.warn(warning_string)
+
+            if model_name == nwp_model_utils.HRRR_MODEL_NAME:
+                short_range_indices = numpy.where(forecast_hours <= 18)[0]
+                found_all_short_range_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in short_range_indices
+                ])
+
+                if found_all_short_range_inputs:
+                    continue_flag = False
+
+            if model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
+                short_range_indices = numpy.where(forecast_hours <= 24)[0]
+                found_all_short_range_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in short_range_indices
+                ])
+
+                if found_all_short_range_inputs:
+                    continue_flag = False
+
+        if continue_flag:
+            continue
+
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
+            if not os.path.isfile(input_file_names[k]):
+                continue
 
             # Most models store wind vectors in grid-relative coordinates.
             # These vectors must be rotated to Earth-relative coordinates.
@@ -334,6 +376,9 @@ def _run(input_dir_name, model_name,
 
         # The above for-loop creates one xarray table per forecast hour.
         # Concatenate these all into one table.
+        nwp_forecast_tables_xarray = [
+            t for t in nwp_forecast_tables_xarray if t is not None
+        ]
         nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
             nwp_forecast_tables_xarray
         )

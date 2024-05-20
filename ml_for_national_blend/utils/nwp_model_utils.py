@@ -265,6 +265,9 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
     if model_name == NAM_MODEL_NAME:
         return numpy.linspace(51, 84, num=12, dtype=int)
 
+    if model_name == NAM_NEST_MODEL_NAME:
+        return numpy.linspace(1, 60, num=60, dtype=int)
+
     if model_name == GRIDDED_LAMP_MODEL_NAME:
         return numpy.linspace(1, 25, num=25, dtype=int)
 
