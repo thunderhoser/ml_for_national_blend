@@ -365,15 +365,19 @@ def _run(input_dir_name, model_name,
                     be_lenient_with_forecast_hours = True
 
             if model_name == nwp_model_utils.GFS_MODEL_NAME:
-                multiple_of_3_indices = numpy.where(
-                    numpy.mod(forecast_hours, 3) == 0
-                )[0]
-                found_all_multiple_of_3_inputs = all([
+                old_forecast_hours = numpy.concatenate([
+                    numpy.linspace(3, 240, num=80, dtype=int),
+                    numpy.linspace(252, 384, num=12, dtype=int)
+                ])
+                essential_indices = numpy.where(numpy.isin(
+                    element=forecast_hours, test_elements=old_forecast_hours
+                ))[0]
+                found_all_essential_inputs = all([
                     os.path.isfile(input_file_names[k])
-                    for k in multiple_of_3_indices
+                    for k in essential_indices
                 ])
 
-                if found_all_multiple_of_3_inputs:
+                if found_all_essential_inputs:
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
 
