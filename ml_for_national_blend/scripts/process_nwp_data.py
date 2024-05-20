@@ -357,6 +357,19 @@ def _run(input_dir_name, model_name,
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
 
+            if model_name == nwp_model_utils.GFS_MODEL_NAME:
+                multiple_of_3_indices = numpy.where(
+                    numpy.mod(forecast_hours, 3) == 0
+                )[0]
+                found_all_multiple_of_3_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in multiple_of_3_indices
+                ])
+
+                if found_all_multiple_of_3_inputs:
+                    continue_flag = False
+                    be_lenient_with_forecast_hours = True
+
         if continue_flag:
             continue
 
