@@ -335,6 +335,16 @@ def _run(input_dir_name, model_name,
                 if found_all_short_range_inputs:
                     continue_flag = False
 
+            if model_name == nwp_model_utils.NAM_NEST_MODEL_NAME:
+                short_range_indices = numpy.where(forecast_hours <= 24)[0]
+                found_all_short_range_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in short_range_indices
+                ])
+
+                if found_all_short_range_inputs:
+                    continue_flag = False
+
         if continue_flag:
             continue
 
