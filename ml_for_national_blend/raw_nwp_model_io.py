@@ -713,6 +713,7 @@ def read_ecmwf_file(
             warnings.warn(warning_string)
             continue
 
+        this_data_matrix = numpy.flip(this_data_matrix, axis=0)
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
         # assert not numpy.any(numpy.isnan(this_data_matrix))
