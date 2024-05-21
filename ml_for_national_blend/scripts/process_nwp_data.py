@@ -430,6 +430,15 @@ def _run(input_dir_name, model_name,
                         rotate_winds=this_rotate_flag
                     )
                 )
+            elif model_name == nwp_model_utils.ECMWF_MODEL_NAME:
+                nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_ecmwf_file(
+                    grib_file_name=input_file_names[k],
+                    desired_row_indices=desired_row_indices,
+                    desired_column_indices=desired_column_indices,
+                    wgrib_exe_name=wgrib2_exe_name,
+                    temporary_dir_name=temporary_dir_name,
+                    field_names=field_names
+                )
             else:
                 nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
                     grib2_file_name=input_file_names[k],
