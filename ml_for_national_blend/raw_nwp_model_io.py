@@ -25,6 +25,7 @@ import grib_io
 import number_rounding
 import time_conversion
 import longitude_conversion as lng_conversion
+import moisture_conversions as moisture_conv
 import file_system_utils
 import error_checking
 import misc_utils
@@ -95,6 +96,60 @@ FIELD_NAME_TO_CONV_FACTOR = {
 }
 
 ALL_FIELD_NAMES = list(FIELD_NAME_TO_GRIB_NAME.keys())
+
+FIELD_NAME_TO_GRIB_NAME_ECMWF = {
+    nwp_model_utils.MSL_PRESSURE_NAME: 'MSL:sfc',
+    nwp_model_utils.SURFACE_PRESSURE_NAME: 'SP:sfc',
+    nwp_model_utils.TEMPERATURE_2METRE_NAME: '2T:sfc',
+    nwp_model_utils.DEWPOINT_2METRE_NAME: '2D:sfc',
+    nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME: '2RH:sfc',  # Will not work.
+    nwp_model_utils.U_WIND_10METRE_NAME: '10U:sfc',
+    nwp_model_utils.V_WIND_10METRE_NAME: '10V:sfc',
+    nwp_model_utils.WIND_GUST_10METRE_NAME: '10GUST:sfc',  # Will not work.
+    nwp_model_utils.PRECIP_NAME: 'TP:sfc',
+    nwp_model_utils.HEIGHT_500MB_NAME: 'GH:500 mb',
+    nwp_model_utils.HEIGHT_700MB_NAME: 'GH:700 mb',
+    nwp_model_utils.RELATIVE_HUMIDITY_500MB_NAME: 'R:500 mb',
+    nwp_model_utils.RELATIVE_HUMIDITY_700MB_NAME: 'R:700 mb',
+    nwp_model_utils.RELATIVE_HUMIDITY_850MB_NAME: 'R:850 mb',
+    nwp_model_utils.U_WIND_500MB_NAME: 'U:500 mb',
+    nwp_model_utils.U_WIND_700MB_NAME: 'U:700 mb',
+    nwp_model_utils.U_WIND_1000MB_NAME: 'U:1000 mb',
+    nwp_model_utils.V_WIND_500MB_NAME: 'V:500 mb',
+    nwp_model_utils.V_WIND_700MB_NAME: 'V:700 mb',
+    nwp_model_utils.V_WIND_1000MB_NAME: 'V:1000 mb',
+    nwp_model_utils.TEMPERATURE_850MB_NAME: 'T:850 mb',
+    nwp_model_utils.TEMPERATURE_950MB_NAME: 'T:950 mb',  # Will not work.
+    nwp_model_utils.MIN_RELATIVE_HUMIDITY_2METRE_NAME: '2MINRH:sfc',  # Will not work.
+    nwp_model_utils.MAX_RELATIVE_HUMIDITY_2METRE_NAME: '2MAXRH:sfc'  # Will not work.
+}
+
+FIELD_NAME_TO_CONV_FACTOR_ECMWF = {
+    nwp_model_utils.MSL_PRESSURE_NAME: 1.,
+    nwp_model_utils.SURFACE_PRESSURE_NAME: 1.,
+    nwp_model_utils.TEMPERATURE_2METRE_NAME: 1.,
+    nwp_model_utils.DEWPOINT_2METRE_NAME: 1.,
+    nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME: 0.01,
+    nwp_model_utils.U_WIND_10METRE_NAME: 1.,
+    nwp_model_utils.V_WIND_10METRE_NAME: 1.,
+    nwp_model_utils.WIND_GUST_10METRE_NAME: 1.,
+    nwp_model_utils.PRECIP_NAME: 1.,
+    nwp_model_utils.HEIGHT_500MB_NAME: 1.,
+    nwp_model_utils.HEIGHT_700MB_NAME: 1.,
+    nwp_model_utils.RELATIVE_HUMIDITY_500MB_NAME: 0.01,
+    nwp_model_utils.RELATIVE_HUMIDITY_700MB_NAME: 0.01,
+    nwp_model_utils.RELATIVE_HUMIDITY_850MB_NAME: 0.01,
+    nwp_model_utils.U_WIND_500MB_NAME: 1.,
+    nwp_model_utils.U_WIND_700MB_NAME: 1.,
+    nwp_model_utils.U_WIND_1000MB_NAME: 1.,
+    nwp_model_utils.V_WIND_500MB_NAME: 1.,
+    nwp_model_utils.V_WIND_700MB_NAME: 1.,
+    nwp_model_utils.V_WIND_1000MB_NAME: 1.,
+    nwp_model_utils.TEMPERATURE_850MB_NAME: 1.,
+    nwp_model_utils.TEMPERATURE_950MB_NAME: 1.,
+    nwp_model_utils.MIN_RELATIVE_HUMIDITY_2METRE_NAME: 0.01,
+    nwp_model_utils.MAX_RELATIVE_HUMIDITY_2METRE_NAME: 0.01
+}
 
 
 def find_file(directory_name, model_name, init_time_unix_sec, forecast_hour,
@@ -176,7 +231,7 @@ def file_name_to_init_time(nwp_forecast_file_name, model_name):
     pathless_file_name = os.path.split(nwp_forecast_file_name)[1]
 
     if model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
-        assert len(pathless_file_name) == 11
+        assert len(pathless_file_name) in [11, 13]
 
         # fake_init_time_unix_sec = time_conversion.string_to_unix_sec(
         #     pathless_file_name[:7], INIT_TIME_FORMAT_JULIAN
@@ -523,6 +578,162 @@ def read_file(
 
     if rotate_winds:
         os.remove(new_grib2_file_name)
+
+    coord_dict = {
+        nwp_model_utils.FORECAST_HOUR_DIM:
+            numpy.array([forecast_hour], dtype=int),
+        nwp_model_utils.ROW_DIM: desired_row_indices,
+        nwp_model_utils.COLUMN_DIM: desired_column_indices,
+        nwp_model_utils.FIELD_DIM: field_names
+    }
+
+    these_dim = (
+        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
+        nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+    )
+    main_data_dict = {
+        nwp_model_utils.DATA_KEY: (
+            these_dim, numpy.expand_dims(data_matrix, axis=0)
+        )
+    }
+
+    these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
+    main_data_dict.update({
+        nwp_model_utils.LATITUDE_KEY: (
+            these_dim,
+            latitude_matrix_deg_n[desired_row_indices, :][:, desired_column_indices]
+        ),
+        nwp_model_utils.LONGITUDE_KEY: (
+            these_dim,
+            longitude_matrix_deg_e[desired_row_indices, :][:, desired_column_indices]
+        )
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
+def read_ecmwf_file(
+        grib_file_name, desired_row_indices, desired_column_indices,
+        wgrib_exe_name, temporary_dir_name, field_names=ALL_FIELD_NAMES):
+    """Same as read_file but for ECMWF data.
+
+    :param grib_file_name: See documentation for `read_file`.
+    :param desired_row_indices: Same.
+    :param desired_column_indices: Same.
+    :param wgrib_exe_name: Same.
+    :param temporary_dir_name: Same.
+    :param field_names: Same.
+    :return: nwp_forecast_table_xarray: Same.
+    """
+
+    # Check input args.
+    (
+        latitude_matrix_deg_n, longitude_matrix_deg_e
+    ) = nwp_model_utils.read_model_coords(
+        model_name=nwp_model_utils.ECMWF_MODEL_NAME
+    )
+
+    longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
+        longitude_matrix_deg_e
+    )
+
+    num_grid_rows = latitude_matrix_deg_n.shape[0]
+    num_grid_columns = latitude_matrix_deg_n.shape[1]
+
+    error_checking.assert_is_numpy_array(
+        desired_column_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_column_indices)
+    error_checking.assert_is_geq_numpy_array(desired_column_indices, 0)
+    error_checking.assert_is_less_than_numpy_array(
+        desired_column_indices, num_grid_columns
+    )
+
+    error_checking.assert_is_numpy_array(
+        desired_row_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_row_indices)
+    error_checking.assert_is_geq_numpy_array(desired_row_indices, 0)
+    error_checking.assert_is_less_than_numpy_array(
+        desired_row_indices, num_grid_rows
+    )
+    error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
+
+    error_checking.assert_is_string_list(field_names)
+    for this_field_name in field_names:
+        nwp_model_utils.check_field_name(this_field_name)
+
+    # Do actual stuff.
+    forecast_hour = file_name_to_forecast_hour(grib_file_name)
+
+    num_grid_rows = len(desired_row_indices)
+    num_grid_columns = len(desired_column_indices)
+    num_fields = len(field_names)
+    data_matrix = numpy.full(
+        (num_grid_rows, num_grid_columns, num_fields), numpy.nan
+    )
+
+    # new_grib2_file_name = None
+    # grib2_file_name_to_use = grib2_file_name
+
+    for f in range(num_fields):
+        if field_names[f] == nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME:
+            continue
+
+        grib_search_string = FIELD_NAME_TO_GRIB_NAME_ECMWF[field_names[f]]
+
+        print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
+            grib_search_string, grib_file_name
+        ))
+        this_data_matrix = grib_io.read_field_from_grib_file(
+            grib_file_name=grib_file_name,
+            field_name_grib1=grib_search_string,
+            num_grid_rows=latitude_matrix_deg_n.shape[0],
+            num_grid_columns=latitude_matrix_deg_n.shape[1],
+            wgrib_exe_name=wgrib_exe_name,
+            wgrib2_exe_name=None,
+            temporary_dir_name=temporary_dir_name,
+            sentinel_value=SENTINEL_VALUE,
+            raise_error_if_fails=(
+                field_names[f] not in
+                nwp_model_utils.model_to_maybe_missing_fields(
+                    nwp_model_utils.ECMWF_MODEL_NAME
+                )
+            )
+        )
+
+        if this_data_matrix is None:
+            warning_string = (
+                'POTENTIAL ERROR: Cannot find line "{0:s}" in GRIB file: '
+                '"{1:s}"'
+            ).format(
+                grib_search_string, grib_file_name
+            )
+
+            warnings.warn(warning_string)
+            continue
+
+        this_data_matrix = this_data_matrix[desired_row_indices, :]
+        this_data_matrix = this_data_matrix[:, desired_column_indices]
+        # assert not numpy.any(numpy.isnan(this_data_matrix))
+
+        data_matrix[..., f] = (
+            this_data_matrix * FIELD_NAME_TO_CONV_FACTOR_ECMWF[field_names[f]]
+        )
+
+    for f in range(num_fields):
+        if field_names[f] != nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME:
+            continue
+
+        temp_idx = field_names.index(nwp_model_utils.TEMPERATURE_2METRE_NAME)
+        dewp_idx = field_names.index(nwp_model_utils.DEWPOINT_2METRE_NAME)
+        pres_idx = field_names.index(nwp_model_utils.SURFACE_PRESSURE_NAME)
+
+        data_matrix[..., f] = moisture_conv.dewpoint_to_relative_humidity(
+            dewpoints_kelvins=data_matrix[..., dewp_idx],
+            temperatures_kelvins=data_matrix[..., temp_idx],
+            total_pressures_pascals=data_matrix[..., pres_idx]
+        )
 
     coord_dict = {
         nwp_model_utils.FORECAST_HOUR_DIM:

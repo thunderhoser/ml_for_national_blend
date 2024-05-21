@@ -231,6 +231,8 @@ def read_field_from_grib_file(
 
     # Housekeeping.
     grib_file_type = file_name_to_type(grib_file_name)
+    if wgrib2_exe_name is None:
+        grib_file_type = GRIB1_FILE_TYPE
 
     if temporary_dir_name is not None:
         file_system_utils.mkdir_recursive_if_necessary(
