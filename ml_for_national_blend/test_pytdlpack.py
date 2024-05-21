@@ -10,8 +10,8 @@ import pytdlpack
 SENTINEL_VALUE = 9999.
 
 INPUT_FILE_NAME = (
-    '/scratch1/NCEPDEV/mdl/Geoff.Wagner/firewx_test_data/gmos/tdlpack/'
-    'gfs00gmos_co.trimmed.202211'
+    '/scratch2/STI/mdl-sti/John.Crockett/firewx_data/gmos/fdr/'
+    'gfs00gmos_co.202204'
 )
 
 
