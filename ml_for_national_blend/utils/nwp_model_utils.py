@@ -45,9 +45,11 @@ GFS_MODEL_NAME = 'gfs'
 HRRR_MODEL_NAME = 'hrrr'
 GEFS_MODEL_NAME = 'gefs'
 GRIDDED_LAMP_MODEL_NAME = 'gridded_lamp'
+ECMWF_MODEL_NAME = 'ecmwf'
 ALL_MODEL_NAMES = [
     WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
-    GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME
+    GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME,
+    ECMWF_MODEL_NAME
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
@@ -202,7 +204,7 @@ def check_init_time(init_time_unix_sec, model_name):
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return
 
-    if model_name == WRF_ARW_MODEL_NAME:
+    if model_name in [WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME]:
         assert hour_string in ['00', '12']
     else:
         assert hour_string in ['00', '06', '12', '18']
@@ -224,7 +226,7 @@ def model_to_init_time_interval(model_name):
 
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
-    if model_name == WRF_ARW_MODEL_NAME:
+    if model_name in [WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME]:
         return 12 * HOURS_TO_SECONDS
 
     return 6 * HOURS_TO_SECONDS
@@ -283,6 +285,9 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
             numpy.linspace(246, 384, num=24, dtype=int)
         ])
 
+    if model_name == ECMWF_MODEL_NAME:
+        return numpy.linspace(6, 240, num=40, dtype=int)
+
     return numpy.linspace(1, 48, num=48, dtype=int)
 
 
@@ -335,6 +340,14 @@ def model_to_maybe_missing_fields(model_name):
             V_WIND_500MB_NAME, V_WIND_700MB_NAME, V_WIND_1000MB_NAME,
             TEMPERATURE_850MB_NAME, TEMPERATURE_950MB_NAME,
             MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
+        ]
+
+    if model_name == ECMWF_MODEL_NAME:
+        return [
+            WIND_GUST_10METRE_NAME,
+            MIN_RELATIVE_HUMIDITY_2METRE_NAME,
+            MAX_RELATIVE_HUMIDITY_2METRE_NAME,
+            TEMPERATURE_950MB_NAME
         ]
 
     return [WIND_GUST_10METRE_NAME]
@@ -408,7 +421,7 @@ def model_to_nbm_downsampling_factor(model_name):
 
     if model_name in [RAP_MODEL_NAME, NAM_MODEL_NAME]:
         return 4
-    if model_name == GFS_MODEL_NAME:
+    if model_name in [GFS_MODEL_NAME, ECMWF_MODEL_NAME]:
         return 8
     if model_name == GEFS_MODEL_NAME:
         return 16
@@ -946,7 +959,7 @@ def precip_from_incremental_to_full_run(
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
 
-    assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME]
+    assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME, ECMWF_MODEL_NAME]
     error_checking.assert_is_boolean(be_lenient_with_forecast_hours)
 
     forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values

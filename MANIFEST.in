@@ -4,6 +4,7 @@ include ml_for_national_blend/utils/nam_coords.nc
 include ml_for_national_blend/utils/nam_nest_coords.nc
 include ml_for_national_blend/utils/rap_coords.nc
 include ml_for_national_blend/utils/gfs_coords.nc
+include ml_for_national_blend/utils/ecmwf_coords.nc
 include ml_for_national_blend/utils/hrrr_coords.nc
 include ml_for_national_blend/utils/gefs_coords.nc
 include ml_for_national_blend/utils/gridded_lamp_coords.nc

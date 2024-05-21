@@ -172,10 +172,11 @@ def _run(input_dir_name, model_name,
 
     # start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e, and
     # end_longitude_deg_e are used to subset the domain for global models.
-    # The only global models are GFS and GEFS.  Thus, if the model is neither
-    # GFS nor GEFS, subsetting the domain is not needed.
+    # The only global models are GFS, GEFS, and ECMWF.  Thus, if the model is
+    # anything else, subsetting the domain is not needed.
     if model_name not in [
-            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.GEFS_MODEL_NAME
+            nwp_model_utils.GFS_MODEL_NAME, nwp_model_utils.GEFS_MODEL_NAME,
+            nwp_model_utils.ECMWF_MODEL_NAME
     ]:
         start_latitude_deg_n = 1001.
         end_latitude_deg_n = 1001.
@@ -223,8 +224,8 @@ def _run(input_dir_name, model_name,
         init_times_unix_sec += 3 * HOURS_TO_SECONDS
 
     # For the given model, read grid coordinates and find desired grid points.
-    # If the model is global (GFS or GEFS), desired grid points may be a subset.
-    # Otherwise, desired grid points will be the entire grid.
+    # If the model is global (GFS/GEFS/ECMWF), desired grid points may be a
+    # subset.  Otherwise, desired grid points will be the entire grid.
     latitude_matrix_deg_n = nwp_model_utils.read_model_coords(
         model_name=model_name
     )[0]
@@ -247,12 +248,21 @@ def _run(input_dir_name, model_name,
             start_longitude_deg_e=start_longitude_deg_e,
             end_longitude_deg_e=end_longitude_deg_e
         )
-    else:
+    elif model_name == nwp_model_utils.GEFS_MODEL_NAME:
         desired_row_indices = gefs_utils.desired_latitudes_to_rows(
             start_latitude_deg_n=start_latitude_deg_n,
             end_latitude_deg_n=end_latitude_deg_n
         )
         desired_column_indices = gefs_utils.desired_longitudes_to_columns(
+            start_longitude_deg_e=start_longitude_deg_e,
+            end_longitude_deg_e=end_longitude_deg_e
+        )
+    elif model_name == nwp_model_utils.ECMWF_MODEL_NAME:
+        desired_row_indices = gfs_utils.desired_latitudes_to_rows(
+            start_latitude_deg_n=start_latitude_deg_n,
+            end_latitude_deg_n=end_latitude_deg_n
+        )
+        desired_column_indices = gfs_utils.desired_longitudes_to_columns(
             start_longitude_deg_e=start_longitude_deg_e,
             end_longitude_deg_e=end_longitude_deg_e
         )
@@ -265,7 +275,8 @@ def _run(input_dir_name, model_name,
     # the precip variable is an accumulation between forecast hours 0 and H --
     # i.e., over the full model run.
     read_incremental_precip = model_name in [
-        nwp_model_utils.NAM_MODEL_NAME, nwp_model_utils.NAM_NEST_MODEL_NAME,
+        nwp_model_utils.NAM_MODEL_NAME,
+        nwp_model_utils.NAM_NEST_MODEL_NAME,
         nwp_model_utils.GEFS_MODEL_NAME
     ]
 
@@ -398,6 +409,7 @@ def _run(input_dir_name, model_name,
                 nwp_model_utils.RAP_MODEL_NAME,
                 nwp_model_utils.GFS_MODEL_NAME,
                 nwp_model_utils.GEFS_MODEL_NAME,
+                nwp_model_utils.ECMWF_MODEL_NAME,
                 nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
             ]
 
