@@ -252,21 +252,21 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         else:
             data_matrix[..., f] *= this_conv_factor
 
-        if numpy.all(numpy.logical_or(
-                found_data_matrix[:, f], numpy.invert(need_data_matrix[:, f])
-        )):
-            continue
-
-        error_string = (
-            'Could not find all forecast hours for field {0:s} in file '
-            '"{1:s}".  Missing the following hours:\n{2:s}'
-        ).format(
-            field_names[f],
-            tdlpack_file_name,
-            str(forecast_hours[found_data_matrix[:, f] == False])
-        )
-
-        raise ValueError(error_string)
+        # if numpy.all(numpy.logical_or(
+        #         found_data_matrix[:, f], numpy.invert(need_data_matrix[:, f])
+        # )):
+        #     continue
+        #
+        # error_string = (
+        #     'Could not find all forecast hours for field {0:s} in file '
+        #     '"{1:s}".  Missing the following hours:\n{2:s}'
+        # ).format(
+        #     field_names[f],
+        #     tdlpack_file_name,
+        #     str(forecast_hours[found_data_matrix[:, f] == False])
+        # )
+        #
+        # raise ValueError(error_string)
 
     coord_dict = {
         nwp_model_utils.FORECAST_HOUR_DIM: forecast_hours,
