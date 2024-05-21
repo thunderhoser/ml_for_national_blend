@@ -32,7 +32,7 @@ import nwp_model_utils
 
 SENTINEL_VALUE = 9999.
 VARIABLE_ID_WORD2 = 000000000
-MAX_PRECIP_FORECAST_HOUR = 156
+# MAX_PRECIP_FORECAST_HOUR = 156
 
 DAYS_TO_HOURS = 24
 KT_TO_METRES_PER_SECOND = 1.852 / 3.6
@@ -45,7 +45,7 @@ FIELD_NAME_TO_TDLPACK_NAME = {
     nwp_model_utils.U_WIND_10METRE_NAME: 224060008,
     nwp_model_utils.V_WIND_10METRE_NAME: 224160008,
     nwp_model_utils.WIND_GUST_10METRE_NAME: 224390008,
-    nwp_model_utils.PRECIP_NAME: 223270008
+    # nwp_model_utils.PRECIP_NAME: 223270008
 }
 
 FIELD_NAME_TO_CONV_FACTOR = {
@@ -57,7 +57,7 @@ FIELD_NAME_TO_CONV_FACTOR = {
     nwp_model_utils.U_WIND_10METRE_NAME: KT_TO_METRES_PER_SECOND,
     nwp_model_utils.V_WIND_10METRE_NAME: KT_TO_METRES_PER_SECOND,
     nwp_model_utils.WIND_GUST_10METRE_NAME: KT_TO_METRES_PER_SECOND,
-    nwp_model_utils.PRECIP_NAME: INCHES_TO_METRES
+    # nwp_model_utils.PRECIP_NAME: INCHES_TO_METRES
 }
 
 ALL_FIELD_NAMES = list(FIELD_NAME_TO_TDLPACK_NAME.keys())
@@ -172,7 +172,7 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
     print('Reading data from: "{0:s}"...'.format(tdlpack_file_name))
     tdlpack_file_object = pytdlpack.open(tdlpack_file_name, 'r')
     tdlpack_file_object.rewind()
-    print(tdlpack_file_object)
+    print(dir(tdlpack_file_object))
 
     num_grid_rows = latitude_matrix_deg_n.shape[0]
     num_grid_columns = latitude_matrix_deg_n.shape[1]
@@ -186,26 +186,9 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
     found_data_matrix = numpy.full(
         (num_forecast_hours, num_fields), False, dtype=bool
     )
-    need_data_matrix = numpy.full(
-        (num_forecast_hours, num_fields), True, dtype=bool
-    )
-
-    if nwp_model_utils.PRECIP_NAME in field_names:
-        field_idx = field_names.index(nwp_model_utils.PRECIP_NAME)
-        hour_idxs = numpy.where(forecast_hours > MAX_PRECIP_FORECAST_HOUR)[0]
-        need_data_matrix[hour_idxs, field_idx] = False
-
-    hour_idxs = numpy.where(forecast_hours == 3)[0]
-    if len(hour_idxs) > 0:
-        need_data_matrix[hour_idxs[0], :] = False
 
     while not tdlpack_file_object.eof:
-
-        # TODO(thunderhoser): This may lead to precip after 156 hours not being
-        # read, even if it is available.
-        if numpy.all(numpy.logical_or(
-                found_data_matrix, numpy.invert(need_data_matrix)
-        )):
+        if numpy.all(found_data_matrix):
             break
 
         this_record_object = tdlpack_file_object.read(unpack=True)
@@ -254,8 +237,6 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
             field_names[field_idx], forecast_hours[hour_idx]
         ))
 
-    print('DONE WITH LOOP')
-
     for f in range(num_fields):
         this_conv_factor = FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
 
@@ -264,22 +245,19 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         else:
             data_matrix[..., f] *= this_conv_factor
 
-        if numpy.all(numpy.logical_or(
-                found_data_matrix[:, f], numpy.invert(need_data_matrix[:, f])
-        )):
+        if numpy.all(found_data_matrix[:, f]):
             continue
 
-        error_string = (
-            'Could not find all forecast hours for field {0:s} in file '
-            '"{1:s}".  Missing the following hours:\n{2:s}'
+        warning_string = (
+            'POTENTIAL ERROR: Could not find all forecast hours for field '
+            '{0:s} in file "{1:s}".  Missing the following hours:\n{2:s}'
         ).format(
             field_names[f],
             tdlpack_file_name,
             str(forecast_hours[found_data_matrix[:, f] == False])
         )
 
-        warnings.warn(error_string)
-        # raise ValueError(error_string)
+        warnings.warn(warning_string)
 
     coord_dict = {
         nwp_model_utils.FORECAST_HOUR_DIM: forecast_hours,
@@ -309,9 +287,10 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
     forecast_table_xarray = xarray.Dataset(
         data_vars=main_data_dict, coords=coord_dict
     )
-    return forecast_table_xarray
     # return nwp_model_utils.precip_from_incremental_to_full_run(
     #     nwp_forecast_table_xarray=forecast_table_xarray,
     #     model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
     #     init_time_unix_sec=init_time_unix_sec
     # )
+
+    return forecast_table_xarray
