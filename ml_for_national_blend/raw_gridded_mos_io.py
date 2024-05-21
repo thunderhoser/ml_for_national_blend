@@ -207,7 +207,10 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
             break
 
         this_record_object = tdlpack_file_object.read(unpack=True)
-        print(this_record_object)
+        print(this_record_object.plain)
+        print(this_record_object.id[0])
+        print(this_record_object.is1[:6])
+        print('\n')
 
         try:
             _ = this_record_object.id
@@ -286,9 +289,7 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
     )
     main_data_dict = {
-        nwp_model_utils.DATA_KEY: (
-            these_dim, numpy.expand_dims(data_matrix, axis=0)
-        )
+        nwp_model_utils.DATA_KEY: (these_dim, data_matrix)
     }
 
     these_dim = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
