@@ -203,6 +203,7 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
             break
 
         this_record_object = tdlpack_file_object.read(unpack=True)
+        print(this_record_object)
 
         try:
             _ = this_record_object.id
@@ -237,6 +238,8 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         print('Found data for field {0:s} at forecast hour {1:d}!'.format(
             field_names[field_idx], forecast_hours[hour_idx]
         ))
+
+    print('DONE WITH LOOP')
 
     for f in range(num_fields):
         this_conv_factor = FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
