@@ -177,8 +177,24 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
     found_data_matrix = numpy.full(
         (num_forecast_hours, num_fields), False, dtype=bool
     )
+    need_data_matrix = numpy.full(
+        (num_forecast_hours, num_fields), True, dtype=bool
+    )
+
+    if nwp_model_utils.PRECIP_NAME in field_names:
+        field_idx = field_names.index(nwp_model_utils.PRECIP_NAME)
+        hour_idxs = numpy.where(forecast_hours > MAX_PRECIP_FORECAST_HOUR)[0]
+        need_data_matrix[hour_idxs, field_idx] = False
 
     while not tdlpack_file_object.eof:
+
+        # TODO(thunderhoser): This may lead to precip after 156 hours not being
+        # read, even if it is available.
+        if numpy.all(numpy.logical_or(
+                found_data_matrix, numpy.invert(need_data_matrix)
+        )):
+            break
+
         this_record_object = tdlpack_file_object.read(unpack=True)
 
         try:
@@ -190,8 +206,16 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         if this_record_object.id[0] not in field_names_tdlpack:
             continue
 
-        # TODO(thunderhoser): This might change for 12Z model runs.
-        if this_record_object.id[1] != VARIABLE_ID_WORD2:
+        this_init_time_string = '{0:04d}-{1:02d}-{2:02d}-{3:02d}'.format(
+            this_record_object.is1[2],
+            this_record_object.is1[3],
+            this_record_object.is1[4],
+            this_record_object.is1[5]
+        )
+        this_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            this_init_time_string, '%Y-%m-%d-%H'
+        )
+        if this_init_time_unix_sec != init_time_unix_sec:
             continue
 
         this_record_object.unpack(data=True)
@@ -215,16 +239,9 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         else:
             data_matrix[..., f] *= this_conv_factor
 
-        if field_names[f] == nwp_model_utils.PRECIP_NAME:
-            relevant_idxs = numpy.where(
-                forecast_hours <= MAX_PRECIP_FORECAST_HOUR
-            )[0]
-        else:
-            relevant_idxs = numpy.linspace(
-                0, num_forecast_hours - 1, num=num_forecast_hours, dtype=int
-            )
-
-        if numpy.all(found_data_matrix[relevant_idxs, f]):
+        if numpy.all(numpy.logical_or(
+                found_data_matrix[:, f], numpy.invert(need_data_matrix[:, f])
+        )):
             continue
 
         error_string = (
