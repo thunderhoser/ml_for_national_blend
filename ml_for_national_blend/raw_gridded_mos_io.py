@@ -201,8 +201,9 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         if this_record_object.id[1] != VARIABLE_ID_WORD2:
             continue
 
-        print(this_record_object)
-        print(this_record_object.id)
+        print(this_record_object.reference_date)
+        print(type(this_record_object.reference_date))
+        print(this_record_object.is1)
 
         this_record_object.unpack(data=True)
         this_data_matrix = numpy.transpose(this_record_object.data)
