@@ -162,10 +162,11 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         longitude_matrix_deg_e
     )
 
-    forecast_hours = nwp_model_utils.model_to_forecast_hours(
-        model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
-        init_time_unix_sec=init_time_unix_sec
-    )
+    # forecast_hours = nwp_model_utils.model_to_forecast_hours(
+    #     model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
+    #     init_time_unix_sec=init_time_unix_sec
+    # )
+    forecast_hours = numpy.array([6, 60], dtype=int)
     field_names_tdlpack = [FIELD_NAME_TO_TDLPACK_NAME[f] for f in field_names]
 
     print('Reading data from: "{0:s}"...'.format(tdlpack_file_name))
@@ -217,6 +218,7 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         print(this_record_object.plain)
         print(this_record_object.id[0])
         print(this_record_object.is1[:6])
+        print(this_record_object.lead_time)
         print('\n')
 
         if this_record_object.id[0] not in field_names_tdlpack:
@@ -302,8 +304,9 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
     forecast_table_xarray = xarray.Dataset(
         data_vars=main_data_dict, coords=coord_dict
     )
-    return nwp_model_utils.precip_from_incremental_to_full_run(
-        nwp_forecast_table_xarray=forecast_table_xarray,
-        model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
-        init_time_unix_sec=init_time_unix_sec
-    )
+    return forecast_table_xarray
+    # return nwp_model_utils.precip_from_incremental_to_full_run(
+    #     nwp_forecast_table_xarray=forecast_table_xarray,
+    #     model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
+    #     init_time_unix_sec=init_time_unix_sec
+    # )
