@@ -148,6 +148,8 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
     ]
     init_hours = [int(t.split('-')[-1]) for t in init_time_strings]
 
+    print(init_hours)
+
     if process_00z_runs and process_12z_runs:
         good_indices = numpy.linspace(
             0, len(init_hours) - 1, num=len(init_hours), dtype=int
