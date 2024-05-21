@@ -8,6 +8,7 @@ include ml_for_national_blend/ecmwf_coords.nc
 include ml_for_national_blend/hrrr_coords.nc
 include ml_for_national_blend/gefs_coords.nc
 include ml_for_national_blend/gridded_lamp_coords.nc
+include ml_for_national_blend/gridded_gfs_mos_coords.nc
 include ml_for_national_blend/urma_coords.nc
 include ml_for_national_blend/nbm_coords.nc
 include ml_for_national_blend/borders_longitude-positive-in-west.nc

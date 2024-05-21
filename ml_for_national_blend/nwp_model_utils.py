@@ -49,10 +49,11 @@ HRRR_MODEL_NAME = 'hrrr'
 GEFS_MODEL_NAME = 'gefs'
 GRIDDED_LAMP_MODEL_NAME = 'gridded_lamp'
 ECMWF_MODEL_NAME = 'ecmwf'
+GRIDDED_MOS_MODEL_NAME = 'gridded_gfs_mos'
 ALL_MODEL_NAMES = [
     WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
     GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME,
-    ECMWF_MODEL_NAME
+    ECMWF_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
 ]
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
@@ -207,7 +208,9 @@ def check_init_time(init_time_unix_sec, model_name):
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return
 
-    if model_name in [WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME]:
+    if model_name in [
+            WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
+    ]:
         assert hour_string in ['00', '12']
     else:
         assert hour_string in ['00', '06', '12', '18']
@@ -229,7 +232,10 @@ def model_to_init_time_interval(model_name):
 
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
-    if model_name in [WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME]:
+
+    if model_name in [
+            WRF_ARW_MODEL_NAME, ECMWF_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
+    ]:
         return 12 * HOURS_TO_SECONDS
 
     return 6 * HOURS_TO_SECONDS
@@ -290,6 +296,12 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
 
     if model_name == ECMWF_MODEL_NAME:
         return numpy.linspace(6, 240, num=40, dtype=int)
+
+    if model_name == GRIDDED_MOS_MODEL_NAME:
+        return numpy.concatenate([
+            numpy.linspace(3, 192, num=64, dtype=int),
+            numpy.linspace(198, 264, num=12, dtype=int)
+        ])
 
     return numpy.linspace(1, 48, num=48, dtype=int)
 
@@ -353,6 +365,18 @@ def model_to_maybe_missing_fields(model_name):
             TEMPERATURE_950MB_NAME
         ]
 
+    if model_name == GRIDDED_MOS_MODEL_NAME:
+        return [
+            MSL_PRESSURE_NAME, SURFACE_PRESSURE_NAME,
+            HEIGHT_500MB_NAME, HEIGHT_700MB_NAME,
+            RELATIVE_HUMIDITY_500MB_NAME, RELATIVE_HUMIDITY_700MB_NAME,
+            RELATIVE_HUMIDITY_850MB_NAME,
+            U_WIND_500MB_NAME, U_WIND_700MB_NAME, U_WIND_1000MB_NAME,
+            V_WIND_500MB_NAME, V_WIND_700MB_NAME, V_WIND_1000MB_NAME,
+            TEMPERATURE_850MB_NAME, TEMPERATURE_950MB_NAME,
+            MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
+        ]
+
     return [WIND_GUST_10METRE_NAME]
 
 
@@ -404,6 +428,13 @@ def model_to_projection(model_name):
             proj='lcc', lat_1=25., lat_2=25., lat_0=25., lon_0=265.,
             R=6371229., ellps='sphere',
             x_0=2763216.95215798, y_0=263790.58033545
+        )
+
+    if model_name == GRIDDED_MOS_MODEL_NAME:
+        return pyproj.Proj(
+            proj='lcc', lat_1=25., lat_2=25., lon_0=265.,
+            R=6371200., ellps='sphere',
+            x_0=3271151.6058371766, y_0=-2604259.810222088
         )
 
     return None  # Lat-long projection
@@ -995,7 +1026,10 @@ def precip_from_incremental_to_full_run(
     num_forecast_hours = len(forecast_hours)
 
     for j in range(num_forecast_hours)[::-1]:
-        if model_name in [WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, RAP_MODEL_NAME]:
+        if model_name in [
+                WRF_ARW_MODEL_NAME, NAM_MODEL_NAME,
+                RAP_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
+        ]:
             addend_indices = numpy.where(forecast_hours <= forecast_hours[j])[0]
         elif model_name == NAM_NEST_MODEL_NAME:
             addend_flags = numpy.logical_or(
