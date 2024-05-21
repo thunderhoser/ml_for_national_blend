@@ -237,6 +237,8 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
             field_names[field_idx], forecast_hours[hour_idx]
         ))
 
+    tdlpack_file_object.close()
+
     for f in range(num_fields):
         this_conv_factor = FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
 
