@@ -146,8 +146,9 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
         time_conversion.unix_sec_to_string(t, TIME_FORMAT)
         for t in init_times_unix_sec
     ]
-    init_hours = [int(t.split('-')[-1]) for t in init_time_strings]
-
+    init_hours = numpy.array(
+        [int(t.split('-')[-1]) for t in init_time_strings], dtype=int
+    )
     print(init_hours)
 
     if process_00z_runs and process_12z_runs:
