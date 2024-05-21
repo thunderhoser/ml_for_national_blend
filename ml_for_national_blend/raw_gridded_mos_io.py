@@ -207,16 +207,17 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
             break
 
         this_record_object = tdlpack_file_object.read(unpack=True)
-        print(this_record_object.plain)
-        print(this_record_object.id[0])
-        print(this_record_object.is1[:6])
-        print('\n')
 
         try:
             _ = this_record_object.id
             _ = this_record_object.plain
         except:
             continue
+
+        print(this_record_object.plain)
+        print(this_record_object.id[0])
+        print(this_record_object.is1[:6])
+        print('\n')
 
         if this_record_object.id[0] not in field_names_tdlpack:
             continue
