@@ -195,8 +195,9 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         hour_idxs = numpy.where(forecast_hours > MAX_PRECIP_FORECAST_HOUR)[0]
         need_data_matrix[hour_idxs, field_idx] = False
 
-    hour_idx = numpy.where(forecast_hours == 3)[0][0]
-    need_data_matrix[hour_idx, :] = False
+    hour_idxs = numpy.where(forecast_hours == 3)[0]
+    if len(hour_idxs) > 0:
+        need_data_matrix[hour_idxs[0], :] = False
 
     while not tdlpack_file_object.eof:
 
