@@ -38,8 +38,8 @@ INPUT_DIR_NAME="/scratch2/STI/mdl-sti/John.Crockett/firewx_data/gmos/fdr"
 OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_gfs_mos/processed/test"
 WGRIB2_EXE_NAME="wgrib"
 
-FIRST_INIT_TIME_STRINGS=("2018-01-01-00")
-LAST_INIT_TIME_STRINGS=("2018-01-31-18")
+FIRST_INIT_TIME_STRINGS=("2021-01-01-00")
+LAST_INIT_TIME_STRINGS=("2021-01-31-18")
 
 first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
 last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
