@@ -225,6 +225,10 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         if this_record_object.id[0] not in field_names_tdlpack:
             continue
 
+        hour_idxs = numpy.where(forecast_hours == this_record_object.id[2])[0]
+        if len(hour_idxs) == 0:
+            continue
+
         this_init_time_string = '{0:04d}-{1:02d}-{2:02d}-{3:02d}'.format(
             this_record_object.is1[2],
             this_record_object.is1[3],
