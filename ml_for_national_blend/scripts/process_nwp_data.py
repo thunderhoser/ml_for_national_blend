@@ -322,6 +322,7 @@ def _run(input_dir_name, model_name,
         continue_flag = False
         be_lenient_with_forecast_hours = False
         using_old_gfs_or_gefs = False
+        using_oldish_gfs = False
 
         if not found_all_inputs:
             continue_flag = True
@@ -372,7 +373,24 @@ def _run(input_dir_name, model_name,
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
 
-            if model_name in [
+            if model_name == nwp_model_utils.GFS_MODEL_NAME:
+                oldish_forecast_hours = (
+                    nwp_model_utils.model_to_oldish_forecast_hours(model_name)
+                )
+                essential_indices = numpy.where(numpy.isin(
+                    element=forecast_hours, test_elements=oldish_forecast_hours
+                ))[0]
+                found_all_essential_inputs = all([
+                    os.path.isfile(input_file_names[k])
+                    for k in essential_indices
+                ])
+
+                if found_all_essential_inputs:
+                    continue_flag = False
+                    be_lenient_with_forecast_hours = True
+                    using_oldish_gfs = True
+
+            if continue_flag and model_name in [
                     nwp_model_utils.GFS_MODEL_NAME,
                     nwp_model_utils.GEFS_MODEL_NAME
             ]:
@@ -390,9 +408,8 @@ def _run(input_dir_name, model_name,
                 if found_all_essential_inputs:
                     continue_flag = False
                     be_lenient_with_forecast_hours = True
-
-                read_incremental_precip = True
-                using_old_gfs_or_gefs = True
+                    read_incremental_precip = True
+                    using_old_gfs_or_gefs = True
 
         if continue_flag:
             continue
@@ -426,18 +443,31 @@ def _run(input_dir_name, model_name,
                         desired_column_indices=desired_column_indices,
                         wgrib2_exe_name=wgrib2_exe_name,
                         temporary_dir_name=temporary_dir_name,
+                        field_names=field_names
+                    )
+                )
+            elif using_oldish_gfs:
+                nwp_forecast_tables_xarray[k] = (
+                    raw_nwp_model_io.read_oldish_gfs_file(
+                        grib2_file_name=input_file_names[k],
+                        model_name=model_name,
+                        desired_row_indices=desired_row_indices,
+                        desired_column_indices=desired_column_indices,
+                        wgrib2_exe_name=wgrib2_exe_name,
+                        temporary_dir_name=temporary_dir_name,
                         field_names=field_names,
-                        rotate_winds=this_rotate_flag
                     )
                 )
             elif model_name == nwp_model_utils.ECMWF_MODEL_NAME:
-                nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_ecmwf_file(
-                    grib_file_name=input_file_names[k],
-                    desired_row_indices=desired_row_indices,
-                    desired_column_indices=desired_column_indices,
-                    wgrib_exe_name=wgrib2_exe_name,
-                    temporary_dir_name=temporary_dir_name,
-                    field_names=field_names
+                nwp_forecast_tables_xarray[k] = (
+                    raw_nwp_model_io.read_ecmwf_file(
+                        grib_file_name=input_file_names[k],
+                        desired_row_indices=desired_row_indices,
+                        desired_column_indices=desired_column_indices,
+                        wgrib_exe_name=wgrib2_exe_name,
+                        temporary_dir_name=temporary_dir_name,
+                        field_names=field_names
+                    )
                 )
             else:
                 nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
