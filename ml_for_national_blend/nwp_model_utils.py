@@ -325,6 +325,18 @@ def model_to_old_forecast_hours(model_name):
     return numpy.linspace(6, 384, num=64, dtype=int)
 
 
+def model_to_oldish_forecast_hours(model_name):
+    """Same as model_to_forecast_hours but for oldish GFS data.
+
+    :param model_name: See doc for `model_to_forecast_hours`.
+    :return: all_forecast_hours: Same.
+    """
+
+    check_model_name(model_name)
+    assert model_name in [GFS_MODEL_NAME]
+    return numpy.linspace(3, 384, num=128, dtype=int)
+
+
 def model_to_maybe_missing_fields(model_name):
     """Returns list of acceptably missing fields for the given model.
 
