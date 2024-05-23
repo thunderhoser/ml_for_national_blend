@@ -162,11 +162,10 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         longitude_matrix_deg_e
     )
 
-    # forecast_hours = nwp_model_utils.model_to_forecast_hours(
-    #     model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
-    #     init_time_unix_sec=init_time_unix_sec
-    # )
-    forecast_hours = numpy.array([6, 60], dtype=int)
+    forecast_hours = nwp_model_utils.model_to_forecast_hours(
+        model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
+        init_time_unix_sec=init_time_unix_sec
+    )
     field_names_tdlpack = [FIELD_NAME_TO_TDLPACK_NAME[f] for f in field_names]
 
     print('Reading data from: "{0:s}"...'.format(tdlpack_file_name))
@@ -229,7 +228,10 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
 
         if this_data_matrix.shape[1] == num_grid_columns - 200:
             this_data_matrix = numpy.pad(
-                this_data_matrix, pad_width=((0, 0), (200, 0))
+                this_data_matrix,
+                pad_width=((0, 0), (200, 0)),
+                mode='constant',
+                constant_values=numpy.nan
             )
 
         field_idx = field_names_tdlpack.index(this_record_object.id[0])
