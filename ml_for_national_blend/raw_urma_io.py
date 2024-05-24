@@ -107,12 +107,18 @@ def file_name_to_valid_time(urma_file_name):
 
     error_checking.assert_is_string(urma_file_name)
 
-    valid_date_string = urma_file_name.split('/')[-2]
-    hour_string = urma_file_name.split('/')[-1].split('.')[1]
-    hour_string = hour_string.replace('t', '').replace('z', '')
-    valid_time_string = '{0:s}{1:s}'.format(valid_date_string, hour_string)
+    if urma_file_name.endswith('grb2_wexp'):
+        valid_date_string = urma_file_name.split('/')[-2]
+        hour_string = urma_file_name.split('/')[-1].split('.')[1]
+        hour_string = hour_string.replace('t', '').replace('z', '')
+        valid_time_string = '{0:s}{1:s}'.format(valid_date_string, hour_string)
 
-    return time_conversion.string_to_unix_sec(valid_time_string, '%Y%m%d%H')
+        return time_conversion.string_to_unix_sec(valid_time_string, '%Y%m%d%H')
+
+    pathless_file_name = os.path.split(urma_file_name)[1]
+    return time_conversion.string_to_unix_sec(
+        pathless_file_name[:7], VALID_TIME_FORMAT_JULIAN
+    )
 
 
 def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
