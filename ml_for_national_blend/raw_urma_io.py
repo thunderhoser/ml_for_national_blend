@@ -30,8 +30,13 @@ import error_checking
 import urma_utils
 
 SENTINEL_VALUE = 9.999e20
+
 HOURS_TO_SECONDS = 3600
 VALID_TIME_FORMAT_JULIAN = '%y%j%H'
+
+FORMAT_CUTOFF_TIME_UNIX_SEC = time_conversion.string_to_unix_sec(
+    '2017-05-02-00', '%Y-%m-%d-%H'
+)
 
 FIELD_NAME_TO_GRIB_NAME = {
     urma_utils.TEMPERATURE_2METRE_NAME: 'TMP:2 m above ground',
@@ -246,16 +251,17 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
         # NaN rows), the GRIB2 file is in row-major order -- but for later URMA
         # data (without NaN rows), the GRIB2 file is in column-major order.
         # Fuck literally everything.
-        if not numpy.any(numpy.isnan(this_data_matrix)):
+        if valid_time_unix_sec >= FORMAT_CUTOFF_TIME_UNIX_SEC:
             orig_dimensions = this_data_matrix.shape
             this_data_matrix = numpy.reshape(
                 numpy.ravel(this_data_matrix), orig_dimensions, order='F'
             )
+            assert not numpy.any(numpy.isnan(this_data_matrix))
+        else:
+            print(this_data_matrix[250:260, 250:260])
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
-        # assert not numpy.any(numpy.isnan(this_data_matrix))
-
         data_matrix[..., f] = this_data_matrix + 0.
 
     if rotate_winds:
