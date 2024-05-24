@@ -31,6 +31,7 @@ import urma_utils
 
 SENTINEL_VALUE = 9.999e20
 HOURS_TO_SECONDS = 3600
+VALID_TIME_FORMAT_JULIAN = '%y%j%H'
 
 FIELD_NAME_TO_GRIB_NAME = {
     urma_utils.TEMPERATURE_2METRE_NAME: 'TMP:2 m above ground',
@@ -74,6 +75,18 @@ def find_file(directory_name, valid_time_unix_sec, raise_error_if_missing=True):
         directory_name,
         valid_date_string,
         hour_string
+    )
+
+    if os.path.isfile(urma_file_name) or not raise_error_if_missing:
+        return urma_file_name
+
+    valid_time_string_julian = time_conversion.unix_sec_to_string(
+        valid_time_unix_sec, VALID_TIME_FORMAT_JULIAN
+    )
+    urma_file_name = '{0:s}/{1:s}/{2:s}000000'.format(
+        directory_name,
+        valid_date_string,
+        valid_time_string_julian
     )
 
     if raise_error_if_missing and not os.path.isfile(urma_file_name):
