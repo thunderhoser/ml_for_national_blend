@@ -279,15 +279,27 @@ def read_field_from_grib_file(
     field_vector = numpy.loadtxt(temporary_file_name)
     os.remove(temporary_file_name)
 
-    try:
+    if len(field_vector) == (num_grid_columns - 200) * num_grid_rows:
+        field_matrix = numpy.reshape(
+            field_vector, (num_grid_rows, num_grid_columns - 200)
+        )
+        field_matrix = numpy.pad(
+            field_matrix,
+            pad_width=((0, 0), (200, 0)),
+            mode='constant',
+            constant_values=numpy.nan
+        )
+        return _sentinel_value_to_nan(
+            data_matrix=field_matrix, sentinel_value=sentinel_value
+        )
+
+    if len(field_vector) == num_grid_columns * num_grid_rows:
         field_matrix = numpy.reshape(
             field_vector, (num_grid_rows, num_grid_columns)
         )
         return _sentinel_value_to_nan(
             data_matrix=field_matrix, sentinel_value=sentinel_value
         )
-    except:
-        pass
 
     try:
         num_values = len(field_vector)
