@@ -279,13 +279,13 @@ def read_field_from_grib_file(
     field_vector = numpy.loadtxt(temporary_file_name)
     os.remove(temporary_file_name)
 
-    if len(field_vector) == (num_grid_columns - 200) * num_grid_rows:
+    if len(field_vector) == num_grid_columns * (num_grid_rows - 200):
         field_matrix = numpy.reshape(
-            field_vector, (num_grid_rows, num_grid_columns - 200)
+            field_vector, (num_grid_rows - 200, num_grid_columns)
         )
         field_matrix = numpy.pad(
             field_matrix,
-            pad_width=((0, 0), (200, 0)),
+            pad_width=((200, 0), (0, 0)),
             mode='constant',
             constant_values=numpy.nan
         )
