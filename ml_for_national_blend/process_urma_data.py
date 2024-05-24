@@ -151,7 +151,6 @@ def _run(input_dir_name, first_valid_date_string, last_valid_date_string,
             time_interval_sec=HOURS_TO_SECONDS,
             include_endpoint=True
         )
-        valid_times_unix_sec = valid_times_unix_sec[:2]  # TODO: hack!!!
 
         # Find the input (GRIB2) file for each valid time.
         input_file_names = [
