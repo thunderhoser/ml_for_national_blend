@@ -242,10 +242,15 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             warnings.warn(warning_string)
             continue
 
-        orig_dimensions = this_data_matrix.shape
-        this_data_matrix = numpy.reshape(
-            numpy.ravel(this_data_matrix), orig_dimensions, order='F'
-        )
+        # TODO(thunderhoser): This is a HACK.  For earlier URMA data (with 200
+        # NaN rows), the GRIB2 file is in row-major order -- but for later URMA
+        # data (without NaN rows), the GRIB2 file is in column-major order.
+        # Fuck literally everything.
+        if not numpy.any(numpy.isnan(this_data_matrix)):
+            orig_dimensions = this_data_matrix.shape
+            this_data_matrix = numpy.reshape(
+                numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+            )
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
