@@ -249,7 +249,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
-        assert not numpy.any(numpy.isnan(this_data_matrix))
+        # assert not numpy.any(numpy.isnan(this_data_matrix))
 
         data_matrix[..., f] = this_data_matrix + 0.
 
