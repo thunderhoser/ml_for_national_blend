@@ -35,7 +35,7 @@ echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Allison.Layne/firewx_data/nam_nest/grib2"
-OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed"
+OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed"
 WGRIB2_EXE_NAME="wgrib2"
 
 FIRST_INIT_TIME_STRINGS=("2019-05-11-00" "2019-05-11-06" "2019-05-11-12" "2019-05-11-18" "2022-01-26-06" "2022-01-26-12" "2022-01-26-18" "2022-09-18-06" "2022-09-18-12" "2022-09-18-18")

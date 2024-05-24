@@ -35,7 +35,7 @@ echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Allison.Layne/firewx_data/glmp/grib2"
-OUTPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_lamp/processed"
+OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_lamp/processed"
 WGRIB2_EXE_NAME="wgrib2"
 
 FIRST_INIT_TIME_STRINGS=("2023-01-30-18")
