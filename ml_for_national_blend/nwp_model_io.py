@@ -125,6 +125,8 @@ def find_files_for_period(
             if raise_error_if_any_missing:
                 raise this_error
 
+            continue
+
         if os.path.isdir(this_file_name) or os.path.isfile(this_file_name):
             zarr_file_names.append(this_file_name)
 
