@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#SBATCH --job-name="process_urma_data_patch"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=0-81
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_urma_data_patch_%A_%a.out
+
+module load gnu/9.2.0
+module load wgrib2/3.1.2_ncep
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Allison.Layne/firewx_data/urma/grib2"
+OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+WGRIB2_EXE_NAME="wgrib2"
+
+FIRST_VALID_DATE_STRINGS=("20180430" "20181106" "20181107" "20181108" "20181109" "20181110" "20181111" "20181112" "20181113" "20181114" "20181115" "20181116" "20181117" "20181118" "20181119" "20181120" "20181121" "20181122" "20181123" "20181124" "20181125" "20181126" "20181127" "20181128" "20181129" "20181130" "20200308" "20200309" "20200310" "20200311" "20200312" "20200313" "20200314" "20200315" "20200316" "20200317" "20200318" "20200319" "20200320" "20200321" "20200322" "20200323" "20200324" "20200325" "20200326" "20200327" "20200328" "20200329" "20200330" "20200331" "20200415" "20200416" "20200417" "20200418" "20200419" "20200420" "20200421" "20200422" "20200423" "20200424" "20200425" "20200426" "20200427" "20200428" "20200429" "20200430" "20200522" "20200523" "20200524" "20200525" "20200526" "20200527" "20200528" "20200529" "20200530" "20200531" "20200625" "20200626" "20200627" "20200628" "20200629" "20200630")
+LAST_VALID_DATE_STRINGS=("20180430" "20181106" "20181107" "20181108" "20181109" "20181110" "20181111" "20181112" "20181113" "20181114" "20181115" "20181116" "20181117" "20181118" "20181119" "20181120" "20181121" "20181122" "20181123" "20181124" "20181125" "20181126" "20181127" "20181128" "20181129" "20181130" "20200308" "20200309" "20200310" "20200311" "20200312" "20200313" "20200314" "20200315" "20200316" "20200317" "20200318" "20200319" "20200320" "20200321" "20200322" "20200323" "20200324" "20200325" "20200326" "20200327" "20200328" "20200329" "20200330" "20200331" "20200415" "20200416" "20200417" "20200418" "20200419" "20200420" "20200421" "20200422" "20200423" "20200424" "20200425" "20200426" "20200427" "20200428" "20200429" "20200430" "20200522" "20200523" "20200524" "20200525" "20200526" "20200527" "20200528" "20200529" "20200530" "20200531" "20200625" "20200626" "20200627" "20200628" "20200629" "20200630")
+
+first_valid_date_string="${FIRST_VALID_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+last_valid_date_string="${LAST_VALID_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_urma_data.py" \
+--input_grib2_dir_name="${INPUT_DIR_NAME}" \
+--first_valid_date_string="${first_valid_date_string}" \
+--last_valid_date_string="${last_valid_date_string}" \
+--wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_valid_date_string}-${last_valid_date_string}" \
+--output_netcdf_dir_name="${OUTPUT_DIR_NAME}"
