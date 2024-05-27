@@ -219,6 +219,14 @@ def read_file(tdlpack_file_name, init_time_unix_sec,
         this_data_matrix = numpy.transpose(this_record_object.data)
         this_data_matrix[this_data_matrix >= SENTINEL_VALUE - 1] = numpy.nan
 
+        if this_data_matrix.shape[1] == num_grid_columns - 200:
+            this_data_matrix = numpy.pad(
+                this_data_matrix,
+                pad_width=((0, 0), (200, 0)),
+                mode='constant',
+                constant_values=numpy.nan
+            )
+
         field_idx = field_names_tdlpack.index(this_record_object.id[0])
         hour_idx = numpy.where(forecast_hours == this_record_object.id[2])[0][0]
         data_matrix[hour_idx, ..., field_idx] = this_data_matrix

@@ -27,7 +27,13 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 
 SENTINEL_VALUE = 9.999e20
+
 HOURS_TO_SECONDS = 3600
+VALID_TIME_FORMAT_JULIAN = '%y%j%H'
+
+FORMAT_CUTOFF_TIME_UNIX_SEC = time_conversion.string_to_unix_sec(
+    '2017-05-02-00', '%Y-%m-%d-%H'
+)
 
 FIELD_NAME_TO_GRIB_NAME = {
     urma_utils.TEMPERATURE_2METRE_NAME: 'TMP:2 m above ground',
@@ -73,6 +79,18 @@ def find_file(directory_name, valid_time_unix_sec, raise_error_if_missing=True):
         hour_string
     )
 
+    if os.path.isfile(urma_file_name) or not raise_error_if_missing:
+        return urma_file_name
+
+    valid_time_string_julian = time_conversion.unix_sec_to_string(
+        valid_time_unix_sec, VALID_TIME_FORMAT_JULIAN
+    )
+    urma_file_name = '{0:s}/{1:s}/{2:s}000000'.format(
+        directory_name,
+        valid_date_string,
+        valid_time_string_julian
+    )
+
     if raise_error_if_missing and not os.path.isfile(urma_file_name):
         error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
             urma_file_name
@@ -91,12 +109,18 @@ def file_name_to_valid_time(urma_file_name):
 
     error_checking.assert_is_string(urma_file_name)
 
-    valid_date_string = urma_file_name.split('/')[-2]
-    hour_string = urma_file_name.split('/')[-1].split('.')[1]
-    hour_string = hour_string.replace('t', '').replace('z', '')
-    valid_time_string = '{0:s}{1:s}'.format(valid_date_string, hour_string)
+    if urma_file_name.endswith('grb2_wexp'):
+        valid_date_string = urma_file_name.split('/')[-2]
+        hour_string = urma_file_name.split('/')[-1].split('.')[1]
+        hour_string = hour_string.replace('t', '').replace('z', '')
+        valid_time_string = '{0:s}{1:s}'.format(valid_date_string, hour_string)
 
-    return time_conversion.string_to_unix_sec(valid_time_string, '%Y%m%d%H')
+        return time_conversion.string_to_unix_sec(valid_time_string, '%Y%m%d%H')
+
+    pathless_file_name = os.path.split(urma_file_name)[1]
+    return time_conversion.string_to_unix_sec(
+        pathless_file_name[:7], VALID_TIME_FORMAT_JULIAN
+    )
 
 
 def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
@@ -220,15 +244,19 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             warnings.warn(warning_string)
             continue
 
-        orig_dimensions = this_data_matrix.shape
-        this_data_matrix = numpy.reshape(
-            numpy.ravel(this_data_matrix), orig_dimensions, order='F'
-        )
+        # TODO(thunderhoser): This is a HACK.  For earlier URMA data (with 200
+        # NaN rows), the GRIB2 file is in row-major order -- but for later URMA
+        # data (without NaN rows), the GRIB2 file is in column-major order.
+        # Fuck literally everything.
+        if valid_time_unix_sec >= FORMAT_CUTOFF_TIME_UNIX_SEC:
+            orig_dimensions = this_data_matrix.shape
+            this_data_matrix = numpy.reshape(
+                numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+            )
+            assert not numpy.any(numpy.isnan(this_data_matrix))
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
-        assert not numpy.any(numpy.isnan(this_data_matrix))
-
         data_matrix[..., f] = this_data_matrix + 0.
 
     if rotate_winds:
