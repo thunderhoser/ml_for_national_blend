@@ -106,8 +106,12 @@ def field_to_colour_scheme(field_name, min_value, max_value):
     conversion_factor = FIELD_NAME_TO_CONV_FACTOR[field_name]
 
     if callable(conversion_factor):
-        min_value_converted = conversion_factor(min_value)
-        max_value_converted = conversion_factor(max_value)
+        try:
+            min_value_converted = conversion_factor(min_value)
+            max_value_converted = conversion_factor(max_value)
+        except:
+            min_value_converted = conversion_factor(numpy.array([min_value]))[0]
+            max_value_converted = conversion_factor(numpy.array([max_value]))[0]
     else:
         min_value_converted = min_value * conversion_factor
         max_value_converted = max_value * conversion_factor
