@@ -1610,6 +1610,8 @@ def data_generator(option_dict):
 
     # TODO(thunderhoser): HACK because I have data for only every 5th day right
     # now.
+
+    # TODO(thunderhoser): This will fuck up in leap years!
     init_date_strings = [
         time_conversion.unix_sec_to_string(t, '%Y-%j')
         for t in init_times_unix_sec
