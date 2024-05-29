@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH --job-name="get_norm_params_for_nwp"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
@@ -11,7 +11,7 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=48:00:00
+#SBATCH --time=08:00:00
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -30,7 +30,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-OUTPUT_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/normalization_params_20170101-20211220.nc"
+OUTPUT_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/normalization_params_20170101-20211220_bigmem.nc"
 
 python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --model_names "wrf_arw" "nam" "nam_nest" "rap" "gfs" "hrrr" "gefs" "gridded_lamp" "ecmwf" "gridded_gfs_mos" \
@@ -39,5 +39,5 @@ python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --last_init_time_string="2021-12-20-18" \
 --num_init_times_by_model 100 100 100 100 100 100 100 100 100 100 \
 --num_quantiles=1001 \
---num_sample_values_per_file=2000 \
+--num_sample_values_per_file=3000 \
 --output_norm_file_name="${OUTPUT_FILE_NAME}"
