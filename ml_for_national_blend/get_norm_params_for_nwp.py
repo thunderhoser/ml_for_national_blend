@@ -22,6 +22,7 @@ import nwp_model_utils
 import normalization
 
 TIME_FORMAT = '%Y-%m-%d-%H'
+HOURS_TO_SECONDS = 3600
 
 MODELS_ARG_NAME = 'model_names'
 INPUT_DIRS_ARG_NAME = 'input_dir_name_by_model'
@@ -121,13 +122,22 @@ def _find_input_files_1model(
         given model.
     """
 
+    init_time_interval_sec = nwp_model_utils.model_to_init_time_interval(
+        model_name
+    )
+    init_time_interval_sec = max([init_time_interval_sec, 6 * HOURS_TO_SECONDS])
+
     init_times_unix_sec = time_periods.range_and_interval_to_list(
         start_time_unix_sec=first_init_time_unix_sec,
         end_time_unix_sec=last_init_time_unix_sec,
-        time_interval_sec=
-        nwp_model_utils.model_to_init_time_interval(model_name),
+        time_interval_sec=init_time_interval_sec,
         include_endpoint=True
     )
+
+    # TODO(thunderhoser): This is a HACK.  I need to encode this RAP fuckery
+    # somewhere else.
+    if model_name == nwp_model_utils.RAP_MODEL_NAME:
+        init_times_unix_sec += 3 * HOURS_TO_SECONDS
 
     good_indices = []
 
