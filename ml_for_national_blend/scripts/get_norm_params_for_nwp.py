@@ -147,20 +147,17 @@ def _find_input_files_1model(
             init_time_unix_sec=init_times_unix_sec[j]
         )
 
-        # TODO(thunderhoser): Checking only the first and last forecast hours is
-        # a HACK to save time.
-        these_file_names = [
-            interp_nwp_model_io.find_file(
-                directory_name=input_dir_name,
-                init_time_unix_sec=init_times_unix_sec[j],
-                forecast_hour=h,
-                model_name=model_name,
-                raise_error_if_missing=False
-            )
-            for h in [forecast_hours[0], forecast_hours[-1]]
-        ]
+        # TODO(thunderhoser): Checking only the first forecast hour is a HACK to
+        # save time.
+        this_file_name = interp_nwp_model_io.find_file(
+            directory_name=input_dir_name,
+            init_time_unix_sec=init_times_unix_sec[j],
+            forecast_hour=forecast_hours[0],
+            model_name=model_name,
+            raise_error_if_missing=False
+        )
 
-        if not all([os.path.isfile(f) for f in these_file_names]):
+        if not os.path.isfile(this_file_name):
             continue
 
         good_indices.append(j)
@@ -188,16 +185,19 @@ def _find_input_files_1model(
             init_time_unix_sec=init_times_unix_sec[j]
         )
 
-        interp_nwp_file_names += [
+        these_file_names = [
             interp_nwp_model_io.find_file(
                 directory_name=input_dir_name,
                 init_time_unix_sec=init_times_unix_sec[j],
                 forecast_hour=h,
                 model_name=model_name,
-                raise_error_if_missing=True
+                raise_error_if_missing=False
             )
             for h in forecast_hours
         ]
+
+        these_file_names = [f for f in these_file_names if os.path.isfile(f)]
+        interp_nwp_file_names += these_file_names
 
     return interp_nwp_file_names
 
