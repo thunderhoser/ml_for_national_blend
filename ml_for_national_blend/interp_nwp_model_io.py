@@ -204,6 +204,6 @@ def write_file(nwp_forecast_table_xarray, netcdf_file_name):
         nwp_model_utils.DATA_KEY: {'dtype': 'float32'}
     }
     nwp_forecast_table_xarray.to_netcdf(
-        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT',
+        path=netcdf_file_name, mode='w', format='NETCDF4_CLASSIC',
         encoding=encoding_dict
     )

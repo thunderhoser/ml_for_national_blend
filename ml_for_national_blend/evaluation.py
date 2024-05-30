@@ -1218,11 +1218,11 @@ def write_file(result_table_xarray, netcdf_file_name):
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     # result_table_xarray.to_netcdf(
-    #     path=netcdf_file_name, mode='w', format='NETCDF3_64BIT_OFFSET'
+    #     path=netcdf_file_name, mode='w', format='NETCDF4_CLASSIC'
     # )
 
     result_table_xarray.to_netcdf(
-        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
+        path=netcdf_file_name, mode='w', format='NETCDF4_CLASSIC'
     )
 
 
