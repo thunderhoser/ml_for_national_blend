@@ -12,6 +12,8 @@ from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nbm_constant_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
+TOLERANCE = 1e-6
+
 MIN_CUMULATIVE_DENSITY = 1e-6
 MAX_CUMULATIVE_DENSITY = 1. - 1e-6
 # MAX_CUMULATIVE_DENSITY = 0.9995  # To account for 16-bit floats.
@@ -220,6 +222,373 @@ def _quantile_denormalize_1var(data_values, reference_values_1d):
     )
 
     return data_values
+
+
+def get_intermediate_norm_params_for_nwp(
+        interp_nwp_file_names, field_names, precip_forecast_hours,
+        num_sample_values_per_file):
+    """Computes intermediate normalization parameters for NWP data.
+
+    'Final' normalization params = mean, stdev, and quantiles for every variable
+
+    'Intermediate' normalization params = mean, mean of squares, number of
+    values, and sample values for every variable.  Intermediate normalization
+    params computed on many chunks of data can later be combined into final
+    normalization params.
+
+    :param interp_nwp_file_names: See doc for
+        `get_normalization_params_for_nwp`.
+    :param field_names: Same.
+    :param precip_forecast_hours: Same.
+    :param num_sample_values_per_file: Same.
+    :return: intermediate_norm_param_table_xarray: xarray table with
+        intermediate normalization parameters.  Metadata and variable names in
+        this table should make it self-explanatory.
+    """
+
+    # Check input args.
+    error_checking.assert_is_string_list(interp_nwp_file_names)
+    error_checking.assert_is_string_list(field_names)
+    error_checking.assert_is_geq(num_sample_values_per_file, 10)
+
+    error_checking.assert_is_numpy_array(
+        precip_forecast_hours, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(precip_forecast_hours)
+    error_checking.assert_is_greater_numpy_array(precip_forecast_hours, 0)
+
+    for this_field_name in field_names:
+        nwp_model_utils.check_field_name(this_field_name)
+
+    # Do actual stuff.
+    norm_param_dict_dict = {}
+    num_sample_values_total = (
+        len(interp_nwp_file_names) * num_sample_values_per_file
+    )
+
+    for this_field_name in field_names:
+        if this_field_name not in ACCUM_PRECIP_FIELD_NAMES:
+            norm_param_dict_dict[this_field_name] = {
+                NUM_VALUES_KEY: 0,
+                MEAN_VALUE_KEY: 0.,
+                MEAN_OF_SQUARES_KEY: 0.,
+                SAMPLE_VALUES_KEY:
+                    numpy.full(num_sample_values_total, numpy.nan)
+            }
+            continue
+
+        for this_forecast_hour in precip_forecast_hours:
+            norm_param_dict_dict[this_field_name, this_forecast_hour] = {
+                NUM_VALUES_KEY: 0,
+                MEAN_VALUE_KEY: 0.,
+                MEAN_OF_SQUARES_KEY: 0.,
+                SAMPLE_VALUES_KEY:
+                    numpy.full(num_sample_values_total, numpy.nan)
+            }
+
+    for i in range(len(interp_nwp_file_names)):
+        print('Reading data from: "{0:s}"...'.format(interp_nwp_file_names[i]))
+        nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
+            interp_nwp_file_names[i]
+        )
+
+        nwpft = nwp_forecast_table_xarray
+        nwp_field_names = nwpft.coords[nwp_model_utils.FIELD_DIM].values
+        nwp_forecast_hours = numpy.round(
+            nwpft.coords[nwp_model_utils.FORECAST_HOUR_DIM].values
+        ).astype(int)
+
+        for j in range(len(nwp_field_names)):
+            f = nwp_field_names[j]
+            if f not in field_names:
+                continue
+
+            if f not in ACCUM_PRECIP_FIELD_NAMES:
+                norm_param_dict_dict[f] = _update_norm_params_1var_1file(
+                    norm_param_dict=norm_param_dict_dict[f],
+                    new_data_matrix=
+                    nwpft[nwp_model_utils.DATA_KEY].values[..., j],
+                    num_sample_values_per_file=num_sample_values_per_file,
+                    file_index=i
+                )
+                continue
+
+            for k in range(len(nwp_forecast_hours)):
+                if nwp_forecast_hours[k] not in precip_forecast_hours:
+                    continue
+
+                h = nwp_forecast_hours[k]
+
+                norm_param_dict_dict[f, h] = _update_norm_params_1var_1file(
+                    norm_param_dict=norm_param_dict_dict[f, h],
+                    new_data_matrix=
+                    nwpft[nwp_model_utils.DATA_KEY].values[k, ..., j],
+                    num_sample_values_per_file=num_sample_values_per_file,
+                    file_index=i
+                )
+
+    num_fields = len(field_names)
+    num_precip_hours = len(precip_forecast_hours)
+
+    mean_value_matrix = numpy.full(
+        (num_precip_hours, num_fields), numpy.nan
+    )
+    mean_squared_value_matrix = numpy.full(
+        (num_precip_hours, num_fields), numpy.nan
+    )
+    num_values_matrix = numpy.full(
+        (num_precip_hours, num_fields), -1, dtype=int
+    )
+    sample_value_matrix = numpy.full(
+        (num_precip_hours, num_fields, num_sample_values_total), numpy.nan
+    )
+
+    for j in range(num_fields):
+        for k in range(num_precip_hours):
+            f = field_names[j]
+            h = precip_forecast_hours[k]
+
+            if f in ACCUM_PRECIP_FIELD_NAMES:
+                mean_value_matrix[k, j] = (
+                    norm_param_dict_dict[f, h][MEAN_VALUE_KEY]
+                )
+                mean_squared_value_matrix[k, j] = (
+                    norm_param_dict_dict[f, h][MEAN_OF_SQUARES_KEY]
+                )
+                num_values_matrix[k, j] = (
+                    norm_param_dict_dict[f, h][NUM_VALUES_KEY]
+                )
+                sample_value_matrix[k, j, :] = (
+                    norm_param_dict_dict[f, h][SAMPLE_VALUES_KEY]
+                )
+
+                print((
+                    'Mean, mean square, and num values for {0:s} at '
+                    '{1:d}-hour lead = {2:.4g}, {3:.4g}, {4:d}'
+                ).format(
+                    field_names[j],
+                    precip_forecast_hours[k],
+                    mean_value_matrix[k, j],
+                    mean_squared_value_matrix[k, j],
+                    num_values_matrix[k, j]
+                ))
+            else:
+                mean_value_matrix[k, j] = (
+                    norm_param_dict_dict[f][MEAN_VALUE_KEY]
+                )
+                mean_squared_value_matrix[k, j] = (
+                    norm_param_dict_dict[f][MEAN_OF_SQUARES_KEY]
+                )
+                num_values_matrix[k, j] = (
+                    norm_param_dict_dict[f][NUM_VALUES_KEY]
+                )
+                sample_value_matrix[k, j, :] = (
+                    norm_param_dict_dict[f][SAMPLE_VALUES_KEY]
+                )
+
+                if k > 0:
+                    continue
+
+                print((
+                    'Mean, mean square, and num values for {0:s} = '
+                    '{1:.4g}, {2:.4g}, {3:.4g}'
+                ).format(
+                    field_names[j],
+                    mean_value_matrix[k, j],
+                    mean_squared_value_matrix[k, j],
+                    num_values_matrix[k, j]
+                ))
+
+    coord_dict = {
+        nwp_model_utils.FORECAST_HOUR_DIM: precip_forecast_hours,
+        nwp_model_utils.FIELD_DIM: field_names,
+        nwp_model_utils.SAMPLE_VALUE_DIM: numpy.linspace(
+            0, num_sample_values_total - 1,
+            num=num_sample_values_total, dtype=int
+        )
+    }
+
+    these_dim = (nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.FIELD_DIM)
+    main_data_dict = {
+        nwp_model_utils.MEAN_VALUE_KEY: (these_dim, mean_value_matrix),
+        nwp_model_utils.MEAN_SQUARED_VALUE_KEY: (
+            these_dim, mean_squared_value_matrix
+        ),
+        nwp_model_utils.NUM_VALUES_KEY: (these_dim, num_values_matrix)
+    }
+
+    these_dim = (
+        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.FIELD_DIM,
+        nwp_model_utils.SAMPLE_VALUE_DIM
+    )
+    main_data_dict.update({
+        nwp_model_utils.SAMPLE_VALUE_KEY: (these_dim, sample_value_matrix)
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
+def intermediate_to_final_normalization_params(
+        intermediate_norm_param_tables_xarray, num_quantiles):
+    """Computes final normalization params from intermediate ones.
+
+    Each set of intermediate normalization params is based on a different chunk
+    of data -- e.g., one possibility is that each set of intermediate params is
+    based on a different NWP model.
+
+    :param intermediate_norm_param_tables_xarray: 1-D list of xarray tables with
+        intermediate normalization params, each produced by
+        `get_intermediate_norm_params_for_nwp`.
+    :param num_quantiles: Number of quantiles to store for each variable.  The
+        quantile levels will be evenly spaced from 0 to 1 (i.e., the 0th to
+        100th percentile).
+    :return: normalization_param_table_xarray: xarray table with final
+        normalization parameters.  Metadata and variable names in this table
+        should make it self-explanatory.
+    """
+
+    # Check input args.
+    first_table = intermediate_norm_param_tables_xarray[0]
+
+    for this_table in intermediate_norm_param_tables_xarray[1:]:
+        assert numpy.array_equal(
+            first_table.coords[nwp_model_utils.FORECAST_HOUR_DIM].values,
+            this_table.coords[nwp_model_utils.FORECAST_HOUR_DIM].values
+        )
+        assert numpy.array_equal(
+            first_table.coords[nwp_model_utils.FIELD_DIM].values,
+            this_table.coords[nwp_model_utils.FIELD_DIM].values
+        )
+
+    error_checking.assert_is_geq(num_quantiles, 100)
+
+    # Do actual stuff.
+    precip_forecast_hours = (
+        first_table.coords[nwp_model_utils.FORECAST_HOUR_DIM].values
+    )
+    field_names = first_table.coords[nwp_model_utils.FIELD_DIM].values
+
+    num_fields = len(field_names)
+    num_precip_hours = len(precip_forecast_hours)
+    quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
+
+    mean_value_matrix = numpy.full(
+        (num_precip_hours, num_fields), numpy.nan
+    )
+    mean_squared_value_matrix = numpy.full(
+        (num_precip_hours, num_fields), numpy.nan
+    )
+    stdev_matrix = numpy.full(
+        (num_precip_hours, num_fields), numpy.nan
+    )
+    quantile_matrix = numpy.full(
+        (num_precip_hours, num_fields, num_quantiles), numpy.nan
+    )
+
+    for h in range(num_precip_hours):
+        for f in range(num_fields):
+            these_counts = numpy.array([
+                t[nwp_model_utils.NUM_VALUES_KEY].values[h, f]
+                for t in intermediate_norm_param_tables_xarray
+            ])
+
+            if numpy.sum(these_counts) < TOLERANCE:
+                continue
+
+            these_means = numpy.array([
+                t[nwp_model_utils.MEAN_VALUE_KEY].values[h, f]
+                for t in intermediate_norm_param_tables_xarray
+            ])
+            mean_value_matrix[h, f] = numpy.average(
+                these_means, weights=these_counts
+            )
+
+            these_mean_squares = numpy.array([
+                t[nwp_model_utils.MEAN_SQUARED_VALUE_KEY].values[h, f]
+                for t in intermediate_norm_param_tables_xarray
+            ])
+            mean_squared_value_matrix[h, f] = numpy.average(
+                these_mean_squares, weights=these_counts
+            )
+
+            this_norm_param_dict = {
+                NUM_VALUES_KEY: numpy.sum(these_counts).astype(int),
+                MEAN_VALUE_KEY: mean_value_matrix[h, f],
+                MEAN_OF_SQUARES_KEY: mean_squared_value_matrix[h, f]
+            }
+            stdev_matrix[h, f] = _get_standard_deviation_1var(
+                this_norm_param_dict
+            )
+
+            these_sample_values = numpy.concatenate([
+                t[nwp_model_utils.SAMPLE_VALUE_KEY].values[h, f, :]
+                for t in intermediate_norm_param_tables_xarray
+            ])
+            quantile_matrix[h, f, :] = numpy.nanpercentile(
+                these_sample_values, 100 * quantile_levels
+            )
+
+            if field_names[f] in ACCUM_PRECIP_FIELD_NAMES:
+                print((
+                    'Mean, mean square, and standard deviation for {0:s} at '
+                    '{1:d}-hour lead = {2:.4g}, {3:.4g}, {4:.4g}'
+                ).format(
+                    field_names[f],
+                    precip_forecast_hours[h],
+                    mean_value_matrix[f, h],
+                    mean_squared_value_matrix[f, h],
+                    stdev_matrix[f, h]
+                ))
+            else:
+                if h > 0:
+                    continue
+
+                print((
+                    'Mean, mean square, and standard deviation for {0:s} = '
+                    '{1:.4g}, {2:.4g}, {3:.4g}'
+                ).format(
+                    field_names[f],
+                    mean_value_matrix[h, f],
+                    mean_squared_value_matrix[h, f],
+                    stdev_matrix[h, f]
+                ))
+
+            for m in range(num_quantiles)[::10]:
+                print((
+                    '{0:.2f}th percentile for {1:s}{2:s} = {3:.4g}'
+                ).format(
+                    100 * quantile_levels[m],
+                    field_names[f],
+                    ' at {0:d}-hour lead'.format(precip_forecast_hours[h])
+                    if f in ACCUM_PRECIP_FIELD_NAMES
+                    else '',
+                    quantile_matrix[h, f, m]
+                ))
+
+    coord_dict = {
+        nwp_model_utils.FORECAST_HOUR_DIM: precip_forecast_hours,
+        nwp_model_utils.FIELD_DIM: field_names,
+        nwp_model_utils.QUANTILE_LEVEL_DIM: quantile_levels
+    }
+
+    these_dim = (nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.FIELD_DIM)
+    main_data_dict = {
+        nwp_model_utils.MEAN_VALUE_KEY: (these_dim, mean_value_matrix),
+        nwp_model_utils.MEAN_SQUARED_VALUE_KEY: (
+            these_dim, mean_squared_value_matrix
+        ),
+        nwp_model_utils.STDEV_KEY: (these_dim, stdev_matrix)
+    }
+
+    these_dim = (
+        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.FIELD_DIM,
+        nwp_model_utils.QUANTILE_LEVEL_DIM
+    )
+    main_data_dict.update({
+        nwp_model_utils.QUANTILE_KEY: (these_dim, quantile_matrix)
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
 def get_normalization_params_for_nwp(

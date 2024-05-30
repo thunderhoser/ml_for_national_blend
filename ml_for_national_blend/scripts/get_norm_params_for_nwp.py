@@ -24,6 +24,7 @@ LAST_TIME_ARG_NAME = 'last_init_time_string'
 INIT_TIME_COUNTS_ARG_NAME = 'num_init_times_by_model'
 NUM_QUANTILES_ARG_NAME = 'num_quantiles'
 NUM_SAMPLE_VALUES_ARG_NAME = 'num_sample_values_per_file'
+COMPUTE_INTERMEDIATE_ARG_NAME = 'compute_intermediate_params'
 OUTPUT_FILE_ARG_NAME = 'output_norm_file_name'
 
 MODELS_HELP_STRING = (
@@ -60,6 +61,10 @@ NUM_SAMPLE_VALUES_HELP_STRING = (
     'Number of sample values per file to use for computing quantiles.  This '
     'value will be applied to each variable.'
 )
+COMPUTE_INTERMEDIATE_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will compute intermediate (final) normalization '
+    'parameters.'
+)
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Will be written by '
     '`nwp_model_io.write_normalization_file`.'
@@ -93,6 +98,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + NUM_SAMPLE_VALUES_ARG_NAME, type=int, required=True,
     help=NUM_SAMPLE_VALUES_ARG_NAME
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + COMPUTE_INTERMEDIATE_ARG_NAME, type=int, required=True,
+    help=COMPUTE_INTERMEDIATE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
@@ -237,7 +246,7 @@ def _get_all_precip_forecast_hours():
 def _run(model_names, input_dir_name_by_model,
          first_init_time_string, last_init_time_string,
          num_init_times_by_model, num_quantiles, num_sample_values_per_file,
-         output_file_name):
+         compute_intermediate_params, output_file_name):
     """Computes normalization parameters for NWP data.
 
     This is effectively the main method.
@@ -249,6 +258,7 @@ def _run(model_names, input_dir_name_by_model,
     :param num_init_times_by_model: Same.
     :param num_quantiles: Same.
     :param num_sample_values_per_file: Same.
+    :param compute_intermediate_params: Same.
     :param output_file_name: Same.
     """
 
@@ -294,13 +304,25 @@ def _run(model_names, input_dir_name_by_model,
         )
 
     # Compute z-score parameters.
-    norm_param_table_xarray = normalization.get_normalization_params_for_nwp(
-        interp_nwp_file_names=interp_nwp_file_names,
-        field_names=nwp_model_utils.ALL_FIELD_NAMES,
-        precip_forecast_hours=_get_all_precip_forecast_hours(),
-        num_quantiles=num_quantiles,
-        num_sample_values_per_file=num_sample_values_per_file
-    )
+    if compute_intermediate_params:
+        norm_param_table_xarray = (
+            normalization.get_intermediate_norm_params_for_nwp(
+                interp_nwp_file_names=interp_nwp_file_names,
+                field_names=nwp_model_utils.ALL_FIELD_NAMES,
+                precip_forecast_hours=_get_all_precip_forecast_hours(),
+                num_sample_values_per_file=num_sample_values_per_file
+            )
+        )
+    else:
+        norm_param_table_xarray = (
+            normalization.get_normalization_params_for_nwp(
+                interp_nwp_file_names=interp_nwp_file_names,
+                field_names=nwp_model_utils.ALL_FIELD_NAMES,
+                precip_forecast_hours=_get_all_precip_forecast_hours(),
+                num_quantiles=num_quantiles,
+                num_sample_values_per_file=num_sample_values_per_file
+            )
+        )
 
     print('Writing z-score params to: "{0:s}"...'.format(output_file_name))
     nwp_model_io.write_normalization_file(
@@ -323,6 +345,9 @@ if __name__ == '__main__':
         num_quantiles=getattr(INPUT_ARG_OBJECT, NUM_QUANTILES_ARG_NAME),
         num_sample_values_per_file=getattr(
             INPUT_ARG_OBJECT, NUM_SAMPLE_VALUES_ARG_NAME
+        ),
+        compute_intermediate_params=bool(
+            getattr(INPUT_ARG_OBJECT, COMPUTE_INTERMEDIATE_ARG_NAME)
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
