@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH --job-name="get_intermediate_norm_params"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
@@ -11,7 +11,7 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=24:00:00
+#SBATCH --time=08:00:00
 #SBATCH --array=0-9
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
@@ -49,4 +49,4 @@ python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --num_quantiles=1001 \
 --num_sample_values_per_file=1000 \
 --compute_intermediate_params=1 \
---output_norm_file_name="${input_dir_name}/normalization_params_20170101-20211220.nc"
+--output_norm_file_name="${input_dir_name}/normalization_params_bigmem_20170101-20211220.nc"
