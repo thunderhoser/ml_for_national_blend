@@ -347,8 +347,11 @@ def get_intermediate_norm_params_for_nwp(
     num_values_matrix = numpy.full(
         (num_precip_hours, num_fields), -1, dtype=int
     )
-    sample_value_matrix = numpy.full(
-        (num_precip_hours, num_fields, num_sample_values_total), numpy.nan
+    precip_sample_value_matrix = numpy.full(
+        (num_precip_hours, num_sample_values_total), numpy.nan
+    )
+    nonprecip_sample_value_matrix = numpy.full(
+        (num_fields, num_sample_values_total), numpy.nan
     )
 
     for j in range(num_fields):
@@ -366,7 +369,7 @@ def get_intermediate_norm_params_for_nwp(
                 num_values_matrix[k, j] = (
                     norm_param_dict_dict[f, h][NUM_VALUES_KEY]
                 )
-                sample_value_matrix[k, j, :] = (
+                precip_sample_value_matrix[k, :] = (
                     norm_param_dict_dict[f, h][SAMPLE_VALUES_KEY]
                 )
 
@@ -390,12 +393,13 @@ def get_intermediate_norm_params_for_nwp(
                 num_values_matrix[k, j] = (
                     norm_param_dict_dict[f][NUM_VALUES_KEY]
                 )
-                sample_value_matrix[k, j, :] = (
-                    norm_param_dict_dict[f][SAMPLE_VALUES_KEY]
-                )
 
                 if k > 0:
                     continue
+
+                nonprecip_sample_value_matrix[j, :] = (
+                    norm_param_dict_dict[f][SAMPLE_VALUES_KEY]
+                )
 
                 print((
                     'Mean, mean square, and num values for {0:s} = '
@@ -428,11 +432,21 @@ def get_intermediate_norm_params_for_nwp(
     }
 
     these_dim = (
-        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.FIELD_DIM,
-        nwp_model_utils.SAMPLE_VALUE_DIM
+        nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.SAMPLE_VALUE_DIM
     )
     main_data_dict.update({
-        nwp_model_utils.SAMPLE_VALUE_KEY: (these_dim, sample_value_matrix)
+        nwp_model_utils.PRECIP_SAMPLE_VALUE_KEY: (
+            these_dim, precip_sample_value_matrix
+        )
+    })
+
+    these_dim = (
+        nwp_model_utils.FIELD_DIM, nwp_model_utils.SAMPLE_VALUE_DIM
+    )
+    main_data_dict.update({
+        nwp_model_utils.NONPRECIP_SAMPLE_VALUE_KEY: (
+            these_dim, nonprecip_sample_value_matrix
+        )
     })
 
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
@@ -530,10 +544,17 @@ def intermediate_to_final_normalization_params(
                 this_norm_param_dict
             )
 
-            these_sample_values = numpy.concatenate([
-                t[nwp_model_utils.SAMPLE_VALUE_KEY].values[h, f, :]
-                for t in intermediate_norm_param_tables_xarray
-            ])
+            if field_names[f] in ACCUM_PRECIP_FIELD_NAMES:
+                these_sample_values = numpy.concatenate([
+                    t[nwp_model_utils.PRECIP_SAMPLE_VALUE_KEY].values[h, :]
+                    for t in intermediate_norm_param_tables_xarray
+                ])
+            else:
+                these_sample_values = numpy.concatenate([
+                    t[nwp_model_utils.NONPRECIP_SAMPLE_VALUE_KEY].values[f, :]
+                    for t in intermediate_norm_param_tables_xarray
+                ])
+
             quantile_matrix[h, f, :] = numpy.nanpercentile(
                 these_sample_values, 100 * quantile_levels
             )
