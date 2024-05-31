@@ -558,9 +558,9 @@ def intermediate_to_final_normalization_params(
                 ).format(
                     field_names[f],
                     precip_forecast_hours[h],
-                    mean_value_matrix[f, h],
-                    mean_squared_value_matrix[f, h],
-                    stdev_matrix[f, h]
+                    mean_value_matrix[h, f],
+                    mean_squared_value_matrix[h, f],
+                    stdev_matrix[h, f]
                 ))
             else:
                 if h > 0:
@@ -583,7 +583,7 @@ def intermediate_to_final_normalization_params(
                     100 * quantile_levels[m],
                     field_names[f],
                     ' at {0:d}-hour lead'.format(precip_forecast_hours[h])
-                    if f in ACCUM_PRECIP_FIELD_NAMES
+                    if field_names[f] in ACCUM_PRECIP_FIELD_NAMES
                     else '',
                     quantile_matrix[h, f, m]
                 ))
