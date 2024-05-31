@@ -422,7 +422,9 @@ def get_intermediate_norm_params_for_nwp(
         nwp_model_utils.MEAN_SQUARED_VALUE_KEY: (
             these_dim, mean_squared_value_matrix
         ),
-        nwp_model_utils.NUM_VALUES_KEY: (these_dim, num_values_matrix)
+        nwp_model_utils.NUM_VALUES_KEY: (
+            these_dim, num_values_matrix.astype(float)
+        )
     }
 
     these_dim = (
