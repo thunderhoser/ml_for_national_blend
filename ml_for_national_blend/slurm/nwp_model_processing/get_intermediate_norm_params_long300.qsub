@@ -35,10 +35,12 @@ CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_
 MODEL_NAMES=("wrf_arw" "nam" "nam_nest" "rap" "gfs" "hrrr" "gefs" "gridded_lamp" "ecmwf" "gridded_gfs_mos")
 INPUT_DIR_NAMES=("/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/wrf_arw/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gefs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_lamp/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ecmwf/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_gfs_mos/processed/interp_to_nbm_grid")
 INIT_TIME_COUNTS=(100 100 100 100 300 100 300 100 300 100)
+SAMPLE_VALUE_COUNTS=(5000 5000 5000 5000 2500 5000 2500 5000 2500 5000)
 
 model_name="${MODEL_NAMES[$SLURM_ARRAY_TASK_ID]}"
 input_dir_name="${INPUT_DIR_NAMES[$SLURM_ARRAY_TASK_ID]}"
 num_init_times="${INIT_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}"
+num_sample_values_per_file="${SAMPLE_VALUE_COUNTS[$SLURM_ARRAY_TASK_ID]}"
 
 python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --model_names ${model_name} \
@@ -47,6 +49,6 @@ python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --last_init_time_string="2021-12-20-18" \
 --num_init_times_by_model ${num_init_times} \
 --num_quantiles=1001 \
---num_sample_values_per_file=10000 \
+--num_sample_values_per_file=${num_sample_values_per_file} \
 --compute_intermediate_params=1 \
---output_norm_file_name="${input_dir_name}/normalization_params_some300_20170101-20211220.nc"
+--output_norm_file_name="${input_dir_name}/normalization_params_long300_20170101-20211220.nc"
