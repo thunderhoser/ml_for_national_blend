@@ -219,7 +219,7 @@ def write_file(
     # Do actual stuff.
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     dataset_object = netCDF4.Dataset(
-        netcdf_file_name, 'w', format='NETCDF3_64BIT_OFFSET'
+        netcdf_file_name, 'w', format='NETCDF4_CLASSIC'
     )
 
     num_field_chars = max([len(f) for f in field_names])

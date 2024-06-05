@@ -31,7 +31,7 @@ def write_file(nbm_constant_table_xarray, netcdf_file_name):
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     nbm_constant_table_xarray.to_netcdf(
-        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
+        path=netcdf_file_name, mode='w', format='NETCDF4_CLASSIC'
     )
 
 
@@ -45,7 +45,7 @@ def write_normalization_file(norm_param_table_xarray, netcdf_file_name):
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     norm_param_table_xarray.to_netcdf(
-        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
+        path=netcdf_file_name, mode='w', format='NETCDF4_CLASSIC'
     )
 
 

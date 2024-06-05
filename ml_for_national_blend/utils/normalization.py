@@ -75,14 +75,11 @@ def _update_norm_params_1var_1file(norm_param_dict, new_data_matrix,
 
     first_index = file_index * num_sample_values_per_file
     last_index = first_index + num_sample_values_per_file
-
-    new_values_real = new_data_matrix[
-        numpy.invert(numpy.isnan(new_data_matrix))
-    ]
-    numpy.random.shuffle(new_values_real)
-
+    percentile_levels = numpy.linspace(
+        0, 100, num=num_sample_values_per_file, dtype=float
+    )
     norm_param_dict[SAMPLE_VALUES_KEY][first_index:last_index] = (
-        new_values_real[:num_sample_values_per_file]
+        numpy.nanpercentile(new_data_matrix, percentile_levels)
     )
 
     return norm_param_dict
