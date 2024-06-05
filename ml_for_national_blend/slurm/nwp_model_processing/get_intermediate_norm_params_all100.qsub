@@ -47,6 +47,6 @@ python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nwp.py" \
 --last_init_time_string="2021-12-20-18" \
 --num_init_times_by_model ${num_init_times} \
 --num_quantiles=1001 \
---num_sample_values_per_file=5000 \
+--num_sample_values_per_file=1001 \
 --compute_intermediate_params=1 \
 --output_norm_file_name="${input_dir_name}/normalization_params_all100_20170101-20211220.nc"
