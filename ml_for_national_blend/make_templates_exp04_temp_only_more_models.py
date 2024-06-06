@@ -282,7 +282,7 @@ def _run():
         ).format(
             OUTPUT_DIR_NAME,
             nwp_model_set_strings[i],
-            UNIQUE_PREDICTOR_SET_DESCRIPTIONS[i]
+            predictor_set_descriptions[i]
         )
 
         file_system_utils.mkdir_recursive_if_necessary(
