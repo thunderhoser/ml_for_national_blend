@@ -73,10 +73,12 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --resid_baseline_model_name="hrrr" \
 --resid_baseline_lead_time_hours=48 \
 --resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" \
---init_time_limit_strings_for_training "2017-01-01-00" "2021-12-20-18" \
+--first_init_time_strings_for_training "2017-01-01-00" \
+--last_init_time_strings_for_training "2021-12-20-18" \
 --nwp_dir_names_for_training "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
---init_time_limit_strings_for_validation "2022-01-01-00" "2022-12-20-18" \
+--first_init_time_strings_for_validation "2022-01-01-00" \
+--last_init_time_strings_for_validation "2022-12-20-18" \
 --nwp_dir_names_for_validation "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
 --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
 --num_epochs=1000 \
