@@ -1029,6 +1029,21 @@ def _read_predictors_one_example(
                     raise_error_if_missing=False
                 )
             else:
+
+                # TODO(thunderhoser): Need an input arg that dictates whether to
+                # use init times every 6 hours or 12 hours.
+                try:
+                    nwp_model_utils.check_init_time(
+                        init_time_unix_sec=init_time_unix_sec,
+                        model_name=nwp_model_names[i]
+                    )
+                except:
+                    continue
+
+                # TODO(thunderhoser): Also need a more flexible residual
+                # baseline.  If the desired model is missing, there should be a
+                # priority list.
+
                 this_file_name = interp_nwp_model_io.find_file(
                     directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
                     init_time_unix_sec=init_time_unix_sec,

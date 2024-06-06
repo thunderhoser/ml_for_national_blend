@@ -70,9 +70,9 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --predict_dewpoint_depression=0 \
 --predict_gust_factor=0 \
 --do_residual_prediction=1 \
---resid_baseline_model_name="hrrr" \
+--resid_baseline_model_name="nam_nest" \
 --resid_baseline_lead_time_hours=48 \
---resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" \
+--resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" \
 --first_init_time_strings_for_training "2017-01-01-00" \
 --last_init_time_strings_for_training "2021-12-20-18" \
 --nwp_dir_names_for_training "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
