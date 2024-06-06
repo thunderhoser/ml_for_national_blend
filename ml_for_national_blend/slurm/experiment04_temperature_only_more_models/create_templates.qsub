@@ -1,4 +1,4 @@
-#!/bin/tcsh
+#!/bin/bash
 
 #SBATCH --job-name="create_templates"
 #SBATCH --partition="fge"
@@ -26,6 +26,6 @@ echo `which conda`
 echo `which python`
 echo `which python3`
 
-set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 
 python3 -u "${CODE_DIR_NAME}/make_templates_exp04_temp_only_more_models.py"
