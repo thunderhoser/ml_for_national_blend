@@ -6,6 +6,7 @@ import pickle
 import warnings
 import numpy
 import keras
+from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -22,6 +23,7 @@ import nwp_model_io
 import interp_nwp_model_io
 import nbm_constant_io
 import urma_io
+import misc_utils
 import nwp_model_utils
 import urma_utils
 import nbm_constant_utils
@@ -268,6 +270,59 @@ def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
     )
 
     return prediction_matrix
+
+
+def __interp_predictors_by_lead_time(predictor_matrix, lead_times_hours):
+    """Interpolates predictors to fill missing lead times.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    L = number of lead times
+    P = number of predictor variables
+
+    :param predictor_matrix: M-by-N-by-L-by-P numpy array of predictor values.
+    :param lead_times_hours: length-L numpy array of lead times.
+    :return: predictor_matrix: Same as input, though maybe with fewer NaN's.
+    """
+
+    num_predictors = predictor_matrix.shape[-1]
+
+    for p in range(num_predictors):
+        missing_lead_time_flags = numpy.all(
+            numpy.isnan(predictor_matrix[..., p]),
+            axis=(0, 1)
+        )
+        missing_lead_time_indices = numpy.where(missing_lead_time_flags)[0]
+        filled_lead_time_indices = numpy.where(
+            numpy.invert(missing_lead_time_flags)
+        )[0]
+
+        missing_lead_time_indices = [
+            k for k in missing_lead_time_indices if
+            k >= numpy.min(filled_lead_time_indices)
+        ]
+        missing_lead_time_indices = [
+            k for k in missing_lead_time_indices if
+            k < numpy.max(filled_lead_time_indices)
+        ]
+
+        if len(missing_lead_time_indices) == 0:
+            continue
+
+        interp_object = interp1d(
+            x=lead_times_hours[filled_lead_time_indices],
+            y=predictor_matrix[..., filled_lead_time_indices, p],
+            axis=2,
+            kind='linear',
+            bounds_error=True,
+            assume_sorted=True
+        )
+
+        predictor_matrix[..., missing_lead_time_indices, p] = interp_object(
+            lead_times_hours[missing_lead_time_indices]
+        )
+
+    return predictor_matrix
 
 
 def _check_generator_args(option_dict):
@@ -933,6 +988,9 @@ def _read_predictors_one_example(
         without first axis.
     :return: predictor_matrix_40km: Same as output from `data_generator` but
         without first axis.
+    :return: found_any_predictors: Boolean flag.  If True, at least one output
+        matrix contains a real value.  If False, the output matrices are all NaN
+        or None.
     """
 
     num_nwp_models = len(nwp_model_names)
@@ -955,13 +1013,29 @@ def _read_predictors_one_example(
 
     for i in range(num_nwp_models):
         for j in range(num_nwp_lead_times):
-            this_file_name = interp_nwp_model_io.find_file(
-                directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
-                init_time_unix_sec=init_time_unix_sec,
-                forecast_hour=nwp_lead_times_hours[j],
-                model_name=nwp_model_names[i],
-                raise_error_if_missing=False
-            )
+            if nwp_model_names[i] == nwp_model_utils.RAP_MODEL_NAME:
+                adjusted_init_time_unix_sec = (
+                    init_time_unix_sec + 3 * HOURS_TO_SECONDS
+                )
+                adjusted_lead_time_hours = nwp_lead_times_hours[j] - 3
+                if adjusted_lead_time_hours < 1:
+                    continue
+
+                this_file_name = interp_nwp_model_io.find_file(
+                    directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
+                    init_time_unix_sec=adjusted_init_time_unix_sec,
+                    forecast_hour=adjusted_lead_time_hours,
+                    model_name=nwp_model_names[i],
+                    raise_error_if_missing=False
+                )
+            else:
+                this_file_name = interp_nwp_model_io.find_file(
+                    directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
+                    init_time_unix_sec=init_time_unix_sec,
+                    forecast_hour=nwp_lead_times_hours[j],
+                    model_name=nwp_model_names[i],
+                    raise_error_if_missing=False
+                )
 
             # TODO(thunderhoser): For now, letting all missing files go.  Not
             # sure if this is always the best decision, though.
@@ -1061,11 +1135,20 @@ def _read_predictors_one_example(
                     nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
                 )
 
+    found_any_predictors = False
+
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
     else:
         predictor_matrix_2pt5km = numpy.concatenate(
             predictor_matrices_2pt5km, axis=-1
+        )
+        predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
+            predictor_matrix=predictor_matrix_2pt5km,
+            lead_times_hours=nwp_lead_times_hours
+        )
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_2pt5km)
         )
 
     if predictor_matrices_10km is None:
@@ -1074,12 +1157,26 @@ def _read_predictors_one_example(
         predictor_matrix_10km = numpy.concatenate(
             predictor_matrices_10km, axis=-1
         )
+        predictor_matrix_10km = __interp_predictors_by_lead_time(
+            predictor_matrix=predictor_matrix_10km,
+            lead_times_hours=nwp_lead_times_hours
+        )
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_10km)
+        )
 
     if predictor_matrices_20km is None:
         predictor_matrix_20km = None
     else:
         predictor_matrix_20km = numpy.concatenate(
             predictor_matrices_20km, axis=-1
+        )
+        predictor_matrix_20km = __interp_predictors_by_lead_time(
+            predictor_matrix=predictor_matrix_20km,
+            lead_times_hours=nwp_lead_times_hours
+        )
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_20km)
         )
 
     if predictor_matrices_40km is None:
@@ -1088,11 +1185,59 @@ def _read_predictors_one_example(
         predictor_matrix_40km = numpy.concatenate(
             predictor_matrices_40km, axis=-1
         )
+        predictor_matrix_40km = __interp_predictors_by_lead_time(
+            predictor_matrix=predictor_matrix_40km,
+            lead_times_hours=nwp_lead_times_hours
+        )
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_40km)
+        )
 
     return (
         predictor_matrix_2pt5km, predictor_matrix_10km,
-        predictor_matrix_20km, predictor_matrix_40km
+        predictor_matrix_20km, predictor_matrix_40km,
+        found_any_predictors
     )
+
+
+def _find_relevant_init_times(first_time_by_period_unix_sec,
+                              last_time_by_period_unix_sec, nwp_model_names):
+    """Finds relevant model-initialization times.
+
+    P = number of continuous periods
+
+    :param first_time_by_period_unix_sec: length-P numpy array with start time
+        of each period.
+    :param last_time_by_period_unix_sec: length-P numpy array with end time
+        of each period.
+    :param nwp_model_names: 1-D list with names of NWP models used for predictors
+        (each list item must be accepted by `nwp_model_utils.check_model_name`).
+    :return: relevant_init_times_unix_sec: 1-D numpy array of relevant init
+        times.
+    """
+
+    nwp_init_time_intervals_sec = numpy.array([
+        nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
+    ], dtype=int)
+
+    slow_refresh_flags = nwp_init_time_intervals_sec > 6 * HOURS_TO_SECONDS
+    if numpy.mean(slow_refresh_flags) > 0.5:
+        nn_init_time_interval_sec = 12 * HOURS_TO_SECONDS
+    else:
+        nn_init_time_interval_sec = 6 * HOURS_TO_SECONDS
+
+    relevant_init_times_unix_sec = numpy.concatenate([
+        time_periods.range_and_interval_to_list(
+            start_time_unix_sec=f,
+            end_time_unix_sec=l,
+            time_interval_sec=nn_init_time_interval_sec,
+            include_endpoint=True
+        )
+        for f, l in
+        zip(first_time_by_period_unix_sec, last_time_by_period_unix_sec)
+    ])
+
+    return misc_utils.remove_unused_days(relevant_init_times_unix_sec)
 
 
 def create_data(option_dict):
@@ -1165,24 +1310,14 @@ def create_data(option_dict):
             target_normalization_file_name
         )
 
-    init_time_intervals_sec = numpy.array([
-        nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
-    ], dtype=int)
-
-    init_times_unix_sec = numpy.concatenate([
-        time_periods.range_and_interval_to_list(
-            start_time_unix_sec=f,
-            end_time_unix_sec=l,
-            time_interval_sec=numpy.max(init_time_intervals_sec),
-            include_endpoint=True
-        )
-        for f, l in zip(first_init_times_unix_sec, last_init_times_unix_sec)
-    ])
-
     # Do actual stuff.
+    init_times_unix_sec = _find_relevant_init_times(
+        first_time_by_period_unix_sec=first_init_times_unix_sec,
+        last_time_by_period_unix_sec=last_init_times_unix_sec,
+        nwp_model_names=nwp_model_names
+    )
     num_examples = len(init_times_unix_sec)
 
-    # Do actual stuff.
     if nbm_constant_file_name is None:
         nbm_constant_matrix = None
     else:
@@ -1260,7 +1395,8 @@ def create_data(option_dict):
             this_predictor_matrix_2pt5km,
             this_predictor_matrix_10km,
             this_predictor_matrix_20km,
-            this_predictor_matrix_40km
+            this_predictor_matrix_40km,
+            good_example_flags[i]
         ) = _read_predictors_one_example(
             init_time_unix_sec=init_times_unix_sec[i],
             nwp_model_names=nwp_model_names,
@@ -1273,24 +1409,12 @@ def create_data(option_dict):
         )
 
         if predictor_matrix_2pt5km is not None:
-            good_example_flags[i] &= not numpy.all(
-                numpy.isnan(this_predictor_matrix_2pt5km)
-            )
             predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
         if predictor_matrix_10km is not None:
-            good_example_flags[i] &= not numpy.all(
-                numpy.isnan(this_predictor_matrix_10km)
-            )
             predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
         if predictor_matrix_20km is not None:
-            good_example_flags[i] &= not numpy.all(
-                numpy.isnan(this_predictor_matrix_20km)
-            )
             predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
         if predictor_matrix_40km is not None:
-            good_example_flags[i] &= not numpy.all(
-                numpy.isnan(this_predictor_matrix_40km)
-            )
             predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
 
     good_indices = numpy.where(good_example_flags)[0]
@@ -1527,15 +1651,6 @@ def data_generator(option_dict):
         resolution.
     """
 
-    # TODO(thunderhoser): Also, I should eventually allow a different lead-time
-    # set for each NWP model.  To make everything consistent -- i.e., to make
-    # sure that feature maps from different NWP models have the same length on
-    # the time axis -- I could use either convolution or some kind of
-    # interpolation layer(s).  Based on a Google search, it looks like conv is
-    # my best option.  Interpolation can be done via Upsampling1D, but the
-    # upsampling factor must be an integer.  But also, maybe I could use LSTM to
-    # change the sequence length.
-
     option_dict = _check_generator_args(option_dict)
     first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
     last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
@@ -1591,42 +1706,11 @@ def data_generator(option_dict):
             target_normalization_file_name
         )
 
-    # TODO(thunderhoser): Different NWP models are available at different init
-    # times.  Currently, I handle this by using only common init times.
-    # However, I should eventually come up with something more clever.
-    init_time_intervals_sec = numpy.array([
-        nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
-    ], dtype=int)
-
-    init_times_unix_sec = numpy.concatenate([
-        time_periods.range_and_interval_to_list(
-            start_time_unix_sec=f,
-            end_time_unix_sec=l,
-            time_interval_sec=numpy.max(init_time_intervals_sec),
-            include_endpoint=True
-        )
-        for f, l in zip(first_init_times_unix_sec, last_init_times_unix_sec)
-    ])
-
-    # TODO(thunderhoser): HACK because I have data for only every 5th day right
-    # now.
-
-    # TODO(thunderhoser): This will fuck up in leap years!
-    init_date_strings = [
-        time_conversion.unix_sec_to_string(t, '%Y-%j')
-        for t in init_times_unix_sec
-    ]
-    init_dates_julian = numpy.array(
-        [int(t.split('-')[1]) for t in init_date_strings],
-        dtype=int
+    init_times_unix_sec = _find_relevant_init_times(
+        first_time_by_period_unix_sec=first_init_times_unix_sec,
+        last_time_by_period_unix_sec=last_init_times_unix_sec,
+        nwp_model_names=nwp_model_names
     )
-    good_indices = numpy.where(
-        numpy.mod(init_dates_julian, 5) == 0
-    )[0]
-
-    init_times_unix_sec = init_times_unix_sec[good_indices]
-    del init_date_strings
-    del init_dates_julian
 
     # Do actual stuff.
     if nbm_constant_file_name is None:
@@ -1719,7 +1803,8 @@ def data_generator(option_dict):
                 this_predictor_matrix_2pt5km,
                 this_predictor_matrix_10km,
                 this_predictor_matrix_20km,
-                this_predictor_matrix_40km
+                this_predictor_matrix_40km,
+                found_any_predictors
             ) = _read_predictors_one_example(
                 init_time_unix_sec=init_times_unix_sec[init_time_index],
                 nwp_model_names=nwp_model_names,
@@ -1731,32 +1816,18 @@ def data_generator(option_dict):
                 subset_grid=subset_grid
             )
 
-            found_any_predictors = True
-
-            if predictor_matrix_2pt5km is not None:
-                found_any_predictors &= not numpy.all(
-                    numpy.isnan(this_predictor_matrix_2pt5km)
-                )
-                predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
-            if predictor_matrix_10km is not None:
-                found_any_predictors &= not numpy.all(
-                    numpy.isnan(this_predictor_matrix_10km)
-                )
-                predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
-            if predictor_matrix_20km is not None:
-                found_any_predictors &= not numpy.all(
-                    numpy.isnan(this_predictor_matrix_20km)
-                )
-                predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
-            if predictor_matrix_40km is not None:
-                found_any_predictors &= not numpy.all(
-                    numpy.isnan(this_predictor_matrix_40km)
-                )
-                predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
-
             if not found_any_predictors:
                 init_time_index += 1
                 continue
+
+            if predictor_matrix_2pt5km is not None:
+                predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
+            if predictor_matrix_10km is not None:
+                predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
+            if predictor_matrix_20km is not None:
+                predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
+            if predictor_matrix_40km is not None:
+                predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
 
             num_examples_in_memory += 1
             init_time_index += 1

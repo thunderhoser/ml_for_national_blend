@@ -2,6 +2,8 @@
 
 import os
 import sys
+import copy
+import json
 import argparse
 import numpy
 
@@ -11,6 +13,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import nwp_model_utils
 import neural_net
 import training_args
 
@@ -20,8 +23,43 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
 
+def _process_nwp_directories(nwp_directory_names, nwp_model_names):
+    """Processes NWP directories for either training or validation data.
+
+    :param nwp_directory_names: See documentation for input arg
+        "nwp_dir_names_for_training" to this script.
+    :param nwp_model_names: See documentation for input arg to this script.
+    :return: nwp_model_to_dir_name: Dictionary, where each key is the name of an
+        NWP model and the corresponding value is the input directory.
+    """
+
+    # assert len(nwp_model_names) == len(nwp_directory_names)
+    nwp_directory_names = nwp_directory_names[:len(nwp_model_names)]
+
+    if len(nwp_directory_names) == 1:
+        found_any_model_name_in_dir_name = any([
+            m in nwp_directory_names[0] for m in nwp_model_utils.ALL_MODEL_NAMES
+        ])
+        infer_directories = (
+            len(nwp_model_names) > 1 or
+            (len(nwp_model_names) == 1 and not found_any_model_name_in_dir_name)
+        )
+    else:
+        infer_directories = False
+
+    if infer_directories:
+        top_directory_name = copy.deepcopy(nwp_directory_names[0])
+        nwp_directory_names = [
+            '{0:s}/{1:s}/processed/interp_to_nbm_grid'.format(
+                top_directory_name, m
+            ) for m in nwp_model_names
+        ]
+
+    return dict(zip(nwp_model_names, nwp_directory_names))
+
+
 def _run(template_file_name, output_dir_name,
-         nwp_lead_times_hours, nwp_model_names, nwp_field_names,
+         nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
          nwp_normalization_file_name, nwp_use_quantile_norm,
          target_lead_time_hours, target_field_names,
          target_normalization_file_name, targets_use_quantile_norm,
@@ -48,7 +86,7 @@ def _run(template_file_name, output_dir_name,
     :param output_dir_name: Same.
     :param nwp_lead_times_hours: Same.
     :param nwp_model_names: Same.
-    :param nwp_field_names: Same.
+    :param nwp_model_to_field_names: Same.
     :param nwp_normalization_file_name: Same.
     :param nwp_use_quantile_norm: Same.
     :param target_lead_time_hours: Same.
@@ -99,22 +137,14 @@ def _run(template_file_name, output_dir_name,
         nbm_constant_file_name = None
         nbm_constant_field_names = []
 
-    # assert len(nwp_model_names) == len(nwp_dir_names_for_training)
-    # assert len(nwp_model_names) == len(nwp_dir_names_for_validation)
-
-    nwp_dir_names_for_training = nwp_dir_names_for_training[:len(nwp_model_names)]
-    nwp_dir_names_for_validation = nwp_dir_names_for_validation[:len(nwp_model_names)]
-
-    nwp_model_to_training_dir_name = dict(
-        zip(nwp_model_names, nwp_dir_names_for_training)
+    nwp_model_to_training_dir_name = _process_nwp_directories(
+        nwp_directory_names=nwp_dir_names_for_training,
+        nwp_model_names=nwp_model_names
     )
-    nwp_model_to_validation_dir_name = dict(
-        zip(nwp_model_names, nwp_dir_names_for_validation)
+    nwp_model_to_validation_dir_name = _process_nwp_directories(
+        nwp_directory_names=nwp_dir_names_for_validation,
+        nwp_model_names=nwp_model_names
     )
-
-    nwp_model_to_field_names = dict()
-    for this_model in nwp_model_names:
-        nwp_model_to_field_names[this_model] = nwp_field_names
 
     first_init_times_for_training_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
@@ -214,9 +244,9 @@ if __name__ == '__main__':
         nwp_model_names=getattr(
             INPUT_ARG_OBJECT, training_args.NWP_MODELS_ARG_NAME
         ),
-        nwp_field_names=getattr(
-            INPUT_ARG_OBJECT, training_args.NWP_FIELDS_ARG_NAME
-        ),
+        nwp_model_to_field_names=json.loads(getattr(
+            INPUT_ARG_OBJECT, training_args.NWP_MODEL_TO_FIELDS_ARG_NAME
+        )),
         nwp_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.NWP_NORMALIZATION_FILE_ARG_NAME
         ),
