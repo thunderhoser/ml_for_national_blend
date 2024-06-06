@@ -297,6 +297,9 @@ def __interp_predictors_by_lead_time(predictor_matrix, lead_times_hours):
             numpy.invert(missing_lead_time_flags)
         )[0]
 
+        if len(filled_lead_time_indices) == 0:
+            continue
+
         missing_lead_time_indices = [
             k for k in missing_lead_time_indices if
             k >= numpy.min(filled_lead_time_indices)
