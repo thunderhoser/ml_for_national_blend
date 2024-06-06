@@ -2,11 +2,25 @@
 
 import os
 import numpy
+from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 
 DEGREES_TO_RADIANS = numpy.pi / 180
 WIND_DIR_DEFAULT_DEG = 0.
+
+USED_DATE_STRINGS = time_conversion.get_spc_dates_in_range(
+    '20170101', '20200225'
+)[::5]
+USED_DATE_STRINGS += time_conversion.get_spc_dates_in_range(
+    '20200302', '20221028'
+)[::5]
+USED_DATE_STRINGS += time_conversion.get_spc_dates_in_range(
+    '20221101', '20231027'
+)[::5]
+USED_DATE_STRINGS += time_conversion.get_spc_dates_in_range(
+    '20231102', '20231227'
+)[::5]
 
 
 def untar_file(tar_file_name, target_dir_name, relative_paths_to_untar=None):
@@ -143,3 +157,31 @@ def speed_and_direction_to_uv(wind_speeds_m_s01, wind_directions_deg):
     )
 
     return u_winds_m_s01, v_winds_m_s01
+
+
+def remove_unused_days(candidate_times_unix_sec):
+    """Removes times that occur during an unused day.
+
+    An 'unused day' is just a day for which we did not bother downloading all
+    the NWP outputs from HPSS.
+
+    :param candidate_times_unix_sec: 1-D numpy array of candidate times.
+    :return: relevant_times_unix_sec: 1-D numpy array of relevant times,
+        excluding unused days.
+    """
+
+    error_checking.assert_is_numpy_array(
+        candidate_times_unix_sec, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(candidate_times_unix_sec)
+
+    candidate_date_strings = [
+        time_conversion.unix_sec_to_string(t, time_conversion.SPC_DATE_FORMAT)
+        for t in candidate_times_unix_sec
+    ]
+    good_indices = numpy.where(numpy.isin(
+        element=numpy.array(candidate_date_strings),
+        test_elements=numpy.array(USED_DATE_STRINGS)
+    ))[0]
+
+    return candidate_times_unix_sec[good_indices]

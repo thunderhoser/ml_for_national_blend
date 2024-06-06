@@ -8,7 +8,7 @@ OUTPUT_DIR_ARG_NAME = 'output_model_dir_name'
 
 NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
 NWP_MODELS_ARG_NAME = 'nwp_model_names'
-NWP_FIELDS_ARG_NAME = 'nwp_field_names'
+NWP_MODEL_TO_FIELDS_ARG_NAME = 'nwp_model_to_field_names'
 NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'
 NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
@@ -63,11 +63,13 @@ NWP_MODELS_HELP_STRING = (
 ).format(
     str(nwp_model_utils.ALL_MODEL_NAMES)
 )
-NWP_FIELDS_HELP_STRING = (
-    'List of fields to use in predictors.  The same set of fields will be used '
-    'for every NWP model.  Each field name must be in the following list:'
-    '\n{0:s}'
+NWP_MODEL_TO_FIELDS_HELP_STRING = (
+    'Dictionary, where each key is the name of an NWP model (from the list '
+    '{0:s}) and the corresponding value is a list of predictor variables '
+    '(fields).  The dictionary must be formatted as a JSON string.  Each field '
+    'name must be in the following list:\n{1:s}'
 ).format(
+    NWP_MODELS_ARG_NAME,
     str(nwp_model_utils.ALL_FIELD_NAMES)
 )
 NWP_NORMALIZATION_FILE_HELP_STRING = (
@@ -151,11 +153,13 @@ LAST_TRAINING_TIMES_HELP_STRING = (
 ).format(
     FIRST_TRAINING_TIMES_ARG_NAME
 )
+
 TRAINING_NWP_DIRS_HELP_STRING = (
-    'List of directory paths with NWP data for training period.  This list '
-    'must have the same length as `{0:s}`.  Relevant files in each directory '
-    'will be found by `nwp_model_io.find_file` and read by '
-    '`nwp_model_io.read_file`.'
+    'This argument can be formatted in two ways.  Option 1: a single path.  In '
+    'this case, for each model, "<model_name>/processed/interp_to_nbm_grid" '
+    'will be added to the end.  Option 2: a list of paths, with the same '
+    'length as {0:s}.  Relevant files in any directory will be found by '
+    '`nwp_model_io.find_file` and read by `nwp_model_io.read_file`.'
 ).format(
     NWP_MODELS_ARG_NAME
 )
@@ -231,8 +235,8 @@ def add_input_args(parser_object):
         help=NWP_MODELS_HELP_STRING
     )
     parser_object.add_argument(
-        '--' + NWP_FIELDS_ARG_NAME, type=str, nargs='+', required=True,
-        help=NWP_FIELDS_HELP_STRING
+        '--' + NWP_MODEL_TO_FIELDS_ARG_NAME, type=str, required=True,
+        help=NWP_MODEL_TO_FIELDS_HELP_STRING
     )
     parser_object.add_argument(
         '--' + NWP_NORMALIZATION_FILE_ARG_NAME, type=str, required=False,
