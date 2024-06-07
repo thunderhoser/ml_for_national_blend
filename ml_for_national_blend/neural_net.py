@@ -497,6 +497,9 @@ def _init_predictor_matrices_1example(
         for m in nwp_model_names
     ], dtype=int)
 
+    print(nwp_model_names)
+    print(downsampling_factors)
+
     model_indices = numpy.where(downsampling_factors == 1)[0]
     num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
         nwp_model_utils.HRRR_MODEL_NAME
