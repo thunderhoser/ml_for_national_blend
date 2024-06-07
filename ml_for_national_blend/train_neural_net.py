@@ -137,6 +137,9 @@ def _run(template_file_name, output_dir_name,
         nbm_constant_file_name = None
         nbm_constant_field_names = []
 
+    print(nwp_model_names)
+    print('\n\n\n\n\n\n')
+
     nwp_model_to_training_dir_name = _process_nwp_directories(
         nwp_directory_names=nwp_dir_names_for_training,
         nwp_model_names=nwp_model_names
