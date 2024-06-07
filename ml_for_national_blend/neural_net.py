@@ -1304,9 +1304,9 @@ def create_data(option_dict):
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
 
     nwp_model_names = list(set(first_nwp_model_names))
-    nwp_model_names = [
-        m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
-    ]
+    # nwp_model_names = [
+    #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
+    # ]
 
     if nwp_normalization_file_name is None:
         nwp_norm_param_table_xarray = None
@@ -1700,9 +1700,9 @@ def data_generator(option_dict):
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
 
     nwp_model_names = list(set(first_nwp_model_names))
-    nwp_model_names = [
-        m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
-    ]
+    # nwp_model_names = [
+    #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
+    # ]
 
     if nwp_normalization_file_name is None:
         nwp_norm_param_table_xarray = None
