@@ -787,16 +787,25 @@ def _read_targets_one_example(
         return None
 
     print('Reading data from: "{0:s}"...'.format(urma_file_name))
-    urma_table_xarray = urma_io.read_file(urma_file_name)
-    urma_table_xarray = urma_utils.subset_by_time(
-        urma_table_xarray=urma_table_xarray,
-        desired_times_unix_sec=
-        numpy.array([target_valid_time_unix_sec], dtype=int)
-    )
-    urma_table_xarray = urma_utils.subset_by_field(
-        urma_table_xarray=urma_table_xarray,
-        desired_field_names=target_field_names
-    )
+
+    try:
+        urma_table_xarray = urma_io.read_file(urma_file_name)
+        urma_table_xarray = urma_utils.subset_by_time(
+            urma_table_xarray=urma_table_xarray,
+            desired_times_unix_sec=
+            numpy.array([target_valid_time_unix_sec], dtype=int)
+        )
+        urma_table_xarray = urma_utils.subset_by_field(
+            urma_table_xarray=urma_table_xarray,
+            desired_field_names=target_field_names
+        )
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read file at: "{0:s}"'
+        ).format(urma_file_name)
+
+        warnings.warn(warning_string)
+        return None
 
     if target_norm_param_table_xarray is None:
         data_matrix = urma_table_xarray[urma_utils.DATA_KEY].values
@@ -910,39 +919,49 @@ def _read_residual_baseline_one_example(
         return None
 
     print('Reading data from: "{0:s}"...'.format(input_file_name))
-    nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
 
-    if subset_grid:
-        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            desired_row_indices=numpy.linspace(544, 992, num=449, dtype=int)
-        )
-        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            desired_column_indices=numpy.linspace(752, 1200, num=449, dtype=int)
-        )
+    try:
+        nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
 
-    if predict_dewpoint_depression:
-        nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
+        if subset_grid:
+            nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                desired_row_indices=numpy.linspace(544, 992, num=449, dtype=int)
+            )
+            nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                desired_column_indices=numpy.linspace(752, 1200, num=449, dtype=int)
+            )
+
+        if predict_dewpoint_depression:
+            nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
+                nwp_forecast_table_xarray
+            )
+        if predict_gust_factor:
+            nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
+                nwp_forecast_table_xarray
+            )
+
+        nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
             nwp_forecast_table_xarray
         )
-    if predict_gust_factor:
-        nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
-            nwp_forecast_table_xarray
-        )
 
-    nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
-        nwp_forecast_table_xarray
-    )
+        these_matrices = [
+            nwp_model_utils.get_field(
+                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                field_name=target_field_to_baseline_nwp_field[f]
+            )[0, ...]
+            for f in target_field_names
+        ]
+        residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read file at: "{0:s}".  This '
+            'is needed for residual baseline.'
+        ).format(input_file_name)
 
-    these_matrices = [
-        nwp_model_utils.get_field(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            field_name=target_field_to_baseline_nwp_field[f]
-        )[0, ...]
-        for f in target_field_names
-    ]
-    residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
+        warnings.warn(warning_string)
+        return None
 
     need_fake_gust_data = (
         urma_utils.WIND_GUST_10METRE_NAME in target_field_names
@@ -1040,7 +1059,6 @@ def _read_predictors_one_example(
                     raise_error_if_missing=False
                 )
             else:
-
                 # TODO(thunderhoser): Need an input arg that dictates whether to
                 # use init times every 6 hours or 12 hours.
                 try:
@@ -1083,13 +1101,56 @@ def _read_predictors_one_example(
                     this_file_name
                 )
 
-                for this_coord in [
-                        nwp_model_utils.FORECAST_HOUR_DIM,
-                        nwp_model_utils.ROW_DIM,
-                        nwp_model_utils.COLUMN_DIM,
-                        nwp_model_utils.FIELD_DIM
-                ]:
-                    assert this_coord in nwp_forecast_table_xarray.coords
+                nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
+                )
+
+                if subset_grid:
+                    if nwp_downsampling_factors[i] == 1:
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_row_indices=
+                            numpy.linspace(544, 992, num=449, dtype=int)
+                        )
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_column_indices=
+                            numpy.linspace(752, 1200, num=449, dtype=int)
+                        )
+                    elif nwp_downsampling_factors[i] == 4:
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_row_indices=
+                            numpy.linspace(136, 248, num=113, dtype=int)
+                        )
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_column_indices=
+                            numpy.linspace(188, 300, num=113, dtype=int)
+                        )
+                    elif nwp_downsampling_factors[i] == 8:
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_row_indices=
+                            numpy.linspace(68, 124, num=57, dtype=int)
+                        )
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_column_indices=
+                            numpy.linspace(94, 150, num=57, dtype=int)
+                        )
+                    else:
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_row_indices=
+                            numpy.linspace(34, 62, num=29, dtype=int)
+                        )
+                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                            desired_column_indices=
+                            numpy.linspace(47, 75, num=29, dtype=int)
+                        )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read file at: "{0:s}".'
@@ -1098,57 +1159,6 @@ def _read_predictors_one_example(
 
                 warnings.warn(warning_string)
                 continue
-
-            nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
-                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
-            )
-
-            if subset_grid:
-                if nwp_downsampling_factors[i] == 1:
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_row_indices=
-                        numpy.linspace(544, 992, num=449, dtype=int)
-                    )
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_column_indices=
-                        numpy.linspace(752, 1200, num=449, dtype=int)
-                    )
-                elif nwp_downsampling_factors[i] == 4:
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_row_indices=
-                        numpy.linspace(136, 248, num=113, dtype=int)
-                    )
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_column_indices=
-                        numpy.linspace(188, 300, num=113, dtype=int)
-                    )
-                elif nwp_downsampling_factors[i] == 8:
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_row_indices=
-                        numpy.linspace(68, 124, num=57, dtype=int)
-                    )
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_column_indices=
-                        numpy.linspace(94, 150, num=57, dtype=int)
-                    )
-                else:
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_row_indices=
-                        numpy.linspace(34, 62, num=29, dtype=int)
-                    )
-                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        desired_column_indices=
-                        numpy.linspace(47, 75, num=29, dtype=int)
-                    )
 
             if nwp_norm_param_table_xarray is not None:
                 print('Normalizing predictor variables to z-scores...')
