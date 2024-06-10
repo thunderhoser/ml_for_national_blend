@@ -1075,9 +1075,30 @@ def _read_predictors_one_example(
                 continue
 
             print('Reading data from: "{0:s}"...'.format(this_file_name))
-            nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
-                this_file_name
-            )
+
+            # TODO(thunderhoser): The try-except statement is a HACK for
+            # corrupt files.
+            try:
+                nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
+                    this_file_name
+                )
+
+                for this_coord in [
+                        nwp_model_utils.FORECAST_HOUR_DIM,
+                        nwp_model_utils.ROW_DIM,
+                        nwp_model_utils.COLUMN_DIM,
+                        nwp_model_utils.FIELD_DIM
+                ]:
+                    assert this_coord in nwp_forecast_table_xarray.coords
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read file at: "{0:s}".'
+                    '  Filling predictor matrix with NaN, instead.'
+                ).format(this_file_name)
+
+                warnings.warn(warning_string)
+                continue
+
             nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
                 nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                 desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
