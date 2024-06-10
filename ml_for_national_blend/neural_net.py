@@ -775,8 +775,16 @@ def _read_targets_one_example(
     urma_file_name = urma_io.find_file(
         directory_name=target_dir_name,
         valid_date_string=target_valid_date_string,
-        raise_error_if_missing=True
+        raise_error_if_missing=False
     )
+
+    if not os.path.isfile(urma_file_name):
+        warning_string = (
+            'POTENTIAL ERROR: Could not find file expected at: "{0:s}"'
+        ).format(urma_file_name)
+
+        warnings.warn(warning_string)
+        return None
 
     print('Reading data from: "{0:s}"...'.format(urma_file_name))
     urma_table_xarray = urma_io.read_file(urma_file_name)
