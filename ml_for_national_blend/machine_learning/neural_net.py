@@ -780,25 +780,16 @@ def _read_targets_one_example(
         return None
 
     print('Reading data from: "{0:s}"...'.format(urma_file_name))
-
-    try:
-        urma_table_xarray = urma_io.read_file(urma_file_name)
-        urma_table_xarray = urma_utils.subset_by_time(
-            urma_table_xarray=urma_table_xarray,
-            desired_times_unix_sec=
-            numpy.array([target_valid_time_unix_sec], dtype=int)
-        )
-        urma_table_xarray = urma_utils.subset_by_field(
-            urma_table_xarray=urma_table_xarray,
-            desired_field_names=target_field_names
-        )
-    except:
-        warning_string = (
-            'POTENTIAL ERROR: Could not read file at: "{0:s}"'
-        ).format(urma_file_name)
-
-        warnings.warn(warning_string)
-        return None
+    urma_table_xarray = urma_io.read_file(urma_file_name)
+    urma_table_xarray = urma_utils.subset_by_time(
+        urma_table_xarray=urma_table_xarray,
+        desired_times_unix_sec=
+        numpy.array([target_valid_time_unix_sec], dtype=int)
+    )
+    urma_table_xarray = urma_utils.subset_by_field(
+        urma_table_xarray=urma_table_xarray,
+        desired_field_names=target_field_names
+    )
 
     if target_norm_param_table_xarray is None:
         data_matrix = urma_table_xarray[urma_utils.DATA_KEY].values
@@ -912,49 +903,39 @@ def _read_residual_baseline_one_example(
         return None
 
     print('Reading data from: "{0:s}"...'.format(input_file_name))
+    nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
 
-    try:
-        nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
+    if subset_grid:
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_row_indices=numpy.linspace(544, 992, num=449, dtype=int)
+        )
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_column_indices=numpy.linspace(752, 1200, num=449, dtype=int)
+        )
 
-        if subset_grid:
-            nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                desired_row_indices=numpy.linspace(544, 992, num=449, dtype=int)
-            )
-            nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                desired_column_indices=numpy.linspace(752, 1200, num=449, dtype=int)
-            )
-
-        if predict_dewpoint_depression:
-            nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
-                nwp_forecast_table_xarray
-            )
-        if predict_gust_factor:
-            nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
-                nwp_forecast_table_xarray
-            )
-
-        nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
+    if predict_dewpoint_depression:
+        nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
+            nwp_forecast_table_xarray
+        )
+    if predict_gust_factor:
+        nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
             nwp_forecast_table_xarray
         )
 
-        these_matrices = [
-            nwp_model_utils.get_field(
-                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                field_name=target_field_to_baseline_nwp_field[f]
-            )[0, ...]
-            for f in target_field_names
-        ]
-        residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
-    except:
-        warning_string = (
-            'POTENTIAL ERROR: Could not read file at: "{0:s}".  This '
-            'is needed for residual baseline.'
-        ).format(input_file_name)
+    nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
+        nwp_forecast_table_xarray
+    )
 
-        warnings.warn(warning_string)
-        return None
+    these_matrices = [
+        nwp_model_utils.get_field(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            field_name=target_field_to_baseline_nwp_field[f]
+        )[0, ...]
+        for f in target_field_names
+    ]
+    residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
 
     need_fake_gust_data = (
         urma_utils.WIND_GUST_10METRE_NAME in target_field_names
@@ -1065,7 +1046,6 @@ def _read_predictors_one_example(
                 # TODO(thunderhoser): Also need a more flexible residual
                 # baseline.  If the desired model is missing, there should be a
                 # priority list.
-
                 this_file_name = interp_nwp_model_io.find_file(
                     directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
                     init_time_unix_sec=init_time_unix_sec,
@@ -1086,72 +1066,59 @@ def _read_predictors_one_example(
                 continue
 
             print('Reading data from: "{0:s}"...'.format(this_file_name))
+            nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
+                this_file_name
+            )
+            nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
+                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
+            )
 
-            # TODO(thunderhoser): The try-except statement is a HACK for
-            # corrupt files.
-            try:
-                nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
-                    this_file_name
-                )
-
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
-                )
-
-                if subset_grid:
-                    if nwp_downsampling_factors[i] == 1:
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_row_indices=
-                            numpy.linspace(544, 992, num=449, dtype=int)
-                        )
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_column_indices=
-                            numpy.linspace(752, 1200, num=449, dtype=int)
-                        )
-                    elif nwp_downsampling_factors[i] == 4:
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_row_indices=
-                            numpy.linspace(136, 248, num=113, dtype=int)
-                        )
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_column_indices=
-                            numpy.linspace(188, 300, num=113, dtype=int)
-                        )
-                    elif nwp_downsampling_factors[i] == 8:
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_row_indices=
-                            numpy.linspace(68, 124, num=57, dtype=int)
-                        )
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_column_indices=
-                            numpy.linspace(94, 150, num=57, dtype=int)
-                        )
-                    else:
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_row_indices=
-                            numpy.linspace(34, 62, num=29, dtype=int)
-                        )
-                        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                            desired_column_indices=
-                            numpy.linspace(47, 75, num=29, dtype=int)
-                        )
-            except:
-                warning_string = (
-                    'POTENTIAL ERROR: Could not read file at: "{0:s}".'
-                    '  Filling predictor matrix with NaN, instead.'
-                ).format(this_file_name)
-
-                warnings.warn(warning_string)
-                continue
+            if subset_grid:
+                if nwp_downsampling_factors[i] == 1:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(544, 992, num=449, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(752, 1200, num=449, dtype=int)
+                    )
+                elif nwp_downsampling_factors[i] == 4:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(136, 248, num=113, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(188, 300, num=113, dtype=int)
+                    )
+                elif nwp_downsampling_factors[i] == 8:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(68, 124, num=57, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(94, 150, num=57, dtype=int)
+                    )
+                else:
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_row_indices=
+                        numpy.linspace(34, 62, num=29, dtype=int)
+                    )
+                    nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                        desired_column_indices=
+                        numpy.linspace(47, 75, num=29, dtype=int)
+                    )
 
             if nwp_norm_param_table_xarray is not None:
                 print('Normalizing predictor variables to z-scores...')
@@ -1407,15 +1374,28 @@ def create_data(option_dict):
     )
 
     for i in range(num_examples):
-        this_target_matrix = _read_targets_one_example(
-            init_time_unix_sec=init_times_unix_sec[i],
-            target_lead_time_hours=target_lead_time_hours,
-            target_field_names=target_field_names,
-            target_dir_name=target_dir_name,
-            target_norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=targets_use_quantile_norm,
-            subset_grid=subset_grid
-        )
+        try:
+            this_target_matrix = _read_targets_one_example(
+                init_time_unix_sec=init_times_unix_sec[i],
+                target_lead_time_hours=target_lead_time_hours,
+                target_field_names=target_field_names,
+                target_dir_name=target_dir_name,
+                target_norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm,
+                subset_grid=subset_grid
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read targets for init time {0:s}.  '
+                'Something went wrong in `_read_targets_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_times_unix_sec[i], '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            this_target_matrix = None
 
         if this_target_matrix is None:
             good_example_flags[i] = False
@@ -1424,16 +1404,30 @@ def create_data(option_dict):
         target_matrix[i, ...] = this_target_matrix
 
         if do_residual_prediction:
-            this_baseline_matrix = _read_residual_baseline_one_example(
-                init_time_unix_sec=init_times_unix_sec[i],
-                nwp_model_name=resid_baseline_model_name,
-                nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                nwp_directory_name=resid_baseline_model_dir_name,
-                target_field_names=target_field_names,
-                subset_grid=subset_grid,
-                predict_dewpoint_depression=predict_dewpoint_depression,
-                predict_gust_factor=predict_gust_factor
-            )
+            try:
+                this_baseline_matrix = _read_residual_baseline_one_example(
+                    init_time_unix_sec=init_times_unix_sec[i],
+                    nwp_model_name=resid_baseline_model_name,
+                    nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                    nwp_directory_name=resid_baseline_model_dir_name,
+                    target_field_names=target_field_names,
+                    subset_grid=subset_grid,
+                    predict_dewpoint_depression=predict_dewpoint_depression,
+                    predict_gust_factor=predict_gust_factor
+                )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read residual baseline for '
+                    'init time {0:s}.  Something went wrong in '
+                    '`_read_residual_baseline_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[i], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                this_baseline_matrix = None
 
             if this_baseline_matrix is None:
                 good_example_flags[i] = False
@@ -1441,22 +1435,40 @@ def create_data(option_dict):
 
             predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
 
-        (
-            this_predictor_matrix_2pt5km,
-            this_predictor_matrix_10km,
-            this_predictor_matrix_20km,
-            this_predictor_matrix_40km,
-            good_example_flags[i]
-        ) = _read_predictors_one_example(
-            init_time_unix_sec=init_times_unix_sec[i],
-            nwp_model_names=nwp_model_names,
-            nwp_lead_times_hours=nwp_lead_times_hours,
-            nwp_model_to_field_names=nwp_model_to_field_names,
-            nwp_model_to_dir_name=nwp_model_to_dir_name,
-            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-            use_quantile_norm=nwp_use_quantile_norm,
-            subset_grid=subset_grid
-        )
+        try:
+            (
+                this_predictor_matrix_2pt5km,
+                this_predictor_matrix_10km,
+                this_predictor_matrix_20km,
+                this_predictor_matrix_40km,
+                good_example_flags[i]
+            ) = _read_predictors_one_example(
+                init_time_unix_sec=init_times_unix_sec[i],
+                nwp_model_names=nwp_model_names,
+                nwp_lead_times_hours=nwp_lead_times_hours,
+                nwp_model_to_field_names=nwp_model_to_field_names,
+                nwp_model_to_dir_name=nwp_model_to_dir_name,
+                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                use_quantile_norm=nwp_use_quantile_norm,
+                subset_grid=subset_grid
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read predictors for init time '
+                '{0:s}.  Something went wrong in '
+                '`_read_predictors_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_times_unix_sec[i], '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            this_predictor_matrix_2pt5km = None
+            this_predictor_matrix_10km = None
+            this_predictor_matrix_20km = None
+            this_predictor_matrix_40km = None
+            good_example_flags[i] = False
 
         if predictor_matrix_2pt5km is not None:
             predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
@@ -1814,15 +1826,29 @@ def data_generator(option_dict):
                 numpy.random.shuffle(init_times_unix_sec)
                 init_time_index = 0
 
-            this_target_matrix = _read_targets_one_example(
-                init_time_unix_sec=init_times_unix_sec[init_time_index],
-                target_lead_time_hours=target_lead_time_hours,
-                target_field_names=target_field_names,
-                target_dir_name=target_dir_name,
-                target_norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=targets_use_quantile_norm,
-                subset_grid=subset_grid
-            )
+            try:
+                this_target_matrix = _read_targets_one_example(
+                    init_time_unix_sec=init_times_unix_sec[init_time_index],
+                    target_lead_time_hours=target_lead_time_hours,
+                    target_field_names=target_field_names,
+                    target_dir_name=target_dir_name,
+                    target_norm_param_table_xarray=target_norm_param_table_xarray,
+                    use_quantile_norm=targets_use_quantile_norm,
+                    subset_grid=subset_grid
+                )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read targets for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`_read_targets_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                this_target_matrix = None
 
             if this_target_matrix is None:
                 init_time_index += 1
@@ -1832,16 +1858,30 @@ def data_generator(option_dict):
             target_matrix[i, ...] = this_target_matrix
 
             if do_residual_prediction:
-                this_baseline_matrix = _read_residual_baseline_one_example(
-                    init_time_unix_sec=init_times_unix_sec[init_time_index],
-                    nwp_model_name=resid_baseline_model_name,
-                    nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                    nwp_directory_name=resid_baseline_model_dir_name,
-                    target_field_names=target_field_names,
-                    subset_grid=subset_grid,
-                    predict_dewpoint_depression=predict_dewpoint_depression,
-                    predict_gust_factor=predict_gust_factor
-                )
+                try:
+                    this_baseline_matrix = _read_residual_baseline_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_name=resid_baseline_model_name,
+                        nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                        nwp_directory_name=resid_baseline_model_dir_name,
+                        target_field_names=target_field_names,
+                        subset_grid=subset_grid,
+                        predict_dewpoint_depression=predict_dewpoint_depression,
+                        predict_gust_factor=predict_gust_factor
+                    )
+                except:
+                    warning_string = (
+                        'POTENTIAL ERROR: Could not read residual baseline for '
+                        'init time {0:s}.  Something went wrong in '
+                        '`_read_residual_baseline_one_example`.'
+                    ).format(
+                        time_conversion.unix_sec_to_string(
+                            init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                        )
+                    )
+
+                    warnings.warn(warning_string)
+                    this_baseline_matrix = None
 
                 if this_baseline_matrix is None:
                     init_time_index += 1
@@ -1849,22 +1889,40 @@ def data_generator(option_dict):
 
                 predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
 
-            (
-                this_predictor_matrix_2pt5km,
-                this_predictor_matrix_10km,
-                this_predictor_matrix_20km,
-                this_predictor_matrix_40km,
-                found_any_predictors
-            ) = _read_predictors_one_example(
-                init_time_unix_sec=init_times_unix_sec[init_time_index],
-                nwp_model_names=nwp_model_names,
-                nwp_lead_times_hours=nwp_lead_times_hours,
-                nwp_model_to_field_names=nwp_model_to_field_names,
-                nwp_model_to_dir_name=nwp_model_to_dir_name,
-                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-                use_quantile_norm=nwp_use_quantile_norm,
-                subset_grid=subset_grid
-            )
+            try:
+                (
+                    this_predictor_matrix_2pt5km,
+                    this_predictor_matrix_10km,
+                    this_predictor_matrix_20km,
+                    this_predictor_matrix_40km,
+                    found_any_predictors
+                ) = _read_predictors_one_example(
+                    init_time_unix_sec=init_times_unix_sec[init_time_index],
+                    nwp_model_names=nwp_model_names,
+                    nwp_lead_times_hours=nwp_lead_times_hours,
+                    nwp_model_to_field_names=nwp_model_to_field_names,
+                    nwp_model_to_dir_name=nwp_model_to_dir_name,
+                    nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                    use_quantile_norm=nwp_use_quantile_norm,
+                    subset_grid=subset_grid
+                )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read predictors for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`_read_predictors_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                this_predictor_matrix_2pt5km = None
+                this_predictor_matrix_10km = None
+                this_predictor_matrix_20km = None
+                this_predictor_matrix_40km = None
+                found_any_predictors = False
 
             if not found_any_predictors:
                 init_time_index += 1
