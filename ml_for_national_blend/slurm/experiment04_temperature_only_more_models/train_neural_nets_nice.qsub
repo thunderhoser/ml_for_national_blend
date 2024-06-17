@@ -45,45 +45,56 @@ nwp_model_name_set=${NWP_MODEL_NAME_SETS[$SLURM_ARRAY_TASK_ID]}
 nwp_field_name_dict=${NWP_FIELD_NAME_DICTS[$SLURM_ARRAY_TASK_ID]}
 nwp_field_set_description=${NWP_FIELD_SET_DESCRIPTIONS[$SLURM_ARRAY_TASK_ID]}
 
-template_file_name="${TEMPLATE_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}/model.keras"
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}"
 echo $output_dir_name
 
 nwp_model_name_set=$(echo $nwp_model_name_set | tr "-" " ")
 
-python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
---input_template_file_name="${template_file_name}" \
---output_model_dir_name="${output_dir_name}" \
---nwp_lead_times_hours 12 24 36 48 \
---nwp_model_names ${nwp_model_name_set} \
---nwp_model_to_field_names=${nwp_field_name_dict} \
---nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
---nwp_use_quantile_norm=1 \
---target_lead_time_hours=48 \
---target_field_names "temperature_2m_agl_kelvins" \
---target_normalization_file_name="" \
---targets_use_quantile_norm=0 \
---nbm_constant_field_names "orographic_height_m_asl" "land_sea_mask_land1" \
---nbm_constant_file_name="${NBM_CONSTANT_FILE_NAME}" \
---num_examples_per_batch=3 \
---sentinel_value=-10 \
---predict_dewpoint_depression=0 \
---predict_gust_factor=0 \
---do_residual_prediction=1 \
---resid_baseline_model_name="nam_nest" \
---resid_baseline_lead_time_hours=48 \
---resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" \
---first_init_time_strings_for_training "2017-01-01-00" \
---last_init_time_strings_for_training "2021-12-20-18" \
---nwp_dir_names_for_training "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
---target_dir_name_for_training="${TARGET_DIR_NAME}" \
---first_init_time_strings_for_validation "2022-01-01-00" \
---last_init_time_strings_for_validation "2022-12-20-18" \
---nwp_dir_names_for_validation "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
---target_dir_name_for_validation="${TARGET_DIR_NAME}" \
---num_epochs=1000 \
---num_training_batches_per_epoch=64 \
---num_validation_batches_per_epoch=32 \
---plateau_patience_epochs=10 \
---plateau_learning_rate_multiplier=0.9 \
---early_stopping_patience_epochs=100
+i=0
+
+while true; do
+    if [ $i == 0 ]; then
+        input_model_file_name="${TEMPLATE_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}/model.keras"
+    else
+        input_model_file_name="${TOP_OUTPUT_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}/model.keras"
+    fi
+
+    python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+    --input_template_file_name="${input_model_file_name}" \
+    --output_model_dir_name="${output_dir_name}" \
+    --nwp_lead_times_hours 12 24 36 48 \
+    --nwp_model_names ${nwp_model_name_set} \
+    --nwp_model_to_field_names=${nwp_field_name_dict} \
+    --nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
+    --nwp_use_quantile_norm=1 \
+    --target_lead_time_hours=48 \
+    --target_field_names "temperature_2m_agl_kelvins" \
+    --target_normalization_file_name="" \
+    --targets_use_quantile_norm=0 \
+    --nbm_constant_field_names "orographic_height_m_asl" "land_sea_mask_land1" \
+    --nbm_constant_file_name="${NBM_CONSTANT_FILE_NAME}" \
+    --num_examples_per_batch=3 \
+    --sentinel_value=-10 \
+    --predict_dewpoint_depression=0 \
+    --predict_gust_factor=0 \
+    --do_residual_prediction=1 \
+    --resid_baseline_model_name="nam_nest" \
+    --resid_baseline_lead_time_hours=48 \
+    --resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" \
+    --first_init_time_strings_for_training "2017-01-01-00" \
+    --last_init_time_strings_for_training "2021-12-20-18" \
+    --nwp_dir_names_for_training "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
+    --target_dir_name_for_training="${TARGET_DIR_NAME}" \
+    --first_init_time_strings_for_validation "2022-01-01-00" \
+    --last_init_time_strings_for_validation "2022-12-20-18" \
+    --nwp_dir_names_for_validation "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final" \
+    --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
+    --num_epochs=1000 \
+    --num_training_batches_per_epoch=64 \
+    --num_validation_batches_per_epoch=32 \
+    --plateau_patience_epochs=10 \
+    --plateau_learning_rate_multiplier=0.9 \
+    --early_stopping_patience_epochs=100
+    
+    i=$(( $i + 1 ))
+done
