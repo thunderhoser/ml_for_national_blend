@@ -48,7 +48,7 @@ nwp_field_set_description=${NWP_FIELD_SET_DESCRIPTIONS[$SLURM_ARRAY_TASK_ID]}
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}"
 echo $output_dir_name
 
-nwp_model_name_set=$(echo $nwp_model_name_set | tr "-" " ")
+nwp_model_name_set_with_spaces=$(echo $nwp_model_name_set | tr "-" " ")
 
 i=0
 
@@ -63,7 +63,7 @@ while true; do
     --input_template_file_name="${input_model_file_name}" \
     --output_model_dir_name="${output_dir_name}" \
     --nwp_lead_times_hours 12 24 36 48 \
-    --nwp_model_names ${nwp_model_name_set} \
+    --nwp_model_names ${nwp_model_name_set_with_spaces} \
     --nwp_model_to_field_names=${nwp_field_name_dict} \
     --nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
     --nwp_use_quantile_norm=1 \
