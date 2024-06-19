@@ -50,6 +50,6 @@ python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
 --max_colour_percentiles 99.9 \
 --plot_diffs=1 \
 --max_colour_percentiles_for_diff 99.9 \
---baseline_nwp_model_name="hrrr" \
---baseline_nwp_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" \
+--baseline_nwp_model_name="nam_nest" \
+--baseline_nwp_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" \
 --output_dir_name="${model_dir_name}/validation/${INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
