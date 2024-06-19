@@ -1,0 +1,52 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_ungridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=12:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_ungridded_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment04_temperature_only_more_models/models_trained_with_seg_faults_and_shit"
+TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+NWP_MODEL_NAME_SETS=("nam_nest-gridded_lamp-hrrr")
+NWP_FIELD_NAME_SETS=("surface")
+
+nwp_model_name_set=${NWP_MODEL_NAME_SETS[0]}
+nwp_field_name_set=${NWP_FIELD_NAME_SETS[0]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_name_set}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+--input_eval_file_names "${model_dir_name}/validation/ungridded_evaluation.nc" \
+--input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+--line_styles "solid" \
+--line_colours "217_95_2" \
+--set_descriptions "model" \
+--plot_full_error_distributions=1 \
+--confidence_level=0.95 \
+--report_metrics_in_titles=1 \
+--output_dir_name="${model_dir_name}/validation/ungridded_evaluation"
