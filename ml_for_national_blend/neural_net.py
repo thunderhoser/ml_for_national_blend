@@ -1313,6 +1313,18 @@ def create_data(option_dict):
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
 
     nwp_model_names = list(set(first_nwp_model_names))
+
+    # TODO(thunderhoser): This is a HACK.  Model names ultimately should just be
+    # sorted alphabetically.
+    nwp_model_names = [
+        nwp_model_utils.RAP_MODEL_NAME,
+        nwp_model_utils.NAM_NEST_MODEL_NAME,
+        nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
+        nwp_model_utils.HRRR_MODEL_NAME,
+        nwp_model_utils.GFS_MODEL_NAME,
+        nwp_model_utils.ECMWF_MODEL_NAME
+    ]
+
     # nwp_model_names = [
     #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
     # ]
