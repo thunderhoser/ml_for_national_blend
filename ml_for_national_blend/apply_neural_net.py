@@ -2,6 +2,7 @@
 
 import os
 import sys
+import copy
 import argparse
 import numpy
 
@@ -13,6 +14,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import time_conversion
 import prediction_io
 import nbm_utils
+import nwp_model_utils
 import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -82,6 +84,41 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
+def _process_nwp_directories(nwp_directory_names, nwp_model_names):
+    """Processes NWP directories for either training or validation data.
+
+    :param nwp_directory_names: See documentation for input arg
+        "nwp_dir_names_for_training" to this script.
+    :param nwp_model_names: See documentation for input arg to this script.
+    :return: nwp_model_to_dir_name: Dictionary, where each key is the name of an
+        NWP model and the corresponding value is the input directory.
+    """
+
+    # assert len(nwp_model_names) == len(nwp_directory_names)
+    nwp_directory_names = nwp_directory_names[:len(nwp_model_names)]
+
+    if len(nwp_directory_names) == 1:
+        found_any_model_name_in_dir_name = any([
+            m in nwp_directory_names[0] for m in nwp_model_utils.ALL_MODEL_NAMES
+        ])
+        infer_directories = (
+            len(nwp_model_names) > 1 or
+            (len(nwp_model_names) == 1 and not found_any_model_name_in_dir_name)
+        )
+    else:
+        infer_directories = False
+
+    if infer_directories:
+        top_directory_name = copy.deepcopy(nwp_directory_names[0])
+        nwp_directory_names = [
+            '{0:s}/{1:s}/processed/interp_to_nbm_grid'.format(
+                top_directory_name, m
+            ) for m in nwp_model_names
+        ]
+
+    return dict(zip(nwp_model_names, nwp_directory_names))
+
+
 def _run(model_file_name, init_time_string, nwp_model_names,
          nwp_directory_names, target_dir_name, output_dir_name):
     """Applies trained neural net -- inference time!
@@ -108,8 +145,9 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
     )
 
-    nwp_model_to_dir_name = dict(
-        zip(nwp_model_names, nwp_directory_names)
+    nwp_model_to_dir_name = _process_nwp_directories(
+        nwp_directory_names=nwp_directory_names,
+        nwp_model_names=nwp_model_names
     )
     init_time_unix_sec = time_conversion.string_to_unix_sec(
         init_time_string, TIME_FORMAT
