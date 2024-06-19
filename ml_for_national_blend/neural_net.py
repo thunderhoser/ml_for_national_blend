@@ -379,6 +379,9 @@ def _check_generator_args(option_dict):
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
+
+    print(first_nwp_model_names)
+    print(second_nwp_model_names)
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
 
     nwp_model_names = list(set(second_nwp_model_names))
