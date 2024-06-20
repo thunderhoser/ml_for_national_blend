@@ -379,12 +379,10 @@ def _check_generator_args(option_dict):
 
     first_nwp_model_names = list(nwp_model_to_dir_name.keys())
     second_nwp_model_names = list(nwp_model_to_field_names.keys())
-
-    print(first_nwp_model_names)
-    print(second_nwp_model_names)
     assert set(first_nwp_model_names) == set(second_nwp_model_names)
 
-    nwp_model_names = list(set(second_nwp_model_names))
+    nwp_model_names = second_nwp_model_names
+    nwp_model_names.sort()
 
     for this_model_name in nwp_model_names:
         error_checking.assert_is_string(nwp_model_to_dir_name[this_model_name])
@@ -1308,22 +1306,8 @@ def create_data(option_dict):
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
 
-    first_nwp_model_names = list(nwp_model_to_dir_name.keys())
-    second_nwp_model_names = list(nwp_model_to_field_names.keys())
-    assert set(first_nwp_model_names) == set(second_nwp_model_names)
-
-    nwp_model_names = list(set(first_nwp_model_names))
-
-    # TODO(thunderhoser): This is a HACK.  Model names ultimately should just be
-    # sorted alphabetically.
-    nwp_model_names = [
-        nwp_model_utils.RAP_MODEL_NAME,
-        nwp_model_utils.NAM_NEST_MODEL_NAME,
-        nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
-        nwp_model_utils.HRRR_MODEL_NAME,
-        nwp_model_utils.GFS_MODEL_NAME,
-        nwp_model_utils.ECMWF_MODEL_NAME
-    ]
+    nwp_model_names = list(nwp_model_to_dir_name.keys())
+    nwp_model_names.sort()
 
     # nwp_model_names = [
     #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
@@ -1761,11 +1745,9 @@ def data_generator(option_dict):
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
 
-    first_nwp_model_names = list(nwp_model_to_dir_name.keys())
-    second_nwp_model_names = list(nwp_model_to_field_names.keys())
-    assert set(first_nwp_model_names) == set(second_nwp_model_names)
+    nwp_model_names = list(nwp_model_to_dir_name.keys())
+    nwp_model_names.sort()
 
-    nwp_model_names = list(set(first_nwp_model_names))
     # nwp_model_names = [
     #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
     # ]
