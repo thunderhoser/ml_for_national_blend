@@ -11,6 +11,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import error_checking
 import prediction_io
 import evaluation
 
@@ -20,7 +21,8 @@ SENTINEL_VALUE = -1e6
 TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
-INIT_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings'
+FIRST_INIT_TIMES_ARG_NAME = 'first_init_time_string_by_period'
+LAST_INIT_TIMES_ARG_NAME = 'last_init_time_string_by_period'
 NUM_BOOTSTRAP_REPS_ARG_NAME = 'num_bootstrap_reps'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_NORM_FILE_ARG_NAME = 'input_target_norm_file_name'
@@ -37,9 +39,15 @@ INPUT_DIR_HELP_STRING = (
     'Files therein will be found by `prediction_io.find_file` and read by '
     '`prediction_io.read_file`.'
 )
-INIT_TIME_LIMITS_HELP_STRING = (
-    'List of two init times (format "yyyy-mm-dd-HH"), specifying the beginning '
-    'and end of the evaluation period.'
+FIRST_INIT_TIMES_HELP_STRING = (
+    'List with first init time in each period.  List must have length P, where '
+    'P = number of continuous periods to include in the evaluation.  Each time '
+    'must be in format "yyyy-mm-dd-HH".'
+)
+LAST_INIT_TIMES_HELP_STRING = (
+    'List with last init time in each period.  List must have length P, where '
+    'P = number of continuous periods to include in the evaluation.  Each time '
+    'must be in format "yyyy-mm-dd-HH".'
 )
 NUM_BOOTSTRAP_REPS_HELP_STRING = 'Number of bootstrap replicates.'
 TARGET_FIELDS_HELP_STRING = (
@@ -89,8 +97,12 @@ INPUT_ARG_PARSER.add_argument(
     help=INPUT_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + INIT_TIME_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
-    help=INIT_TIME_LIMITS_HELP_STRING
+    '--' + FIRST_INIT_TIMES_ARG_NAME, type=str, nargs='+', required=True,
+    help=FIRST_INIT_TIMES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + LAST_INIT_TIMES_ARG_NAME, type=str, nargs='+', required=True,
+    help=LAST_INIT_TIMES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + NUM_BOOTSTRAP_REPS_ARG_NAME, type=int, required=True,
@@ -136,7 +148,8 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(prediction_dir_name, init_time_limit_strings, num_bootstrap_reps,
+def _run(prediction_dir_name, first_init_time_string_by_period,
+         last_init_time_string_by_period, num_bootstrap_reps,
          target_field_names, target_normalization_file_name,
          num_relia_bins_by_target, min_relia_bin_edge_by_target,
          max_relia_bin_edge_by_target,
@@ -148,7 +161,8 @@ def _run(prediction_dir_name, init_time_limit_strings, num_bootstrap_reps,
     This is effectively the main method.
 
     :param prediction_dir_name: See documentation at top of file.
-    :param init_time_limit_strings: Same.
+    :param first_init_time_string_by_period: Same.
+    :param last_init_time_string_by_period: Same.
     :param num_bootstrap_reps: Same.
     :param target_field_names: Same.
     :param target_normalization_file_name: Same.
@@ -179,18 +193,38 @@ def _run(prediction_dir_name, init_time_limit_strings, num_bootstrap_reps,
         min_relia_bin_edge_prctile_by_target = None
         max_relia_bin_edge_prctile_by_target = None
 
-    init_time_limits_unix_sec = numpy.array([
+    first_init_time_by_period_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
-        for t in init_time_limit_strings
+        for t in first_init_time_string_by_period
     ], dtype=int)
 
-    prediction_file_names = prediction_io.find_files_for_period(
-        directory_name=prediction_dir_name,
-        first_init_time_unix_sec=init_time_limits_unix_sec[0],
-        last_init_time_unix_sec=init_time_limits_unix_sec[1],
-        raise_error_if_any_missing=False,
-        raise_error_if_all_missing=True
+    last_init_time_by_period_unix_sec = numpy.array([
+        time_conversion.string_to_unix_sec(t, TIME_FORMAT)
+        for t in last_init_time_string_by_period
+    ], dtype=int)
+
+    error_checking.assert_equals(
+        len(first_init_time_by_period_unix_sec),
+        len(last_init_time_by_period_unix_sec)
     )
+
+    prediction_file_names_2d_list = [
+        prediction_io.find_files_for_period(
+            directory_name=prediction_dir_name,
+            first_init_time_unix_sec=f,
+            last_init_time_unix_sec=l,
+            raise_error_if_any_missing=False,
+            raise_error_if_all_missing=True
+        )
+        for f, l in zip(
+            first_init_time_by_period_unix_sec,
+            last_init_time_by_period_unix_sec
+        )
+    ]
+
+    prediction_file_names = [
+        f for sublist in prediction_file_names_2d_list for f in sublist
+    ]
 
     result_table_xarray = evaluation.get_scores_with_bootstrapping(
         prediction_file_names=prediction_file_names,
@@ -258,8 +292,11 @@ if __name__ == '__main__':
 
     _run(
         prediction_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
-        init_time_limit_strings=getattr(
-            INPUT_ARG_OBJECT, INIT_TIME_LIMITS_ARG_NAME
+        first_init_time_string_by_period=getattr(
+            INPUT_ARG_OBJECT, FIRST_INIT_TIMES_ARG_NAME
+        ),
+        last_init_time_string_by_period=getattr(
+            INPUT_ARG_OBJECT, LAST_INIT_TIMES_ARG_NAME
         ),
         num_bootstrap_reps=getattr(
             INPUT_ARG_OBJECT, NUM_BOOTSTRAP_REPS_ARG_NAME

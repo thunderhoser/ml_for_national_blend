@@ -774,69 +774,59 @@ def confidence_interval_to_polygon(
 def read_inputs(prediction_file_names, target_field_names):
     """Reads inputs (predictions and targets) from many files.
 
-    E = number of examples
-    M = number of rows in grid
-    N = number of columns in grid
-    T = number of target fields
-    S = number of ensemble members
-
     :param prediction_file_names: 1-D list of paths to prediction files.  Each
         file will be read by `prediction_io.read_file`.
     :param target_field_names: length-T list of field names desired.
-    :return: target_matrix: E-by-M-by-N-by-T numpy array of target values.
-    :return: prediction_matrix: E-by-M-by-N-by-T-by-S numpy array of
-        predictions.
-    :return: model_file_name: Path to model that generated predictions.
+    :return: prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
     """
 
-    # TODO(thunderhoser): Put this in prediction_io.py and allow it to return
-    # grid coords as well (for use in, e.g., plot_predictions.py).
+    # TODO(thunderhoser): Put this in prediction_io.py.
 
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_string_list(target_field_names)
 
     num_times = len(prediction_file_names)
-    target_matrix = numpy.array([], dtype=float)
-    prediction_matrix = numpy.array([], dtype=float)
+    prediction_tables_xarray = [xarray.Dataset()] * num_times
     model_file_name = None
 
     for i in range(num_times):
         print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
-        this_prediction_table_xarray = prediction_io.read_file(
+        prediction_tables_xarray[i] = prediction_io.read_file(
             prediction_file_names[i]
         )
-        tpt = this_prediction_table_xarray
+        pt_i = prediction_tables_xarray[i]
 
         if model_file_name is None:
-            these_dim = (
-                (num_times,) + tpt[prediction_io.TARGET_KEY].values.shape
-            )
-            target_matrix = numpy.full(these_dim, numpy.nan)
-
-            these_dim = (
-                (num_times,) + tpt[prediction_io.PREDICTION_KEY].values.shape
-            )
-            prediction_matrix = numpy.full(these_dim, numpy.nan)
-
             model_file_name = copy.deepcopy(
-                tpt.attrs[prediction_io.MODEL_FILE_KEY]
+                pt_i.attrs[prediction_io.MODEL_FILE_KEY]
             )
 
-        assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+        assert model_file_name == pt_i.attrs[prediction_io.MODEL_FILE_KEY]
 
         these_indices = numpy.array([
-            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            numpy.where(pt_i[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
             for f in target_field_names
         ], dtype=int)
 
-        target_matrix[i, ...] = (
-            tpt[prediction_io.TARGET_KEY].values[..., these_indices]
-        )
-        prediction_matrix[i, ...] = (
-            tpt[prediction_io.PREDICTION_KEY].values[..., these_indices, :]
-        )
+        pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
+        prediction_tables_xarray[i] = pt_i
 
-    return target_matrix, prediction_matrix, model_file_name
+    # try:
+    #     return xarray.concat(
+    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+    #         data_vars='all', coords='minimal', compat='identical', join='exact'
+    #     )
+    # except:
+    #     return xarray.concat(
+    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+    #         data_vars='all', coords='minimal', compat='identical'
+    #     )
+
+    return xarray.concat(
+        prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+        data_vars='all', coords='minimal', compat='identical', join='exact'
+    )
 
 
 def get_scores_with_bootstrapping(
@@ -930,10 +920,15 @@ def get_scores_with_bootstrapping(
                 min_relia_bin_edge_by_target[j]
             )
 
-    target_matrix, prediction_matrix, model_file_name = read_inputs(
+    prediction_table_xarray = read_inputs(
         prediction_file_names=prediction_file_names,
         target_field_names=target_field_names
     )
+    ptx = prediction_table_xarray
+
+    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+    target_matrix = ptx[prediction_io.TARGET_KEY].values
+    model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
     # prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
 
     print('Reading mean (climo) values from: "{0:s}"...'.format(
@@ -1122,19 +1117,38 @@ def get_scores_with_bootstrapping(
     main_data_dict.update(new_dict)
 
     if per_grid_cell:
-        this_prediction_table_xarray = prediction_io.read_file(
-            prediction_file_names[0]
+        ptx = prediction_table_xarray
+        latitude_matrix_deg_n = ptx[prediction_io.LATITUDE_KEY].values
+        longitude_matrix_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
+
+        latitude_diff_matrix_deg = (
+            numpy.max(latitude_matrix_deg_n, axis=0) -
+            numpy.min(latitude_matrix_deg_n, axis=0)
         )
-        tpt = this_prediction_table_xarray
+        longitude_diff_matrix_deg = (
+            numpy.max(longitude_matrix_deg_e, axis=0) -
+            numpy.min(longitude_matrix_deg_e, axis=0)
+        )
+
+        if (
+                numpy.all(latitude_diff_matrix_deg < TOLERANCE) and
+                numpy.all(longitude_diff_matrix_deg < TOLERANCE)
+        ):
+            latitude_matrix_deg_n = latitude_matrix_deg_n[0, ...]
+            longitude_matrix_deg_e = longitude_matrix_deg_e[0, ...]
+        else:
+            latitude_matrix_deg_n = numpy.full(
+                latitude_matrix_deg_n[0, ...].shape, numpy.nan
+            )
+            longitude_matrix_deg_e = numpy.full(
+                latitude_matrix_deg_n[0, ...].shape, numpy.nan
+            )
+
         these_dim_keys = (ROW_DIM, COLUMN_DIM)
 
         new_dict = {
-            LATITUDE_KEY: (
-                these_dim_keys, tpt[prediction_io.LATITUDE_KEY].values
-            ),
-            LONGITUDE_KEY: (
-                these_dim_keys, tpt[prediction_io.LONGITUDE_KEY].values
-            )
+            LATITUDE_KEY: (these_dim_keys, latitude_matrix_deg_n),
+            LONGITUDE_KEY: (these_dim_keys, longitude_matrix_deg_e)
         }
         main_data_dict.update(new_dict)
 

@@ -23,13 +23,14 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 # TODO(thunderhoser): This will change.
 DEFAULT_INIT_TIME_INTERVAL_SEC = 6 * 3600
 
+INIT_TIME_DIM = 'init_time'
 ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
 FIELD_DIM = 'field'
 FIELD_CHAR_DIM = 'field_char'
 
 MODEL_FILE_KEY = 'model_file_name'
-INIT_TIME_KEY = 'init_date_unix_sec'
+INIT_TIME_KEY = 'init_time_unix_sec'
 
 TARGET_KEY = 'target'
 PREDICTION_KEY = 'prediction'
@@ -232,33 +233,49 @@ def write_file(
     num_field_chars = max([len(f) for f in field_names])
 
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
-    dataset_object.setncattr(INIT_TIME_KEY, init_time_unix_sec)
+    dataset_object.createDimension(INIT_TIME_DIM, 1)
     dataset_object.createDimension(ROW_DIM, num_rows)
     dataset_object.createDimension(COLUMN_DIM, num_columns)
     dataset_object.createDimension(FIELD_DIM, num_fields)
     dataset_object.createDimension(FIELD_CHAR_DIM, num_field_chars)
 
-    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
+    these_dim = (INIT_TIME_DIM,)
+    dataset_object.createVariable(
+        INIT_TIME_KEY, datatype=numpy.int64, dimensions=these_dim
+    )
+    dataset_object.variables[INIT_TIME_KEY][:] = numpy.array(
+        [init_time_unix_sec], dtype=int
+    )
+
+    these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
         TARGET_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[TARGET_KEY][:] = target_matrix
+    dataset_object.variables[TARGET_KEY][:] = numpy.expand_dims(
+        target_matrix, axis=0
+    )
 
     dataset_object.createVariable(
         PREDICTION_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[PREDICTION_KEY][:] = prediction_matrix
+    dataset_object.variables[PREDICTION_KEY][:] = numpy.expand_dims(
+        prediction_matrix, axis=0
+    )
 
-    these_dim = (ROW_DIM, COLUMN_DIM)
+    these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM)
     dataset_object.createVariable(
         LATITUDE_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[LATITUDE_KEY][:] = latitude_matrix_deg_n
+    dataset_object.variables[LATITUDE_KEY][:] = numpy.expand_dims(
+        latitude_matrix_deg_n, axis=0
+    )
 
     dataset_object.createVariable(
         LONGITUDE_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[LONGITUDE_KEY][:] = longitude_matrix_deg_e
+    dataset_object.variables[LONGITUDE_KEY][:] = numpy.expand_dims(
+        longitude_matrix_deg_e, axis=0
+    )
 
     this_string_format = 'S{0:d}'.format(num_field_chars)
     field_names_char_array = netCDF4.stringtochar(numpy.array(
