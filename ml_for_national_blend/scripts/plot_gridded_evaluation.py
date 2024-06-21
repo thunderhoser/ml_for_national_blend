@@ -5,6 +5,7 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
+from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
@@ -226,6 +227,27 @@ def _plot_one_score(
     :param output_file_name: Path to output file.
     """
 
+    plotting_with_borders = not (
+        numpy.all(numpy.isnan(grid_latitude_matrix_deg_n)) and
+        numpy.all(numpy.isnan(grid_longitude_matrix_deg_e))
+    )
+
+    if not plotting_with_borders:
+        num_rows = score_matrix.shape[0]
+        grid_latitudes_deg_n = numpy.linspace(-1, 1, num=num_rows, dtype=float)
+
+        num_columns = score_matrix.shape[1]
+        grid_longitudes_deg_e = numpy.linspace(
+            -1, 1, num=num_columns, dtype=float
+        )
+
+        grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e = (
+            grids.latlng_vectors_to_matrices(
+                unique_latitudes_deg=grid_latitudes_deg_n,
+                unique_longitudes_deg=grid_longitudes_deg_e
+            )
+        )
+
     border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
         border_longitudes_deg_e
     )
@@ -248,19 +270,20 @@ def _plot_one_score(
         plot_colour_bar=True
     )
 
-    plotting_utils.plot_borders(
-        border_latitudes_deg_n=border_latitudes_deg_n,
-        border_longitudes_deg_e=border_longitudes_deg_e,
-        axes_object=axes_object,
-        line_colour=numpy.full(3, 0.)
-    )
-    plotting_utils.plot_grid_lines(
-        plot_latitudes_deg_n=numpy.ravel(grid_latitude_matrix_deg_n),
-        plot_longitudes_deg_e=numpy.ravel(grid_longitude_matrix_deg_e),
-        axes_object=axes_object,
-        meridian_spacing_deg=20.,
-        parallel_spacing_deg=10.
-    )
+    if plotting_with_borders:
+        plotting_utils.plot_borders(
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            axes_object=axes_object,
+            line_colour=numpy.full(3, 0.)
+        )
+        plotting_utils.plot_grid_lines(
+            plot_latitudes_deg_n=numpy.ravel(grid_latitude_matrix_deg_n),
+            plot_longitudes_deg_e=numpy.ravel(grid_longitude_matrix_deg_e),
+            axes_object=axes_object,
+            meridian_spacing_deg=20.,
+            parallel_spacing_deg=10.
+        )
 
     axes_object.set_xlim(
         numpy.min(grid_longitude_matrix_deg_e),
@@ -477,9 +500,10 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
 
             _plot_one_score(
                 score_matrix=this_score_matrix,
-                grid_latitude_matrix_deg_n=etx[evaluation.LATITUDE_KEY].values,
+                grid_latitude_matrix_deg_n=
+                etx[evaluation.LATITUDE_KEY].values + 0.,
                 grid_longitude_matrix_deg_e=
-                etx[evaluation.LONGITUDE_KEY].values,
+                etx[evaluation.LONGITUDE_KEY].values + 0.,
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
                 colour_map_object=colour_map_object,

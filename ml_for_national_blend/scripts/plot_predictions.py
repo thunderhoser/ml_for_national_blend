@@ -6,16 +6,20 @@ import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
 from gewittergefahr.gg_utils import time_conversion
+from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import urma_utils
+from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_with_fancy_patches
 from ml_for_national_blend.plotting import target_plotting
 from ml_for_national_blend.plotting import plotting_utils
 
+TOLERANCE = 1e-6
 HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
 
@@ -396,19 +400,78 @@ def _run(prediction_dir_name, init_time_string, field_names,
         valid_time_unix_sec, TIME_FORMAT
     )
 
+    # TODO(thunderhoser): After getting rid of legacy grid with subset_grid
+    # (fixed, rather than variable, patch location during training), I can
+    # simplify the code below.
     if baseline_nwp_model_name is not None:
-        baseline_prediction_matrix = (
-            neural_net._read_residual_baseline_one_example(
-                init_time_unix_sec=init_time_unix_sec,
-                nwp_model_name=baseline_nwp_model_name,
-                nwp_lead_time_hours=lead_time_hours,
-                nwp_directory_name=baseline_nwp_model_dir_name,
-                target_field_names=field_names,
-                subset_grid=subset_grid,
-                predict_dewpoint_depression=False,
-                predict_gust_factor=False
+        if neural_net.SUBSET_GRID_KEY in training_option_dict:
+            baseline_prediction_matrix = (
+                neural_net._read_residual_baseline_one_example(
+                    init_time_unix_sec=init_time_unix_sec,
+                    nwp_model_name=baseline_nwp_model_name,
+                    nwp_lead_time_hours=lead_time_hours,
+                    nwp_directory_name=baseline_nwp_model_dir_name,
+                    target_field_names=field_names,
+                    subset_grid=subset_grid,
+                    predict_dewpoint_depression=False,
+                    predict_gust_factor=False
+                )
             )
-        )
+        else:
+            if subset_grid:
+                full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+                    nbm_utils.read_coords()
+                )
+                full_longitude_matrix_deg_e = (
+                    lng_conversion.convert_lng_positive_in_west(
+                        full_longitude_matrix_deg_e
+                    )
+                )
+
+                patch_start_latitude_deg_n = (
+                    ptx[prediction_io.LATITUDE_KEY].values[0, 0, 0]
+                )
+                patch_start_longitude_deg_e = (
+                    ptx[prediction_io.LONGITUDE_KEY].values[0, 0, 0]
+                )
+                patch_start_longitude_deg_e = (
+                    lng_conversion.convert_lng_positive_in_west(
+                        patch_start_longitude_deg_e
+                    )
+                )
+
+                good_indices = numpy.where(numpy.logical_and(
+                    numpy.absolute(
+                        full_latitude_matrix_deg_n -
+                        patch_start_latitude_deg_n
+                    ) < TOLERANCE,
+                    numpy.absolute(
+                        full_longitude_matrix_deg_e -
+                        patch_start_longitude_deg_e
+                    ) < TOLERANCE
+                ))
+
+                patch_location_dict = misc_utils.determine_patch_locations(
+                    patch_size_2pt5km_pixels=
+                    len(ptx.coords[prediction_io.ROW_DIM].values),
+                    start_row_2pt5km=good_indices[0][0],
+                    start_column_2pt5km=good_indices[1][0]
+                )
+            else:
+                patch_location_dict = None
+
+            baseline_prediction_matrix = (
+                neural_net_with_fancy_patches._read_residual_baseline_one_example(
+                    init_time_unix_sec=init_time_unix_sec,
+                    nwp_model_name=baseline_nwp_model_name,
+                    nwp_lead_time_hours=lead_time_hours,
+                    nwp_directory_name=baseline_nwp_model_dir_name,
+                    target_field_names=field_names,
+                    patch_location_dict=patch_location_dict,
+                    predict_dewpoint_depression=False,
+                    predict_gust_factor=False
+                )
+            )
     else:
         baseline_prediction_matrix = None
 
@@ -421,10 +484,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
         )[0][0]
 
         prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., j_new]
+            ptx[prediction_io.PREDICTION_KEY].values[0, ..., j_new]
         )
         target_matrix = (
-            ptx[prediction_io.TARGET_KEY].values[..., j_new]
+            ptx[prediction_io.TARGET_KEY].values[0, ..., j_new]
         )
 
         title_string = 'Predicted {0:s}\nInit {1:s}, valid {2:s}'.format(
@@ -474,8 +537,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
         _plot_one_field(
             data_matrix=prediction_matrix,
-            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -499,8 +564,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
         _plot_one_field(
             data_matrix=target_matrix,
-            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -525,8 +592,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
             _plot_one_field(
                 data_matrix=baseline_prediction_matrix[..., j],
-                latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-                longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+                latitude_matrix_deg_n=
+                ptx[prediction_io.LATITUDE_KEY].values[0, ...],
+                longitude_matrix_deg_e=
+                ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
                 colour_map_object=colour_map_object,
@@ -582,8 +651,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
         _plot_one_field(
             data_matrix=prediction_matrix - target_matrix,
-            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -610,8 +681,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
         _plot_one_field(
             data_matrix=baseline_prediction_matrix[..., j] - target_matrix,
-            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,

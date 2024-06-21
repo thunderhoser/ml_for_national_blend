@@ -7,6 +7,7 @@ import numpy
 from gewittergefahr.gg_utils import time_conversion
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_with_fancy_patches
 from ml_for_national_blend.scripts import training_args
 
 TIME_FORMAT = '%Y-%m-%d-%H'
@@ -56,7 +57,7 @@ def _run(template_file_name, output_dir_name,
          target_lead_time_hours, target_field_names,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
-         num_examples_per_batch, sentinel_value,
+         num_examples_per_batch, sentinel_value, patch_size_2pt5km_pixels,
          predict_dewpoint_depression, predict_gust_factor,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
@@ -89,6 +90,7 @@ def _run(template_file_name, output_dir_name,
     :param nbm_constant_file_name: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
+    :param patch_size_2pt5km_pixels: Same.
     :param predict_dewpoint_depression: Same.
     :param predict_gust_factor: Same.
     :param do_residual_prediction: Same.
@@ -172,9 +174,6 @@ def _run(template_file_name, output_dir_name,
         neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
-
-        # TODO(thunderhoser): Make this an actual input arg.
-        neural_net.SUBSET_GRID_KEY: True,
         neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY: predict_dewpoint_depression,
         neural_net.PREDICT_GUST_FACTOR_KEY: predict_gust_factor,
         neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
@@ -182,6 +181,16 @@ def _run(template_file_name, output_dir_name,
         neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name
     }
+
+    if patch_size_2pt5km_pixels == 0:
+        training_option_dict[neural_net.SUBSET_GRID_KEY] = True
+    else:
+        if patch_size_2pt5km_pixels < 0:
+            patch_size_2pt5km_pixels = None
+
+        training_option_dict[neural_net_with_fancy_patches.PATCH_SIZE_KEY] = (
+            patch_size_2pt5km_pixels
+        )
 
     validation_option_dict = {
         neural_net.FIRST_INIT_TIMES_KEY:
@@ -200,23 +209,44 @@ def _run(template_file_name, output_dir_name,
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
 
-    neural_net.train_model(
-        model_object=model_object,
-        num_epochs=num_epochs,
-        num_training_batches_per_epoch=num_training_batches_per_epoch,
-        training_option_dict=training_option_dict,
-        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
-        validation_option_dict=validation_option_dict,
-        loss_function_string=model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
-        optimizer_function_string=
-        model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
-        metric_function_strings=
-        model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
-        plateau_patience_epochs=plateau_patience_epochs,
-        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs=early_stopping_patience_epochs,
-        output_dir_name=output_dir_name
-    )
+    if patch_size_2pt5km_pixels == 0:
+        neural_net.train_model(
+            model_object=model_object,
+            num_epochs=num_epochs,
+            num_training_batches_per_epoch=num_training_batches_per_epoch,
+            training_option_dict=training_option_dict,
+            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+            validation_option_dict=validation_option_dict,
+            loss_function_string=
+            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
+            optimizer_function_string=
+            model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
+            metric_function_strings=
+            model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
+            plateau_patience_epochs=plateau_patience_epochs,
+            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+            early_stopping_patience_epochs=early_stopping_patience_epochs,
+            output_dir_name=output_dir_name
+        )
+    else:
+        neural_net_with_fancy_patches.train_model(
+            model_object=model_object,
+            num_epochs=num_epochs,
+            num_training_batches_per_epoch=num_training_batches_per_epoch,
+            training_option_dict=training_option_dict,
+            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+            validation_option_dict=validation_option_dict,
+            loss_function_string=
+            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
+            optimizer_function_string=
+            model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
+            metric_function_strings=
+            model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
+            plateau_patience_epochs=plateau_patience_epochs,
+            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+            early_stopping_patience_epochs=early_stopping_patience_epochs,
+            output_dir_name=output_dir_name
+        )
 
 
 if __name__ == '__main__':
@@ -268,6 +298,9 @@ if __name__ == '__main__':
         ),
         sentinel_value=getattr(
             INPUT_ARG_OBJECT, training_args.SENTINEL_VALUE_ARG_NAME
+        ),
+        patch_size_2pt5km_pixels=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_SIZE_ARG_NAME
         ),
         predict_dewpoint_depression=bool(getattr(
             INPUT_ARG_OBJECT, training_args.PREDICT_DEWPOINT_DEPRESSION_ARG_NAME

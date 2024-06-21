@@ -19,6 +19,7 @@ NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
+PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
 
 PREDICT_DEWPOINT_DEPRESSION_ARG_NAME = 'predict_dewpoint_depression'
 PREDICT_GUST_FACTOR_ARG_NAME = 'predict_gust_factor'
@@ -116,6 +117,15 @@ BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
     'All NaN predictors will be replaced with this value.'
 )
+
+# TODO(thunderhoser): Get rid of the 0-for-Colorado thing.  This is a HACK.
+PATCH_SIZE_HELP_STRING = (
+    'Patch size, in units of 2.5-km pixels.  For example, if {0:s} = 448, then '
+    'grid dimensions at the finest resolution (2.5 km) are 448 x 448.  If you '
+    'want to train with the full grid -- and not the patchwise approach -- '
+    'make this argument negative.  If you want to train over Colorado only, '
+    'make this argument 0.'
+).format(PATCH_SIZE_ARG_NAME)
 
 PREDICT_DEWPOINT_DEPRESSION_HELP_STRING = (
     'Boolean flag.  If True, the NN is trained to predict dewpoint depression, '
@@ -277,6 +287,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + SENTINEL_VALUE_ARG_NAME, type=float, required=False,
         default=-10., help=SENTINEL_VALUE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_SIZE_ARG_NAME, type=int, required=True,
+        help=PATCH_SIZE_HELP_STRING
     )
 
     parser_object.add_argument(
