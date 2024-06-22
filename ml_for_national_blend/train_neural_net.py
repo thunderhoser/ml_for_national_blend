@@ -66,6 +66,7 @@ def _run(template_file_name, output_dir_name,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
          num_examples_per_batch, sentinel_value, patch_size_2pt5km_pixels,
+         use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          predict_dewpoint_depression, predict_gust_factor,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
@@ -99,6 +100,8 @@ def _run(template_file_name, output_dir_name,
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
+    :param use_fast_patch_generator: Same.
+    :param patch_overlap_size_2pt5km_pixels: Same.
     :param predict_dewpoint_depression: Same.
     :param predict_gust_factor: Same.
     :param do_residual_prediction: Same.
@@ -131,6 +134,8 @@ def _run(template_file_name, output_dir_name,
         resid_baseline_model_dir_name = None
     if resid_baseline_lead_time_hours <= 0:
         resid_baseline_lead_time_hours = None
+    if not use_fast_patch_generator:
+        patch_overlap_size_2pt5km_pixels = None
 
     if nbm_constant_file_name == '':
         nbm_constant_file_name = None
@@ -253,6 +258,8 @@ def _run(template_file_name, output_dir_name,
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
+            patch_overlap_fast_gen_2pt5km_pixels=
+            patch_overlap_size_2pt5km_pixels,
             output_dir_name=output_dir_name
         )
 
@@ -309,6 +316,12 @@ if __name__ == '__main__':
         ),
         patch_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_SIZE_ARG_NAME
+        ),
+        use_fast_patch_generator=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.USE_FAST_PATCH_GENERATOR_ARG_NAME
+        )),
+        patch_overlap_size_2pt5km_pixels=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_OVERLAP_SIZE_ARG_NAME
         ),
         predict_dewpoint_depression=bool(getattr(
             INPUT_ARG_OBJECT, training_args.PREDICT_DEWPOINT_DEPRESSION_ARG_NAME
