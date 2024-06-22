@@ -20,6 +20,8 @@ NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
+USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
+PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 
 PREDICT_DEWPOINT_DEPRESSION_ARG_NAME = 'predict_dewpoint_depression'
 PREDICT_GUST_FACTOR_ARG_NAME = 'predict_gust_factor'
@@ -125,7 +127,21 @@ PATCH_SIZE_HELP_STRING = (
     'want to train with the full grid -- and not the patchwise approach -- '
     'make this argument negative.  If you want to train over Colorado only, '
     'make this argument 0.'
-).format(PATCH_SIZE_ARG_NAME)
+).format(
+    PATCH_SIZE_ARG_NAME
+)
+USE_FAST_PATCH_GENERATOR_HELP_STRING = (
+    '[used only if {0:s} is positive] Boolean flag.  If 1, will use fast '
+    'version of patch-generator.  I HIGHLY RECOMMEND LEAVING THIS ARGUMENT AT 1.'
+).format(
+    PATCH_SIZE_ARG_NAME
+)
+PATCH_OVERLAP_SIZE_HELP_STRING = (
+    '[used only if {0:s} == 1] Overlap between adjacent patches, measured in '
+    'number of pixels on the finest-resolution (2.5-km) grid.'
+).format(
+    USE_FAST_PATCH_GENERATOR_ARG_NAME
+)
 
 PREDICT_DEWPOINT_DEPRESSION_HELP_STRING = (
     'Boolean flag.  If True, the NN is trained to predict dewpoint depression, '
@@ -291,6 +307,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + PATCH_SIZE_ARG_NAME, type=int, required=True,
         help=PATCH_SIZE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + USE_FAST_PATCH_GENERATOR_ARG_NAME, type=int, required=False,
+        default=1, help=USE_FAST_PATCH_GENERATOR_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=int, required=False,
+        default=-1, help=PATCH_OVERLAP_SIZE_HELP_STRING
     )
 
     parser_object.add_argument(
