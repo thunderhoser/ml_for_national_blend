@@ -87,6 +87,7 @@ def _nwp_model_set_string_to_fancy(nwp_model_set_string):
     fancy_set_string = nwp_model_set_string.replace('-', ', ')
     fancy_set_string = fancy_set_string.replace('wrf_arw', 'WRF-ARW')
     fancy_set_string = fancy_set_string.replace('nam_nest', 'NAM Nest')
+    fancy_set_string = fancy_set_string.replace('gridded_gfs_mos', 'GMOS')
     fancy_set_string = fancy_set_string.replace('nam', 'NAM')
     fancy_set_string = fancy_set_string.replace('rap', 'RAP')
     fancy_set_string = fancy_set_string.replace('gfs', 'GFS')
@@ -94,7 +95,6 @@ def _nwp_model_set_string_to_fancy(nwp_model_set_string):
     fancy_set_string = fancy_set_string.replace('gefs', 'GEFS')
     fancy_set_string = fancy_set_string.replace('ecmwf', 'ECMWF')
     fancy_set_string = fancy_set_string.replace('gridded_lamp', 'GLAMP')
-    fancy_set_string = fancy_set_string.replace('gridded_gfs_mos', 'GMOS')
 
     return fancy_set_string
 

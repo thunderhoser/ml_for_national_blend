@@ -588,7 +588,7 @@ def _get_scores_one_replicate(
 
                     t[RELIABILITY_KEY].values[i, j, k, rep_idx] = (
                         numpy.nansum(these_counts * these_squared_diffs) /
-                        numpy.sum(these_counts)
+                        numpy.nansum(these_counts)
                     )
 
                     if rep_idx == 0:
@@ -649,7 +649,7 @@ def _get_scores_one_replicate(
 
             t[RELIABILITY_KEY].values[k, rep_idx] = (
                 numpy.nansum(these_counts * these_squared_diffs) /
-                numpy.sum(these_counts)
+                numpy.nansum(these_counts)
             )
 
             if rep_idx == 0:
