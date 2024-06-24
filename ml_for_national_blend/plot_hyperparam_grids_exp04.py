@@ -32,12 +32,12 @@ PREDICTOR_SET_STRINGS_AXIS2 = (
 )
 
 BEST_MARKER_TYPE = '*'
-BEST_MARKER_SIZE_GRID_CELLS = 0.175
+BEST_MARKER_SIZE_GRID_CELLS = 0.075
 WHITE_COLOUR = numpy.full(3, 1.)
 BLACK_COLOUR = numpy.full(3, 0.)
 
 SELECTED_MARKER_TYPE = 'o'
-SELECTED_MARKER_SIZE_GRID_CELLS = 0.175
+SELECTED_MARKER_SIZE_GRID_CELLS = 0.075
 SELECTED_MARKER_INDICES = numpy.array([0, 0], dtype=int)
 
 MAIN_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='viridis', lut=20)
@@ -46,6 +46,8 @@ MAIN_COLOUR_MAP_OBJECT.set_bad(numpy.full(3, 152. / 255))
 BIAS_COLOUR_MAP_OBJECT.set_bad(numpy.full(3, 152. / 255))
 
 FONT_SIZE = 26
+AXIS_LABEL_FONT_SIZE = 13
+
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -84,9 +86,9 @@ def _nwp_model_set_string_to_fancy(nwp_model_set_string):
     :return: fancy_set_string: New string (fancy).
     """
 
-    fancy_set_string = nwp_model_set_string.replace('-', ', ')
-    fancy_set_string = fancy_set_string.replace('wrf_arw', 'WRF-ARW')
-    fancy_set_string = fancy_set_string.replace('nam_nest', 'NAM Nest')
+    fancy_set_string = nwp_model_set_string.replace('-', '/')
+    fancy_set_string = fancy_set_string.replace('wrf_arw', 'WRF')
+    fancy_set_string = fancy_set_string.replace('nam_nest', 'NAMN')
     fancy_set_string = fancy_set_string.replace('gridded_gfs_mos', 'GMOS')
     fancy_set_string = fancy_set_string.replace('nam', 'NAM')
     fancy_set_string = fancy_set_string.replace('rap', 'RAP')
@@ -153,7 +155,7 @@ def _plot_scores_2d(
         0, score_matrix.shape[0] - 1, num=score_matrix.shape[0], dtype=float
     )
 
-    pyplot.xticks(x_tick_values, x_tick_labels)
+    pyplot.xticks(x_tick_values, x_tick_labels, rotation=90.)
     pyplot.yticks(y_tick_values, y_tick_labels)
 
     colour_norm_object = matplotlib.colors.Normalize(
@@ -548,8 +550,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=WHITE_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'Dual-weighted MSE ([$^{\circ}$C]$^3$)')
 
     output_file_name = '{0:s}/dwmse.jpg'.format(output_dir_name)
@@ -595,8 +597,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=WHITE_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'RMSE ($^{\circ}$C)')
 
     output_file_name = '{0:s}/rmse.jpg'.format(output_dir_name)
@@ -642,8 +644,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=WHITE_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'MAE ($^{\circ}$C)')
 
     output_file_name = '{0:s}/mae.jpg'.format(output_dir_name)
@@ -693,8 +695,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'Bias ($^{\circ}$C)')
 
     output_file_name = '{0:s}/bias.jpg'.format(output_dir_name)
@@ -744,8 +746,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'Standard-deviation bias ($^{\circ}$C)')
 
     output_file_name = '{0:s}/stdev_bias.jpg'.format(output_dir_name)
@@ -795,8 +797,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'Spatial-minimum bias ($^{\circ}$C)')
 
     output_file_name = '{0:s}/spatial_min_bias.jpg'.format(output_dir_name)
@@ -846,8 +848,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'Spatial-maximum bias ($^{\circ}$C)')
 
     output_file_name = '{0:s}/spatial_max_bias.jpg'.format(output_dir_name)
@@ -893,8 +895,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title('Correlation')
 
     output_file_name = '{0:s}/correlation.jpg'.format(output_dir_name)
@@ -940,8 +942,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=BLACK_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title('Kling-Gupta efficiency')
 
     output_file_name = '{0:s}/kge.jpg'.format(output_dir_name)
@@ -987,8 +989,8 @@ def _run(experiment_dir_name, output_dir_name):
         markeredgecolor=WHITE_COLOUR
     )
 
-    axes_object.set_xlabel(x_axis_label)
-    axes_object.set_ylabel(y_axis_label)
+    axes_object.set_xlabel(x_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
+    axes_object.set_ylabel(y_axis_label, fontsize=AXIS_LABEL_FONT_SIZE)
     axes_object.set_title(r'RMSE ([$^{\circ}$C]$^2$)')
 
     output_file_name = '{0:s}/reliability.jpg'.format(output_dir_name)
