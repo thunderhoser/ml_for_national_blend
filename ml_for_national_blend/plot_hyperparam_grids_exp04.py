@@ -24,7 +24,7 @@ import evaluation
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-NWP_MODEL_SET_STRINGS_AXIS1, _ = make_templates_exp04._get_hyperparams()
+NWP_MODEL_SET_STRINGS_AXIS1 = make_templates_exp04._get_hyperparams()[0]
 NWP_MODEL_SET_STRINGS_AXIS1 = NWP_MODEL_SET_STRINGS_AXIS1[::4]
 PREDICTOR_SET_STRINGS_AXIS2 = make_templates_exp04.UNIQUE_PREDICTOR_SET_STRINGS
 
