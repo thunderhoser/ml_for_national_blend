@@ -11,6 +11,7 @@ from matplotlib import pyplot
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import urma_io
+from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import evaluation
 from ml_for_national_blend.machine_learning import neural_net
@@ -556,12 +557,14 @@ def _run(evaluation_file_names, target_normalization_file_name,
                 prediction_file_names[j]
             ))
 
-            this_target_matrix, this_prediction_matrix = (
-                evaluation.read_inputs(
-                    prediction_file_names=[prediction_file_names[j]],
-                    target_field_names=target_field_names
-                )[:2]
+            this_prediction_table_xarray = evaluation.read_inputs(
+                prediction_file_names=[prediction_file_names[j]],
+                target_field_names=target_field_names
             )
+            ptx = this_prediction_table_xarray
+
+            this_prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+            this_target_matrix = ptx[prediction_io.TARGET_KEY].values
 
             if len(this_prediction_matrix.shape) > len(this_target_matrix.shape):
                 this_prediction_matrix = numpy.nanmean(
