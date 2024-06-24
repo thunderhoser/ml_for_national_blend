@@ -1167,6 +1167,14 @@ def _read_residual_baseline_one_example(
     ]
     residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
 
+    num_fields = residual_baseline_matrix.shape[-1]
+    for k in range(num_fields):
+
+        # TODO(thunderhoser): Create files with ensembled NWP output.
+        residual_baseline_matrix[..., k] = misc_utils.fill_nans_by_nn_interp(
+            residual_baseline_matrix[..., k]
+        )
+
     need_fake_gust_data = (
         urma_utils.WIND_GUST_10METRE_NAME in target_field_names
         and nwp_model_name != nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
@@ -2123,9 +2131,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         predict_dewpoint_depression=predict_dewpoint_depression,
                         predict_gust_factor=predict_gust_factor
                     )
-                    print('\n\n\n\n\n\nRESIDUAL FULL')
-                    print(numpy.mean(numpy.isnan(full_baseline_matrix)))
-                    print('\n\n\n\n\n\n')
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '

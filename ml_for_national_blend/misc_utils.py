@@ -3,6 +3,7 @@
 import os
 import sys
 import numpy
+from scipy.ndimage import distance_transform_edt
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -357,3 +358,21 @@ def determine_patch_locations(patch_size_2pt5km_pixels, start_row_2pt5km=None,
         ROW_LIMITS_40KM_KEY: row_limits_40km,
         COLUMN_LIMITS_40KM_KEY: column_limits_40km
     }
+
+
+def fill_nans_by_nn_interp(data_matrix):
+    """Fills NaN's with nearest neighbours.
+
+    This method is adapted from the method `fill`, which you can find here:
+    https://stackoverflow.com/posts/9262129/revisions
+
+    :param data_matrix: numpy array of real-valued data.
+    :return: data_matrix: Same but without NaN's.
+    """
+
+    error_checking.assert_is_real_numpy_array(data_matrix)
+
+    indices = distance_transform_edt(
+        numpy.isnan(data_matrix), return_distances=False, return_indices=True
+    )
+    return data_matrix[tuple(indices)]
