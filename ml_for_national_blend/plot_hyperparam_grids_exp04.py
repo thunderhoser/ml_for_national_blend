@@ -46,7 +46,8 @@ MAIN_COLOUR_MAP_OBJECT.set_bad(numpy.full(3, 152. / 255))
 BIAS_COLOUR_MAP_OBJECT.set_bad(numpy.full(3, 152. / 255))
 
 FONT_SIZE = 26
-AXIS_LABEL_FONT_SIZE = 13
+AXIS_LABEL_FONT_SIZE = 26
+TICK_LABEL_FONT_SIZE = 14
 
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
@@ -155,8 +156,11 @@ def _plot_scores_2d(
         0, score_matrix.shape[0] - 1, num=score_matrix.shape[0], dtype=float
     )
 
-    pyplot.xticks(x_tick_values, x_tick_labels, rotation=90.)
-    pyplot.yticks(y_tick_values, y_tick_labels)
+    pyplot.xticks(
+        x_tick_values, x_tick_labels,
+        rotation=90., fontsize=TICK_LABEL_FONT_SIZE
+    )
+    pyplot.yticks(y_tick_values, y_tick_labels, fontsize=TICK_LABEL_FONT_SIZE)
 
     colour_norm_object = matplotlib.colors.Normalize(
         vmin=min_colour_value, vmax=max_colour_value, clip=False
