@@ -157,7 +157,7 @@ def read_file(netcdf_file_name):
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
     init_times_unix_sec = numpy.round(
-        prediction_table_xarray[FIELD_NAME_KEY].values
+        prediction_table_xarray[INIT_TIME_KEY].values
     ).astype(int)
 
     return prediction_table_xarray.assign({
