@@ -2032,6 +2032,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             patch_metalocation_dict = __update_patch_metalocation_dict(
                 patch_metalocation_dict
             )
+            print('patch_metalocation_dict:')
+            print(patch_metalocation_dict)
 
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
                 full_target_matrix = None
