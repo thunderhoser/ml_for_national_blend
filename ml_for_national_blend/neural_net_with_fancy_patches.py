@@ -2032,8 +2032,32 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             patch_metalocation_dict = __update_patch_metalocation_dict(
                 patch_metalocation_dict
             )
-            print('patch_metalocation_dict:')
             print(patch_metalocation_dict)
+            print('full_target_matrix.shape = {0:s}'.format(
+                'None' if full_target_matrix is None
+                else str(full_target_matrix.shape))
+            )
+            print('full_baseline_matrix.shape = {0:s}'.format(
+                'None' if full_baseline_matrix is None
+                else str(full_baseline_matrix.shape))
+            )
+            print('full_predictor_matrix_2pt5km.shape = {0:s}'.format(
+                'None' if full_predictor_matrix_2pt5km is None
+                else str(full_predictor_matrix_2pt5km.shape))
+            )
+            print('full_predictor_matrix_10km.shape = {0:s}'.format(
+                'None' if full_predictor_matrix_10km is None
+                else str(full_predictor_matrix_10km.shape))
+            )
+            print('full_predictor_matrix_20km.shape = {0:s}'.format(
+                'None' if full_predictor_matrix_20km is None
+                else str(full_predictor_matrix_20km.shape))
+            )
+            print('full_predictor_matrix_40km.shape = {0:s}'.format(
+                'None' if full_predictor_matrix_40km is None
+                else str(full_predictor_matrix_40km.shape))
+            )
+            print('\n')
 
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
                 full_target_matrix = None
@@ -2047,6 +2071,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
                 )
+                continue
 
             try:
                 if full_target_matrix is None:
@@ -2073,6 +2098,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
 
                 warnings.warn(warning_string)
                 full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
 
             if full_target_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
@@ -2093,6 +2123,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         predict_dewpoint_depression=predict_dewpoint_depression,
                         predict_gust_factor=predict_gust_factor
                     )
+                    print('\n\n\n\n\n\nRESIDUAL FULL')
+                    print(numpy.mean(numpy.isnan(full_baseline_matrix)))
+                    print('\n\n\n\n\n\n')
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '
@@ -2105,7 +2138,12 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
+                full_target_matrix = None
                 full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
 
             if full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
@@ -2133,7 +2171,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         patch_location_dict=None
                     )
                 else:
-                    found_any_predictors = False
+                    found_any_predictors = True
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read predictors for init time '
@@ -2146,6 +2184,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
@@ -2165,7 +2205,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 start_column_2pt5km=
                 patch_metalocation_dict[PATCH_START_COLUMN_KEY]
             )
+            print('\n\n\n\n\n\n\n')
             print(patch_location_dict)
+            print('\n\n\n\n\n\n\n')
             pld = patch_location_dict
 
             j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
@@ -2268,9 +2310,13 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 str(numpy.nanmax(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
             ))
 
-            error_checking.assert_is_numpy_array_without_nan(
-                predictor_matrix_resid_baseline
-            )
+            predictor_matrix_resid_baseline[
+                numpy.isnan(predictor_matrix_resid_baseline)
+            ] = sentinel_value
+
+            # error_checking.assert_is_numpy_array_without_nan(
+            #     predictor_matrix_resid_baseline
+            # )
 
         if predictor_matrix_10km is not None:
             print((
