@@ -19,6 +19,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import file_system_utils
 import error_checking
 import urma_io
+import prediction_io
 import urma_utils
 import evaluation
 import neural_net
@@ -564,12 +565,14 @@ def _run(evaluation_file_names, target_normalization_file_name,
                 prediction_file_names[j]
             ))
 
-            this_target_matrix, this_prediction_matrix = (
-                evaluation.read_inputs(
-                    prediction_file_names=[prediction_file_names[j]],
-                    target_field_names=target_field_names
-                )[:2]
+            this_prediction_table_xarray = evaluation.read_inputs(
+                prediction_file_names=[prediction_file_names[j]],
+                target_field_names=target_field_names
             )
+            ptx = this_prediction_table_xarray
+
+            this_prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+            this_target_matrix = ptx[prediction_io.TARGET_KEY].values
 
             if len(this_prediction_matrix.shape) > len(this_target_matrix.shape):
                 this_prediction_matrix = numpy.nanmean(
