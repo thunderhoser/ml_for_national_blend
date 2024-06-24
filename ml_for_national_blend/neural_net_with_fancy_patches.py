@@ -1898,6 +1898,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     :return: target_matrix: Same.
     """
 
+    # TODO(thunderhoser): Need a create_data_fast_patches, too.
+
     option_dict = _check_generator_args(option_dict)
     first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
     last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
@@ -2184,24 +2186,39 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                     full_predictor_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
                 )
 
+            if nbm_constant_matrix is not None:
+                nbm_constant_matrix[i, ...] = (
+                    full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
+                )
+
             if predictor_matrix_10km is not None:
+                j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+
                 predictor_matrix_10km[i, ...] = (
                     full_predictor_matrix_10km[j_start:j_end, k_start:k_end, ...]
                 )
 
             if predictor_matrix_20km is not None:
+                j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+
                 predictor_matrix_20km[i, ...] = (
                     full_predictor_matrix_20km[j_start:j_end, k_start:k_end, ...]
                 )
 
             if predictor_matrix_40km is not None:
+                j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
                 predictor_matrix_40km[i, ...] = (
                     full_predictor_matrix_40km[j_start:j_end, k_start:k_end, ...]
-                )
-
-            if nbm_constant_matrix is not None:
-                nbm_constant_matrix[i, ...] = (
-                    full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
                 )
 
             num_examples_in_memory += 1
