@@ -156,11 +156,18 @@ def read_file(netcdf_file_name):
         f.decode('utf-8') for f in
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
+    init_times_unix_sec = numpy.round(
+        prediction_table_xarray[FIELD_NAME_KEY].values
+    ).astype(int)
 
     return prediction_table_xarray.assign({
         FIELD_NAME_KEY: (
             prediction_table_xarray[FIELD_NAME_KEY].dims,
             target_field_names
+        ),
+        INIT_TIME_KEY: (
+            prediction_table_xarray[INIT_TIME_KEY].dims,
+            init_times_unix_sec
         )
     })
 
@@ -241,10 +248,10 @@ def write_file(
 
     these_dim = (INIT_TIME_DIM,)
     dataset_object.createVariable(
-        INIT_TIME_KEY, datatype=numpy.int64, dimensions=these_dim
+        INIT_TIME_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[INIT_TIME_KEY][:] = numpy.array(
-        [init_time_unix_sec], dtype=int
+        [init_time_unix_sec], dtype=float
     )
 
     these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM, FIELD_DIM)
