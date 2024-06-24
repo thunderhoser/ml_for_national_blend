@@ -18,6 +18,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import file_system_utils
 import gg_plotting_utils
 import make_templates_exp04_temp_only_more_models as make_templates_exp04
 import evaluation
@@ -26,7 +27,9 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 NWP_MODEL_SET_STRINGS_AXIS1 = make_templates_exp04._get_hyperparams()[0]
 NWP_MODEL_SET_STRINGS_AXIS1 = NWP_MODEL_SET_STRINGS_AXIS1[::4]
-PREDICTOR_SET_STRINGS_AXIS2 = make_templates_exp04.UNIQUE_PREDICTOR_SET_STRINGS
+PREDICTOR_SET_STRINGS_AXIS2 = (
+    make_templates_exp04.UNIQUE_PREDICTOR_SET_DESCRIPTIONS
+)
 
 BEST_MARKER_TYPE = '*'
 BEST_MARKER_SIZE_GRID_CELLS = 0.175
