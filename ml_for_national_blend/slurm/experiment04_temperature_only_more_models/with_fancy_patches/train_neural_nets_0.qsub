@@ -52,10 +52,6 @@ nwp_model_name_set_with_spaces=$(echo $nwp_model_name_set | tr "-" " ")
 
 i=0
 
-# PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
-# USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
-# PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
-
 while true; do
     if [ $i == 0 ]; then
         input_model_file_name="${TEMPLATE_DIR_NAME}/nwp-model-names=${nwp_model_name_set}_nwp-fields=${nwp_field_set_description}/model.keras"
