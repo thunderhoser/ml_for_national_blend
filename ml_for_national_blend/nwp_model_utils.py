@@ -19,6 +19,10 @@ import time_conversion
 import error_checking
 import nbm_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 TOLERANCE = 1e-6
 
 HOURS_TO_SECONDS = 3600
@@ -54,11 +58,16 @@ GEFS_MODEL_NAME = 'gefs'
 GRIDDED_LAMP_MODEL_NAME = 'gridded_lamp'
 ECMWF_MODEL_NAME = 'ecmwf'
 GRIDDED_MOS_MODEL_NAME = 'gridded_gfs_mos'
-ALL_MODEL_NAMES = [
+ENSEMBLE_MODEL_NAME = 'ensemble'
+
+ALL_MODEL_NAMES_SANS_ENSEMBLE = [
     WRF_ARW_MODEL_NAME, NAM_MODEL_NAME, NAM_NEST_MODEL_NAME, RAP_MODEL_NAME,
     GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME,
     ECMWF_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
 ]
+ALL_MODEL_NAMES_WITH_ENSEMBLE = (
+    ALL_MODEL_NAMES_SANS_ENSEMBLE + [ENSEMBLE_MODEL_NAME]
+)
 
 MSL_PRESSURE_NAME = 'pressure_mean_sea_level_pascals'
 SURFACE_PRESSURE_NAME = 'pressure_surface_pascals'  # ECMWFE control missing this.
@@ -153,22 +162,32 @@ def _get_rap_wind_rotation_angles(latitude_array_deg_n, longitude_array_deg_e):
     return numpy.cos(angle_array_radians), numpy.sin(angle_array_radians)
 
 
-def check_model_name(model_name):
+def check_model_name(model_name, allow_ensemble=False):
     """Ensures that model name is valid.
 
-    :param model_name: String (must be in list `ALL_MODEL_NAMES`).
-    :raises: ValueError: if `model_name not in ALL_MODEL_NAMES`.
+    :param model_name: String.
+    :param allow_ensemble: Boolean flag.  If True, the model name must belong to
+        the list `ALL_MODEL_NAMES_WITH_ENSEMBLE`.  If False, the model name must
+        belong to the list `ALL_MODEL_NAMES_SANS_ENSEMBLE`.
+    :raises: ValueError: if model name does not belong to relevant list.
     """
 
     error_checking.assert_is_string(model_name)
-    if model_name in ALL_MODEL_NAMES:
+    error_checking.assert_is_boolean(allow_ensemble)
+
+    if allow_ensemble:
+        good_model_names = ALL_MODEL_NAMES_WITH_ENSEMBLE
+    else:
+        good_model_names = ALL_MODEL_NAMES_SANS_ENSEMBLE
+
+    if model_name in good_model_names:
         return
 
     error_string = (
         'Model name "{0:s}" is not in the list of accepted model names '
         '(below):\n{1:s}'
     ).format(
-        model_name, str(ALL_MODEL_NAMES)
+        model_name, str(good_model_names)
     )
 
     raise ValueError(error_string)
@@ -202,7 +221,7 @@ def check_init_time(init_time_unix_sec, model_name):
     :raises: AssertionError: if time is neither 00Z nor 12Z.
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=True)
 
     init_time_string = time_conversion.unix_sec_to_string(
         init_time_unix_sec, INIT_TIME_FORMAT
@@ -228,7 +247,7 @@ def model_to_init_time_interval(model_name):
         runs.
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=True)
 
     # TODO(thunderhoser): HACK to prevent creation of huge amounts of data.
     if model_name == HRRR_MODEL_NAME:
@@ -253,7 +272,7 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
     :return: all_forecast_hours: 1-D numpy array of integers.
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=True)
 
     if model_name == RAP_MODEL_NAME:
         init_time_string = time_conversion.unix_sec_to_string(
@@ -307,6 +326,9 @@ def model_to_forecast_hours(model_name, init_time_unix_sec):
             numpy.linspace(198, 264, num=12, dtype=int)
         ])
 
+    if model_name == ENSEMBLE_MODEL_NAME:
+        return numpy.linspace(1, 384, num=384, dtype=int)
+
     return numpy.linspace(1, 48, num=48, dtype=int)
 
 
@@ -317,7 +339,6 @@ def model_to_old_forecast_hours(model_name):
     :return: all_forecast_hours: Same.
     """
 
-    check_model_name(model_name)
     assert model_name in [GFS_MODEL_NAME, GEFS_MODEL_NAME]
 
     if model_name == GFS_MODEL_NAME:
@@ -336,7 +357,6 @@ def model_to_oldish_forecast_hours(model_name):
     :return: all_forecast_hours: Same.
     """
 
-    check_model_name(model_name)
     assert model_name in [GFS_MODEL_NAME]
     return numpy.linspace(3, 384, num=128, dtype=int)
 
@@ -349,7 +369,7 @@ def model_to_maybe_missing_fields(model_name):
         missing fields.
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=True)
 
     if model_name in [
             RAP_MODEL_NAME, GFS_MODEL_NAME, HRRR_MODEL_NAME, GEFS_MODEL_NAME
@@ -395,6 +415,19 @@ def model_to_maybe_missing_fields(model_name):
             PRECIP_NAME
         ]
 
+    if model_name == ENSEMBLE_MODEL_NAME:
+        return [
+            MSL_PRESSURE_NAME, SURFACE_PRESSURE_NAME,
+            RELATIVE_HUMIDITY_2METRE_NAME, PRECIP_NAME,
+            HEIGHT_500MB_NAME, HEIGHT_700MB_NAME,
+            RELATIVE_HUMIDITY_500MB_NAME, RELATIVE_HUMIDITY_700MB_NAME,
+            RELATIVE_HUMIDITY_850MB_NAME,
+            U_WIND_500MB_NAME, U_WIND_700MB_NAME, U_WIND_1000MB_NAME,
+            V_WIND_500MB_NAME, V_WIND_700MB_NAME, V_WIND_1000MB_NAME,
+            TEMPERATURE_850MB_NAME, TEMPERATURE_950MB_NAME,
+            MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
+        ]
+
     return [WIND_GUST_10METRE_NAME]
 
 
@@ -405,7 +438,7 @@ def model_to_projection(model_name):
     :return: proj_object: Instance of `pyproj.Proj`.
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=False)
 
     if model_name == HRRR_MODEL_NAME:
         return pyproj.Proj(
@@ -469,7 +502,7 @@ def model_to_nbm_downsampling_factor(model_name):
     :return: downsampling_factor: Downsampling factor (positive integer).
     """
 
-    check_model_name(model_name)
+    check_model_name(model_name=model_name, allow_ensemble=True)
 
     if model_name in [RAP_MODEL_NAME, NAM_MODEL_NAME]:
         return 4
@@ -524,7 +557,7 @@ def read_model_coords(netcdf_file_name=None, model_name=None):
     """
 
     if netcdf_file_name is None:
-        check_model_name(model_name)
+        check_model_name(model_name=model_name, allow_ensemble=False)
         netcdf_file_name = '{0:s}/{1:s}_coords.nc'.format(
             THIS_DIRECTORY_NAME, model_name
         )
@@ -646,20 +679,30 @@ def get_field(nwp_forecast_table_xarray, field_name):
     return nwp_forecast_table_xarray[DATA_KEY].values[..., k]
 
 
-def interp_data_to_nbm_grid(nwp_forecast_table_xarray, model_name,
-                            use_nearest_neigh):
+def interp_data_to_nbm_grid(
+        nwp_forecast_table_xarray, model_name, use_nearest_neigh,
+        interp_to_full_resolution=False, proj_object=None):
     """Interpolates NWP output to the National Blend of Models (NBM) grid.
 
     :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
     :param model_name: Model name.
     :param use_nearest_neigh: Boolean flag.  If True (False), will use
         nearest-neighbour (linear) interpolation.
+    :param interp_to_full_resolution: Boolean flag.  If True, will interpolate
+        to the full-resolution NBM grid, regardless of the source model's
+        resolution.  If False, will interpolate to a possibly coarsened version
+        of the NBM grid, depending on the source model's resolution.
+    :param proj_object: Leave this argument alone.  It's a hack.
     :return: interp_forecast_table_xarray: Same as input but with interpolated
         forecasts.
     """
 
+    check_model_name(model_name=model_name, allow_ensemble=False)
     error_checking.assert_is_boolean(use_nearest_neigh)
-    proj_object = model_to_projection(model_name)
+    error_checking.assert_is_boolean(interp_to_full_resolution)
+
+    if proj_object is None:
+        proj_object = model_to_projection(model_name)
 
     nwpft = nwp_forecast_table_xarray
 
@@ -686,7 +729,10 @@ def interp_data_to_nbm_grid(nwp_forecast_table_xarray, model_name,
         model_x_coords_metres = numpy.mean(model_x_matrix_metres, axis=0)
         model_y_coords_metres = numpy.mean(model_y_matrix_metres, axis=1)
 
-    downsampling_factor = model_to_nbm_downsampling_factor(model_name)
+    if interp_to_full_resolution:
+        downsampling_factor = 1
+    else:
+        downsampling_factor = model_to_nbm_downsampling_factor(model_name)
 
     nbm_latitude_matrix_deg_n, nbm_longitude_matrix_deg_e = (
         nbm_utils.read_coords()
@@ -800,6 +846,7 @@ def read_nonprecip_field_different_times(
     """
 
     # Check input args.
+    check_model_name(model_name=model_name, allow_ensemble=False)
     check_init_time(
         init_time_unix_sec=init_time_unix_sec, model_name=model_name
     )
@@ -889,6 +936,7 @@ def read_24hour_precip_different_times(
     # noon.
 
     # Check input args.
+    check_model_name(model_name=model_name, allow_ensemble=False)
     check_init_time(
         init_time_unix_sec=init_time_unix_sec, model_name=model_name
     )
@@ -1011,6 +1059,7 @@ def precip_from_incremental_to_full_run(
     :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
     """
 
+    check_model_name(model_name=model_name, allow_ensemble=False)
     assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME, ECMWF_MODEL_NAME]
     error_checking.assert_is_boolean(be_lenient_with_forecast_hours)
 

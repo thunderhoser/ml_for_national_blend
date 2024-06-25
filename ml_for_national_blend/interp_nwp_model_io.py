@@ -157,7 +157,7 @@ def file_name_to_model_name(interp_nwp_file_name):
     pathless_file_name = os.path.split(interp_nwp_file_name)[1]
     model_name = '_'.join(pathless_file_name.split('_')[:-2])
 
-    nwp_model_utils.check_model_name(model_name)
+    nwp_model_utils.check_model_name(model_name=model_name, allow_ensemble=True)
     return model_name
 
 

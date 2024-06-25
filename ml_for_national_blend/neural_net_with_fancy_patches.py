@@ -1097,13 +1097,9 @@ def _read_residual_baseline_one_example(
         urma_utils.DEWPOINT_2METRE_NAME: nwp_model_utils.DEWPOINT_2METRE_NAME,
         urma_utils.U_WIND_10METRE_NAME: nwp_model_utils.U_WIND_10METRE_NAME,
         urma_utils.V_WIND_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME,
-        urma_utils.WIND_GUST_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME
+        urma_utils.WIND_GUST_10METRE_NAME:
+            nwp_model_utils.WIND_GUST_10METRE_NAME
     }
-
-    if nwp_model_name == nwp_model_utils.GRIDDED_LAMP_MODEL_NAME:
-        target_field_to_baseline_nwp_field[
-            urma_utils.WIND_GUST_10METRE_NAME
-        ] = nwp_model_utils.WIND_GUST_10METRE_NAME
 
     input_file_name = interp_nwp_model_io.find_file(
         directory_name=nwp_directory_name,
@@ -1124,6 +1120,50 @@ def _read_residual_baseline_one_example(
 
     print('Reading data from: "{0:s}"...'.format(input_file_name))
     nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
+
+    if (
+            nwp_model_utils.WIND_GUST_10METRE_NAME not in
+            nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values
+    ):
+        nwpft = nwp_forecast_table_xarray
+
+        u = numpy.where(
+            nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+            nwp_model_utils.U_WIND_10METRE_NAME
+        )[0][0]
+        v = numpy.where(
+            nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+            nwp_model_utils.V_WIND_10METRE_NAME
+        )[0][0]
+
+        gust_matrix = numpy.sqrt(
+            nwpft[nwp_model_utils.DATA_KEY].values[..., u] ** 2 +
+            nwpft[nwp_model_utils.DATA_KEY].values[..., v] ** 2
+        )
+        data_matrix = numpy.concatenate([
+            nwpft[nwp_model_utils.DATA_KEY].values,
+            numpy.expand_dims(gust_matrix, axis=-1)
+        ], axis=-1)
+
+        field_names = (
+            nwpft.coords[nwp_model_utils.FIELD_DIM].values.tolist() +
+            [nwp_model_utils.WIND_GUST_10METRE_NAME]
+        )
+
+        nwpft.drop_vars(names=[nwp_model_utils.DATA_KEY])
+        nwpft = nwpft.assign_coords({
+            nwp_model_utils.FIELD_DIM: field_names
+        })
+
+        these_dims = (
+            nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
+            nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+        )
+        nwpft = nwpft.assign({
+            nwp_model_utils.DATA_KEY: (these_dims, data_matrix)
+        })
+
+        nwp_forecast_table_xarray = nwpft
 
     if patch_location_dict is not None:
         i_start = patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
@@ -1149,6 +1189,7 @@ def _read_residual_baseline_one_example(
         nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
             nwp_forecast_table_xarray
         )
+
     if predict_gust_factor:
         nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
             nwp_forecast_table_xarray
@@ -1169,36 +1210,9 @@ def _read_residual_baseline_one_example(
 
     num_fields = residual_baseline_matrix.shape[-1]
     for k in range(num_fields):
-
-        # TODO(thunderhoser): Create files with ensembled NWP output.
         residual_baseline_matrix[..., k] = misc_utils.fill_nans_by_nn_interp(
             residual_baseline_matrix[..., k]
         )
-
-    need_fake_gust_data = (
-        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
-        and nwp_model_name != nwp_model_utils.GRIDDED_LAMP_MODEL_NAME
-    )
-
-    if not need_fake_gust_data:
-        return residual_baseline_matrix
-
-    gust_idx = target_field_names.index(urma_utils.WIND_GUST_10METRE_NAME)
-
-    if predict_gust_factor:
-        residual_baseline_matrix[..., gust_idx] = DEFAULT_GUST_FACTOR - 1.
-        return residual_baseline_matrix
-
-    u_idx = target_field_names.index(urma_utils.U_WIND_10METRE_NAME)
-    v_idx = target_field_names.index(urma_utils.V_WIND_10METRE_NAME)
-
-    speed_matrix = numpy.sqrt(
-        residual_baseline_matrix[..., u_idx] ** 2 +
-        residual_baseline_matrix[..., v_idx] ** 2
-    )
-    residual_baseline_matrix[..., gust_idx] = (
-        DEFAULT_GUST_FACTOR * speed_matrix
-    )
 
     return residual_baseline_matrix
 
