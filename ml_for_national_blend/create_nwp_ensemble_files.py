@@ -10,6 +10,7 @@ Each output file has the following properties:
 
 import os
 import sys
+import copy
 import argparse
 import warnings
 import numpy
@@ -155,7 +156,9 @@ def _extract_1model_from_matrices(
 
     i = nwp_model_names.index(desired_nwp_model_name)
 
-    current_field_names = nwp_model_to_field_names[desired_nwp_model_name]
+    current_field_names = copy.deepcopy(
+        nwp_model_to_field_names[desired_nwp_model_name]
+    )
     same_ds_factor_indices = numpy.where(
         nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
     )[0]
