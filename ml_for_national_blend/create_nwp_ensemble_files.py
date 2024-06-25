@@ -167,12 +167,52 @@ def _extract_1model_from_matrices(
     k_end = k_start + len(current_field_names)
 
     if nwp_downsampling_factors[i] == 1:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_2pt5km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_2pt5km[..., 0, k_start:k_end]
     elif nwp_downsampling_factors[i] == 4:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_10km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_10km[..., 0, k_start:k_end]
     elif nwp_downsampling_factors[i] == 8:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_20km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_20km[..., 0, k_start:k_end]
     else:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_40km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_40km[..., 0, k_start:k_end]
 
     if nwp_model_utils.WIND_GUST_10METRE_NAME not in current_field_names:
