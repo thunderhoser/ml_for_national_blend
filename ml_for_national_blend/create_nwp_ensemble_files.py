@@ -240,7 +240,7 @@ def _create_ensemble_file_1init_1valid(
         init_time_unix_sec=init_time_unix_sec,
         nwp_model_names=nwp_model_names,
         nwp_lead_times_hours=numpy.array([lead_time_hours], dtype=int),
-        nwp_model_to_field_names=None,
+        nwp_model_to_field_names=nwp_model_to_field_names,
         nwp_model_to_dir_name=nwp_model_to_dir_name,
         nwp_norm_param_table_xarray=None,
         use_quantile_norm=False,
