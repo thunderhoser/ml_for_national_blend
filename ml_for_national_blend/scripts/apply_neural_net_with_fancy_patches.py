@@ -137,7 +137,8 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 
     if len(nwp_directory_names) == 1:
         found_any_model_name_in_dir_name = any([
-            m in nwp_directory_names[0] for m in nwp_model_utils.ALL_MODEL_NAMES
+            m in nwp_directory_names[0]
+            for m in nwp_model_utils.ALL_MODEL_NAMES_WITH_ENSEMBLE
         ])
         infer_directories = (
             len(nwp_model_names) > 1 or

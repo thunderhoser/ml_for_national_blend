@@ -230,7 +230,7 @@ def _get_all_precip_forecast_hours():
 
     precip_forecast_hours = numpy.array([], dtype=int)
 
-    for this_model_name in nwp_model_utils.ALL_MODEL_NAMES:
+    for this_model_name in nwp_model_utils.ALL_MODEL_NAMES_SANS_ENSEMBLE:
         for this_init_time_unix_sec in dummy_init_times_unix_sec:
             these_hours = nwp_model_utils.model_to_forecast_hours(
                 model_name=this_model_name,

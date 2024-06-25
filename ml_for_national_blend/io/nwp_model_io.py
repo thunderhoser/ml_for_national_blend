@@ -174,7 +174,9 @@ def file_name_to_model_name(nwp_forecast_file_name):
     extensionless_file_name = os.path.splitext(pathless_file_name)[0]
 
     model_name = '_'.join(extensionless_file_name.split('_')[:-1])
-    nwp_model_utils.check_model_name(model_name)
+    nwp_model_utils.check_model_name(
+        model_name=model_name, allow_ensemble=False
+    )
 
     return model_name
 

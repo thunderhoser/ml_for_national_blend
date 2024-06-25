@@ -64,7 +64,7 @@ NWP_MODELS_HELP_STRING = (
     'List of NWP models to use in predictors.  Each model name must be in the '
     'following list:\n{0:s}'
 ).format(
-    str(nwp_model_utils.ALL_MODEL_NAMES)
+    str(nwp_model_utils.ALL_MODEL_NAMES_WITH_ENSEMBLE)
 )
 NWP_MODEL_TO_FIELDS_HELP_STRING = (
     'Dictionary, where each key is the name of an NWP model (from the list '

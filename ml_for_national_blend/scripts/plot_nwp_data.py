@@ -279,7 +279,7 @@ def _run(nwp_directory_name, plot_interp_data, model_name, init_time_string,
     """
 
     # Check input args.
-    nwp_model_utils.check_model_name(model_name)
+    nwp_model_utils.check_model_name(model_name=model_name, allow_ensemble=True)
     init_time_unix_sec = time_conversion.string_to_unix_sec(
         init_time_string, TIME_FORMAT
     )
