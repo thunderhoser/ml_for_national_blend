@@ -161,7 +161,8 @@ def _extract_1model_from_matrices(
     )[0]
 
     k_start = sum([
-        len(nwp_model_to_field_names[s]) for s in same_ds_factor_indices
+        len(nwp_model_to_field_names[nwp_model_names[s]])
+        for s in same_ds_factor_indices
     ])
     k_end = k_start + len(current_field_names)
 
