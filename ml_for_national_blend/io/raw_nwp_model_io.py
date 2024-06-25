@@ -14,13 +14,13 @@ import os
 import warnings
 import numpy
 import xarray
-from gewittergefahr.gg_io import grib_io
-from gewittergefahr.gg_utils import number_rounding
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import moisture_conversions as moisture_conv
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import grib_io
+from ml_for_national_blend.outside_code import number_rounding
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import moisture_conversions as moisture_conv
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.utils import nwp_model_utils
 

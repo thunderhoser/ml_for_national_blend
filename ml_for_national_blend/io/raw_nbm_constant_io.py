@@ -7,8 +7,8 @@ Each raw file should be a GRIB2 file with one constant variable on the NBM grid.
 
 import numpy
 import xarray
-from gewittergefahr.gg_io import grib_io
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import grib_io
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import nbm_constant_utils
 

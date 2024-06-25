@@ -3,7 +3,7 @@
 import numpy
 import tensorflow
 from tensorflow.keras import backend as K
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import error_checking
 
 
 def _log2(input_tensor):

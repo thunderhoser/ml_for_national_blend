@@ -6,7 +6,7 @@ The Chiu-net++ is a hybrid between the Chiu net
 
 import numpy
 import keras
-from gewittergefahr.deep_learning import architecture_utils
+from ml_for_national_blend.outside_code import architecture_utils
 from ml_for_national_blend.machine_learning import \
     chiu_net_architecture as chiu_net_arch
 

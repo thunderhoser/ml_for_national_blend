@@ -18,8 +18,8 @@ import os
 import shutil
 import argparse
 import numpy
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import time_periods
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import time_periods
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import raw_gridded_mos_io
 from ml_for_national_blend.utils import misc_utils

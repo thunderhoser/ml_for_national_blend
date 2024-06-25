@@ -16,10 +16,10 @@ import warnings
 import numpy
 import xarray
 import pytdlpack
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import nwp_model_utils
 

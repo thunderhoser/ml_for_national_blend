@@ -3,10 +3,10 @@
 import os
 import numpy
 from scipy.ndimage import distance_transform_edt
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import number_rounding
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import number_rounding
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nbm_utils
 
 DEGREES_TO_RADIANS = numpy.pi / 180

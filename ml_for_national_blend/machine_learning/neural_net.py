@@ -7,11 +7,11 @@ import numpy
 import keras
 from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import time_periods
-from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import time_periods
+from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.io import nbm_constant_io

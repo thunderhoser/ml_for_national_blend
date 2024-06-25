@@ -6,7 +6,7 @@ matplotlib.use('agg')
 import matplotlib.colors
 import matplotlib.patches
 from matplotlib import pyplot
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.outside_code import taylor_diagram
 
 # TODO(thunderhoser): Incorporate confidence intervals into this module, instead

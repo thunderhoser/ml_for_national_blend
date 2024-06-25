@@ -4,8 +4,8 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
-from gewittergefahr.gg_utils import number_rounding
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import number_rounding
+from ml_for_national_blend.outside_code import error_checking
 
 GRID_LINE_WIDTH = 1.
 GRID_LINE_COLOUR = numpy.full(3, 0.)

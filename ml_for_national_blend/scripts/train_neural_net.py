@@ -4,7 +4,7 @@ import copy
 import json
 import argparse
 import numpy
-from gewittergefahr.gg_utils import time_conversion
+from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.machine_learning import neural_net_with_fancy_patches

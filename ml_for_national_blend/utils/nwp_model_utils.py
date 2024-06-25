@@ -7,9 +7,9 @@ import numpy
 import xarray
 import pyproj
 from scipy.interpolate import interp1d, RegularGridInterpolator
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nbm_utils
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(

@@ -5,7 +5,7 @@ import numpy
 import xarray
 import pyproj
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import error_checking
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))

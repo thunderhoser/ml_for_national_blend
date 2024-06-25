@@ -4,7 +4,7 @@ import numpy
 import xarray
 import scipy.stats
 from scipy.interpolate import interp1d
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.io import nbm_constant_io
 from ml_for_national_blend.io import interp_nwp_model_io

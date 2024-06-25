@@ -4,7 +4,7 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
-from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.plotting import target_plotting
 

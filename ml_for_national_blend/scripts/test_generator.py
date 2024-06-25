@@ -7,9 +7,9 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.plotting import plotting_utils as gg_plotting_utils
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import gg_plotting_utils
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nwp_model_utils

@@ -9,7 +9,7 @@ The output will contain all fields in one NetCDF file.
 import argparse
 import numpy
 import xarray
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import raw_nbm_constant_io
 from ml_for_national_blend.io import nbm_constant_io
 from ml_for_national_blend.utils import nbm_constant_utils

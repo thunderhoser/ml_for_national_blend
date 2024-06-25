@@ -5,9 +5,9 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import interp_nwp_model_io

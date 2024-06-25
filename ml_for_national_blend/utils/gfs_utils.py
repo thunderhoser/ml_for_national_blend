@@ -1,9 +1,9 @@
 """Helper methods for GFS data."""
 
 import numpy
-from gewittergefahr.gg_utils import number_rounding
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import number_rounding
+from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import error_checking
 
 TOLERANCE = 1e-6
 

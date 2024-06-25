@@ -5,10 +5,10 @@ import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
 from scipy.interpolate import RegularGridInterpolator
-from gewittergefahr.gg_utils import grids
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import error_checking
-from gewittergefahr.plotting import plotting_utils as gg_plotting_utils
+from ml_for_national_blend.outside_code import grids
+from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import error_checking
+from ml_for_national_blend.outside_code import gg_plotting_utils
 from ml_for_national_blend.utils import urma_utils
 
 # TODO(thunderhoser): I might want code in this module to convert temperature

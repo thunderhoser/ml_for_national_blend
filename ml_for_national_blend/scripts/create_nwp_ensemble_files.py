@@ -8,13 +8,14 @@ Each output file has the following properties:
 - Contains forecasts of the five target variables
 """
 
+import copy
 import argparse
 import warnings
 import numpy
 import xarray
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import time_periods
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import time_periods
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import misc_utils
@@ -148,23 +149,66 @@ def _extract_1model_from_matrices(
 
     i = nwp_model_names.index(desired_nwp_model_name)
 
-    current_field_names = nwp_model_to_field_names[desired_nwp_model_name]
+    current_field_names = copy.deepcopy(
+        nwp_model_to_field_names[desired_nwp_model_name]
+    )
     same_ds_factor_indices = numpy.where(
         nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
     )[0]
 
     k_start = sum([
-        len(nwp_model_to_field_names[s]) for s in same_ds_factor_indices
+        len(nwp_model_to_field_names[nwp_model_names[s]])
+        for s in same_ds_factor_indices
     ])
     k_end = k_start + len(current_field_names)
 
     if nwp_downsampling_factors[i] == 1:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_2pt5km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_2pt5km[..., 0, k_start:k_end]
     elif nwp_downsampling_factors[i] == 4:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_10km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_10km[..., 0, k_start:k_end]
     elif nwp_downsampling_factors[i] == 8:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_20km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_20km[..., 0, k_start:k_end]
     else:
+        print((
+            'Found {0:d} fields from model {1:s}, at indices {2:d}-{3:d} of '
+            'data_matrix_40km!'
+        ).format(
+            len(current_field_names),
+            desired_nwp_model_name,
+            k_start,
+            k_end - 1
+        ))
+
         desired_model_data_matrix = data_matrix_40km[..., 0, k_start:k_end]
 
     if nwp_model_utils.WIND_GUST_10METRE_NAME not in current_field_names:
@@ -233,7 +277,7 @@ def _create_ensemble_file_1init_1valid(
         init_time_unix_sec=init_time_unix_sec,
         nwp_model_names=nwp_model_names,
         nwp_lead_times_hours=numpy.array([lead_time_hours], dtype=int),
-        nwp_model_to_field_names=None,
+        nwp_model_to_field_names=nwp_model_to_field_names,
         nwp_model_to_dir_name=nwp_model_to_dir_name,
         nwp_norm_param_table_xarray=None,
         use_quantile_norm=False,
@@ -273,7 +317,7 @@ def _create_ensemble_file_1init_1valid(
         )
 
         if nwp_downsampling_factors[i] == 1:
-            ensemble_data_matrix_2pt5km[i, ...] = current_data_matrix + 0.
+            ensemble_data_matrix_2pt5km[..., i] = current_data_matrix + 0.
             continue
 
         source_latitude_matrix_deg_n, source_longitude_matrix_deg_e = (
@@ -388,7 +432,7 @@ def _create_ensemble_file_1init_1valid(
         directory_name=output_ensemble_dir_name,
         init_time_unix_sec=init_time_unix_sec,
         forecast_hour=lead_time_hours,
-        model_name=None,
+        model_name=nwp_model_utils.ENSEMBLE_MODEL_NAME,
         raise_error_if_missing=False
     )
 

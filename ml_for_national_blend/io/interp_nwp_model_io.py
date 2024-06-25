@@ -2,10 +2,10 @@
 
 import os
 import xarray
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import time_periods
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import time_periods
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nwp_model_utils
 
 TIME_FORMAT = '%Y-%m-%d-%H'

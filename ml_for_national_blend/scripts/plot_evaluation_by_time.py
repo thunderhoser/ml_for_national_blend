@@ -9,8 +9,8 @@ matplotlib.use('agg')
 import matplotlib.colors
 import matplotlib.patches
 from matplotlib import pyplot
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import evaluation
 

@@ -8,8 +8,8 @@ Based on Chiu et al. (2020): https://doi.org/10.1109/LRA.2020.2992184
 
 import numpy
 import keras
-from gewittergefahr.gg_utils import error_checking
-from gewittergefahr.deep_learning import architecture_utils
+from ml_for_national_blend.outside_code import error_checking
+from ml_for_national_blend.outside_code import architecture_utils
 
 INPUT_DIMENSIONS_CONST_KEY = 'input_dimensions_const'
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'

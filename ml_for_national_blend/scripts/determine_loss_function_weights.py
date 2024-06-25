@@ -7,8 +7,8 @@ that the loss function is MSE or dual-weighted MSE.
 
 import argparse
 import numpy
-from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import time_conversion
+from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.utils import urma_utils
 
