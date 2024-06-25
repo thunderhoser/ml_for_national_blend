@@ -324,7 +324,7 @@ def _create_ensemble_file_1init_1valid(
         )
 
         if nwp_downsampling_factors[i] == 1:
-            ensemble_data_matrix_2pt5km[i, ...] = current_data_matrix + 0.
+            ensemble_data_matrix_2pt5km[..., i] = current_data_matrix + 0.
             continue
 
         source_latitude_matrix_deg_n, source_longitude_matrix_deg_e = (
