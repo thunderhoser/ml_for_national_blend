@@ -439,7 +439,7 @@ def _create_ensemble_file_1init_1valid(
         directory_name=output_ensemble_dir_name,
         init_time_unix_sec=init_time_unix_sec,
         forecast_hour=lead_time_hours,
-        model_name=None,
+        model_name=nwp_model_utils.ENSEMBLE_MODEL_NAME,
         raise_error_if_missing=False
     )
 
