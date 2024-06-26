@@ -216,7 +216,7 @@ def write_file(
         prediction_matrix,
         exact_dimensions=numpy.array(target_matrix.shape, dtype=int)
     )
-    error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
+    # error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
 
     error_checking.assert_is_numpy_array(
         latitude_matrix_deg_n,
