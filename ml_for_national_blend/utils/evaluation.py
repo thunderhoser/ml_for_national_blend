@@ -74,13 +74,13 @@ def _get_mse_one_scalar(target_values, predicted_values, per_grid_cell):
     """
 
     if per_grid_cell:
-        mse_total = numpy.mean(
+        mse_total = numpy.nanmean(
             (target_values - predicted_values) ** 2, axis=0
         )
-        mse_bias = numpy.mean(target_values - predicted_values, axis=0) ** 2
+        mse_bias = numpy.nanmean(target_values - predicted_values, axis=0) ** 2
     else:
-        mse_total = numpy.mean((target_values - predicted_values) ** 2)
-        mse_bias = numpy.mean(target_values - predicted_values) ** 2
+        mse_total = numpy.nanmean((target_values - predicted_values) ** 2)
+        mse_bias = numpy.nanmean(target_values - predicted_values) ** 2
 
     return mse_total, mse_bias, mse_total - mse_bias
 
@@ -126,12 +126,12 @@ def _get_dwmse_one_scalar(target_values, predicted_values, per_grid_cell):
     )
 
     if per_grid_cell:
-        return numpy.mean(
+        return numpy.nanmean(
             dual_weights * (target_values - predicted_values) ** 2,
             axis=0
         )
 
-    return numpy.mean(
+    return numpy.nanmean(
         dual_weights * (target_values - predicted_values) ** 2
     )
 
@@ -172,12 +172,12 @@ def _get_mae_one_scalar(target_values, predicted_values, per_grid_cell):
     """
 
     if per_grid_cell:
-        return numpy.mean(
+        return numpy.nanmean(
             numpy.absolute(target_values - predicted_values),
             axis=0
         )
 
-    return numpy.mean(
+    return numpy.nanmean(
         numpy.absolute(target_values - predicted_values)
     )
 
@@ -217,9 +217,9 @@ def _get_bias_one_scalar(target_values, predicted_values, per_grid_cell):
     """
 
     if per_grid_cell:
-        return numpy.mean(predicted_values - target_values, axis=0)
+        return numpy.nanmean(predicted_values - target_values, axis=0)
 
-    return numpy.mean(predicted_values - target_values)
+    return numpy.nanmean(predicted_values - target_values)
 
 
 def _get_spatial_min_bias_one_field(target_matrix, prediction_matrix):
@@ -234,8 +234,8 @@ def _get_spatial_min_bias_one_field(target_matrix, prediction_matrix):
     :return: spatial_min_bias: Self-explanatory.
     """
 
-    min_target_values = numpy.min(target_matrix, axis=(1, 2))
-    min_predicted_values = numpy.min(prediction_matrix, axis=(1, 2))
+    min_target_values = numpy.nanmin(target_matrix, axis=(1, 2))
+    min_predicted_values = numpy.nanmin(prediction_matrix, axis=(1, 2))
     return numpy.mean(min_predicted_values - min_target_values)
 
 
@@ -247,8 +247,8 @@ def _get_spatial_max_bias_one_field(target_matrix, prediction_matrix):
     :return: spatial_max_bias: Self-explanatory.
     """
 
-    max_target_values = numpy.max(target_matrix, axis=(1, 2))
-    max_predicted_values = numpy.max(prediction_matrix, axis=(1, 2))
+    max_target_values = numpy.nanmax(target_matrix, axis=(1, 2))
+    max_predicted_values = numpy.nanmax(prediction_matrix, axis=(1, 2))
     return numpy.mean(max_predicted_values - max_target_values)
 
 
@@ -262,29 +262,29 @@ def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell):
     """
 
     if per_grid_cell:
-        numerator = numpy.sum(
-            (target_values - numpy.mean(target_values)) *
-            (predicted_values - numpy.mean(predicted_values)),
+        numerator = numpy.nansum(
+            (target_values - numpy.nanmean(target_values)) *
+            (predicted_values - numpy.nanmean(predicted_values)),
             axis=0
         )
-        sum_squared_target_diffs = numpy.sum(
-            (target_values - numpy.mean(target_values)) ** 2,
+        sum_squared_target_diffs = numpy.nansum(
+            (target_values - numpy.nanmean(target_values)) ** 2,
             axis=0
         )
-        sum_squared_prediction_diffs = numpy.sum(
-            (predicted_values - numpy.mean(predicted_values)) ** 2,
+        sum_squared_prediction_diffs = numpy.nansum(
+            (predicted_values - numpy.nanmean(predicted_values)) ** 2,
             axis=0
         )
     else:
-        numerator = numpy.sum(
-            (target_values - numpy.mean(target_values)) *
-            (predicted_values - numpy.mean(predicted_values))
+        numerator = numpy.nansum(
+            (target_values - numpy.nanmean(target_values)) *
+            (predicted_values - numpy.nanmean(predicted_values))
         )
-        sum_squared_target_diffs = numpy.sum(
-            (target_values - numpy.mean(target_values)) ** 2
+        sum_squared_target_diffs = numpy.nansum(
+            (target_values - numpy.nanmean(target_values)) ** 2
         )
-        sum_squared_prediction_diffs = numpy.sum(
-            (predicted_values - numpy.mean(predicted_values)) ** 2
+        sum_squared_prediction_diffs = numpy.nansum(
+            (predicted_values - numpy.nanmean(predicted_values)) ** 2
         )
 
     correlation = (
@@ -311,15 +311,15 @@ def _get_kge_one_scalar(target_values, predicted_values, per_grid_cell):
     )
 
     if per_grid_cell:
-        mean_target_value = numpy.mean(target_values, axis=0)
-        mean_predicted_value = numpy.mean(predicted_values, axis=0)
-        stdev_target_value = numpy.std(target_values, ddof=1, axis=0)
-        stdev_predicted_value = numpy.std(predicted_values, ddof=1, axis=0)
+        mean_target_value = numpy.nanmean(target_values, axis=0)
+        mean_predicted_value = numpy.nanmean(predicted_values, axis=0)
+        stdev_target_value = numpy.nanstd(target_values, ddof=1, axis=0)
+        stdev_predicted_value = numpy.nanstd(predicted_values, ddof=1, axis=0)
     else:
-        mean_target_value = numpy.mean(target_values)
-        mean_predicted_value = numpy.mean(predicted_values)
-        stdev_target_value = numpy.std(target_values, ddof=1)
-        stdev_predicted_value = numpy.std(predicted_values, ddof=1)
+        mean_target_value = numpy.nanmean(target_values)
+        mean_predicted_value = numpy.nanmean(predicted_values)
+        stdev_target_value = numpy.nanstd(target_values, ddof=1)
+        stdev_predicted_value = numpy.nanstd(predicted_values, ddof=1)
 
     variance_bias = (
         (stdev_predicted_value / mean_predicted_value) *
@@ -361,8 +361,14 @@ def _get_rel_curve_one_scalar(
     # max_bin_edge = max([max_bin_edge, numpy.finfo(float).eps])
     # min_bin_edge = min([min_bin_edge, 0.])
 
+    real_indices = numpy.where(
+        numpy.invert(numpy.isnan(target_values))
+    )[0]
+    real_target_values = target_values[real_indices]
+    real_predicted_values = predicted_values[real_indices]
+
     bin_index_by_example = histograms.create_histogram(
-        input_values=target_values if invert else predicted_values,
+        input_values=real_target_values if invert else real_predicted_values,
         num_bins=num_bins, min_value=min_bin_edge, max_value=max_bin_edge
     )[0]
 
@@ -377,10 +383,10 @@ def _get_rel_curve_one_scalar(
 
         example_counts[i] = len(these_example_indices)
         mean_predictions[i] = numpy.mean(
-            predicted_values[these_example_indices]
+            real_predicted_values[these_example_indices]
         )
         mean_observations[i] = numpy.mean(
-            target_values[these_example_indices]
+            real_target_values[these_example_indices]
         )
 
     return mean_predictions, mean_observations, example_counts
@@ -433,27 +439,27 @@ def _get_scores_one_replicate(
     num_target_fields = len(mean_training_target_values)
 
     if per_grid_cell:
-        t[TARGET_STDEV_KEY].values[..., rep_idx] = numpy.std(
+        t[TARGET_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
             target_matrix, ddof=1, axis=0
         )
-        t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.std(
+        t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
             prediction_matrix, ddof=1, axis=0
         )
-        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.mean(
+        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
             target_matrix, axis=0
         )
-        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.mean(
+        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
             prediction_matrix, axis=0
         )
     else:
-        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.std(
+        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
             target_matrix, ddof=1
         )
-        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.std(
+        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
             prediction_matrix, ddof=1
         )
-        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.mean(target_matrix)
-        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.mean(
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(target_matrix)
+        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
             prediction_matrix
         )
 
@@ -536,11 +542,11 @@ def _get_scores_one_replicate(
             min_bin_edge = min_relia_bin_edge_by_target[k] + 0.
             max_bin_edge = max_relia_bin_edge_by_target[k] + 0.
         else:
-            min_bin_edge = numpy.percentile(
+            min_bin_edge = numpy.nanpercentile(
                 prediction_matrix[..., k],
                 min_relia_bin_edge_prctile_by_target[k]
             )
-            max_bin_edge = numpy.percentile(
+            max_bin_edge = numpy.nanpercentile(
                 prediction_matrix[..., k],
                 max_relia_bin_edge_prctile_by_target[k]
             )
@@ -611,12 +617,16 @@ def _get_scores_one_replicate(
                         )
 
                     if rep_idx == 0 and full_target_matrix.size > 0:
+                        real_indices = numpy.where(numpy.invert(numpy.isnan(
+                            full_target_matrix[:, i, j, k]
+                        )))[0]
+
                         (
                             t[KS_STATISTIC_KEY].values[i, j, k],
                             t[KS_P_VALUE_KEY].values[i, j, k]
                         ) = ks_2samp(
-                            full_target_matrix[:, i, j, k],
-                            full_prediction_matrix[:, i, j, k],
+                            full_target_matrix[real_indices, i, j, k],
+                            full_prediction_matrix[real_indices, i, j, k],
                             alternative='two-sided',
                             mode='auto'
                         )
@@ -672,12 +682,16 @@ def _get_scores_one_replicate(
                 )
 
             if rep_idx == 0 and full_target_matrix.size > 0:
+                real_indices = numpy.where(numpy.invert(numpy.isnan(
+                    full_target_matrix[..., k]
+                )))
+
                 (
                     t[KS_STATISTIC_KEY].values[k],
                     t[KS_P_VALUE_KEY].values[k]
                 ) = ks_2samp(
-                    numpy.ravel(full_target_matrix[..., k]),
-                    numpy.ravel(full_prediction_matrix[..., k]),
+                    numpy.ravel(full_target_matrix[..., k][real_indices]),
+                    numpy.ravel(full_prediction_matrix[..., k][real_indices]),
                     alternative='two-sided',
                     mode='auto'
                 )
@@ -734,7 +748,8 @@ def confidence_interval_to_polygon(
     )
 
     real_indices = numpy.where(numpy.invert(numpy.logical_or(
-        numpy.isnan(x_values_bottom), numpy.isnan(y_values_bottom)
+        numpy.isnan(x_values_bottom),
+        numpy.isnan(y_values_bottom)
     )))[0]
 
     if len(real_indices) == 0:

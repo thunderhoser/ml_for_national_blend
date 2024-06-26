@@ -417,6 +417,30 @@ def __get_grid_dimensions(grid_spacing_km, patch_location_dict):
     return num_rows, num_columns
 
 
+def __init_patch_metalocation_dict(patch_size_2pt5km_pixels,
+                                   patch_overlap_size_2pt5km_pixels):
+    """Initializes patch-metalocation dictionary.
+
+    To understand what the "patch-metalocation dictionary" is, see documentation
+    for `__update_patch_metalocation_dict`.
+
+    :param patch_size_2pt5km_pixels: See doc for
+        `__update_patch_metalocation_dict`.
+    :param patch_overlap_size_2pt5km_pixels: Same.
+    :return: patch_metalocation_dict: Same.
+    """
+
+    return {
+        NUM_FULL_ROWS_KEY: len(nbm_utils.NBM_Y_COORDS_METRES),
+        NUM_FULL_COLUMNS_KEY: len(nbm_utils.NBM_X_COORDS_METRES),
+        NUM_PATCH_ROWS_KEY: patch_size_2pt5km_pixels,
+        NUM_PATCH_COLUMNS_KEY: patch_size_2pt5km_pixels,
+        PATCH_OVERLAP_SIZE_KEY: patch_overlap_size_2pt5km_pixels,
+        PATCH_START_ROW_KEY: -1,
+        PATCH_START_COLUMN_KEY: -1
+    }
+
+
 def __update_patch_metalocation_dict(patch_metalocation_dict):
     """Updates patch-metalocation dictionary.
 
@@ -1289,9 +1313,6 @@ def _read_predictors_one_example(
                 except:
                     continue
 
-                # TODO(thunderhoser): Also need a more flexible residual
-                # baseline.  If the desired model is missing, there should be a
-                # priority list.
                 this_file_name = interp_nwp_model_io.find_file(
                     directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
                     init_time_unix_sec=init_time_unix_sec,
@@ -1495,36 +1516,39 @@ def _find_relevant_init_times(first_time_by_period_unix_sec,
     return misc_utils.remove_unused_days(relevant_init_times_unix_sec)
 
 
-def create_data(option_dict, patch_start_row_2pt5km=None,
-                patch_start_column_2pt5km=None):
-    """Creates, instead of generates, neural-network inputs.
+def create_data(option_dict, init_time_unix_sec):
+    """Creates validation or testing data for neural network.
 
-    E = number of examples returned
-    M = number of rows in grid
-    N = number of columns in grid
+    E = number of examples (data samples) = 1
+    M = number of rows in full-resolution (2.5-km) grid
+    N = number of columns in full-resolution (2.5-km) grid
 
     :param option_dict: See documentation for `data_generator`.
-    :param patch_start_row_2pt5km: [used only with patchwise approach]
-        For every data sample -- i.e., every init time -- will take the patch
-        from the same location, starting at this row in the 2.5-km grid.  If
-        you want the patch location to move around, leave this argument alone.
-    :param patch_start_column_2pt5km: Same as `patch_start_row_2pt5km`, but for
-        column instead of row.
-
+    :param init_time_unix_sec: Will return data only for this initialization
+        time.
     :return: data_dict: Dictionary with the following keys.
     data_dict["predictor_matrices"]: Same as output from `data_generator`.
     data_dict["target_matrix"]: Same as output from `data_generator`.
     data_dict["init_times_unix_sec"]: length-E numpy array of forecast-
         initialization times.
-    data_dict["latitude_matrix_deg_n"]: E-by-M-by-N numpy array of latitudes
-        (deg north).
-    data_dict["longitude_matrix_deg_e"]: E-by-M-by-N numpy array of longitudes
-        (deg east).
+    data_dict["latitude_matrix_deg_n"]: E-by-M-by-N numpy array of grid-point
+        latitudes (deg north).
+    data_dict["longitude_matrix_deg_e"]: E-by-M-by-N numpy array of grid-point
+        longitudes (deg east).
     """
 
-    # Check input args.
-    option_dict[BATCH_SIZE_KEY] = 32  # Dummy argument.
+    # Add dummy arguments.
+    error_checking.assert_is_integer(init_time_unix_sec)
 
+    option_dict[BATCH_SIZE_KEY] = 32
+    option_dict[FIRST_INIT_TIMES_KEY] = numpy.array(
+        [init_time_unix_sec], dtype=int
+    )
+    option_dict[LAST_INIT_TIMES_KEY] = numpy.array(
+        [init_time_unix_sec], dtype=int
+    )
+
+    # Check input args.
     option_dict = _check_generator_args(option_dict)
     first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
     last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
@@ -1553,10 +1577,6 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    # nwp_model_names = [
-    #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
-    # ]
-
     if nwp_normalization_file_name is None:
         nwp_norm_param_table_xarray = None
     else:
@@ -1577,14 +1597,16 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
             target_normalization_file_name
         )
 
-    # Do actual stuff.
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
         last_time_by_period_unix_sec=last_init_times_unix_sec,
         nwp_model_names=nwp_model_names
     )
-    num_examples = len(init_times_unix_sec)
 
+    error_checking.assert_equals(len(init_times_unix_sec), 1)
+    init_time_unix_sec = init_times_unix_sec[0]
+
+    # Do actual stuff.
     if nbm_constant_file_name is None:
         full_nbm_constant_matrix = None
     else:
@@ -1608,115 +1630,46 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
     if patch_size_2pt5km_pixels is None:
         patch_location_dict = None
     else:
+
+        # TODO(thunderhoser): Add input args to create_data that allow for non-
+        # random patch location.
         patch_location_dict = misc_utils.determine_patch_locations(
-            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
-            start_row_2pt5km=patch_start_row_2pt5km,
-            start_column_2pt5km=patch_start_column_2pt5km
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
         )
 
-    (
-        predictor_matrix_2pt5km, predictor_matrix_10km,
-        predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, target_matrix
-    ) = _init_matrices_1batch(
-        nwp_model_names=nwp_model_names,
-        nwp_model_to_field_names=nwp_model_to_field_names,
-        num_nwp_lead_times=len(nwp_lead_times_hours),
-        num_target_fields=len(target_field_names),
-        num_examples_per_batch=num_examples,
-        patch_location_dict=patch_location_dict,
-        do_residual_prediction=do_residual_prediction
-    )
-
-    if full_nbm_constant_matrix is None:
-        nbm_constant_matrix = None
-    else:
-        these_dims = (
-            target_matrix.shape[:-1] + (len(nbm_constant_field_names),)
+    try:
+        target_matrix = _read_targets_one_example(
+            init_time_unix_sec=init_time_unix_sec,
+            target_lead_time_hours=target_lead_time_hours,
+            target_field_names=target_field_names,
+            target_dir_name=target_dir_name,
+            target_norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=targets_use_quantile_norm,
+            patch_location_dict=patch_location_dict
         )
-        nbm_constant_matrix = numpy.full(these_dims, numpy.nan)
-
-    full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
-        nbm_utils.read_coords()
-    )
-    latitude_matrix_deg_n = numpy.full(target_matrix.shape[:-1], numpy.nan)
-    longitude_matrix_deg_e = numpy.full(target_matrix.shape[:-1], numpy.nan)
-
-    good_example_flags = numpy.full(num_examples, True, dtype=bool)
-
-    for i in range(num_examples):
-        if patch_size_2pt5km_pixels is None:
-            patch_location_dict = None
-        else:
-            patch_location_dict = misc_utils.determine_patch_locations(
-                patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
-                start_row_2pt5km=patch_start_row_2pt5km,
-                start_column_2pt5km=patch_start_column_2pt5km
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read targets for init time {0:s}.  '
+            'Something went wrong in `_read_targets_one_example`.'
+        ).format(
+            time_conversion.unix_sec_to_string(
+                init_time_unix_sec, '%Y-%m-%d-%H'
             )
+        )
 
+        warnings.warn(warning_string)
+        target_matrix = None
+
+    if target_matrix is None:
+        return None
+
+    target_matrix = numpy.expand_dims(target_matrix, axis=0)
+
+    if do_residual_prediction:
         try:
-            this_target_matrix = _read_targets_one_example(
-                init_time_unix_sec=init_times_unix_sec[i],
-                target_lead_time_hours=target_lead_time_hours,
-                target_field_names=target_field_names,
-                target_dir_name=target_dir_name,
-                target_norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=targets_use_quantile_norm,
-                patch_location_dict=patch_location_dict
-            )
-
-            # TODO(thunderhoser): When I make create_data_fancy_patches, I must
-            # fix this!
-            if numpy.any(numpy.isnan(this_target_matrix)):
-                this_target_matrix = None
-        except:
-            warning_string = (
-                'POTENTIAL ERROR: Could not read targets for init time {0:s}.  '
-                'Something went wrong in `_read_targets_one_example`.'
-            ).format(
-                time_conversion.unix_sec_to_string(
-                    init_times_unix_sec[i], '%Y-%m-%d-%H'
-                )
-            )
-
-            warnings.warn(warning_string)
-            this_target_matrix = None
-
-        if this_target_matrix is None:
-            good_example_flags[i] = False
-            continue
-
-        target_matrix[i, ...] = this_target_matrix
-        pld = patch_location_dict
-
-        if pld is None:
-            latitude_matrix_deg_n[i, ...] = full_latitude_matrix_deg_n
-            longitude_matrix_deg_e[i, ...] = full_longitude_matrix_deg_e
-
-            if nbm_constant_matrix is not None:
-                nbm_constant_matrix[i, ...] = full_nbm_constant_matrix
-        else:
-            j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-            j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
-            k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-            k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
-
-            latitude_matrix_deg_n[i, ...] = (
-                full_latitude_matrix_deg_n[j_start:j_end, k_start:k_end]
-            )
-            longitude_matrix_deg_e[i, ...] = (
-                full_longitude_matrix_deg_e[j_start:j_end, k_start:k_end]
-            )
-
-            if nbm_constant_matrix is not None:
-                nbm_constant_matrix[i, ...] = (
-                    full_nbm_constant_matrix[j_start:j_end, k_start:k_end]
-                )
-
-        if do_residual_prediction:
-            try:
-                this_baseline_matrix = _read_residual_baseline_one_example(
-                    init_time_unix_sec=init_times_unix_sec[i],
+            predictor_matrix_resid_baseline = (
+                _read_residual_baseline_one_example(
+                    init_time_unix_sec=init_time_unix_sec,
                     nwp_model_name=resid_baseline_model_name,
                     nwp_lead_time_hours=resid_baseline_lead_time_hours,
                     nwp_directory_name=resid_baseline_model_dir_name,
@@ -1725,89 +1678,122 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
                     predict_dewpoint_depression=predict_dewpoint_depression,
                     predict_gust_factor=predict_gust_factor
                 )
-            except:
-                warning_string = (
-                    'POTENTIAL ERROR: Could not read residual baseline for '
-                    'init time {0:s}.  Something went wrong in '
-                    '`_read_residual_baseline_one_example`.'
-                ).format(
-                    time_conversion.unix_sec_to_string(
-                        init_times_unix_sec[i], '%Y-%m-%d-%H'
-                    )
-                )
-
-                warnings.warn(warning_string)
-                this_baseline_matrix = None
-
-            if this_baseline_matrix is None:
-                good_example_flags[i] = False
-                continue
-
-            predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
-
-        try:
-            (
-                this_predictor_matrix_2pt5km,
-                this_predictor_matrix_10km,
-                this_predictor_matrix_20km,
-                this_predictor_matrix_40km,
-                good_example_flags[i]
-            ) = _read_predictors_one_example(
-                init_time_unix_sec=init_times_unix_sec[i],
-                nwp_model_names=nwp_model_names,
-                nwp_lead_times_hours=nwp_lead_times_hours,
-                nwp_model_to_field_names=nwp_model_to_field_names,
-                nwp_model_to_dir_name=nwp_model_to_dir_name,
-                nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-                use_quantile_norm=nwp_use_quantile_norm,
-                patch_location_dict=patch_location_dict
             )
         except:
             warning_string = (
-                'POTENTIAL ERROR: Could not read predictors for init time '
-                '{0:s}.  Something went wrong in '
-                '`_read_predictors_one_example`.'
+                'POTENTIAL ERROR: Could not read residual baseline for '
+                'init time {0:s}.  Something went wrong in '
+                '`_read_residual_baseline_one_example`.'
             ).format(
                 time_conversion.unix_sec_to_string(
-                    init_times_unix_sec[i], '%Y-%m-%d-%H'
+                    init_time_unix_sec, '%Y-%m-%d-%H'
                 )
             )
 
             warnings.warn(warning_string)
-            this_predictor_matrix_2pt5km = None
-            this_predictor_matrix_10km = None
-            this_predictor_matrix_20km = None
-            this_predictor_matrix_40km = None
-            good_example_flags[i] = False
+            predictor_matrix_resid_baseline = None
 
-        if predictor_matrix_2pt5km is not None:
-            predictor_matrix_2pt5km[i, ...] = this_predictor_matrix_2pt5km
-        if predictor_matrix_10km is not None:
-            predictor_matrix_10km[i, ...] = this_predictor_matrix_10km
-        if predictor_matrix_20km is not None:
-            predictor_matrix_20km[i, ...] = this_predictor_matrix_20km
-        if predictor_matrix_40km is not None:
-            predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
+        if predictor_matrix_resid_baseline is None:
+            return None
 
-    good_indices = numpy.where(good_example_flags)[0]
-    init_times_unix_sec = init_times_unix_sec[good_indices, ...]
-    target_matrix = target_matrix[good_indices, ...]
-    error_checking.assert_is_numpy_array_without_nan(target_matrix)
+        predictor_matrix_resid_baseline = numpy.expand_dims(
+            predictor_matrix_resid_baseline, axis=0
+        )
+    else:
+        predictor_matrix_resid_baseline = None
+
+    try:
+        (
+            predictor_matrix_2pt5km,
+            predictor_matrix_10km,
+            predictor_matrix_20km,
+            predictor_matrix_40km,
+            found_any_predictors
+        ) = _read_predictors_one_example(
+            init_time_unix_sec=init_time_unix_sec,
+            nwp_model_names=nwp_model_names,
+            nwp_lead_times_hours=nwp_lead_times_hours,
+            nwp_model_to_field_names=nwp_model_to_field_names,
+            nwp_model_to_dir_name=nwp_model_to_dir_name,
+            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+            use_quantile_norm=nwp_use_quantile_norm,
+            patch_location_dict=patch_location_dict
+        )
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read predictors for init time '
+            '{0:s}.  Something went wrong in `_read_predictors_one_example`.'
+        ).format(
+            time_conversion.unix_sec_to_string(
+                init_time_unix_sec, '%Y-%m-%d-%H'
+            )
+        )
+
+        warnings.warn(warning_string)
+        predictor_matrix_2pt5km = None
+        predictor_matrix_10km = None
+        predictor_matrix_20km = None
+        predictor_matrix_40km = None
+        found_any_predictors = False
+
+    if not found_any_predictors:
+        return None
+
+    if predictor_matrix_2pt5km is not None:
+        predictor_matrix_2pt5km = numpy.expand_dims(
+            predictor_matrix_2pt5km, axis=0
+        )
+    if predictor_matrix_10km is not None:
+        predictor_matrix_10km = numpy.expand_dims(predictor_matrix_10km, axis=0)
+    if predictor_matrix_20km is not None:
+        predictor_matrix_20km = numpy.expand_dims(predictor_matrix_20km, axis=0)
+    if predictor_matrix_40km is not None:
+        predictor_matrix_40km = numpy.expand_dims(predictor_matrix_40km, axis=0)
+
+    full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+        nbm_utils.read_coords()
+    )
+
+    if patch_location_dict is None:
+        nbm_constant_matrix = full_nbm_constant_matrix
+        latitude_matrix_deg_n = full_latitude_matrix_deg_n
+        longitude_matrix_deg_e = full_longitude_matrix_deg_e
+    else:
+        pld = patch_location_dict
+        j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+
+        if full_nbm_constant_matrix is None:
+            nbm_constant_matrix = None
+        else:
+            nbm_constant_matrix = (
+                full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
+            )
+
+        latitude_matrix_deg_n = (
+            full_latitude_matrix_deg_n[j_start:j_end, k_start:k_end]
+        )
+        longitude_matrix_deg_e = (
+            full_longitude_matrix_deg_e[j_start:j_end, k_start:k_end]
+        )
+
+    latitude_matrix_deg_n = numpy.expand_dims(latitude_matrix_deg_n, axis=0)
+    longitude_matrix_deg_e = numpy.expand_dims(longitude_matrix_deg_e, axis=0)
+    if nbm_constant_matrix is not None:
+        nbm_constant_matrix = numpy.expand_dims(nbm_constant_matrix, axis=0)
 
     print((
-        'Shape of 2.5-km target matrix and NaN fraction: '
-        '{0:s}, {1:.04f}'
+        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
     ).format(
         str(target_matrix.shape),
         numpy.mean(numpy.isnan(target_matrix))
     ))
 
     if predictor_matrix_2pt5km is not None:
-        predictor_matrix_2pt5km = predictor_matrix_2pt5km[good_indices, ...]
-
         print((
-            'Shape of 2.5-km predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
+            'Shape of 2.5-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
         ).format(
             str(predictor_matrix_2pt5km.shape),
             numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
@@ -1818,10 +1804,6 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
         )
 
     if predictor_matrix_resid_baseline is not None:
-        predictor_matrix_resid_baseline = predictor_matrix_resid_baseline[
-            good_indices, ...
-        ]
-
         print((
             'Shape of residual baseline matrix and NaN fraction: '
             '{0:s}, {1:.04f}'
@@ -1835,20 +1817,13 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
         )
 
     if nbm_constant_matrix is not None:
-        nbm_constant_matrix = nbm_constant_matrix[good_indices, ...]
         print('Shape of NBM-constant matrix: {0:s}'.format(
             str(nbm_constant_matrix.shape)
         ))
 
-    latitude_matrix_deg_n = latitude_matrix_deg_n[good_indices, ...]
-    longitude_matrix_deg_e = longitude_matrix_deg_e[good_indices, ...]
-
     if predictor_matrix_10km is not None:
-        predictor_matrix_10km = predictor_matrix_10km[good_indices, ...]
-
         print((
-            'Shape of 10-km predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
+            'Shape of 10-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
         ).format(
             str(predictor_matrix_10km.shape),
             numpy.mean(numpy.isnan(predictor_matrix_10km))
@@ -1859,11 +1834,8 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
         )
 
     if predictor_matrix_20km is not None:
-        predictor_matrix_20km = predictor_matrix_20km[good_indices, ...]
-
         print((
-            'Shape of 20-km predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
+            'Shape of 20-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
         ).format(
             str(predictor_matrix_20km.shape),
             numpy.mean(numpy.isnan(predictor_matrix_20km))
@@ -1874,11 +1846,8 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
         )
 
     if predictor_matrix_40km is not None:
-        predictor_matrix_40km = predictor_matrix_40km[good_indices, ...]
-
         print((
-            'Shape of 40-km predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
+            'Shape of 40-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
         ).format(
             str(predictor_matrix_40km.shape),
             numpy.mean(numpy.isnan(predictor_matrix_40km))
@@ -1902,7 +1871,422 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
     return {
         PREDICTOR_MATRICES_KEY: predictor_matrices,
         TARGET_MATRIX_KEY: target_matrix,
-        INIT_TIMES_KEY: init_times_unix_sec,
+        INIT_TIMES_KEY: numpy.full(1, init_time_unix_sec),
+        LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
+        LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
+    }
+
+
+def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
+                             init_time_unix_sec):
+    """Fast version of create_data for patchwise neural network.
+
+    :param option_dict: See documentation for `data_generator_fast_patches`.
+    :param patch_overlap_size_2pt5km_pixels: Same.
+    :param init_time_unix_sec: Will return all patches for this initialization
+        time.
+    :return: data_dict: See documentation for `create_data`.
+    """
+
+    # Add dummy arguments.
+    error_checking.assert_is_integer(init_time_unix_sec)
+
+    option_dict[BATCH_SIZE_KEY] = 32
+    option_dict[FIRST_INIT_TIMES_KEY] = numpy.array(
+        [init_time_unix_sec], dtype=int
+    )
+    option_dict[LAST_INIT_TIMES_KEY] = numpy.array(
+        [init_time_unix_sec], dtype=int
+    )
+
+    # Check input args.
+    option_dict = _check_generator_args(option_dict)
+    first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
+    last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
+    nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
+    nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
+    nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+    nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
+    target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_dir_name = option_dict[TARGET_DIR_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
+    nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
+    resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
+    resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
+
+    nwp_model_names = list(nwp_model_to_dir_name.keys())
+    nwp_model_names.sort()
+
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
+
+    init_times_unix_sec = _find_relevant_init_times(
+        first_time_by_period_unix_sec=first_init_times_unix_sec,
+        last_time_by_period_unix_sec=last_init_times_unix_sec,
+        nwp_model_names=nwp_model_names
+    )
+
+    error_checking.assert_equals(len(init_times_unix_sec), 1)
+    init_time_unix_sec = init_times_unix_sec[0]
+
+    # Do actual stuff.
+    if nbm_constant_file_name is None:
+        full_nbm_constant_matrix = None
+    else:
+        print('Reading data from: "{0:s}"...'.format(nbm_constant_file_name))
+        nbm_constant_table_xarray = nbm_constant_io.read_file(
+            nbm_constant_file_name
+        )
+        nbmct = nbm_constant_table_xarray
+
+        field_indices = numpy.array([
+            numpy.where(
+                nbmct.coords[nbm_constant_utils.FIELD_DIM].values == f
+            )[0][0]
+            for f in nbm_constant_field_names
+        ], dtype=int)
+
+        full_nbm_constant_matrix = (
+            nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
+        )
+
+    try:
+        full_target_matrix = _read_targets_one_example(
+            init_time_unix_sec=init_time_unix_sec,
+            target_lead_time_hours=target_lead_time_hours,
+            target_field_names=target_field_names,
+            target_dir_name=target_dir_name,
+            target_norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=targets_use_quantile_norm,
+            patch_location_dict=None
+        )
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read targets for init time {0:s}.  '
+            'Something went wrong in `_read_targets_one_example`.'
+        ).format(
+            time_conversion.unix_sec_to_string(
+                init_time_unix_sec, '%Y-%m-%d-%H'
+            )
+        )
+
+        warnings.warn(warning_string)
+        return None
+
+    if full_target_matrix is None:
+        return None
+
+    if do_residual_prediction:
+        try:
+            full_baseline_matrix = _read_residual_baseline_one_example(
+                init_time_unix_sec=init_time_unix_sec,
+                nwp_model_name=resid_baseline_model_name,
+                nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                nwp_directory_name=resid_baseline_model_dir_name,
+                target_field_names=target_field_names,
+                patch_location_dict=None,
+                predict_dewpoint_depression=predict_dewpoint_depression,
+                predict_gust_factor=predict_gust_factor
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read residual baseline for '
+                'init time {0:s}.  Something went wrong in '
+                '`_read_residual_baseline_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            return None
+    else:
+        full_baseline_matrix = None
+
+    if do_residual_prediction and full_baseline_matrix is None:
+        return None
+
+    try:
+        (
+            full_predictor_matrix_2pt5km,
+            full_predictor_matrix_10km,
+            full_predictor_matrix_20km,
+            full_predictor_matrix_40km,
+            found_any_predictors
+        ) = _read_predictors_one_example(
+            init_time_unix_sec=init_time_unix_sec,
+            nwp_model_names=nwp_model_names,
+            nwp_lead_times_hours=nwp_lead_times_hours,
+            nwp_model_to_field_names=nwp_model_to_field_names,
+            nwp_model_to_dir_name=nwp_model_to_dir_name,
+            nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+            use_quantile_norm=nwp_use_quantile_norm,
+            patch_location_dict=None
+        )
+    except:
+        warning_string = (
+            'POTENTIAL ERROR: Could not read predictors for init time '
+            '{0:s}.  Something went wrong in '
+            '`_read_predictors_one_example`.'
+        ).format(
+            time_conversion.unix_sec_to_string(
+                init_time_unix_sec, '%Y-%m-%d-%H'
+            )
+        )
+
+        warnings.warn(warning_string)
+        return None
+
+    if not found_any_predictors:
+        return None
+
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+    pmld = patch_metalocation_dict
+    num_patches = 0
+
+    while True:
+        pmld = __update_patch_metalocation_dict(pmld)
+        if pmld[PATCH_START_ROW_KEY] < 0:
+            break
+
+        num_patches += 1
+
+    dummy_patch_location_dict = misc_utils.determine_patch_locations(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
+    )
+
+    (
+        predictor_matrix_2pt5km, predictor_matrix_10km,
+        predictor_matrix_20km, predictor_matrix_40km,
+        predictor_matrix_resid_baseline, target_matrix
+    ) = _init_matrices_1batch(
+        nwp_model_names=nwp_model_names,
+        nwp_model_to_field_names=nwp_model_to_field_names,
+        num_nwp_lead_times=len(nwp_lead_times_hours),
+        num_target_fields=len(target_field_names),
+        num_examples_per_batch=num_patches,
+        patch_location_dict=dummy_patch_location_dict,
+        do_residual_prediction=do_residual_prediction
+    )
+
+    if full_nbm_constant_matrix is None:
+        nbm_constant_matrix = None
+    else:
+        these_dims = (
+            target_matrix.shape[:-1] + (len(nbm_constant_field_names),)
+        )
+        nbm_constant_matrix = numpy.full(these_dims, numpy.nan)
+
+    full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+        nbm_utils.read_coords()
+    )
+    latitude_matrix_deg_n = numpy.full(target_matrix.shape[:-1], numpy.nan)
+    longitude_matrix_deg_e = numpy.full(target_matrix.shape[:-1], numpy.nan)
+
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+
+    for i in range(num_patches):
+        patch_metalocation_dict = __update_patch_metalocation_dict(
+            patch_metalocation_dict
+        )
+        print(patch_metalocation_dict)
+
+        patch_location_dict = misc_utils.determine_patch_locations(
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+            start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
+            start_column_2pt5km=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+        )
+        print('\n\n\n\n\n\n\n')
+        print(patch_location_dict)
+        print('\n\n\n\n\n\n\n')
+        pld = patch_location_dict
+
+        j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+
+        target_matrix[i, ...] = (
+            full_target_matrix[j_start:j_end, k_start:k_end, ...]
+        )
+        latitude_matrix_deg_n[i, ...] = (
+            full_latitude_matrix_deg_n[j_start:j_end, k_start:k_end]
+        )
+        longitude_matrix_deg_e[i, ...] = (
+            full_longitude_matrix_deg_e[j_start:j_end, k_start:k_end]
+        )
+
+        if do_residual_prediction:
+            predictor_matrix_resid_baseline[i, ...] = (
+                full_baseline_matrix[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if predictor_matrix_2pt5km is not None:
+            predictor_matrix_2pt5km[i, ...] = (
+                full_predictor_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if nbm_constant_matrix is not None:
+            nbm_constant_matrix[i, ...] = (
+                full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if predictor_matrix_10km is not None:
+            j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+
+            predictor_matrix_10km[i, ...] = (
+                full_predictor_matrix_10km[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if predictor_matrix_20km is not None:
+            j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+
+            predictor_matrix_20km[i, ...] = (
+                full_predictor_matrix_20km[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if predictor_matrix_40km is not None:
+            j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
+            predictor_matrix_40km[i, ...] = (
+                full_predictor_matrix_40km[j_start:j_end, k_start:k_end, ...]
+            )
+
+    print((
+        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
+    ).format(
+        str(target_matrix.shape),
+        numpy.mean(numpy.isnan(target_matrix))
+    ))
+
+    if nbm_constant_matrix is not None:
+        print('Shape of NBM-constant matrix: {0:s}'.format(
+            str(nbm_constant_matrix.shape)
+        ))
+
+    if predictor_matrix_resid_baseline is not None:
+        print((
+            'Shape of residual baseline matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_resid_baseline.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
+        ))
+
+        error_checking.assert_is_numpy_array_without_nan(
+            predictor_matrix_resid_baseline
+        )
+
+    if predictor_matrix_2pt5km is not None:
+        print((
+            'Shape of 2.5-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_2pt5km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
+        ))
+
+        predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_10km is not None:
+        print((
+            'Shape of 10-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_10km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_10km))
+        ))
+
+        predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_20km is not None:
+        print((
+            'Shape of 20-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_20km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_20km))
+        ))
+
+        predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
+            sentinel_value
+        )
+
+    if predictor_matrix_40km is not None:
+        print((
+            'Shape of 40-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
+        ).format(
+            str(predictor_matrix_40km.shape),
+            numpy.mean(numpy.isnan(predictor_matrix_40km))
+        ))
+
+        predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
+            sentinel_value
+        )
+
+    predictor_matrices = [
+        m for m in [
+            predictor_matrix_2pt5km, nbm_constant_matrix,
+            predictor_matrix_10km, predictor_matrix_20km,
+            predictor_matrix_40km, predictor_matrix_resid_baseline
+        ]
+        if m is not None
+    ]
+
+    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+
+    return {
+        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        TARGET_MATRIX_KEY: target_matrix,
+        INIT_TIMES_KEY: numpy.full(num_patches, init_time_unix_sec),
         LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
         LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
     }
@@ -1917,8 +2301,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     :return: predictor_matrices: See documentation for `data_generator`.
     :return: target_matrix: Same.
     """
-
-    # TODO(thunderhoser): Need a create_data_fast_patches, too.
 
     option_dict = _check_generator_args(option_dict)
     first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
@@ -2002,15 +2384,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     numpy.random.shuffle(init_times_unix_sec)
     init_time_index = 0
 
-    patch_metalocation_dict = {
-        NUM_FULL_ROWS_KEY: len(nbm_utils.NBM_Y_COORDS_METRES),
-        NUM_FULL_COLUMNS_KEY: len(nbm_utils.NBM_X_COORDS_METRES),
-        NUM_PATCH_ROWS_KEY: patch_size_2pt5km_pixels,
-        NUM_PATCH_COLUMNS_KEY: patch_size_2pt5km_pixels,
-        PATCH_OVERLAP_SIZE_KEY: patch_overlap_size_2pt5km_pixels,
-        PATCH_START_ROW_KEY: -1,
-        PATCH_START_COLUMN_KEY: -1
-    }
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
 
     full_target_matrix = None
     full_baseline_matrix = None
@@ -3104,15 +3481,10 @@ def apply_patchwise_model_to_full_grid(
     num_rows_2pt5km = len(nbm_utils.NBM_Y_COORDS_METRES)
     num_columns_2pt5km = len(nbm_utils.NBM_X_COORDS_METRES)
 
-    patch_metalocation_dict = {
-        NUM_FULL_ROWS_KEY: num_rows_2pt5km,
-        NUM_FULL_COLUMNS_KEY: num_columns_2pt5km,
-        NUM_PATCH_ROWS_KEY: num_rows_in_patch,
-        NUM_PATCH_COLUMNS_KEY: num_columns_in_patch,
-        PATCH_OVERLAP_SIZE_KEY: patch_overlap_size_2pt5km_pixels,
-        PATCH_START_ROW_KEY: -1,
-        PATCH_START_COLUMN_KEY: -1
-    }
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=num_rows_in_patch,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
 
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
@@ -3199,163 +3571,6 @@ def apply_patchwise_model_to_full_grid(
             predict_gust_factor=predict_gust_factor,
             verbose=False,
             target_field_names=target_field_names
-        )
-
-        summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
-            patch_prediction_matrix
-        )
-        prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += 1
-
-    if verbose:
-        print('Have applied model everywhere in full grid!')
-
-    prediction_count_matrix = prediction_count_matrix.astype(float)
-    prediction_count_matrix[prediction_count_matrix < 0.01] = numpy.nan
-    return summed_prediction_matrix / prediction_count_matrix
-
-
-def apply_patchwise_model_to_full_grid_test(
-        full_predictor_matrices,
-        patch_overlap_size_2pt5km_pixels,
-        verbose=True):
-    """Does inference for neural net trained with patchwise approach.
-
-    :param model_object: See documentation for `apply_model`.
-    :param full_predictor_matrices: See documentation for `apply_model` --
-        except these matrices are on the full grid.
-    :param num_examples_per_batch: Same.
-    :param predict_dewpoint_depression: Same.
-    :param predict_gust_factor: Same.
-    :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
-        measured in number of pixels on the finest-resolution (2.5-km) grid.
-    :param verbose: See documentation for `apply_model`.
-    :param target_field_names: Same.
-    :return: full_prediction_matrix: See documentation for `apply_model` --
-        except this matrix is on the full grid.
-    """
-
-    # Check input args.
-    these_dim = (None, 448, 448, 2)
-    num_rows_in_patch = these_dim[1]
-    num_columns_in_patch = these_dim[2]
-    num_target_fields = these_dim[3]
-
-    # TODO(thunderhoser): Might relax this constraint eventually -- I don't
-    # know.
-    error_checking.assert_equals(num_rows_in_patch, num_columns_in_patch)
-
-    error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
-    error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 0)
-    error_checking.assert_is_less_than(
-        2 * patch_overlap_size_2pt5km_pixels,
-        min([num_rows_in_patch, num_columns_in_patch])
-    )
-
-    error_checking.assert_is_boolean(verbose)
-
-    # Do actual stuff.
-    num_rows_2pt5km = len(nbm_utils.NBM_Y_COORDS_METRES)
-    num_columns_2pt5km = len(nbm_utils.NBM_X_COORDS_METRES)
-
-    patch_metalocation_dict = {
-        NUM_FULL_ROWS_KEY: num_rows_2pt5km,
-        NUM_FULL_COLUMNS_KEY: num_columns_2pt5km,
-        NUM_PATCH_ROWS_KEY: num_rows_in_patch,
-        NUM_PATCH_COLUMNS_KEY: num_columns_in_patch,
-        PATCH_OVERLAP_SIZE_KEY: patch_overlap_size_2pt5km_pixels,
-        PATCH_START_ROW_KEY: -1,
-        PATCH_START_COLUMN_KEY: -1
-    }
-
-    num_examples = full_predictor_matrices[0].shape[0]
-    these_dim = (
-        num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields
-    )
-    summed_prediction_matrix = numpy.full(these_dim, 0.)
-    prediction_count_matrix = numpy.full(these_dim, 0, dtype=int)
-
-    while True:
-        patch_metalocation_dict = __update_patch_metalocation_dict(
-            patch_metalocation_dict
-        )
-
-        patch_start_row_2pt5km = patch_metalocation_dict[PATCH_START_ROW_KEY]
-        if patch_start_row_2pt5km < 0:
-            break
-
-        patch_location_dict = misc_utils.determine_patch_locations(
-            patch_size_2pt5km_pixels=num_rows_in_patch,
-            start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
-            start_column_2pt5km=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
-        )
-        pld = patch_location_dict
-
-        # TODO(thunderhoser): Allow for inner and outer domains -- but not now!
-        if verbose:
-            i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-            i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1]
-            j_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-            j_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1]
-
-            print((
-                'Applying model to rows {0:d}-{1:d} of {2:d}, and '
-                'columns {3:d}-{4:d} of {5:d}, in finest-resolution grid...'
-            ).format(
-                i_start, i_end, num_rows_2pt5km,
-                j_start, j_end, num_columns_2pt5km
-            ))
-
-        patch_predictor_matrices = []
-
-        for this_full_pred_matrix in full_predictor_matrices:
-            this_downsampling_factor = int(numpy.round(
-                float(num_rows_2pt5km) /
-                this_full_pred_matrix.shape[1]
-            ))
-            assert this_downsampling_factor in POSSIBLE_DOWNSAMPLING_FACTORS
-
-            if this_downsampling_factor == 1:
-                i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-                i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
-                j_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-                j_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
-            elif this_downsampling_factor == 4:
-                i_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
-                i_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
-                j_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
-                j_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
-            elif this_downsampling_factor == 8:
-                i_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
-                i_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
-                j_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
-                j_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
-            else:
-                i_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
-                i_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
-                j_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
-                j_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
-
-            patch_predictor_matrices.append(
-                this_full_pred_matrix[:, i_start:i_end, j_start:j_end, ...]
-            )
-
-        i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-        i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
-        j_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-        j_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
-
-        # patch_prediction_matrix = apply_model(
-        #     model_object=model_object,
-        #     predictor_matrices=patch_predictor_matrices,
-        #     num_examples_per_batch=num_examples_per_batch,
-        #     predict_dewpoint_depression=predict_dewpoint_depression,
-        #     predict_gust_factor=predict_gust_factor,
-        #     verbose=False,
-        #     target_field_names=target_field_names
-        # )
-
-        patch_prediction_matrix = numpy.random.normal(
-            loc=0., scale=1., size=(num_examples, num_rows_in_patch, num_columns_in_patch, num_target_fields)
         )
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
