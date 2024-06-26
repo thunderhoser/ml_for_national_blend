@@ -4,7 +4,6 @@ import os
 import sys
 import copy
 import argparse
-import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -19,7 +18,7 @@ import neural_net_with_fancy_patches as neural_net
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 TIME_FORMAT = '%Y-%m-%d-%H'
-NUM_EXAMPLES_PER_BATCH = 3
+NUM_EXAMPLES_PER_BATCH = 5
 
 # TODO(thunderhoser): Need to deal with possibility that targets are normalized,
 # i.e., might need to denormalize predictions.
@@ -30,8 +29,6 @@ NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_DIRECTORIES_ARG_NAME = 'input_nwp_directory_names'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 PATCHES_TO_FULL_GRID_ARG_NAME = 'patches_to_full_grid'
-PATCH_START_ROW_ARG_NAME = 'patch_start_row_2pt5km'
-PATCH_START_COLUMN_ARG_NAME = 'patch_start_column_2pt5km'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
@@ -60,21 +57,7 @@ PATCHES_TO_FULL_GRID_HELP_STRING = (
     'full grid.  If 0, will generate predictions for patches of the same size '
     'used to train.'
 )
-PATCH_START_ROW_HELP_STRING = (
-    '[used only if NN was trained with patchwise approach and {0:s} == 0] For '
-    'every data sample -- i.e., every init time -- will apply the NN to a '
-    'patch at the same location, starting at this row in the 2.5-km grid.  If '
-    'you want the patch location to move around, make this argument negative.'
-).format(
-    PATCHES_TO_FULL_GRID_ARG_NAME
-)
-PATCH_START_COLUMN_HELP_STRING = (
-    'Same as {0:s}, but for column instead of row.'
-).format(
-    PATCH_START_ROW_ARG_NAME
-)
 PATCH_OVERLAP_SIZE_HELP_STRING = (
-    '[used only if NN was trained with patchwise approach and {0:s} == 1] '
     'Overlap between adjacent patches, measured in number of pixels on the '
     'finest-resolution (2.5-km) grid.'
 ).format(
@@ -110,14 +93,6 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCHES_TO_FULL_GRID_ARG_NAME, type=int, required=False, default=0,
     help=PATCHES_TO_FULL_GRID_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + PATCH_START_ROW_ARG_NAME, type=int, required=False, default=-1,
-    help=PATCH_START_ROW_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + PATCH_START_COLUMN_ARG_NAME, type=int, required=False, default=-1,
-    help=PATCH_START_COLUMN_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=int, required=False, default=-1,
@@ -167,8 +142,7 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 
 def _run(model_file_name, init_time_string, nwp_model_names,
          nwp_directory_names, target_dir_name,
-         patches_to_full_grid, patch_start_row_2pt5km,
-         patch_start_column_2pt5km, patch_overlap_size_2pt5km_pixels,
+         patches_to_full_grid, patch_overlap_size_2pt5km_pixels,
          output_dir_name):
     """Applies trained neural net -- inference time!
 
@@ -180,8 +154,6 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     :param nwp_directory_names: Same.
     :param target_dir_name: Same.
     :param patches_to_full_grid: Same.
-    :param patch_start_row_2pt5km: Same.
-    :param patch_start_column_2pt5km: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param output_dir_name: Same.
     """
@@ -197,7 +169,9 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     mmd = model_metadata_dict
 
     validation_option_dict = mmd[neural_net.VALIDATION_OPTIONS_KEY]
-    was_nn_trained_patchwise = validation_option_dict[neural_net.PATCH_SIZE_KEY]
+    was_nn_trained_patchwise = (
+        validation_option_dict[neural_net.PATCH_SIZE_KEY] is not None
+    )
     nwp_model_names_for_training = list(
         validation_option_dict[neural_net.NWP_MODEL_TO_DIR_KEY].keys()
     )
@@ -207,45 +181,36 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         nwp_directory_names=nwp_directory_names,
         nwp_model_names=nwp_model_names
     )
-    init_time_unix_sec = time_conversion.string_to_unix_sec(
-        init_time_string, TIME_FORMAT
-    )
     validation_option_dict.update({
-        neural_net.FIRST_INIT_TIMES_KEY: numpy.array(
-            [init_time_unix_sec], dtype=int
-        ),
-        neural_net.LAST_INIT_TIMES_KEY: numpy.array(
-            [init_time_unix_sec], dtype=int
-        ),
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
         neural_net.TARGET_DIR_KEY: target_dir_name
     })
+    init_time_unix_sec = time_conversion.string_to_unix_sec(
+        init_time_string, TIME_FORMAT
+    )
 
     if not was_nn_trained_patchwise:
         patches_to_full_grid = False
-        patch_start_row_2pt5km = None
-        patch_start_column_2pt5km = None
 
     if patches_to_full_grid:
         validation_option_dict[neural_net.PATCH_SIZE_KEY] = None
-        patch_start_row_2pt5km = None
-        patch_start_column_2pt5km = None
 
-    if patch_start_row_2pt5km < 0 or patch_start_column_2pt5km < 0:
-        patch_start_row_2pt5km = None
-        patch_start_column_2pt5km = None
-
-    data_dict = neural_net.create_data(
-        option_dict=validation_option_dict,
-        patch_start_row_2pt5km=patch_start_row_2pt5km,
-        patch_start_column_2pt5km=patch_start_column_2pt5km
-    )
+        data_dict = neural_net.create_data(
+            option_dict=validation_option_dict,
+            init_time_unix_sec=init_time_unix_sec
+        )
+    else:
+        data_dict = neural_net.create_data_fast_patches(
+            option_dict=validation_option_dict,
+            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+            init_time_unix_sec=init_time_unix_sec
+        )
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
     target_matrix = data_dict[neural_net.TARGET_MATRIX_KEY]
-    init_time_unix_sec = data_dict[neural_net.INIT_TIMES_KEY][0]
-    latitude_matrix_deg_n = data_dict[neural_net.LATITUDE_MATRIX_KEY][0, ...]
-    longitude_matrix_deg_e = data_dict[neural_net.LONGITUDE_MATRIX_KEY][0, ...]
+    init_times_unix_sec = data_dict[neural_net.INIT_TIMES_KEY]
+    latitude_matrix_deg_n = data_dict[neural_net.LATITUDE_MATRIX_KEY]
+    longitude_matrix_deg_e = data_dict[neural_net.LONGITUDE_MATRIX_KEY]
 
     vod = validation_option_dict
 
@@ -282,12 +247,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     print('Writing results to: "{0:s}"...'.format(output_file_name))
     prediction_io.write_file(
         netcdf_file_name=output_file_name,
-        target_matrix=target_matrix[0, ...],
-        prediction_matrix=prediction_matrix[0, ...],
+        target_matrix=target_matrix,
+        prediction_matrix=prediction_matrix,
         latitude_matrix_deg_n=latitude_matrix_deg_n,
         longitude_matrix_deg_e=longitude_matrix_deg_e,
         field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
-        init_time_unix_sec=init_time_unix_sec,
+        init_times_unix_sec=init_times_unix_sec,
         model_file_name=model_file_name
     )
 
@@ -303,12 +268,6 @@ if __name__ == '__main__':
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         patches_to_full_grid=bool(
             getattr(INPUT_ARG_OBJECT, PATCHES_TO_FULL_GRID_ARG_NAME)
-        ),
-        patch_start_row_2pt5km=getattr(
-            INPUT_ARG_OBJECT, PATCH_START_ROW_ARG_NAME
-        ),
-        patch_start_column_2pt5km=getattr(
-            INPUT_ARG_OBJECT, PATCH_START_COLUMN_ARG_NAME
         ),
         patch_overlap_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, PATCH_OVERLAP_SIZE_ARG_NAME

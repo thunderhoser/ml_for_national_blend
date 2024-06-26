@@ -291,6 +291,348 @@ def _check_colour_limit_args(
     )
 
 
+def _plot_everything_1sample(
+        prediction_table_xarray, example_index, field_names, lead_time_hours,
+        baseline_nwp_model_name, baseline_nwp_model_dir_name,
+        min_colour_values, max_colour_values,
+        min_colour_percentiles, max_colour_percentiles,
+        border_latitudes_deg_n, border_longitudes_deg_e,
+        plot_diffs, min_colour_values_for_diff, max_colour_values_for_diff,
+        min_colour_percentiles_for_diff, max_colour_percentiles_for_diff,
+        output_dir_name):
+    """Plots everything for one data sample.
+
+    P = number of points in border set
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    :param example_index: Will plot the [i]th data sample, where
+        i = `example_index`.
+    :param field_names: See documentation at top of this script.
+    :param lead_time_hours: Lead time.
+    :param baseline_nwp_model_name: See documentation at top of this script.
+    :param baseline_nwp_model_dir_name: Same.
+    :param min_colour_values: Same.
+    :param max_colour_values: Same.
+    :param min_colour_percentiles: Same.
+    :param max_colour_percentiles: Same.
+    :param border_latitudes_deg_n: length-P numpy array of latitudes (deg
+        north).
+    :param border_longitudes_deg_e: length-P numpy array of longitudes (deg
+        east).
+    :param plot_diffs: See documentation at top of this script.
+    :param min_colour_values_for_diff: Same.
+    :param max_colour_values_for_diff: Same.
+    :param min_colour_percentiles_for_diff: Same.
+    :param max_colour_percentiles_for_diff: Same.
+    :param output_dir_name: Same.
+    """
+
+    i = example_index
+    ptx = prediction_table_xarray
+
+    init_time_unix_sec = ptx[prediction_io.INIT_TIME_DIM].values[i]
+    valid_time_unix_sec = (
+        init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
+    )
+    init_time_string = time_conversion.unix_sec_to_string(
+        init_time_unix_sec, TIME_FORMAT
+    )
+    valid_time_string = time_conversion.unix_sec_to_string(
+        valid_time_unix_sec, TIME_FORMAT
+    )
+
+    plotting_patches = not (
+        len(ptx.coords[prediction_io.ROW_DIM].values) ==
+        len(nbm_utils.NBM_Y_COORDS_METRES)
+        and len(ptx.coords[prediction_io.COLUMN_DIM].values) ==
+        len(nbm_utils.NBM_X_COORDS_METRES)
+    )
+
+    if baseline_nwp_model_name is None:
+        baseline_prediction_matrix = None
+    else:
+        if plotting_patches:
+            full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+                nbm_utils.read_coords()
+            )
+            full_longitude_matrix_deg_e = (
+                lng_conversion.convert_lng_positive_in_west(
+                    full_longitude_matrix_deg_e
+                )
+            )
+
+            patch_start_latitude_deg_n = (
+                ptx[prediction_io.LATITUDE_KEY].values[i, 0, 0]
+            )
+            patch_start_longitude_deg_e = (
+                ptx[prediction_io.LONGITUDE_KEY].values[i, 0, 0]
+            )
+            patch_start_longitude_deg_e = (
+                lng_conversion.convert_lng_positive_in_west(
+                    patch_start_longitude_deg_e
+                )
+            )
+
+            good_indices = numpy.where(numpy.logical_and(
+                numpy.absolute(
+                    full_latitude_matrix_deg_n -
+                    patch_start_latitude_deg_n
+                ) < TOLERANCE,
+                numpy.absolute(
+                    full_longitude_matrix_deg_e -
+                    patch_start_longitude_deg_e
+                ) < TOLERANCE
+            ))
+
+            patch_location_dict = misc_utils.determine_patch_locations(
+                patch_size_2pt5km_pixels=
+                len(ptx.coords[prediction_io.ROW_DIM].values),
+                start_row_2pt5km=good_indices[0][0],
+                start_column_2pt5km=good_indices[1][0]
+            )
+        else:
+            patch_location_dict = None
+
+        baseline_prediction_matrix = (
+            neural_net_with_fancy_patches._read_residual_baseline_one_example(
+                init_time_unix_sec=init_time_unix_sec,
+                nwp_model_name=baseline_nwp_model_name,
+                nwp_lead_time_hours=lead_time_hours,
+                nwp_directory_name=baseline_nwp_model_dir_name,
+                target_field_names=field_names,
+                patch_location_dict=patch_location_dict,
+                predict_dewpoint_depression=False,
+                predict_gust_factor=False
+            )
+        )
+
+    for j in range(len(field_names)):
+        this_field_name_fancy = target_plotting.FIELD_NAME_TO_FANCY[
+            field_names[j]
+        ]
+        j_new = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
+        )[0][0]
+
+        prediction_matrix = (
+            ptx[prediction_io.PREDICTION_KEY].values[i, ..., j_new]
+        )
+        target_matrix = (
+            ptx[prediction_io.TARGET_KEY].values[i, ..., j_new]
+        )
+
+        title_string = 'Predicted {0:s}\nInit {1:s}, valid {2:s}'.format(
+            this_field_name_fancy,
+            init_time_string,
+            valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_predicted.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-'),
+            example_index
+        )
+
+        if min_colour_values is None:
+            if baseline_prediction_matrix is None:
+                these_matrices = [prediction_matrix, target_matrix]
+            else:
+                these_matrices = [
+                    prediction_matrix,
+                    target_matrix,
+                    baseline_prediction_matrix[..., j]
+                ]
+
+            concat_matrix = numpy.stack(these_matrices, axis=-1)
+
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=
+                numpy.nanpercentile(concat_matrix, min_colour_percentiles[j]),
+                max_value=
+                numpy.nanpercentile(concat_matrix, max_colour_percentiles[j]),
+            )
+        else:
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=min_colour_values[j],
+                max_value=max_colour_values[j]
+            )
+
+        _plot_one_field(
+            data_matrix=prediction_matrix,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        title_string = 'Actual {0:s}\nValid {1:s}'.format(
+            this_field_name_fancy, valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_actual.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-'),
+            example_index
+        )
+
+        _plot_one_field(
+            data_matrix=target_matrix,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        if baseline_prediction_matrix is not None:
+            title_string = 'Baseline {0:s}\nValid {1:s}'.format(
+                this_field_name_fancy, valid_time_string
+            )
+
+            output_file_name = (
+                '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_baseline.jpg'
+            ).format(
+                output_dir_name,
+                init_time_string,
+                valid_time_string,
+                field_names[j].replace('_', '-'),
+                example_index
+            )
+
+            _plot_one_field(
+                data_matrix=baseline_prediction_matrix[..., j],
+                latitude_matrix_deg_n=
+                ptx[prediction_io.LATITUDE_KEY].values[i, ...],
+                longitude_matrix_deg_e=
+                ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                colour_map_object=colour_map_object,
+                colour_norm_object=colour_norm_object,
+                title_string=title_string,
+                output_file_name=output_file_name
+            )
+
+        if not plot_diffs:
+            continue
+
+        if max_colour_values_for_diff is None:
+            if baseline_prediction_matrix is None:
+                relevant_matrix = prediction_matrix - target_matrix
+            else:
+                relevant_matrix = numpy.stack([
+                    prediction_matrix - target_matrix,
+                    baseline_prediction_matrix[..., j] - target_matrix
+                ], axis=-1)
+
+            this_max = numpy.nanpercentile(
+                numpy.absolute(relevant_matrix),
+                max_colour_percentiles_for_diff[j]
+            )
+
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=urma_utils.U_WIND_10METRE_NAME,
+                min_value=-1 * this_max,
+                max_value=this_max,
+            )
+        else:
+            (
+                colour_map_object, colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=min_colour_values_for_diff[j],
+                max_value=max_colour_values_for_diff[j]
+            )
+
+        title_string = 'Error in {0:s}\nValid {1:s}'.format(
+            this_field_name_fancy, valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_error.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-'),
+            example_index
+        )
+
+        _plot_one_field(
+            data_matrix=prediction_matrix - target_matrix,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        if baseline_prediction_matrix is None:
+            continue
+
+        title_string = 'Baseline error in {0:s}\nValid {1:s}'.format(
+            this_field_name_fancy, valid_time_string
+        )
+
+        output_file_name = (
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_'
+            'baseline-error.jpg'
+        ).format(
+            output_dir_name,
+            init_time_string,
+            valid_time_string,
+            field_names[j].replace('_', '-'),
+            example_index
+        )
+
+        _plot_one_field(
+            data_matrix=baseline_prediction_matrix[..., j] - target_matrix,
+            latitude_matrix_deg_n=
+            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
+            longitude_matrix_deg_e=
+            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=colour_map_object,
+            colour_norm_object=colour_norm_object,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+
 def _run(prediction_dir_name, init_time_string, field_names,
          min_colour_values, max_colour_values,
          min_colour_percentiles, max_colour_percentiles, plot_diffs,
@@ -384,13 +726,6 @@ def _run(prediction_dir_name, init_time_string, field_names,
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
     ptx = prediction_table_xarray
 
-    subset_grid = not (
-        len(ptx.coords[prediction_io.ROW_DIM].values) ==
-        len(nbm_utils.NBM_Y_COORDS_METRES)
-        and len(ptx.coords[prediction_io.COLUMN_DIM].values) ==
-        len(nbm_utils.NBM_X_COORDS_METRES)
-    )
-
     model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
@@ -401,304 +736,28 @@ def _run(prediction_dir_name, init_time_string, field_names,
     training_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
     lead_time_hours = training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
 
-    valid_time_unix_sec = (
-        init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
-    )
-    valid_time_string = time_conversion.unix_sec_to_string(
-        valid_time_unix_sec, TIME_FORMAT
-    )
+    num_examples = len(ptx.coords[prediction_io.INIT_TIME_DIM].values)
 
-    # TODO(thunderhoser): After getting rid of legacy grid with subset_grid
-    # (fixed, rather than variable, patch location during training), I can
-    # simplify the code below.
-    if baseline_nwp_model_name is not None:
-        if neural_net.SUBSET_GRID_KEY in training_option_dict:
-            baseline_prediction_matrix = (
-                neural_net._read_residual_baseline_one_example(
-                    init_time_unix_sec=init_time_unix_sec,
-                    nwp_model_name=baseline_nwp_model_name,
-                    nwp_lead_time_hours=lead_time_hours,
-                    nwp_directory_name=baseline_nwp_model_dir_name,
-                    target_field_names=field_names,
-                    subset_grid=subset_grid,
-                    predict_dewpoint_depression=False,
-                    predict_gust_factor=False
-                )
-            )
-        else:
-            if subset_grid:
-                full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
-                    nbm_utils.read_coords()
-                )
-                full_longitude_matrix_deg_e = (
-                    lng_conversion.convert_lng_positive_in_west(
-                        full_longitude_matrix_deg_e
-                    )
-                )
-
-                patch_start_latitude_deg_n = (
-                    ptx[prediction_io.LATITUDE_KEY].values[0, 0, 0]
-                )
-                patch_start_longitude_deg_e = (
-                    ptx[prediction_io.LONGITUDE_KEY].values[0, 0, 0]
-                )
-                patch_start_longitude_deg_e = (
-                    lng_conversion.convert_lng_positive_in_west(
-                        patch_start_longitude_deg_e
-                    )
-                )
-
-                good_indices = numpy.where(numpy.logical_and(
-                    numpy.absolute(
-                        full_latitude_matrix_deg_n -
-                        patch_start_latitude_deg_n
-                    ) < TOLERANCE,
-                    numpy.absolute(
-                        full_longitude_matrix_deg_e -
-                        patch_start_longitude_deg_e
-                    ) < TOLERANCE
-                ))
-
-                patch_location_dict = misc_utils.determine_patch_locations(
-                    patch_size_2pt5km_pixels=
-                    len(ptx.coords[prediction_io.ROW_DIM].values),
-                    start_row_2pt5km=good_indices[0][0],
-                    start_column_2pt5km=good_indices[1][0]
-                )
-            else:
-                patch_location_dict = None
-
-            baseline_prediction_matrix = (
-                neural_net_with_fancy_patches._read_residual_baseline_one_example(
-                    init_time_unix_sec=init_time_unix_sec,
-                    nwp_model_name=baseline_nwp_model_name,
-                    nwp_lead_time_hours=lead_time_hours,
-                    nwp_directory_name=baseline_nwp_model_dir_name,
-                    target_field_names=field_names,
-                    patch_location_dict=patch_location_dict,
-                    predict_dewpoint_depression=False,
-                    predict_gust_factor=False
-                )
-            )
-    else:
-        baseline_prediction_matrix = None
-
-    for j in range(len(field_names)):
-        this_field_name_fancy = target_plotting.FIELD_NAME_TO_FANCY[
-            field_names[j]
-        ]
-        j_new = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
-        )[0][0]
-
-        prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[0, ..., j_new]
-        )
-        target_matrix = (
-            ptx[prediction_io.TARGET_KEY].values[0, ..., j_new]
-        )
-
-        title_string = 'Predicted {0:s}\nInit {1:s}, valid {2:s}'.format(
-            this_field_name_fancy,
-            init_time_string,
-            valid_time_string
-        )
-
-        output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_predicted.jpg'
-        ).format(
-            output_dir_name,
-            init_time_string,
-            valid_time_string,
-            field_names[j].replace('_', '-')
-        )
-
-        if min_colour_values is None:
-            if baseline_prediction_matrix is None:
-                these_matrices = [prediction_matrix, target_matrix]
-            else:
-                these_matrices = [
-                    prediction_matrix,
-                    target_matrix,
-                    baseline_prediction_matrix[..., j]
-                ]
-
-            concat_matrix = numpy.stack(these_matrices, axis=-1)
-
-            (
-                colour_map_object, colour_norm_object
-            ) = target_plotting.field_to_colour_scheme(
-                field_name=field_names[j],
-                min_value=
-                numpy.nanpercentile(concat_matrix, min_colour_percentiles[j]),
-                max_value=
-                numpy.nanpercentile(concat_matrix, max_colour_percentiles[j]),
-            )
-        else:
-            (
-                colour_map_object, colour_norm_object
-            ) = target_plotting.field_to_colour_scheme(
-                field_name=field_names[j],
-                min_value=min_colour_values[j],
-                max_value=max_colour_values[j]
-            )
-
-        _plot_one_field(
-            data_matrix=prediction_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
+    for i in range(num_examples):
+        _plot_everything_1sample(
+            prediction_table_xarray=prediction_table_xarray,
+            example_index=i,
+            field_names=field_names,
+            lead_time_hours=lead_time_hours,
+            baseline_nwp_model_name=baseline_nwp_model_name,
+            baseline_nwp_model_dir_name=baseline_nwp_model_dir_name,
+            min_colour_values=min_colour_values,
+            max_colour_values=max_colour_values,
+            min_colour_percentiles=min_colour_percentiles,
+            max_colour_percentiles=max_colour_percentiles,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
-            colour_map_object=colour_map_object,
-            colour_norm_object=colour_norm_object,
-            title_string=title_string,
-            output_file_name=output_file_name
-        )
-
-        title_string = 'Actual {0:s}\nValid {1:s}'.format(
-            this_field_name_fancy, valid_time_string
-        )
-
-        output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_actual.jpg'
-        ).format(
-            output_dir_name,
-            init_time_string,
-            valid_time_string,
-            field_names[j].replace('_', '-')
-        )
-
-        _plot_one_field(
-            data_matrix=target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            colour_map_object=colour_map_object,
-            colour_norm_object=colour_norm_object,
-            title_string=title_string,
-            output_file_name=output_file_name
-        )
-
-        if baseline_prediction_matrix is not None:
-            title_string = 'Baseline {0:s}\nValid {1:s}'.format(
-                this_field_name_fancy, valid_time_string
-            )
-
-            output_file_name = (
-                '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline.jpg'
-            ).format(
-                output_dir_name,
-                init_time_string,
-                valid_time_string,
-                field_names[j].replace('_', '-')
-            )
-
-            _plot_one_field(
-                data_matrix=baseline_prediction_matrix[..., j],
-                latitude_matrix_deg_n=
-                ptx[prediction_io.LATITUDE_KEY].values[0, ...],
-                longitude_matrix_deg_e=
-                ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
-                border_latitudes_deg_n=border_latitudes_deg_n,
-                border_longitudes_deg_e=border_longitudes_deg_e,
-                colour_map_object=colour_map_object,
-                colour_norm_object=colour_norm_object,
-                title_string=title_string,
-                output_file_name=output_file_name
-            )
-
-        if not plot_diffs:
-            continue
-
-        if max_colour_values_for_diff is None:
-            if baseline_prediction_matrix is None:
-                relevant_matrix = prediction_matrix - target_matrix
-            else:
-                relevant_matrix = numpy.stack([
-                    prediction_matrix - target_matrix,
-                    baseline_prediction_matrix[..., j] - target_matrix
-                ], axis=-1)
-
-            this_max = numpy.nanpercentile(
-                numpy.absolute(relevant_matrix), max_colour_percentiles[j]
-            )
-
-            (
-                colour_map_object, colour_norm_object
-            ) = target_plotting.field_to_colour_scheme(
-                field_name=urma_utils.U_WIND_10METRE_NAME,
-                min_value=-1 * this_max,
-                max_value=this_max,
-            )
-        else:
-            (
-                colour_map_object, colour_norm_object
-            ) = target_plotting.field_to_colour_scheme(
-                field_name=field_names[j],
-                min_value=min_colour_values_for_diff[j],
-                max_value=max_colour_values_for_diff[j]
-            )
-
-        title_string = 'Error in {0:s}\nValid {1:s}'.format(
-            this_field_name_fancy, valid_time_string
-        )
-
-        output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_error.jpg'
-        ).format(
-            output_dir_name,
-            init_time_string,
-            valid_time_string,
-            field_names[j].replace('_', '-')
-        )
-
-        _plot_one_field(
-            data_matrix=prediction_matrix - target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            colour_map_object=colour_map_object,
-            colour_norm_object=colour_norm_object,
-            title_string=title_string,
-            output_file_name=output_file_name
-        )
-
-        if baseline_prediction_matrix is None:
-            continue
-
-        title_string = 'Baseline error in {0:s}\nValid {1:s}'.format(
-            this_field_name_fancy, valid_time_string
-        )
-
-        output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline-error.jpg'
-        ).format(
-            output_dir_name,
-            init_time_string,
-            valid_time_string,
-            field_names[j].replace('_', '-')
-        )
-
-        _plot_one_field(
-            data_matrix=baseline_prediction_matrix[..., j] - target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[0, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[0, ...],
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            colour_map_object=colour_map_object,
-            colour_norm_object=colour_norm_object,
-            title_string=title_string,
-            output_file_name=output_file_name
+            plot_diffs=plot_diffs,
+            min_colour_values_for_diff=min_colour_values_for_diff,
+            max_colour_values_for_diff=max_colour_values_for_diff,
+            min_colour_percentiles_for_diff=min_colour_percentiles_for_diff,
+            max_colour_percentiles_for_diff=max_colour_percentiles_for_diff,
+            output_dir_name=output_dir_name
         )
 
 

@@ -175,33 +175,42 @@ def read_file(netcdf_file_name):
 def write_file(
         netcdf_file_name, target_matrix, prediction_matrix,
         latitude_matrix_deg_n, longitude_matrix_deg_e, field_names,
-        init_time_unix_sec, model_file_name):
+        init_times_unix_sec, model_file_name):
     """Writes predictions to NetCDF file.
 
+    T = number of initialization times
     M = number of rows in grid
     N = number of columns in grid
-    T = number of target fields
+    F = number of target fields
 
     :param netcdf_file_name: Path to output file.
-    :param target_matrix: M-by-N-by-T numpy array of actual values.
-    :param prediction_matrix: M-by-N-by-T numpy array of predicted values.
-    :param latitude_matrix_deg_n: M-by-N numpy array of latitudes (deg north).
-    :param longitude_matrix_deg_e: M-by-N numpy array of longitudes (deg east).
-    :param field_names: length-T list of field names.
-    :param init_time_unix_sec: Initialization time.
+    :param target_matrix: T-by-M-by-N-by-F numpy array of actual values.
+    :param prediction_matrix: T-by-M-by-N-by-F numpy array of predicted values.
+    :param latitude_matrix_deg_n: T-by-M-by-N numpy array of latitudes (deg
+        north).
+    :param longitude_matrix_deg_e: T-by-M-by-N numpy array of longitudes (deg
+        east).
+    :param field_names: length-F list of field names.
+    :param init_times_unix_sec: length-T numpy array of initialization times.
     :param model_file_name: Path to file with trained model.
     """
 
     # Check input args.
-    error_checking.assert_is_integer(init_time_unix_sec)
     error_checking.assert_is_string(model_file_name)
 
-    error_checking.assert_is_numpy_array(target_matrix, num_dimensions=3)
-    error_checking.assert_is_numpy_array_without_nan(target_matrix)
+    error_checking.assert_is_numpy_array(target_matrix, num_dimensions=4)
+    # error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
-    num_rows = target_matrix.shape[0]
-    num_columns = target_matrix.shape[1]
-    num_fields = target_matrix.shape[2]
+    num_init_times = target_matrix.shape[0]
+    num_rows = target_matrix.shape[1]
+    num_columns = target_matrix.shape[2]
+    num_fields = target_matrix.shape[3]
+
+    error_checking.assert_is_numpy_array(
+        init_times_unix_sec,
+        exact_dimensions=numpy.array([num_init_times], dtype=int)
+    )
+    error_checking.assert_is_integer_numpy_array(init_times_unix_sec)
 
     error_checking.assert_is_numpy_array(
         prediction_matrix,
@@ -240,7 +249,7 @@ def write_file(
     num_field_chars = max([len(f) for f in field_names])
 
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
-    dataset_object.createDimension(INIT_TIME_DIM, 1)
+    dataset_object.createDimension(INIT_TIME_DIM, num_init_times)
     dataset_object.createDimension(ROW_DIM, num_rows)
     dataset_object.createDimension(COLUMN_DIM, num_columns)
     dataset_object.createDimension(FIELD_DIM, num_fields)
@@ -250,39 +259,31 @@ def write_file(
     dataset_object.createVariable(
         INIT_TIME_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[INIT_TIME_KEY][:] = numpy.array(
-        [init_time_unix_sec], dtype=float
+    dataset_object.variables[INIT_TIME_KEY][:] = (
+        init_times_unix_sec.astype(float)
     )
 
     these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
         TARGET_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[TARGET_KEY][:] = numpy.expand_dims(
-        target_matrix, axis=0
-    )
+    dataset_object.variables[TARGET_KEY][:] = target_matrix
 
     dataset_object.createVariable(
         PREDICTION_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[PREDICTION_KEY][:] = numpy.expand_dims(
-        prediction_matrix, axis=0
-    )
+    dataset_object.variables[PREDICTION_KEY][:] = prediction_matrix
 
     these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM)
     dataset_object.createVariable(
         LATITUDE_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[LATITUDE_KEY][:] = numpy.expand_dims(
-        latitude_matrix_deg_n, axis=0
-    )
+    dataset_object.variables[LATITUDE_KEY][:] = latitude_matrix_deg_n
 
     dataset_object.createVariable(
         LONGITUDE_KEY, datatype=numpy.float64, dimensions=these_dim
     )
-    dataset_object.variables[LONGITUDE_KEY][:] = numpy.expand_dims(
-        longitude_matrix_deg_e, axis=0
-    )
+    dataset_object.variables[LONGITUDE_KEY][:] = longitude_matrix_deg_e
 
     this_string_format = 'S{0:d}'.format(num_field_chars)
     field_names_char_array = netCDF4.stringtochar(numpy.array(
