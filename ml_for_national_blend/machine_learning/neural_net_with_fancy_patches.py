@@ -1664,6 +1664,11 @@ def create_data(option_dict, patch_start_row_2pt5km=None,
                 use_quantile_norm=targets_use_quantile_norm,
                 patch_location_dict=patch_location_dict
             )
+
+            # TODO(thunderhoser): When I make create_data_fancy_patches, I must
+            # fix this!
+            if numpy.any(numpy.isnan(this_target_matrix)):
+                this_target_matrix = None
         except:
             warning_string = (
                 'POTENTIAL ERROR: Could not read targets for init time {0:s}.  '
@@ -2232,6 +2237,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_target_matrix[j_start:j_end, k_start:k_end, ...]
             )
 
+            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+                continue
+
             if do_residual_prediction:
                 predictor_matrix_resid_baseline[i, ...] = (
                     full_baseline_matrix[j_start:j_end, k_start:k_end, ...]
@@ -2655,6 +2663,9 @@ def data_generator(option_dict):
                     use_quantile_norm=targets_use_quantile_norm,
                     patch_location_dict=patch_location_dict
                 )
+
+                if numpy.any(numpy.isnan(this_target_matrix)):
+                    this_target_matrix = None
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read targets for init time '
