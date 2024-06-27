@@ -331,7 +331,7 @@ def _plot_everything_1sample(
     i = example_index
     ptx = prediction_table_xarray
 
-    init_time_unix_sec = ptx[prediction_io.INIT_TIME_DIM].values[i]
+    init_time_unix_sec = ptx[prediction_io.INIT_TIME_KEY].values[i]
     valid_time_unix_sec = (
         init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
     )
