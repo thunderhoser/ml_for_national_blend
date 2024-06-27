@@ -123,11 +123,14 @@ def file_name_to_init_time(interp_nwp_file_name):
     """Parses initialization time from name of file with NWP forecasts.
 
     :param interp_nwp_file_name: File path.
-    :return: init_time_unix_sec: Initialization time.
+    :return: init_time_unix_sec: Initializationtarget_matrix = numpy.transpose(
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
+        axes=(1, 0, 2)
+    ) time.
     """
 
     pathless_file_name = os.path.split(interp_nwp_file_name)[1]
-    init_time_string = pathless_file_name.split('_')[2]
+    init_time_string = pathless_file_name.split('_')[-2]
     model_name = '_'.join(pathless_file_name.split('_')[:-2])
 
     init_time_unix_sec = time_conversion.string_to_unix_sec(

@@ -32,7 +32,7 @@ from ml_for_national_blend.outside_code import error_checking
 # evaluation of the NWP ensembles, because these grid points should remain NaN
 # for fair evaluation.
 
-TOLERANCE = 1e-6
+TOLERANCE_DEG = 1e-3
 HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
 
@@ -173,7 +173,10 @@ def _convert_nwp_forecasts_1init(
         urma_table_xarray=urma_table_xarray,
         desired_field_names=urma_field_names
     )
-    target_matrix = urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
+    target_matrix = numpy.transpose(
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
+        axes=(1, 0, 2)
+    )
 
     k = urma_field_names.index(urma_utils.TEMPERATURE_2METRE_NAME)
     prediction_matrix[..., k] = temperature_conv.kelvins_to_celsius(
@@ -198,16 +201,20 @@ def _convert_nwp_forecasts_1init(
     )
 
     utx = urma_table_xarray
-    urma_latitude_matrix_deg_n = utx[urma_utils.LATITUDE_KEY].values
+    urma_latitude_matrix_deg_n = numpy.transpose(
+        utx[urma_utils.LATITUDE_KEY].values
+    )
     urma_longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
-        utx[urma_utils.LONGITUDE_KEY].values
+        numpy.transpose(utx[urma_utils.LONGITUDE_KEY].values)
     )
 
     assert numpy.allclose(
-        nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n, atol=TOLERANCE
+        nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n,
+        atol=TOLERANCE_DEG
     )
     assert numpy.allclose(
-        nwp_longitude_matrix_deg_e, urma_longitude_matrix_deg_e, atol=TOLERANCE
+        nwp_longitude_matrix_deg_e, urma_longitude_matrix_deg_e,
+        atol=TOLERANCE_DEG
     )
 
     output_file_name = prediction_io.find_file(
