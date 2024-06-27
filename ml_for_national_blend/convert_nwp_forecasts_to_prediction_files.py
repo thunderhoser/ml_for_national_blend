@@ -212,6 +212,10 @@ def _convert_nwp_forecasts_1init(
         numpy.transpose(utx[urma_utils.LONGITUDE_KEY].values)
     )
 
+    print(nwp_latitude_matrix_deg_n[:5, :5])
+    print('\n\n')
+    print(urma_latitude_matrix_deg_n[:5, :5])
+
     assert numpy.allclose(
         nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n, atol=TOLERANCE
     )
