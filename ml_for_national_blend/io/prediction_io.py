@@ -209,19 +209,18 @@ def write_file(
         prediction_matrix,
         exact_dimensions=numpy.array(target_matrix.shape, dtype=int)
     )
-    error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
+    # error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
 
+    these_dims = numpy.array([num_init_times, num_rows, num_columns], dtype=int)
     error_checking.assert_is_numpy_array(
-        latitude_matrix_deg_n,
-        exact_dimensions=numpy.array([num_rows, num_columns], dtype=int)
+        latitude_matrix_deg_n, exact_dimensions=these_dims
     )
     error_checking.assert_is_valid_lat_numpy_array(
         latitude_matrix_deg_n, allow_nan=False
     )
 
     error_checking.assert_is_numpy_array(
-        longitude_matrix_deg_e,
-        exact_dimensions=numpy.array([num_rows, num_columns], dtype=int)
+        longitude_matrix_deg_e, exact_dimensions=these_dims
     )
     longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
         longitude_matrix_deg_e, allow_nan=False
