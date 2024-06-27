@@ -407,6 +407,8 @@ def _plot_everything_1sample(
             )
         )
 
+        print('BASELINE: {0:s}'.format(str(baseline_prediction_matrix.shape)))
+
     for j in range(len(field_names)):
         this_field_name_fancy = target_plotting.FIELD_NAME_TO_FANCY[
             field_names[j]
