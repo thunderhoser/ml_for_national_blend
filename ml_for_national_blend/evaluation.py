@@ -369,9 +369,10 @@ def _get_rel_curve_one_scalar(
     # max_bin_edge = max([max_bin_edge, numpy.finfo(float).eps])
     # min_bin_edge = min([min_bin_edge, 0.])
 
-    real_indices = numpy.where(
-        numpy.invert(numpy.isnan(target_values))
-    )[0]
+    real_indices = numpy.where(numpy.invert(numpy.logical_or(
+        numpy.isnan(target_values),
+        numpy.isnan(predicted_values)
+    )))[0]
     real_target_values = target_values[real_indices]
     real_predicted_values = predicted_values[real_indices]
 
@@ -625,8 +626,9 @@ def _get_scores_one_replicate(
                         )
 
                     if rep_idx == 0 and full_target_matrix.size > 0:
-                        real_indices = numpy.where(numpy.invert(numpy.isnan(
-                            full_target_matrix[:, i, j, k]
+                        real_indices = numpy.where(numpy.invert(numpy.logical_or(
+                            numpy.isnan(full_target_matrix[:, i, j, k]),
+                            numpy.isnan(full_prediction_matrix[:, i, j, k])
                         )))[0]
 
                         (
@@ -690,8 +692,9 @@ def _get_scores_one_replicate(
                 )
 
             if rep_idx == 0 and full_target_matrix.size > 0:
-                real_indices = numpy.where(numpy.invert(numpy.isnan(
-                    full_target_matrix[..., k]
+                real_indices = numpy.where(numpy.invert(numpy.logical_or(
+                    numpy.isnan(full_target_matrix[..., k]),
+                    numpy.isnan(full_prediction_matrix[..., k])
                 )))
 
                 (
