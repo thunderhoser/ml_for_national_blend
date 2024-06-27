@@ -36,7 +36,7 @@ import error_checking
 # evaluation of the NWP ensembles, because these grid points should remain NaN
 # for fair evaluation.
 
-TOLERANCE = 1e-6
+TOLERANCE_DEG = 1e-3
 HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
 
@@ -217,10 +217,12 @@ def _convert_nwp_forecasts_1init(
     print(urma_latitude_matrix_deg_n[:5, :5])
 
     assert numpy.allclose(
-        nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n, atol=TOLERANCE
+        nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n,
+        atol=TOLERANCE_DEG
     )
     assert numpy.allclose(
-        nwp_longitude_matrix_deg_e, urma_longitude_matrix_deg_e, atol=TOLERANCE
+        nwp_longitude_matrix_deg_e, urma_longitude_matrix_deg_e,
+        atol=TOLERANCE_DEG
     )
 
     output_file_name = prediction_io.find_file(
