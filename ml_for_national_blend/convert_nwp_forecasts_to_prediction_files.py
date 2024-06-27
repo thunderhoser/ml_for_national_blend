@@ -177,7 +177,10 @@ def _convert_nwp_forecasts_1init(
         urma_table_xarray=urma_table_xarray,
         desired_field_names=urma_field_names
     )
-    target_matrix = urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
+    target_matrix = numpy.transpose(
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
+        axes=(1, 0, 2)
+    )
 
     k = urma_field_names.index(urma_utils.TEMPERATURE_2METRE_NAME)
     prediction_matrix[..., k] = temperature_conv.kelvins_to_celsius(
