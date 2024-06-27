@@ -205,9 +205,11 @@ def _convert_nwp_forecasts_1init(
     )
 
     utx = urma_table_xarray
-    urma_latitude_matrix_deg_n = utx[urma_utils.LATITUDE_KEY].values
+    urma_latitude_matrix_deg_n = numpy.transpose(
+        utx[urma_utils.LATITUDE_KEY].values
+    )
     urma_longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
-        utx[urma_utils.LONGITUDE_KEY].values
+        numpy.transpose(utx[urma_utils.LONGITUDE_KEY].values)
     )
 
     assert numpy.allclose(
