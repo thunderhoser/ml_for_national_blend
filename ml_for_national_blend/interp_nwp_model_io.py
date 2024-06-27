@@ -134,7 +134,7 @@ def file_name_to_init_time(interp_nwp_file_name):
     """
 
     pathless_file_name = os.path.split(interp_nwp_file_name)[1]
-    init_time_string = pathless_file_name.split('_')[2]
+    init_time_string = pathless_file_name.split('_')[-2]
     model_name = '_'.join(pathless_file_name.split('_')[:-2])
 
     init_time_unix_sec = time_conversion.string_to_unix_sec(
