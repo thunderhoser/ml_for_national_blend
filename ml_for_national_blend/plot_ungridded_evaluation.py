@@ -465,6 +465,9 @@ def _run(evaluation_file_names, target_normalization_file_name,
 
         assert target_field_names == goptd[neural_net.TARGET_FIELDS_KEY]
 
+    # TODO(thunderhoser): HACK!
+    target_field_names = [urma_utils.TEMPERATURE_2METRE_NAME]
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
     ))
