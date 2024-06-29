@@ -1151,7 +1151,7 @@ def get_scores_with_bootstrapping(
                 latitude_matrix_deg_n[0, ...].shape, numpy.nan
             )
             longitude_matrix_deg_e = numpy.full(
-                latitude_matrix_deg_n[0, ...].shape, numpy.nan
+                longitude_matrix_deg_e[0, ...].shape, numpy.nan
             )
 
         these_dim_keys = (ROW_DIM, COLUMN_DIM)

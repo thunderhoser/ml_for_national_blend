@@ -206,7 +206,7 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
             first_init_time_unix_sec=f,
             last_init_time_unix_sec=l,
             raise_error_if_any_missing=False,
-            raise_error_if_all_missing=True
+            raise_error_if_all_missing=False
         )
         for f, l in zip(
             first_init_time_by_period_unix_sec,

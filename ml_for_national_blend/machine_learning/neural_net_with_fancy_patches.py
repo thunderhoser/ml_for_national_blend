@@ -26,8 +26,11 @@ from ml_for_national_blend.utils import normalization
 from ml_for_national_blend.machine_learning import custom_losses
 from ml_for_national_blend.machine_learning import custom_metrics
 
+TOLERANCE = 1e-6
+
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
+
 DEFAULT_GUST_FACTOR = 1.5
 
 POSSIBLE_GRID_SPACINGS_KM = numpy.array([2.5, 10, 20, 40])
@@ -415,6 +418,40 @@ def __get_grid_dimensions(grid_spacing_km, patch_location_dict):
         )[0] + 1
 
     return num_rows, num_columns
+
+
+def __make_trapezoidal_weight_matrix(patch_size_2pt5km_pixels,
+                                     patch_overlap_size_2pt5km_pixels):
+    """Creates trapezoidal weight matrix for applying patchwise NN to full grid.
+
+    :param patch_size_2pt5km_pixels: See doc for
+        `__update_patch_metalocation_dict`.
+    :param patch_overlap_size_2pt5km_pixels: Same.
+    :return: trapezoidal_weight_matrix: M-by-M numpy array of weights, where
+        M = patch size.
+    """
+
+    middle_length = patch_size_2pt5km_pixels - patch_overlap_size_2pt5km_pixels
+    middle_start_index = (patch_size_2pt5km_pixels - middle_length) // 2
+
+    weights_before_plateau = numpy.linspace(
+        0, 1,
+        num=middle_start_index, endpoint=False, dtype=float
+    )
+    weights_before_plateau = numpy.linspace(
+        weights_before_plateau[1], 1,
+        num=middle_start_index, endpoint=False, dtype=float
+    )
+    trapezoidal_weights = numpy.concatenate([
+        weights_before_plateau,
+        numpy.full(middle_length, 1.),
+        weights_before_plateau[::-1]
+    ])
+
+    first_weight_matrix, second_weight_matrix = numpy.meshgrid(
+        trapezoidal_weights, trapezoidal_weights
+    )
+    return first_weight_matrix * second_weight_matrix
 
 
 def __init_patch_metalocation_dict(patch_size_2pt5km_pixels,
@@ -3440,7 +3477,7 @@ def train_model(
 def apply_patchwise_model_to_full_grid(
         model_object, full_predictor_matrices, num_examples_per_batch,
         predict_dewpoint_depression, predict_gust_factor,
-        patch_overlap_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels, use_trapezoidal_weighting=False,
         verbose=True, target_field_names=None):
     """Does inference for neural net trained with patchwise approach.
 
@@ -3452,6 +3489,10 @@ def apply_patchwise_model_to_full_grid(
     :param predict_gust_factor: Same.
     :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
         measured in number of pixels on the finest-resolution (2.5-km) grid.
+    :param use_trapezoidal_weighting: Boolean flag.  If True, trapezoidal
+        weighting will be used, so that predictions in the center of a given
+        patch are given a higher weight than predictions at the edge.  This was
+        Imme's suggestion in the June 27 2024 generative-AI meeting.
     :param verbose: See documentation for `apply_model`.
     :param target_field_names: Same.
     :return: full_prediction_matrix: See documentation for `apply_model` --
@@ -3467,13 +3508,26 @@ def apply_patchwise_model_to_full_grid(
     # TODO(thunderhoser): Might relax this constraint eventually -- I don't
     # know.
     error_checking.assert_equals(num_rows_in_patch, num_columns_in_patch)
+    error_checking.assert_is_boolean(use_trapezoidal_weighting)
 
     error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
     error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 0)
     error_checking.assert_is_less_than(
-        2 * patch_overlap_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels,
         min([num_rows_in_patch, num_columns_in_patch])
     )
+
+    if use_trapezoidal_weighting:
+        half_num_rows_in_patch = int(numpy.ceil(
+            float(num_rows_in_patch) / 2
+        ))
+        half_num_columns_in_patch = int(numpy.ceil(
+            float(num_columns_in_patch) / 2
+        ))
+        error_checking.assert_is_geq(
+            patch_overlap_size_2pt5km_pixels,
+            max([half_num_rows_in_patch, half_num_columns_in_patch])
+        )
 
     error_checking.assert_is_boolean(verbose)
 
@@ -3486,12 +3540,20 @@ def apply_patchwise_model_to_full_grid(
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
     )
 
+    if use_trapezoidal_weighting:
+        trapezoidal_weight_matrix = __make_trapezoidal_weight_matrix(
+            patch_size_2pt5km_pixels=num_rows_in_patch,
+            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+        )
+    else:
+        trapezoidal_weight_matrix = None
+
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
         num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields
     )
     summed_prediction_matrix = numpy.full(these_dim, 0.)
-    prediction_count_matrix = numpy.full(these_dim, 0, dtype=int)
+    prediction_count_matrix = numpy.full(these_dim, 0, dtype=float)
 
     while True:
         patch_metalocation_dict = __update_patch_metalocation_dict(
@@ -3509,7 +3571,8 @@ def apply_patchwise_model_to_full_grid(
         )
         pld = patch_location_dict
 
-        # TODO(thunderhoser): Allow for inner and outer domains -- but not now!
+        # TODO(thunderhoser): I might still want to allow for an outer
+        # (predictor) domain and inner (target) domain.  We will see.
         if verbose:
             i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
             i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1]
@@ -3576,13 +3639,19 @@ def apply_patchwise_model_to_full_grid(
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
             patch_prediction_matrix
         )
-        prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += 1
+
+        if use_trapezoidal_weighting:
+            prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
+                trapezoidal_weight_matrix
+            )
+        else:
+            prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += 1
 
     if verbose:
         print('Have applied model everywhere in full grid!')
 
     prediction_count_matrix = prediction_count_matrix.astype(float)
-    prediction_count_matrix[prediction_count_matrix < 0.01] = numpy.nan
+    prediction_count_matrix[prediction_count_matrix < TOLERANCE] = numpy.nan
     return summed_prediction_matrix / prediction_count_matrix
 
 
