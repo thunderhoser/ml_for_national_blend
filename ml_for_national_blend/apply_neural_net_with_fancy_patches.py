@@ -29,6 +29,7 @@ NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_DIRECTORIES_ARG_NAME = 'input_nwp_directory_names'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 PATCHES_TO_FULL_GRID_ARG_NAME = 'patches_to_full_grid'
+USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME = 'use_trapezoidal_weighting'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
@@ -56,6 +57,13 @@ PATCHES_TO_FULL_GRID_HELP_STRING = (
     '1, will slide patch around the full grid to generate predictions on the '
     'full grid.  If 0, will generate predictions for patches of the same size '
     'used to train.'
+)
+USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING = (
+    '[used only if {0:s} == 1] Boolean flag.  If 1, trapezoidal weighting will '
+    'be used, so that predictions in the center of a given patch are given a '
+    'higher weight than predictions at the edge.'
+).format(
+    PATCHES_TO_FULL_GRID_ARG_NAME
 )
 PATCH_OVERLAP_SIZE_HELP_STRING = (
     'Overlap between adjacent patches, measured in number of pixels on the '
@@ -93,6 +101,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCHES_TO_FULL_GRID_ARG_NAME, type=int, required=False, default=0,
     help=PATCHES_TO_FULL_GRID_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME, type=int, required=False,
+    default=0, help=USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=int, required=False, default=-1,
@@ -142,8 +154,8 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 
 def _run(model_file_name, init_time_string, nwp_model_names,
          nwp_directory_names, target_dir_name,
-         patches_to_full_grid, patch_overlap_size_2pt5km_pixels,
-         output_dir_name):
+         patches_to_full_grid, use_trapezoidal_weighting,
+         patch_overlap_size_2pt5km_pixels, output_dir_name):
     """Applies trained neural net -- inference time!
 
     Does inference for neural net trained with patchwise approach.
@@ -154,6 +166,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     :param nwp_directory_names: Same.
     :param target_dir_name: Same.
     :param patches_to_full_grid: Same.
+    :param use_trapezoidal_weighting: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param output_dir_name: Same.
     """
@@ -224,7 +237,8 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             vod[neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY],
             predict_gust_factor=vod[neural_net.PREDICT_GUST_FACTOR_KEY],
             target_field_names=vod[neural_net.TARGET_FIELDS_KEY],
-            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+            use_trapezoidal_weighting=use_trapezoidal_weighting
         )
     else:
         prediction_matrix = neural_net.apply_model(
@@ -268,6 +282,9 @@ if __name__ == '__main__':
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         patches_to_full_grid=bool(
             getattr(INPUT_ARG_OBJECT, PATCHES_TO_FULL_GRID_ARG_NAME)
+        ),
+        use_trapezoidal_weighting=bool(
+            getattr(INPUT_ARG_OBJECT, USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME)
         ),
         patch_overlap_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, PATCH_OVERLAP_SIZE_ARG_NAME
