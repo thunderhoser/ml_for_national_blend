@@ -710,6 +710,153 @@ def _get_scores_one_replicate(
     return t
 
 
+def _get_scores_one_replicate_inner_patches(
+        result_table_xarray,
+        full_target_matrix, full_prediction_matrix,
+        replicate_index, example_indices_in_replicate,
+        mean_training_target_values, num_relia_bins_by_target,
+        min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
+        min_relia_bin_edge_prctile_by_target,
+        max_relia_bin_edge_prctile_by_target):
+    """Computes scores for one bootstrap replicate.
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+
+    :param result_table_xarray: See doc for `get_scores_with_bootstrapping`.
+    :param full_target_matrix: E-by-M-by-N-by-T numpy array of correct values.
+    :param full_prediction_matrix: E-by-M-by-N-by-T numpy array of predicted
+        values.
+    :param replicate_index: Index of current bootstrap replicate.
+    :param example_indices_in_replicate: 1-D numpy array with indices of
+        examples in this bootstrap replicate.
+    :param mean_training_target_values: length-T numpy array with mean target
+        values in training data (i.e., "climatology").
+    :param num_relia_bins_by_target: See doc for `get_scores_with_bootstrapping`.
+    :param min_relia_bin_edge_by_target: Same.
+    :param max_relia_bin_edge_by_target: Same.
+    :param min_relia_bin_edge_prctile_by_target: Same.
+    :param max_relia_bin_edge_prctile_by_target: Same.
+    :param per_grid_cell: Same.
+    :return: result_table_xarray: Same as input but with values filled for [i]th
+        bootstrap replicate, where i = `replicate_index`.
+    """
+
+    per_grid_cell = True
+
+    t = result_table_xarray
+    rep_idx = replicate_index + 0
+    num_examples = len(example_indices_in_replicate)
+
+    target_matrix = full_target_matrix[example_indices_in_replicate, ...]
+    prediction_matrix = full_prediction_matrix[
+        example_indices_in_replicate, ...
+    ]
+
+    num_target_fields = len(mean_training_target_values)
+
+    if per_grid_cell:
+        t[TARGET_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
+            target_matrix, ddof=1, axis=0
+        )
+        t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
+            prediction_matrix, ddof=1, axis=0
+        )
+        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
+            target_matrix, axis=0
+        )
+        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
+            prediction_matrix, axis=0
+        )
+    else:
+        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
+            target_matrix, ddof=1
+        )
+        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
+            prediction_matrix, ddof=1
+        )
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(target_matrix)
+        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
+            prediction_matrix
+        )
+
+    for k in range(num_target_fields):
+        t[MAE_KEY].values[..., k, rep_idx] = _get_mae_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[MAE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mae_ss_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            mean_training_target_value=mean_training_target_values[k],
+            per_grid_cell=per_grid_cell
+        )
+
+        (
+            t[MSE_KEY].values[..., k, rep_idx],
+            t[MSE_BIAS_KEY].values[..., k, rep_idx],
+            t[MSE_VARIANCE_KEY].values[..., k, rep_idx]
+        ) = _get_mse_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+
+        t[MSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mse_ss_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            mean_training_target_value=mean_training_target_values[k],
+            per_grid_cell=per_grid_cell
+        )
+        t[DWMSE_KEY].values[..., k, rep_idx] = _get_dwmse_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[DWMSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = (
+            _get_dwmse_ss_one_scalar(
+                target_values=target_matrix[..., k],
+                predicted_values=prediction_matrix[..., k],
+                mean_training_target_value=mean_training_target_values[k],
+                per_grid_cell=per_grid_cell
+            )
+        )
+        t[BIAS_KEY].values[..., k, rep_idx] = _get_bias_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[SPATIAL_MIN_BIAS_KEY].values[k, rep_idx] = (
+            _get_spatial_min_bias_one_field(
+                target_matrix=target_matrix[..., k],
+                prediction_matrix=prediction_matrix[..., k]
+            )
+        )
+        t[SPATIAL_MAX_BIAS_KEY].values[k, rep_idx] = (
+            _get_spatial_max_bias_one_field(
+                target_matrix=target_matrix[..., k],
+                prediction_matrix=prediction_matrix[..., k]
+            )
+        )
+        t[CORRELATION_KEY].values[..., k, rep_idx] = (
+            _get_correlation_one_scalar(
+                target_values=target_matrix[..., k],
+                predicted_values=prediction_matrix[..., k],
+                per_grid_cell=per_grid_cell
+            )
+        )
+        t[KGE_KEY].values[..., k, rep_idx] = _get_kge_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+
+    return t
+
+
 def confidence_interval_to_polygon(
         x_value_matrix, y_value_matrix, confidence_level, same_order):
     """Turns confidence interval into polygon.
@@ -828,6 +975,74 @@ def read_inputs(prediction_file_names, target_field_names):
         ], dtype=int)
 
         pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
+        prediction_tables_xarray[i] = pt_i
+
+    # try:
+    #     return xarray.concat(
+    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+    #         data_vars='all', coords='minimal', compat='identical', join='exact'
+    #     )
+    # except:
+    #     return xarray.concat(
+    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+    #         data_vars='all', coords='minimal', compat='identical'
+    #     )
+
+    return xarray.concat(
+        prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
+        data_vars='all', coords='minimal', compat='identical', join='exact'
+    )
+
+
+def read_inputs_inner_patches(prediction_file_names, target_field_names):
+    """Reads inputs (predictions and targets) for inner patches only.
+
+    :param prediction_file_names: 1-D list of paths to prediction files.  Each
+        file will be read by `prediction_io.read_file`.
+    :param target_field_names: length-T list of field names desired.
+    :return: prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    """
+
+    # TODO(thunderhoser): Put this in prediction_io.py.
+
+    error_checking.assert_is_string_list(prediction_file_names)
+    error_checking.assert_is_string_list(target_field_names)
+
+    num_times = len(prediction_file_names)
+    prediction_tables_xarray = [xarray.Dataset()] * num_times
+    model_file_name = None
+
+    for i in range(num_times):
+        print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
+        prediction_tables_xarray[i] = prediction_io.read_file(
+            prediction_file_names[i]
+        )
+        pt_i = prediction_tables_xarray[i]
+
+        if model_file_name is None:
+            model_file_name = copy.deepcopy(
+                pt_i.attrs[prediction_io.MODEL_FILE_KEY]
+            )
+
+        assert model_file_name == pt_i.attrs[prediction_io.MODEL_FILE_KEY]
+
+        these_indices = numpy.array([
+            numpy.where(pt_i[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
+
+        good_indices = numpy.concatenate([
+            numpy.linspace(32, 42, num=11, dtype=int),
+            numpy.linspace(47, 57, num=11, dtype=int),
+            numpy.linspace(62, 72, num=11, dtype=int),
+            numpy.linspace(77, 87, num=11, dtype=int),
+            numpy.linspace(92, 102, num=11, dtype=int)
+        ])
+
+        pt_i = pt_i.isel({prediction_io.INIT_TIME_DIM: good_indices})
         prediction_tables_xarray[i] = pt_i
 
     # try:
@@ -1221,6 +1436,400 @@ def get_scores_with_bootstrapping(
         ))
 
         result_table_xarray = _get_scores_one_replicate(
+            result_table_xarray=result_table_xarray,
+            full_target_matrix=target_matrix,
+            full_prediction_matrix=prediction_matrix,
+            replicate_index=i,
+            example_indices_in_replicate=these_indices,
+            mean_training_target_values=mean_training_target_values,
+            num_relia_bins_by_target=num_relia_bins_by_target,
+            min_relia_bin_edge_by_target=min_relia_bin_edge_by_target,
+            max_relia_bin_edge_by_target=max_relia_bin_edge_by_target,
+            min_relia_bin_edge_prctile_by_target=
+            min_relia_bin_edge_prctile_by_target,
+            max_relia_bin_edge_prctile_by_target=
+            max_relia_bin_edge_prctile_by_target,
+            per_grid_cell=per_grid_cell
+        )
+
+    return result_table_xarray
+
+
+def get_scores_inner_patches_simple(
+        prediction_file_names, num_bootstrap_reps,
+        target_field_names, target_normalization_file_name,
+        num_relia_bins_by_target,
+        min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
+        min_relia_bin_edge_prctile_by_target,
+        max_relia_bin_edge_prctile_by_target):
+    """Computes all scores for inner patches -- USE ONCE AND DESTROY.
+
+    T = number of target fields
+
+    :param prediction_file_names: 1-D list of paths to prediction files.  Each
+        file will be read by `prediction_io.read_file`.
+    :param num_bootstrap_reps: Number of bootstrap replicates.
+    :param target_field_names: length-T list of field names.
+    :param target_normalization_file_name: Path to file with normalization
+        params for target fields.  Mean (climo) values will be read from this
+        file.
+    :param num_relia_bins_by_target: length-T numpy array with number of bins in
+        reliability curve for each target.
+    :param min_relia_bin_edge_by_target: length-T numpy array with minimum
+        target/predicted value in reliability curve for each target.  If you
+        instead want minimum values to be percentiles over the data, make this
+        argument None and use `min_relia_bin_edge_prctile_by_target`.
+    :param max_relia_bin_edge_by_target: Same as above but for max.
+    :param min_relia_bin_edge_prctile_by_target: length-T numpy array with
+        percentile level used to determine minimum target/predicted value in
+        reliability curve for each target.  If you instead want to specify raw
+        values, make this argument None and use `min_relia_bin_edge_by_target`.
+    :param max_relia_bin_edge_prctile_by_target: Same as above but for max.
+    :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
+        scores at each grid cell.  If False, will compute one set of scores for
+        the whole domain.
+    :return: result_table_xarray: xarray table with results (variable and
+        dimension names should make the table self-explanatory).
+    """
+
+    per_grid_cell = True
+
+    error_checking.assert_is_string_list(prediction_file_names)
+    error_checking.assert_is_integer(num_bootstrap_reps)
+    error_checking.assert_is_greater(num_bootstrap_reps, 0)
+    error_checking.assert_is_string_list(target_field_names)
+    error_checking.assert_is_boolean(per_grid_cell)
+
+    num_target_fields = len(target_field_names)
+    expected_dim = numpy.array([num_target_fields], dtype=int)
+
+    error_checking.assert_is_numpy_array(
+        num_relia_bins_by_target, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_integer_numpy_array(num_relia_bins_by_target)
+    error_checking.assert_is_geq_numpy_array(num_relia_bins_by_target, 10)
+    error_checking.assert_is_leq_numpy_array(num_relia_bins_by_target, 1000)
+
+    if (
+            min_relia_bin_edge_by_target is None or
+            max_relia_bin_edge_by_target is None
+    ):
+        error_checking.assert_is_numpy_array(
+            min_relia_bin_edge_prctile_by_target, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_geq_numpy_array(
+            min_relia_bin_edge_prctile_by_target, 0.
+        )
+        error_checking.assert_is_leq_numpy_array(
+            min_relia_bin_edge_prctile_by_target, 10.
+        )
+
+        error_checking.assert_is_numpy_array(
+            max_relia_bin_edge_prctile_by_target, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_geq_numpy_array(
+            max_relia_bin_edge_prctile_by_target, 90.
+        )
+        error_checking.assert_is_leq_numpy_array(
+            max_relia_bin_edge_prctile_by_target, 100.
+        )
+    else:
+        error_checking.assert_is_numpy_array(
+            min_relia_bin_edge_by_target, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_numpy_array(
+            max_relia_bin_edge_by_target, exact_dimensions=expected_dim
+        )
+
+        for j in range(num_target_fields):
+            error_checking.assert_is_greater(
+                max_relia_bin_edge_by_target[j],
+                min_relia_bin_edge_by_target[j]
+            )
+
+    prediction_table_xarray = read_inputs_inner_patches(
+        prediction_file_names=prediction_file_names,
+        target_field_names=target_field_names
+    )
+    ptx = prediction_table_xarray
+
+    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+    target_matrix = ptx[prediction_io.TARGET_KEY].values
+    model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
+    # prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
+
+    print('Reading mean (climo) values from: "{0:s}"...'.format(
+        target_normalization_file_name
+    ))
+    target_norm_param_table_xarray = urma_io.read_normalization_file(
+        target_normalization_file_name
+    )
+    tnpt = target_norm_param_table_xarray
+
+    these_indices = numpy.array([
+        numpy.where(tnpt.coords[urma_utils.FIELD_DIM].values == f)[0][0]
+        for f in target_field_names
+    ], dtype=int)
+
+    mean_training_target_values = (
+        tnpt[urma_utils.MEAN_VALUE_KEY].values[these_indices]
+    )
+
+    # TODO(thunderhoser): Modularize this temperature-conversion shit.
+    for j in range(len(target_field_names)):
+        if target_field_names[j] not in [
+            urma_utils.TEMPERATURE_2METRE_NAME,
+            urma_utils.DEWPOINT_2METRE_NAME
+        ]:
+            continue
+
+        mean_training_target_values[j] = temperature_conv.kelvins_to_celsius(
+            numpy.array([mean_training_target_values[j]], dtype=float)
+        )[0]
+
+    for j in range(num_target_fields):
+        print('Climo-mean {0:s} = {1:.4f}'.format(
+            target_field_names[j], mean_training_target_values[j]
+        ))
+
+    num_grid_rows = target_matrix.shape[1]
+    num_grid_columns = target_matrix.shape[2]
+
+    if per_grid_cell:
+        these_dimensions = (
+            num_grid_rows, num_grid_columns, num_target_fields,
+            num_bootstrap_reps
+        )
+        these_dim_keys = (
+            ROW_DIM, COLUMN_DIM, FIELD_DIM, BOOTSTRAP_REP_DIM
+        )
+    else:
+        these_dimensions = (num_target_fields, num_bootstrap_reps)
+        these_dim_keys = (FIELD_DIM, BOOTSTRAP_REP_DIM)
+
+    main_data_dict = {
+        TARGET_STDEV_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        PREDICTION_STDEV_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        TARGET_MEAN_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        PREDICTION_MEAN_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MAE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MAE_SKILL_SCORE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MSE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MSE_BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MSE_VARIANCE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        MSE_SKILL_SCORE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        DWMSE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        DWMSE_SKILL_SCORE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        CORRELATION_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        KGE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        RELIABILITY_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+
+    these_dimensions = (num_target_fields, num_bootstrap_reps)
+    these_dim_keys = (FIELD_DIM, BOOTSTRAP_REP_DIM)
+    new_dict = {
+        SPATIAL_MIN_BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        SPATIAL_MAX_BIAS_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+    main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        these_dimensions = (
+            num_grid_rows, num_grid_columns, num_target_fields,
+            numpy.max(num_relia_bins_by_target), num_bootstrap_reps
+        )
+        these_dim_keys = (
+            ROW_DIM, COLUMN_DIM, FIELD_DIM,
+            RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM
+        )
+    else:
+        these_dimensions = (
+            num_target_fields, numpy.max(num_relia_bins_by_target),
+            num_bootstrap_reps
+        )
+        these_dim_keys = (FIELD_DIM, RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM)
+
+    new_dict = {
+        RELIABILITY_X_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        RELIABILITY_Y_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+    main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        these_dimensions = (
+            num_grid_rows, num_grid_columns, num_target_fields,
+            numpy.max(num_relia_bins_by_target)
+        )
+        these_dim_keys = (
+            ROW_DIM, COLUMN_DIM, FIELD_DIM, RELIABILITY_BIN_DIM
+        )
+    else:
+        these_dimensions = (
+            num_target_fields, numpy.max(num_relia_bins_by_target)
+        )
+        these_dim_keys = (FIELD_DIM, RELIABILITY_BIN_DIM)
+
+    new_dict = {
+        RELIABILITY_BIN_CENTER_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        RELIABILITY_COUNT_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        INV_RELIABILITY_BIN_CENTER_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        INV_RELIABILITY_COUNT_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+    main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        these_dimensions = (num_grid_rows, num_grid_columns, num_target_fields)
+        these_dim_keys = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
+    else:
+        these_dimensions = (num_target_fields,)
+        these_dim_keys = (FIELD_DIM,)
+
+    new_dict = {
+        KS_STATISTIC_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        KS_P_VALUE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        )
+    }
+    main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        ptx = prediction_table_xarray
+        latitude_matrix_deg_n = ptx[prediction_io.LATITUDE_KEY].values
+        longitude_matrix_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
+
+        latitude_diff_matrix_deg = (
+                numpy.max(latitude_matrix_deg_n, axis=0) -
+                numpy.min(latitude_matrix_deg_n, axis=0)
+        )
+        longitude_diff_matrix_deg = (
+                numpy.max(longitude_matrix_deg_e, axis=0) -
+                numpy.min(longitude_matrix_deg_e, axis=0)
+        )
+
+        if (
+                numpy.all(latitude_diff_matrix_deg < TOLERANCE) and
+                numpy.all(longitude_diff_matrix_deg < TOLERANCE)
+        ):
+            latitude_matrix_deg_n = latitude_matrix_deg_n[0, ...]
+            longitude_matrix_deg_e = longitude_matrix_deg_e[0, ...]
+        else:
+            latitude_matrix_deg_n = numpy.full(
+                latitude_matrix_deg_n[0, ...].shape, numpy.nan
+            )
+            longitude_matrix_deg_e = numpy.full(
+                longitude_matrix_deg_e[0, ...].shape, numpy.nan
+            )
+
+        these_dim_keys = (ROW_DIM, COLUMN_DIM)
+
+        new_dict = {
+            LATITUDE_KEY: (these_dim_keys, latitude_matrix_deg_n),
+            LONGITUDE_KEY: (these_dim_keys, longitude_matrix_deg_e)
+        }
+        main_data_dict.update(new_dict)
+
+    reliability_bin_indices = numpy.linspace(
+        0, numpy.max(num_relia_bins_by_target) - 1,
+        num=numpy.max(num_relia_bins_by_target), dtype=int
+    )
+    bootstrap_indices = numpy.linspace(
+        0, num_bootstrap_reps - 1, num=num_bootstrap_reps, dtype=int
+    )
+    metadata_dict = {
+        FIELD_DIM: target_field_names,
+        RELIABILITY_BIN_DIM: reliability_bin_indices,
+        BOOTSTRAP_REP_DIM: bootstrap_indices
+    }
+
+    if per_grid_cell:
+        metadata_dict.update({
+            ROW_DIM: numpy.linspace(
+                0, num_grid_rows - 1, num=num_grid_rows, dtype=int
+            ),
+            COLUMN_DIM: numpy.linspace(
+                0, num_grid_columns - 1, num=num_grid_columns, dtype=int
+            )
+        })
+
+    result_table_xarray = xarray.Dataset(
+        data_vars=main_data_dict, coords=metadata_dict
+    )
+    result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
+    result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
+        '{0:s}'.format(f) for f in prediction_file_names
+    ])
+
+    num_examples = target_matrix.shape[0]
+    example_indices = numpy.linspace(
+        0, num_examples - 1, num=num_examples, dtype=int
+    )
+
+    for i in range(num_bootstrap_reps):
+        if num_bootstrap_reps == 1:
+            these_indices = example_indices
+        else:
+            these_indices = numpy.random.choice(
+                example_indices, size=num_examples, replace=True
+            )
+
+        print((
+            'Computing scores for {0:d}th of {1:d} bootstrap replicates...'
+        ).format(
+            i + 1, num_bootstrap_reps
+        ))
+
+        result_table_xarray = _get_scores_one_replicate_inner_patches(
             result_table_xarray=result_table_xarray,
             full_target_matrix=target_matrix,
             full_prediction_matrix=prediction_matrix,
