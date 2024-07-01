@@ -147,7 +147,7 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if expect_ensemble:
@@ -206,7 +206,7 @@ def dual_weighted_mse(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if expect_ensemble:
@@ -305,7 +305,7 @@ def dual_weighted_mse_1channel(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if channel_index == dewpoint_index:
@@ -422,7 +422,7 @@ def dual_weighted_mse_with_constraints(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         prediction_tensor = process_dewpoint_predictions(

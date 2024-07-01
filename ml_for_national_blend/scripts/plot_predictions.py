@@ -15,7 +15,6 @@ from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.machine_learning import neural_net
-from ml_for_national_blend.machine_learning import neural_net_with_fancy_patches
 from ml_for_national_blend.plotting import target_plotting
 from ml_for_national_blend.plotting import plotting_utils
 
@@ -387,7 +386,7 @@ def _plot_everything_1sample(
             patch_location_dict = None
 
         baseline_prediction_matrix = (
-            neural_net_with_fancy_patches._read_residual_baseline_one_example(
+            neural_net._read_residual_baseline_one_example(
                 init_time_unix_sec=init_time_unix_sec,
                 nwp_model_name=baseline_nwp_model_name,
                 nwp_lead_time_hours=lead_time_hours,

@@ -20,6 +20,7 @@ NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
+PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'
 USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 
@@ -120,13 +121,18 @@ SENTINEL_VALUE_HELP_STRING = (
     'All NaN predictors will be replaced with this value.'
 )
 
-# TODO(thunderhoser): Get rid of the 0-for-Colorado thing.  This is a HACK.
 PATCH_SIZE_HELP_STRING = (
     'Patch size, in units of 2.5-km pixels.  For example, if {0:s} = 448, then '
     'grid dimensions at the finest resolution (2.5 km) are 448 x 448.  If you '
     'want to train with the full grid -- and not the patchwise approach -- '
-    'make this argument negative.  If you want to train over Colorado only, '
-    'make this argument 0.'
+    'make this argument negative.'
+).format(
+    PATCH_SIZE_ARG_NAME
+)
+PATCH_BUFFER_SIZE_HELP_STRING = (
+    '[used only if {0:s} is positive] Buffer between the outer domain (used '
+    'for predictors) and the inner domain (used to penalize predictions in '
+    'loss function).  This must be a non-negative integer.'
 ).format(
     PATCH_SIZE_ARG_NAME
 )
@@ -307,6 +313,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + PATCH_SIZE_ARG_NAME, type=int, required=True,
         help=PATCH_SIZE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_BUFFER_SIZE_ARG_NAME, type=int, required=False, default=0,
+        help=PATCH_BUFFER_SIZE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + USE_FAST_PATCH_GENERATOR_ARG_NAME, type=int, required=False,
