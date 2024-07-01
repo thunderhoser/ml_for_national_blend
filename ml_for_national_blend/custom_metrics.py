@@ -104,7 +104,7 @@ def max_prediction(
         :return: metric: Max prediction.
         """
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
@@ -180,7 +180,7 @@ def spatial_max_bias(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if channel_index == dewpoint_index:
@@ -265,7 +265,7 @@ def min_prediction(
         :return: metric: Minimum prediction.
         """
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
@@ -341,7 +341,7 @@ def spatial_min_bias(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if channel_index == dewpoint_index:
@@ -428,7 +428,7 @@ def mean_squared_error(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if channel_index == dewpoint_index:
@@ -514,7 +514,7 @@ def dual_weighted_mse(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        mask_weight_tensor = K.expand_dims(target_tensor, axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
         if channel_index == dewpoint_index:
