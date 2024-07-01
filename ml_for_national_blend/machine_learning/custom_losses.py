@@ -147,12 +147,19 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        if expect_ensemble:
-            relevant_target_tensor = K.expand_dims(target_tensor, axis=-1)
-        else:
-            relevant_target_tensor = target_tensor
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
 
-        return K.mean((relevant_target_tensor - prediction_tensor) ** 2)
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                relevant_target_tensor, axis=-1
+            )
+
+        squared_error_tensor = (relevant_target_tensor - prediction_tensor) ** 2
+        return (
+            K.sum(mask_weight_tensor * squared_error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(squared_error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss
@@ -199,10 +206,13 @@ def dual_weighted_mse(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if expect_ensemble:
-            relevant_target_tensor = K.expand_dims(target_tensor, axis=-1)
-        else:
-            relevant_target_tensor = target_tensor
+            relevant_target_tensor = K.expand_dims(
+                relevant_target_tensor, axis=-1
+            )
 
         dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
@@ -224,8 +234,10 @@ def dual_weighted_mse(
             channel_weight_tensor * dual_weight_tensor *
             (relevant_target_tensor - prediction_tensor) ** 2
         )
-
-        return K.mean(error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss
@@ -293,6 +305,9 @@ def dual_weighted_mse_1channel(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if channel_index == dewpoint_index:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -310,16 +325,17 @@ def dual_weighted_mse_1channel(
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                target_tensor[..., channel_index], axis=-1
+                relevant_target_tensor[..., channel_index], axis=-1
             )
             relevant_prediction_tensor = (
                 prediction_tensor[:, :, :, channel_index, :]
             )
         else:
-            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_target_tensor = relevant_target_tensor[..., channel_index]
             relevant_prediction_tensor = (
                 prediction_tensor[:, :, :, channel_index]
             )
+            mask_weight_tensor = mask_weight_tensor[..., 0]
 
         dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
@@ -331,8 +347,10 @@ def dual_weighted_mse_1channel(
             channel_weight * dual_weight_tensor *
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
-
-        return K.mean(error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss
@@ -404,6 +422,9 @@ def dual_weighted_mse_with_constraints(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         prediction_tensor = process_dewpoint_predictions(
             prediction_tensor=prediction_tensor,
             temperature_index=temperature_index,
@@ -417,9 +438,9 @@ def dual_weighted_mse_with_constraints(
         )
 
         if expect_ensemble:
-            relevant_target_tensor = K.expand_dims(target_tensor, axis=-1)
-        else:
-            relevant_target_tensor = target_tensor
+            relevant_target_tensor = K.expand_dims(
+                relevant_target_tensor, axis=-1
+            )
 
         dual_weight_tensor = dual_weight_exponent * K.maximum(
             K.abs(relevant_target_tensor),
@@ -441,7 +462,10 @@ def dual_weighted_mse_with_constraints(
             channel_weight_tensor * dual_weight_tensor *
             (relevant_target_tensor - prediction_tensor) ** 2
         )
-        return K.mean(error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss

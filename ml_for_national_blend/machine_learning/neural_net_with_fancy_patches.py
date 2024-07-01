@@ -53,6 +53,7 @@ NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 PATCH_SIZE_KEY = 'patch_size_2pt5km_pixels'
+PATCH_BUFFER_SIZE_KEY = 'patch_buffer_size_2pt5km_pixels'
 
 PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
 PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
@@ -607,6 +608,30 @@ def __increment_init_time(current_index, init_times_unix_sec):
     return current_index, init_times_unix_sec
 
 
+def __patch_buffer_to_mask(patch_size_2pt5km_pixels,
+                           patch_buffer_size_2pt5km_pixels):
+    """Converts patch size and patch buffer size to mask.
+
+    M = number of rows in outer patch (used for predictors)
+    m = number of rows in inner patch (used for loss function)
+
+    :param patch_size_2pt5km_pixels: M in the above discussion.
+    :param patch_buffer_size_2pt5km_pixels: m in the above discussion.
+    :return: mask_matrix: M-by-M numpy array of integers, where 1 (0) means that
+        the pixel will (not) be considered in the loss function.
+    """
+
+    mask_matrix = numpy.full(
+        (patch_size_2pt5km_pixels, patch_size_2pt5km_pixels), 1, dtype=int
+    )
+    mask_matrix[:patch_buffer_size_2pt5km_pixels, :] = 0
+    mask_matrix[-patch_buffer_size_2pt5km_pixels:, :] = 0
+    mask_matrix[:, :patch_buffer_size_2pt5km_pixels] = 0
+    mask_matrix[:, -patch_buffer_size_2pt5km_pixels:] = 0
+
+    return mask_matrix
+
+
 def _check_generator_args(option_dict):
     """Checks input arguments for generator.
 
@@ -705,8 +730,19 @@ def _check_generator_args(option_dict):
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
 
+    if option_dict[PATCH_SIZE_KEY] is None:
+        option_dict[PATCH_BUFFER_SIZE_KEY] = None
+
     if option_dict[PATCH_SIZE_KEY] is not None:
         error_checking.assert_is_integer(option_dict[PATCH_SIZE_KEY])
+        error_checking.assert_is_greater(option_dict[PATCH_SIZE_KEY], 0)
+
+        error_checking.assert_is_integer(option_dict[PATCH_BUFFER_SIZE_KEY])
+        error_checking.assert_is_geq(option_dict[PATCH_BUFFER_SIZE_KEY], 0)
+        error_checking.assert_is_less_than(
+            option_dict[PATCH_BUFFER_SIZE_KEY],
+            option_dict[PATCH_SIZE_KEY] // 2
+        )
 
     error_checking.assert_is_boolean(
         option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -1603,6 +1639,7 @@ def create_data(option_dict, init_time_unix_sec):
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -1610,6 +1647,20 @@ def create_data(option_dict, init_time_unix_sec):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    if patch_size_2pt5km_pixels is None:
+        num_rows, num_columns = __get_grid_dimensions(
+            grid_spacing_km=2.5, patch_location_dict=None
+        )
+        mask_matrix_for_loss = numpy.full((num_rows, num_columns), 1, dtype=int)
+    else:
+        mask_matrix_for_loss = __patch_buffer_to_mask(
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+            patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
+        )
+
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=0)
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
@@ -1821,6 +1872,9 @@ def create_data(option_dict, init_time_unix_sec):
     if nbm_constant_matrix is not None:
         nbm_constant_matrix = numpy.expand_dims(nbm_constant_matrix, axis=0)
 
+    target_matrix = numpy.concatenate(
+        [target_matrix, mask_matrix_for_loss], axis=-1
+    )
     print((
         'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
     ).format(
@@ -1954,6 +2008,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -2123,6 +2178,17 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
 
         num_patches += 1
 
+    mask_matrix_for_loss = __patch_buffer_to_mask(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
+    )
+    mask_matrix_for_loss = numpy.repeat(
+        numpy.expand_dims(mask_matrix_for_loss, axis=0),
+        repeats=num_patches,
+        axis=0
+    )
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
+
     dummy_patch_location_dict = misc_utils.determine_patch_locations(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
     )
@@ -2236,6 +2302,9 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 full_predictor_matrix_40km[j_start:j_end, k_start:k_end, ...]
             )
 
+    target_matrix = numpy.concatenate(
+        [target_matrix, mask_matrix_for_loss], axis=-1
+    )
     print((
         'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
     ).format(
@@ -2357,6 +2426,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -2364,6 +2434,17 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    mask_matrix_for_loss = __patch_buffer_to_mask(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
+    )
+    mask_matrix_for_loss = numpy.repeat(
+        numpy.expand_dims(mask_matrix_for_loss, axis=0),
+        repeats=num_examples_per_batch,
+        axis=0
+    )
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
 
     error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
     error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
@@ -2701,6 +2782,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
 
             num_examples_in_memory += 1
 
+        target_matrix = numpy.concatenate(
+            [target_matrix, mask_matrix_for_loss], axis=-1
+        )
+
         error_checking.assert_is_numpy_array_without_nan(target_matrix)
         print((
             'Shape of 2.5-km target matrix and NaN fraction: '
@@ -2901,6 +2986,11 @@ def data_generator(option_dict):
         dimensions at the finest resolution (2.5 km) are 448 x 448.  If you
         want to train with the full grid -- and not the patchwise approach --
         make this argument None.
+    option_dict["patch_buffer_size_2pt5km_pixels"]:
+        (used only if `patch_size_2pt5km_pixels is not None`)
+        Buffer between the outer domain (used for predictors) and the inner
+        domain (used to penalize predictions in loss function).  This must be a
+        non-negative integer.
     option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the NN
         is trained to predict dewpoint depression, rather than predicting
         dewpoint temperature directly.
@@ -2937,8 +3027,10 @@ def data_generator(option_dict):
     predictor_matrices[5]: E-by-M-by-N-by-F numpy array of baseline values for
         residual prediction.
 
-    :return: target_matrix: E-by-M-by-N-by-F numpy array of targets at 2.5-km
-        resolution.
+    :return: target_matrix: E-by-M-by-N-by-(F + 1) numpy array of targets at
+        2.5-km resolution.  The first F channels are actual target values; the
+        last channel is a binary mask, where 1 (0) indicates that the pixel
+        should (not) be considered in the loss function.
     """
 
     option_dict = _check_generator_args(option_dict)
@@ -2959,6 +3051,7 @@ def data_generator(option_dict):
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -2966,6 +3059,24 @@ def data_generator(option_dict):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    if patch_size_2pt5km_pixels is None:
+        num_rows, num_columns = __get_grid_dimensions(
+            grid_spacing_km=2.5, patch_location_dict=None
+        )
+        mask_matrix_for_loss = numpy.full((num_rows, num_columns), 1, dtype=int)
+    else:
+        mask_matrix_for_loss = __patch_buffer_to_mask(
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+            patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
+        )
+
+    mask_matrix_for_loss = numpy.repeat(
+        numpy.expand_dims(mask_matrix_for_loss, axis=0),
+        repeats=num_examples_per_batch,
+        axis=0
+    )
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
@@ -3198,6 +3309,10 @@ def data_generator(option_dict):
 
             num_examples_in_memory += 1
             init_time_index += 1
+
+        target_matrix = numpy.concatenate(
+            [target_matrix, mask_matrix_for_loss], axis=-1
+        )
 
         error_checking.assert_is_numpy_array_without_nan(target_matrix)
         print((
@@ -3476,17 +3591,16 @@ def train_model(
 
 def apply_patchwise_model_to_full_grid(
         model_object, full_predictor_matrices, num_examples_per_batch,
-        predict_dewpoint_depression, predict_gust_factor,
-        patch_overlap_size_2pt5km_pixels, use_trapezoidal_weighting=False,
-        verbose=True, target_field_names=None):
+        model_metadata_dict, patch_overlap_size_2pt5km_pixels,
+        use_trapezoidal_weighting=False, verbose=True):
     """Does inference for neural net trained with patchwise approach.
 
     :param model_object: See documentation for `apply_model`.
     :param full_predictor_matrices: See documentation for `apply_model` --
         except these matrices are on the full grid.
     :param num_examples_per_batch: Same.
-    :param predict_dewpoint_depression: Same.
-    :param predict_gust_factor: Same.
+    :param model_metadata_dict: Dictionary in format returned by
+        `read_metafile`.
     :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
         measured in number of pixels on the finest-resolution (2.5-km) grid.
     :param use_trapezoidal_weighting: Boolean flag.  If True, trapezoidal
@@ -3494,7 +3608,6 @@ def apply_patchwise_model_to_full_grid(
         patch are given a higher weight than predictions at the edge.  This was
         Imme's suggestion in the June 27 2024 generative-AI meeting.
     :param verbose: See documentation for `apply_model`.
-    :param target_field_names: Same.
     :return: full_prediction_matrix: See documentation for `apply_model` --
         except this matrix is on the full grid.
     """
@@ -3540,13 +3653,23 @@ def apply_patchwise_model_to_full_grid(
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
     )
 
+    validation_option_dict = model_metadata_dict[VALIDATION_OPTIONS_KEY]
+    patch_buffer_size = validation_option_dict[PATCH_BUFFER_SIZE_KEY]
+
     if use_trapezoidal_weighting:
-        trapezoidal_weight_matrix = __make_trapezoidal_weight_matrix(
-            patch_size_2pt5km_pixels=num_rows_in_patch,
+        weight_matrix = __make_trapezoidal_weight_matrix(
+            patch_size_2pt5km_pixels=num_rows_in_patch - 2 * patch_buffer_size,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
         )
+        weight_matrix = numpy.pad(
+            weight_matrix, pad_width=patch_buffer_size,
+            mode='constant', constant_values=0
+        )
     else:
-        trapezoidal_weight_matrix = None
+        weight_matrix = __patch_buffer_to_mask(
+            patch_size_2pt5km_pixels=num_rows_in_patch,
+            patch_buffer_size_2pt5km_pixels=patch_buffer_size
+        )
 
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
@@ -3630,22 +3753,19 @@ def apply_patchwise_model_to_full_grid(
             model_object=model_object,
             predictor_matrices=patch_predictor_matrices,
             num_examples_per_batch=num_examples_per_batch,
-            predict_dewpoint_depression=predict_dewpoint_depression,
-            predict_gust_factor=predict_gust_factor,
-            verbose=False,
-            target_field_names=target_field_names
+            predict_dewpoint_depression=
+            validation_option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY],
+            predict_gust_factor=validation_option_dict[PREDICT_GUST_FACTOR_KEY],
+            target_field_names=validation_option_dict[TARGET_FIELDS_KEY],
+            verbose=False
         )
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
             patch_prediction_matrix
         )
-
-        if use_trapezoidal_weighting:
-            prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
-                trapezoidal_weight_matrix
-            )
-        else:
-            prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += 1
+        prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
+            weight_matrix
+        )
 
     if verbose:
         print('Have applied model everywhere in full grid!')
@@ -3842,6 +3962,16 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
+
+    training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
+    validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
+
+    if PATCH_BUFFER_SIZE_KEY not in training_option_dict:
+        training_option_dict[PATCH_BUFFER_SIZE_KEY] = 0
+        validation_option_dict[PATCH_BUFFER_SIZE_KEY] = 0
+
+    metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
+    metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
 
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:

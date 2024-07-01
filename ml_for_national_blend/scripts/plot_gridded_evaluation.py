@@ -68,8 +68,6 @@ METRIC_NAME_TO_VERBOSE = {
     evaluation.MAE_KEY: 'MAE',
     evaluation.MAE_SKILL_SCORE_KEY: 'MAE skill score',
     evaluation.BIAS_KEY: 'bias',
-    evaluation.SPATIAL_MIN_BIAS_KEY: 'bias in spatial min',
-    evaluation.SPATIAL_MAX_BIAS_KEY: 'bias in spatial max',
     evaluation.CORRELATION_KEY: 'correlation',
     evaluation.KGE_KEY: 'Kling-Gupta efficiency',
     evaluation.RELIABILITY_KEY: 'reliability'
@@ -102,8 +100,6 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
     evaluation.MAE_KEY: pyplot.get_cmap('viridis'),
     evaluation.MAE_SKILL_SCORE_KEY: pyplot.get_cmap('seismic'),
     evaluation.BIAS_KEY: pyplot.get_cmap('seismic'),
-    evaluation.SPATIAL_MIN_BIAS_KEY: pyplot.get_cmap('seismic'),
-    evaluation.SPATIAL_MAX_BIAS_KEY: pyplot.get_cmap('seismic'),
     evaluation.CORRELATION_KEY: pyplot.get_cmap('seismic'),
     evaluation.KGE_KEY: pyplot.get_cmap('seismic'),
     evaluation.RELIABILITY_KEY: pyplot.get_cmap('viridis')
@@ -125,8 +121,6 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     evaluation.MAE_KEY: 'sequential',
     evaluation.MAE_SKILL_SCORE_KEY: 'diverging_weird',
     evaluation.BIAS_KEY: 'diverging',
-    evaluation.SPATIAL_MIN_BIAS_KEY: 'diverging',
-    evaluation.SPATIAL_MAX_BIAS_KEY: 'diverging',
     evaluation.CORRELATION_KEY: 'diverging',
     evaluation.KGE_KEY: 'diverging_weird',
     evaluation.RELIABILITY_KEY: 'sequential'
@@ -238,7 +232,7 @@ def _plot_one_score(
 
         num_columns = score_matrix.shape[1]
         grid_longitudes_deg_e = numpy.linspace(
-            -1, 1, num=num_columns, dtype=float
+            0, 1, num=num_columns, dtype=float
         )
 
         grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e = (
