@@ -739,7 +739,6 @@ def _get_scores_one_replicate_inner_patches(
     :param max_relia_bin_edge_by_target: Same.
     :param min_relia_bin_edge_prctile_by_target: Same.
     :param max_relia_bin_edge_prctile_by_target: Same.
-    :param per_grid_cell: Same.
     :return: result_table_xarray: Same as input but with values filled for [i]th
         bootstrap replicate, where i = `replicate_index`.
     """
@@ -1485,9 +1484,6 @@ def get_scores_inner_patches_simple(
         reliability curve for each target.  If you instead want to specify raw
         values, make this argument None and use `min_relia_bin_edge_by_target`.
     :param max_relia_bin_edge_prctile_by_target: Same as above but for max.
-    :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
-        scores at each grid cell.  If False, will compute one set of scores for
-        the whole domain.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -1842,8 +1838,7 @@ def get_scores_inner_patches_simple(
             min_relia_bin_edge_prctile_by_target=
             min_relia_bin_edge_prctile_by_target,
             max_relia_bin_edge_prctile_by_target=
-            max_relia_bin_edge_prctile_by_target,
-            per_grid_cell=per_grid_cell
+            max_relia_bin_edge_prctile_by_target
         )
 
     return result_table_xarray
