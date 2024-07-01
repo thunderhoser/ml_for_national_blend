@@ -15,7 +15,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import time_conversion
 import nwp_model_utils
 import neural_net
-import neural_net_with_fancy_patches
 import training_args
 
 TIME_FORMAT = '%Y-%m-%d-%H'
@@ -66,7 +65,8 @@ def _run(template_file_name, output_dir_name,
          target_lead_time_hours, target_field_names,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
-         num_examples_per_batch, sentinel_value, patch_size_2pt5km_pixels,
+         num_examples_per_batch, sentinel_value,
+         patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          predict_dewpoint_depression, predict_gust_factor,
          do_residual_prediction, resid_baseline_model_name,
@@ -101,6 +101,7 @@ def _run(template_file_name, output_dir_name,
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
+    :param patch_buffer_size_2pt5km_pixels: Same.
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param predict_dewpoint_depression: Same.
@@ -137,6 +138,8 @@ def _run(template_file_name, output_dir_name,
         resid_baseline_lead_time_hours = None
     if not use_fast_patch_generator:
         patch_overlap_size_2pt5km_pixels = None
+    if patch_size_2pt5km_pixels < 0:
+        patch_size_2pt5km_pixels = None
 
     if nbm_constant_file_name == '':
         nbm_constant_file_name = None
@@ -193,18 +196,10 @@ def _run(template_file_name, output_dir_name,
         neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
         neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
         neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
-        neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name
+        neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
+        neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
+        neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels
     }
-
-    if patch_size_2pt5km_pixels == 0:
-        training_option_dict[neural_net.SUBSET_GRID_KEY] = True
-    else:
-        if patch_size_2pt5km_pixels < 0:
-            patch_size_2pt5km_pixels = None
-
-        training_option_dict[neural_net_with_fancy_patches.PATCH_SIZE_KEY] = (
-            patch_size_2pt5km_pixels
-        )
 
     validation_option_dict = {
         neural_net.FIRST_INIT_TIMES_KEY:
@@ -223,46 +218,25 @@ def _run(template_file_name, output_dir_name,
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
 
-    if patch_size_2pt5km_pixels == 0:
-        neural_net.train_model(
-            model_object=model_object,
-            num_epochs=num_epochs,
-            num_training_batches_per_epoch=num_training_batches_per_epoch,
-            training_option_dict=training_option_dict,
-            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
-            validation_option_dict=validation_option_dict,
-            loss_function_string=
-            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
-            optimizer_function_string=
-            model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
-            metric_function_strings=
-            model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
-            plateau_patience_epochs=plateau_patience_epochs,
-            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
-            early_stopping_patience_epochs=early_stopping_patience_epochs,
-            output_dir_name=output_dir_name
-        )
-    else:
-        neural_net_with_fancy_patches.train_model(
-            model_object=model_object,
-            num_epochs=num_epochs,
-            num_training_batches_per_epoch=num_training_batches_per_epoch,
-            training_option_dict=training_option_dict,
-            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
-            validation_option_dict=validation_option_dict,
-            loss_function_string=
-            model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
-            optimizer_function_string=
-            model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
-            metric_function_strings=
-            model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
-            plateau_patience_epochs=plateau_patience_epochs,
-            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
-            early_stopping_patience_epochs=early_stopping_patience_epochs,
-            patch_overlap_fast_gen_2pt5km_pixels=
-            patch_overlap_size_2pt5km_pixels,
-            output_dir_name=output_dir_name
-        )
+    neural_net.train_model(
+        model_object=model_object,
+        num_epochs=num_epochs,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        training_option_dict=training_option_dict,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+        validation_option_dict=validation_option_dict,
+        loss_function_string=
+        model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
+        optimizer_function_string=
+        model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
+        metric_function_strings=
+        model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
+        plateau_patience_epochs=plateau_patience_epochs,
+        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs=early_stopping_patience_epochs,
+        patch_overlap_fast_gen_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+        output_dir_name=output_dir_name
+    )
 
 
 if __name__ == '__main__':
@@ -317,6 +291,9 @@ if __name__ == '__main__':
         ),
         patch_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_SIZE_ARG_NAME
+        ),
+        patch_buffer_size_2pt5km_pixels=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_BUFFER_SIZE_ARG_NAME
         ),
         use_fast_patch_generator=bool(getattr(
             INPUT_ARG_OBJECT, training_args.USE_FAST_PATCH_GENERATOR_ARG_NAME
