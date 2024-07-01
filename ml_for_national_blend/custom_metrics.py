@@ -3,6 +3,7 @@
 import os
 import sys
 import numpy
+import tensorflow
 from tensorflow.keras import backend as K
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -12,6 +13,8 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 import custom_losses
+
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 
 def _check_index_args(u_wind_index, v_wind_index, gust_index,
@@ -101,6 +104,8 @@ def max_prediction(
         :return: metric: Max prediction.
         """
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -116,7 +121,18 @@ def max_prediction(
                 gust_index=gust_index
             )
 
-        return K.max(prediction_tensor[:, :, :, channel_index, ...])
+        relevant_prediction_tensor = (
+            prediction_tensor[:, :, :, channel_index, ...]
+        )
+        if not expect_ensemble:
+            mask_weight_tensor = mask_weight_tensor[..., 0]
+
+        relevant_prediction_tensor = tensorflow.boolean_mask(
+            relevant_prediction_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
+
+        return K.max(relevant_prediction_tensor)
 
     metric.__name__ = function_name
     return metric
@@ -164,6 +180,9 @@ def spatial_max_bias(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -186,7 +205,17 @@ def spatial_max_bias(
         else:
             relevant_prediction_tensor = prediction_tensor[..., channel_index]
 
-        relevant_target_tensor = target_tensor[..., channel_index]
+        relevant_target_tensor = relevant_target_tensor[..., channel_index]
+        mask_weight_tensor = mask_weight_tensor[..., 0]
+
+        relevant_prediction_tensor = tensorflow.boolean_mask(
+            relevant_prediction_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
+        relevant_target_tensor = tensorflow.boolean_mask(
+            relevant_target_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
 
         max_predictions = K.max(relevant_prediction_tensor, axis=(1, 2))
         max_targets = K.max(relevant_target_tensor, axis=(1, 2))
@@ -236,6 +265,8 @@ def min_prediction(
         :return: metric: Minimum prediction.
         """
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -251,7 +282,18 @@ def min_prediction(
                 gust_index=gust_index
             )
 
-        return K.min(prediction_tensor[:, :, :, channel_index, ...])
+        relevant_prediction_tensor = (
+            prediction_tensor[:, :, :, channel_index, ...]
+        )
+        if not expect_ensemble:
+            mask_weight_tensor = mask_weight_tensor[..., 0]
+
+        relevant_prediction_tensor = tensorflow.boolean_mask(
+            relevant_prediction_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
+
+        return K.min(relevant_prediction_tensor)
 
     metric.__name__ = function_name
     return metric
@@ -299,6 +341,9 @@ def spatial_min_bias(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -321,7 +366,17 @@ def spatial_min_bias(
         else:
             relevant_prediction_tensor = prediction_tensor[..., channel_index]
 
-        relevant_target_tensor = target_tensor[..., channel_index]
+        relevant_target_tensor = relevant_target_tensor[..., channel_index]
+        mask_weight_tensor = mask_weight_tensor[..., 0]
+
+        relevant_prediction_tensor = tensorflow.boolean_mask(
+            relevant_prediction_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
+        relevant_target_tensor = tensorflow.boolean_mask(
+            relevant_target_tensor,
+            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        )
 
         min_predictions = K.min(relevant_prediction_tensor, axis=(1, 2))
         min_targets = K.min(relevant_target_tensor, axis=(1, 2))
@@ -373,6 +428,9 @@ def mean_squared_error(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -400,11 +458,15 @@ def mean_squared_error(
             relevant_prediction_tensor = (
                 prediction_tensor[:, :, :, channel_index]
             )
+            mask_weight_tensor = mask_weight_tensor[..., 0]
 
         squared_error_tensor = (
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
-        return K.mean(squared_error_tensor)
+        return (
+            K.sum(mask_weight_tensor * squared_error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(squared_error_tensor))
+        )
 
     metric.__name__ = function_name
     return metric
@@ -452,6 +514,9 @@ def dual_weighted_mse(
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
+        mask_weight_tensor = target_tensor[..., [-1]]
+        relevant_target_tensor = target_tensor[..., :-1]
+
         if channel_index == dewpoint_index:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -479,6 +544,7 @@ def dual_weighted_mse(
             relevant_prediction_tensor = (
                 prediction_tensor[:, :, :, channel_index]
             )
+            mask_weight_tensor = mask_weight_tensor[..., 0]
 
         dual_weight_tensor = K.maximum(
             K.abs(relevant_target_tensor),
@@ -488,8 +554,10 @@ def dual_weighted_mse(
             dual_weight_tensor *
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
-
-        return K.mean(error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     metric.__name__ = function_name
     return metric

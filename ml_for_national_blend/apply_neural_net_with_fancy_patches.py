@@ -4,6 +4,7 @@ import os
 import sys
 import copy
 import argparse
+import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -19,6 +20,8 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 NUM_EXAMPLES_PER_BATCH = 5
+
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 # TODO(thunderhoser): Need to deal with possibility that targets are normalized,
 # i.e., might need to denormalize predictions.
@@ -220,10 +223,13 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         )
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-    target_matrix = data_dict[neural_net.TARGET_MATRIX_KEY]
+    target_matrix_with_mask = data_dict[neural_net.TARGET_MATRIX_KEY]
     init_times_unix_sec = data_dict[neural_net.INIT_TIMES_KEY]
     latitude_matrix_deg_n = data_dict[neural_net.LATITUDE_MATRIX_KEY]
     longitude_matrix_deg_e = data_dict[neural_net.LONGITUDE_MATRIX_KEY]
+
+    target_matrix = target_matrix_with_mask[..., :-1]
+    mask_matrix = target_matrix_with_mask[..., -1] >= MASK_PIXEL_IF_WEIGHT_BELOW
 
     vod = validation_option_dict
 
@@ -232,11 +238,8 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             model_object=model_object,
             full_predictor_matrices=predictor_matrices,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
+            model_metadata_dict=model_metadata_dict,
             verbose=True,
-            predict_dewpoint_depression=
-            vod[neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY],
-            predict_gust_factor=vod[neural_net.PREDICT_GUST_FACTOR_KEY],
-            target_field_names=vod[neural_net.TARGET_FIELDS_KEY],
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
             use_trapezoidal_weighting=use_trapezoidal_weighting
         )
@@ -251,6 +254,11 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             predict_gust_factor=vod[neural_net.PREDICT_GUST_FACTOR_KEY],
             target_field_names=vod[neural_net.TARGET_FIELDS_KEY]
         )
+
+        while len(mask_matrix.shape) < len(prediction_matrix.shape):
+            mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
+
+        prediction_matrix[mask_matrix == False] = numpy.nan
 
     output_file_name = prediction_io.find_file(
         directory_name=output_dir_name,
