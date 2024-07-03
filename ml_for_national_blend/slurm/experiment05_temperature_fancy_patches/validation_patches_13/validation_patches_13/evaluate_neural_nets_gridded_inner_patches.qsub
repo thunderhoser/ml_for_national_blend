@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#SBATCH --job-name="evaluate_neural_nets_gridded_subset"
-#SBATCH --partition="bigmem"
-#SBATCH --account="gsd-hpcs"
-#SBATCH --qos="batch"
+#SBATCH --job-name="evaluate_neural_nets_gridded_inner_patches"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=evaluate_neural_nets_gridded_subset_%A_%a.out
+#SBATCH --output=evaluate_neural_nets_gridded_inner_patches_%A_%a.out
 
 conda init
 conda activate base
@@ -43,7 +43,7 @@ num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}_num-nwp-lead-times=${num_nwp_lead_times}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+python3 -u "${CODE_DIR_NAME}/evaluate_model_inner_patches_simple.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_patches" \
 --first_init_time_string_by_period "2022-01-01-00" "2022-01-01-12" "2022-01-06-12" "2022-01-06-18" "2022-01-11-06" "2022-01-11-12" "2022-01-16-06" "2022-01-26-00" "2022-01-26-18" "2022-02-15-18" "2022-02-20-06" "2022-03-02-00" "2022-03-02-12" "2022-03-07-18" "2022-03-17-00" "2022-03-17-12" "2022-03-17-18" "2022-04-06-00" "2022-04-21-00" "2022-05-06-00" "2022-05-06-12" "2022-05-11-18" "2022-05-26-00" "2022-05-31-00" "2022-05-31-06" "2022-05-31-12" "2022-06-10-00" "2022-06-20-12" "2022-07-05-12" "2022-07-10-06" "2022-07-10-12" "2022-07-15-18" "2022-07-20-12" "2022-07-30-00" "2022-08-04-18" "2022-08-14-18" "2022-08-19-00" "2022-09-03-12" "2022-09-08-00" "2022-09-08-12" "2022-09-08-18" "2022-09-13-06" "2022-09-13-18" "2022-09-18-00" "2022-09-18-18" "2022-10-03-12" "2022-10-18-12" "2022-10-23-00" "2022-10-23-12" "2022-10-28-00" "2022-11-01-12" "2022-11-06-12" "2022-11-11-12" "2022-11-26-00" "2022-12-06-12" "2022-12-11-18" "2022-12-16-00" "2022-12-26-12" "2022-12-31-06" "2022-12-31-18" \
 --last_init_time_string_by_period "2022-01-01-00" "2022-01-01-12" "2022-01-06-12" "2022-01-06-18" "2022-01-11-06" "2022-01-11-12" "2022-01-16-06" "2022-01-26-00" "2022-01-26-18" "2022-02-15-18" "2022-02-20-06" "2022-03-02-00" "2022-03-02-12" "2022-03-07-18" "2022-03-17-00" "2022-03-17-12" "2022-03-17-18" "2022-04-06-00" "2022-04-21-00" "2022-05-06-00" "2022-05-06-12" "2022-05-11-18" "2022-05-26-00" "2022-05-31-00" "2022-05-31-06" "2022-05-31-12" "2022-06-10-00" "2022-06-20-12" "2022-07-05-12" "2022-07-10-06" "2022-07-10-12" "2022-07-15-18" "2022-07-20-12" "2022-07-30-00" "2022-08-04-18" "2022-08-14-18" "2022-08-19-00" "2022-09-03-12" "2022-09-08-00" "2022-09-08-12" "2022-09-08-18" "2022-09-13-06" "2022-09-13-18" "2022-09-18-00" "2022-09-18-18" "2022-10-03-12" "2022-10-18-12" "2022-10-23-00" "2022-10-23-12" "2022-10-28-00" "2022-11-01-12" "2022-11-06-12" "2022-11-11-12" "2022-11-26-00" "2022-12-06-12" "2022-12-11-18" "2022-12-16-00" "2022-12-26-12" "2022-12-31-06" "2022-12-31-18" \
@@ -53,5 +53,4 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --num_relia_bins_by_target 65 \
 --min_relia_bin_edge_by_target -30 \
 --max_relia_bin_edge_by_target 35 \
---per_grid_cell=1 \
---output_file_name="${model_dir_name}/validation_patches/gridded_evaluation_subset.nc"
+--output_file_name="${model_dir_name}/validation_inner_patches/gridded_evaluation.nc"
