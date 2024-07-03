@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="evaluate_neural_nets_ungridded"
+#SBATCH --job-name="plot_evaluation_ungridded_simple"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
@@ -9,14 +9,14 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=08:00:00
+#SBATCH --time=01:00:00
 #SBATCH --array=13
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=evaluate_neural_nets_ungridded_%A_%a.out
+#SBATCH --output=plot_evaluation_ungridded_simple_%A_%a.out
 
 conda init
 conda activate base
@@ -43,15 +43,13 @@ num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}_num-nwp-lead-times=${num_nwp_lead_times}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
---input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
---first_init_time_string_by_period "2022-01-01-00" \
---last_init_time_string_by_period "2022-12-31-18" \
---num_bootstrap_reps=1 \
---target_field_names "temperature_2m_agl_kelvins" \
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+--input_eval_file_names "${model_dir_name}/validation_full_grid/ungridded_evaluation_simple.nc" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
---num_relia_bins_by_target 65 \
---min_relia_bin_edge_by_target -30 \
---max_relia_bin_edge_by_target 35 \
---per_grid_cell=0 \
---output_file_name="${model_dir_name}/validation_full_grid/ungridded_evaluation.nc"
+--line_styles "solid" \
+--line_colours "217_95_2" \
+--set_descriptions "model" \
+--plot_full_error_distributions=1 \
+--confidence_level=0.95 \
+--report_metrics_in_titles=1 \
+--output_dir_name="${model_dir_name}/validation_full_grid/ungridded_evaluation_simple"

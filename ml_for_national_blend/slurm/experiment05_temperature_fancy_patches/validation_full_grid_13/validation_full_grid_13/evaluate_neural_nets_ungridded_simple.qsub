@@ -1,22 +1,22 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_predictions"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --job-name="evaluate_neural_nets_ungridded_simple"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=12:00:00
-#SBATCH --array=0
+#SBATCH --time=01:00:00
+#SBATCH --array=13
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_predictions_%A_%a.out
+#SBATCH --output=evaluate_neural_nets_ungridded_simple_%A_%a.out
 
 conda init
 conda activate base
@@ -30,6 +30,7 @@ echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment05_temperature_fancy_patches"
+TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
 BATCH_SIZES=("025" "025" "025" "050" "050" "050" "075" "075" "075" "100" "100" "100" "025" "025" "025" "050" "050" "050" "075" "075" "075" "100" "100" "100" "025" "025" "025" "050" "050" "050" "075" "075" "075" "100" "100" "100" "025" "025" "025" "050" "050" "050" "075" "075" "075" "100" "100" "100" "025" "025" "025" "050" "050" "050" "075" "075" "075" "100" "100" "100")
 L2_WEIGHTS=("0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000")
@@ -42,21 +43,16 @@ num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}_num-nwp-lead-times=${num_nwp_lead_times}"
 echo $model_dir_name
 
-INIT_TIME_STRINGS=("2022-01-01-18" "2022-01-11-18" "2022-01-31-12" "2022-02-05-06" "2022-02-10-06" "2022-02-15-00" "2022-02-15-18" "2022-03-02-06" "2022-03-07-06" "2022-03-17-00" "2022-03-22-12" "2022-03-27-06" "2022-04-01-00" "2022-04-01-06" "2022-04-06-00" "2022-04-11-00" "2022-04-11-12" "2022-04-16-06" "2022-04-21-06" "2022-05-06-00" "2022-05-06-06" "2022-05-11-18" "2022-05-26-06" "2022-06-05-18" "2022-06-10-06" "2022-06-15-12" "2022-06-15-18" "2022-06-25-18" "2022-07-05-18" "2022-07-10-06" "2022-07-20-00" "2022-07-30-18" "2022-08-09-06" "2022-08-09-12" "2022-08-14-06" "2022-08-19-18" "2022-09-08-12" "2022-09-13-12" "2022-09-13-18" "2022-09-18-12" "2022-09-18-18" "2022-09-23-18" "2022-09-28-06" "2022-10-03-06" "2022-10-03-12" "2022-10-08-12" "2022-10-13-00" "2022-10-23-00" "2022-10-23-06" "2022-10-23-18" "2022-10-28-00" "2022-10-28-12" "2022-11-06-12" "2022-11-06-18" "2022-11-16-06" "2022-11-26-06" "2022-11-26-18" "2022-12-06-06" "2022-12-06-18" "2022-12-11-00" "2022-12-16-06" "2022-12-21-06" "2022-12-21-18" "2022-12-31-12")
-i=0
-
-while [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
-    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
-    --init_time_string="${INIT_TIME_STRINGS[$i]}" \
-    --field_names "temperature_2m_agl_kelvins"  \
-    --min_colour_percentiles 0.1 \
-    --max_colour_percentiles 99.9 \
-    --plot_diffs=1 \
-    --max_colour_percentiles_for_diff 99.9 \
-    --baseline_nwp_model_name="ensemble" \
-    --baseline_nwp_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid" \
-    --output_dir_name="${model_dir_name}/validation_full_grid/${INIT_TIME_STRINGS[$i]}"
-    
-    i=$(( $i + 1 ))
-done
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
+--first_init_time_string_by_period "2022-01-01-00" \
+--last_init_time_string_by_period "2022-12-31-18" \
+--num_bootstrap_reps=1 \
+--target_field_names "temperature_2m_agl_kelvins" \
+--input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+--num_relia_bins_by_target 65 \
+--min_relia_bin_edge_by_target -30 \
+--max_relia_bin_edge_by_target 35 \
+--per_grid_cell=0 \
+--keep_it_simple=1 \
+--output_file_name="${model_dir_name}/validation_full_grid/ungridded_evaluation_simple.nc"

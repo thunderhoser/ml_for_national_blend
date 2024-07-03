@@ -1,22 +1,22 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_evaluation_ungridded"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --job-name="plot_evaluation_ungridded_simple"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=12:00:00
+#SBATCH --time=01:00:00
 #SBATCH --array=13
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_ungridded_%A_%a.out
+#SBATCH --output=plot_evaluation_ungridded_simple_%A_%a.out
 
 conda init
 conda activate base
@@ -44,7 +44,7 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_we
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
---input_eval_file_names "${model_dir_name}/validation_full_grid/ungridded_evaluation.nc" \
+--input_eval_file_names "${model_dir_name}/validation_patches/ungridded_evaluation_simple.nc" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
 --line_styles "solid" \
 --line_colours "217_95_2" \
@@ -52,4 +52,4 @@ python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
 --plot_full_error_distributions=1 \
 --confidence_level=0.95 \
 --report_metrics_in_titles=1 \
---output_dir_name="${model_dir_name}/validation_full_grid/ungridded_evaluation"
+--output_dir_name="${model_dir_name}/validation_patches/ungridded_evaluation_simple"
