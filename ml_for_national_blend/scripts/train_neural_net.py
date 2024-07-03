@@ -60,6 +60,7 @@ def _run(template_file_name, output_dir_name,
          num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
+         require_all_predictors,
          predict_dewpoint_depression, predict_gust_factor,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
@@ -96,6 +97,7 @@ def _run(template_file_name, output_dir_name,
     :param patch_buffer_size_2pt5km_pixels: Same.
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
+    :param require_all_predictors: Same.
     :param predict_dewpoint_depression: Same.
     :param predict_gust_factor: Same.
     :param do_residual_prediction: Same.
@@ -190,7 +192,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
-        neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels
+        neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
     }
 
     validation_option_dict = {
@@ -293,6 +296,9 @@ if __name__ == '__main__':
         patch_overlap_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_OVERLAP_SIZE_ARG_NAME
         ),
+        require_all_predictors=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.REQUIRE_ALL_PREDICTORS_ARG_NAME
+        )),
         predict_dewpoint_depression=bool(getattr(
             INPUT_ARG_OBJECT, training_args.PREDICT_DEWPOINT_DEPRESSION_ARG_NAME
         )),

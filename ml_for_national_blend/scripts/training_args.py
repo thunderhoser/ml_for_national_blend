@@ -23,6 +23,7 @@ PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
 PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'
 USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
+REQUIRE_ALL_PREDICTORS_ARG_NAME = 'require_all_predictors'
 
 PREDICT_DEWPOINT_DEPRESSION_ARG_NAME = 'predict_dewpoint_depression'
 PREDICT_GUST_FACTOR_ARG_NAME = 'predict_gust_factor'
@@ -147,6 +148,11 @@ PATCH_OVERLAP_SIZE_HELP_STRING = (
     'number of pixels on the finest-resolution (2.5-km) grid.'
 ).format(
     USE_FAST_PATCH_GENERATOR_ARG_NAME
+)
+REQUIRE_ALL_PREDICTORS_HELP_STRING = (
+    'Boolean flag.  If 1, only data samples where all NWP predictors are found '
+    'will be used.  If 0, any data sample where *some* NWP predictors are '
+    'found will be used.'
 )
 
 PREDICT_DEWPOINT_DEPRESSION_HELP_STRING = (
@@ -325,6 +331,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=int, required=False,
         default=-1, help=PATCH_OVERLAP_SIZE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + REQUIRE_ALL_PREDICTORS_ARG_NAME, type=int, required=True,
+        help=REQUIRE_ALL_PREDICTORS_HELP_STRING
     )
 
     parser_object.add_argument(

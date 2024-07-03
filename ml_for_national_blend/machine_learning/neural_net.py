@@ -54,6 +54,7 @@ BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 PATCH_SIZE_KEY = 'patch_size_2pt5km_pixels'
 PATCH_BUFFER_SIZE_KEY = 'patch_buffer_size_2pt5km_pixels'
+REQUIRE_ALL_PREDICTORS_KEY = 'require_all_predictors'
 
 PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
 PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
@@ -1338,6 +1339,8 @@ def _read_predictors_one_example(
     :return: found_any_predictors: Boolean flag.  If True, at least one output
         matrix contains a real value.  If False, the output matrices are all NaN
         or None.
+    :return: found_all_predictors: Boolean flag.  If True, there are no "NaN"s
+        in the predictor matrices.
     """
 
     num_nwp_models = len(nwp_model_names)
@@ -1485,12 +1488,16 @@ def _read_predictors_one_example(
                 )
 
     found_any_predictors = False
+    found_all_predictors = False
 
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
     else:
         predictor_matrix_2pt5km = numpy.concatenate(
             predictor_matrices_2pt5km, axis=-1
+        )
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_2pt5km)
         )
         predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_2pt5km,
@@ -1506,6 +1513,9 @@ def _read_predictors_one_example(
         predictor_matrix_10km = numpy.concatenate(
             predictor_matrices_10km, axis=-1
         )
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_10km)
+        )
         predictor_matrix_10km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_10km,
             lead_times_hours=nwp_lead_times_hours
@@ -1519,6 +1529,9 @@ def _read_predictors_one_example(
     else:
         predictor_matrix_20km = numpy.concatenate(
             predictor_matrices_20km, axis=-1
+        )
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_20km)
         )
         predictor_matrix_20km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_20km,
@@ -1534,6 +1547,9 @@ def _read_predictors_one_example(
         predictor_matrix_40km = numpy.concatenate(
             predictor_matrices_40km, axis=-1
         )
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_40km)
+        )
         predictor_matrix_40km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_40km,
             lead_times_hours=nwp_lead_times_hours
@@ -1545,7 +1561,7 @@ def _read_predictors_one_example(
     return (
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        found_any_predictors
+        found_any_predictors, found_all_predictors
     )
 
 
@@ -1640,6 +1656,7 @@ def create_data(option_dict, init_time_unix_sec):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+    require_all_predictors = option_dict[REQUIRE_ALL_PREDICTORS_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -1796,7 +1813,8 @@ def create_data(option_dict, init_time_unix_sec):
             predictor_matrix_10km,
             predictor_matrix_20km,
             predictor_matrix_40km,
-            found_any_predictors
+            found_any_predictors,
+            found_all_predictors
         ) = _read_predictors_one_example(
             init_time_unix_sec=init_time_unix_sec,
             nwp_model_names=nwp_model_names,
@@ -1823,8 +1841,11 @@ def create_data(option_dict, init_time_unix_sec):
         predictor_matrix_20km = None
         predictor_matrix_40km = None
         found_any_predictors = False
+        found_all_predictors = False
 
     if not found_any_predictors:
+        return None
+    if require_all_predictors and not found_all_predictors:
         return None
 
     if predictor_matrix_2pt5km is not None:
@@ -2009,6 +2030,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+    require_all_predictors = option_dict[REQUIRE_ALL_PREDICTORS_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -2136,7 +2158,8 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             full_predictor_matrix_10km,
             full_predictor_matrix_20km,
             full_predictor_matrix_40km,
-            found_any_predictors
+            found_any_predictors,
+            found_all_predictors
         ) = _read_predictors_one_example(
             init_time_unix_sec=init_time_unix_sec,
             nwp_model_names=nwp_model_names,
@@ -2162,6 +2185,8 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         return None
 
     if not found_any_predictors:
+        return None
+    if require_all_predictors and not found_all_predictors:
         return None
 
     patch_metalocation_dict = __init_patch_metalocation_dict(
@@ -2427,6 +2452,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+    require_all_predictors = option_dict[REQUIRE_ALL_PREDICTORS_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -2671,7 +2697,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         full_predictor_matrix_10km,
                         full_predictor_matrix_20km,
                         full_predictor_matrix_40km,
-                        found_any_predictors
+                        found_any_predictors,
+                        found_all_predictors
                     ) = _read_predictors_one_example(
                         init_time_unix_sec=init_times_unix_sec[init_time_index],
                         nwp_model_names=nwp_model_names,
@@ -2684,6 +2711,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                     )
                 else:
                     found_any_predictors = True
+                    found_all_predictors = True
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read predictors for init time '
@@ -2703,8 +2731,16 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
                 found_any_predictors = False
+                found_all_predictors = False
 
             if not found_any_predictors:
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            if require_all_predictors and not found_all_predictors:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -3052,6 +3088,7 @@ def data_generator(option_dict):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+    require_all_predictors = option_dict[REQUIRE_ALL_PREDICTORS_KEY]
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
@@ -3265,7 +3302,8 @@ def data_generator(option_dict):
                     this_predictor_matrix_10km,
                     this_predictor_matrix_20km,
                     this_predictor_matrix_40km,
-                    found_any_predictors
+                    found_any_predictors,
+                    found_all_predictors
                 ) = _read_predictors_one_example(
                     init_time_unix_sec=init_times_unix_sec[init_time_index],
                     nwp_model_names=nwp_model_names,
@@ -3293,8 +3331,13 @@ def data_generator(option_dict):
                 this_predictor_matrix_20km = None
                 this_predictor_matrix_40km = None
                 found_any_predictors = False
+                found_all_predictors = False
 
             if not found_any_predictors:
+                init_time_index += 1
+                continue
+
+            if require_all_predictors and not found_all_predictors:
                 init_time_index += 1
                 continue
 
@@ -3970,6 +4013,9 @@ def read_metafile(pickle_file_name):
     if PATCH_BUFFER_SIZE_KEY not in training_option_dict:
         training_option_dict[PATCH_BUFFER_SIZE_KEY] = 0
         validation_option_dict[PATCH_BUFFER_SIZE_KEY] = 0
+    if REQUIRE_ALL_PREDICTORS_KEY not in training_option_dict:
+        training_option_dict[REQUIRE_ALL_PREDICTORS_KEY] = False
+        validation_option_dict[REQUIRE_ALL_PREDICTORS_KEY] = False
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
