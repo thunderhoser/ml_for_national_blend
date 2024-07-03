@@ -3677,8 +3677,9 @@ def apply_patchwise_model_to_full_grid(
             patch_size_2pt5km_pixels=num_rows_in_patch,
             patch_buffer_size_2pt5km_pixels=patch_buffer_size
         )
-        print('SHAPE')
-        print(weight_matrix.shape)
+
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
 
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
@@ -3686,7 +3687,6 @@ def apply_patchwise_model_to_full_grid(
     )
     summed_prediction_matrix = numpy.full(these_dim, 0.)
     prediction_count_matrix = numpy.full(these_dim, 0, dtype=float)
-    print(prediction_count_matrix.shape)
 
     while True:
         patch_metalocation_dict = __update_patch_metalocation_dict(
@@ -3769,10 +3769,6 @@ def apply_patchwise_model_to_full_grid(
             target_field_names=validation_option_dict[TARGET_FIELDS_KEY],
             verbose=False
         )
-
-        print(summed_prediction_matrix.shape)
-        print(patch_prediction_matrix.shape)
-
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
             patch_prediction_matrix
         )
