@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_evaluation_gridded_subset"
+#SBATCH --job-name="plot_evaluation_gridded_subset_simple"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_gridded_subset_%A_%a.out
+#SBATCH --output=plot_evaluation_gridded_subset_simple_%A_%a.out
 
 conda init
 conda activate base
@@ -44,8 +44,8 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_we
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
---input_evaluation_file_name="${model_dir_name}/validation_patches/gridded_evaluation_subset.nc" \
+--input_evaluation_file_name="${model_dir_name}/validation_patches/gridded_evaluation_subset_simple.nc" \
 --metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" \
 --min_colour_percentiles 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 \
 --max_colour_percentiles 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 \
---output_dir_name="${model_dir_name}/validation_patches/gridded_evaluation_subset"
+--output_dir_name="${model_dir_name}/validation_patches/gridded_evaluation_subset_simple"
