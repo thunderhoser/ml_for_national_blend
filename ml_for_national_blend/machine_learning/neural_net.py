@@ -3671,6 +3671,9 @@ def apply_patchwise_model_to_full_grid(
             patch_buffer_size_2pt5km_pixels=patch_buffer_size
         )
 
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
         num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields
@@ -3759,7 +3762,7 @@ def apply_patchwise_model_to_full_grid(
         )
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
-            patch_prediction_matrix
+            weight_matrix * patch_prediction_matrix
         )
         prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
             weight_matrix

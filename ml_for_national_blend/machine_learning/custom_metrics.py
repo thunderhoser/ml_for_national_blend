@@ -7,6 +7,8 @@ from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.machine_learning import custom_losses
 
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
+LARGE_NEGATIVE_VALUE = -1e6
+LARGE_POSITIVE_VALUE = 1e6
 
 
 def _check_index_args(u_wind_index, v_wind_index, gust_index,
@@ -200,13 +202,15 @@ def spatial_max_bias(
         relevant_target_tensor = relevant_target_tensor[..., channel_index]
         mask_weight_tensor = mask_weight_tensor[..., 0]
 
-        relevant_prediction_tensor = tensorflow.boolean_mask(
-            relevant_prediction_tensor,
-            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        relevant_prediction_tensor = tensorflow.where(
+            mask_weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            LARGE_NEGATIVE_VALUE,
+            relevant_prediction_tensor
         )
-        relevant_target_tensor = tensorflow.boolean_mask(
-            relevant_target_tensor,
-            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        relevant_target_tensor = tensorflow.where(
+            mask_weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            LARGE_NEGATIVE_VALUE,
+            relevant_target_tensor
         )
 
         max_predictions = K.max(relevant_prediction_tensor, axis=(1, 2))
@@ -361,13 +365,15 @@ def spatial_min_bias(
         relevant_target_tensor = relevant_target_tensor[..., channel_index]
         mask_weight_tensor = mask_weight_tensor[..., 0]
 
-        relevant_prediction_tensor = tensorflow.boolean_mask(
-            relevant_prediction_tensor,
-            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        relevant_prediction_tensor = tensorflow.where(
+            mask_weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            LARGE_POSITIVE_VALUE,
+            relevant_prediction_tensor
         )
-        relevant_target_tensor = tensorflow.boolean_mask(
-            relevant_target_tensor,
-            mask_weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW
+        relevant_target_tensor = tensorflow.where(
+            mask_weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            LARGE_POSITIVE_VALUE,
+            relevant_target_tensor
         )
 
         min_predictions = K.min(relevant_prediction_tensor, axis=(1, 2))
