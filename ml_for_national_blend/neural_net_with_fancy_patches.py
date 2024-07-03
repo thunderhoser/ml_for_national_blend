@@ -3769,11 +3769,9 @@ def apply_patchwise_model_to_full_grid(
             target_field_names=validation_option_dict[TARGET_FIELDS_KEY],
             verbose=False
         )
-        print(numpy.nanmin(patch_prediction_matrix))
-        print(numpy.nanmax(patch_prediction_matrix))
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
-            patch_prediction_matrix
+            weight_matrix * patch_prediction_matrix
         )
         prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
             weight_matrix
