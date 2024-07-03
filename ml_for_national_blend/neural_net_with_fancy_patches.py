@@ -3770,6 +3770,9 @@ def apply_patchwise_model_to_full_grid(
             verbose=False
         )
 
+        print(summed_prediction_matrix.shape)
+        print(patch_prediction_matrix.shape)
+
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
             patch_prediction_matrix
         )
