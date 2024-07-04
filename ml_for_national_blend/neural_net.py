@@ -2646,13 +2646,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
 
                 warnings.warn(warning_string)
                 full_target_matrix = None
+
+            if full_target_matrix is None:
+                full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
-            if full_target_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2694,6 +2696,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
+                full_baseline_matrix = None
+
+            if full_baseline_matrix is None:
                 full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
@@ -2701,7 +2706,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
-            if full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2747,16 +2751,17 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
+                found_any_predictors = False
+                found_all_predictors = False
+
+            if not found_any_predictors:
                 full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
-                found_any_predictors = False
-                found_all_predictors = False
 
-            if not found_any_predictors:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2764,6 +2769,13 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 continue
 
             if require_all_predictors and not found_all_predictors:
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
