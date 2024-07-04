@@ -34,6 +34,7 @@ import custom_losses
 import custom_metrics
 
 TOLERANCE = 1e-6
+MAX_ACCEPTABLE_NAN_FRACTION = 0.05
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
@@ -1503,8 +1504,9 @@ def _read_predictors_one_example(
         predictor_matrix_2pt5km = numpy.concatenate(
             predictor_matrices_2pt5km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_2pt5km)
+        found_all_predictors &= (
+            numpy.mean(numpy.isnan(predictor_matrix_2pt5km)) <
+            MAX_ACCEPTABLE_NAN_FRACTION
         )
         predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_2pt5km,
@@ -1520,8 +1522,9 @@ def _read_predictors_one_example(
         predictor_matrix_10km = numpy.concatenate(
             predictor_matrices_10km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_10km)
+        found_all_predictors &= (
+            numpy.mean(numpy.isnan(predictor_matrix_10km)) <
+            MAX_ACCEPTABLE_NAN_FRACTION
         )
         predictor_matrix_10km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_10km,
@@ -1537,8 +1540,9 @@ def _read_predictors_one_example(
         predictor_matrix_20km = numpy.concatenate(
             predictor_matrices_20km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_20km)
+        found_all_predictors &= (
+            numpy.mean(numpy.isnan(predictor_matrix_20km)) <
+            MAX_ACCEPTABLE_NAN_FRACTION
         )
         predictor_matrix_20km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_20km,
@@ -1554,8 +1558,9 @@ def _read_predictors_one_example(
         predictor_matrix_40km = numpy.concatenate(
             predictor_matrices_40km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_40km)
+        found_all_predictors &= (
+            numpy.mean(numpy.isnan(predictor_matrix_40km)) <
+            MAX_ACCEPTABLE_NAN_FRACTION
         )
         predictor_matrix_40km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_40km,

@@ -37,7 +37,7 @@ TARGET_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_pr
 NWP_NORMALIZATION_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/normalization_params_long300_20170101-20211220.nc"
 NBM_CONSTANT_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nbm_constants/nbm_constants_quantile_normalized.nc"
 
-NWP_MODEL_TO_FIELDS_DICT='{"hrrr":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"]}'
+NWP_MODEL_TO_FIELDS_DICT='{"wrf_arw":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"]}'
 
 BATCH_SIZES=("025" "050" "075" "100" "025" "050" "075" "100")
 GRAD_ACCUM_STEP_COUNTS=(5 10 15 20 5 10 15 20 5 10 15 20 5 10 15 20)
@@ -63,7 +63,7 @@ while true; do
     --input_template_file_name="${input_model_file_name}" \
     --output_model_dir_name="${output_dir_name}" \
     --nwp_lead_times_hours 48 \
-    --nwp_model_names "hrrr" \
+    --nwp_model_names "wrf_arw" \
     --nwp_model_to_field_names=${NWP_MODEL_TO_FIELDS_DICT} \
     --nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
     --nwp_use_quantile_norm=1 \
