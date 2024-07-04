@@ -2708,80 +2708,53 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
                 continue
 
-            if full_predictor_matrix_2pt5km is None:
-                (
-                    full_predictor_matrix_2pt5km,
-                    full_predictor_matrix_10km,
-                    full_predictor_matrix_20km,
-                    full_predictor_matrix_40km,
-                    found_any_predictors,
-                    found_all_predictors
-                ) = _read_predictors_one_example(
-                    init_time_unix_sec=init_times_unix_sec[init_time_index],
-                    nwp_model_names=nwp_model_names,
-                    nwp_lead_times_hours=nwp_lead_times_hours,
-                    nwp_model_to_field_names=nwp_model_to_field_names,
-                    nwp_model_to_dir_name=nwp_model_to_dir_name,
-                    nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-                    use_quantile_norm=nwp_use_quantile_norm,
-                    patch_location_dict=None
+            try:
+                if full_predictor_matrix_2pt5km is None:
+                    (
+                        full_predictor_matrix_2pt5km,
+                        full_predictor_matrix_10km,
+                        full_predictor_matrix_20km,
+                        full_predictor_matrix_40km,
+                        found_any_predictors,
+                        found_all_predictors
+                    ) = _read_predictors_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_names=nwp_model_names,
+                        nwp_lead_times_hours=nwp_lead_times_hours,
+                        nwp_model_to_field_names=nwp_model_to_field_names,
+                        nwp_model_to_dir_name=nwp_model_to_dir_name,
+                        nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                        use_quantile_norm=nwp_use_quantile_norm,
+                        patch_location_dict=None
+                    )
+
+                    print('full_predictor_matrix_2pt5km NaN fraction = {0:.4f}'.format(
+                        numpy.mean(numpy.isnan(full_predictor_matrix_2pt5km))
+                    ))
+                    print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
+                else:
+                    found_any_predictors = True
+                    found_all_predictors = True
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read predictors for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`_read_predictors_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
                 )
 
-                print('full_predictor_matrix_2pt5km NaN fraction = {0:.f}'.format(
-                    numpy.mean(numpy.isnan(full_predictor_matrix_2pt5km))
-                ))
-                print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
-            else:
-                found_any_predictors = True
-                found_all_predictors = True
-
-            # try:
-            #     if full_predictor_matrix_2pt5km is None:
-            #         (
-            #             full_predictor_matrix_2pt5km,
-            #             full_predictor_matrix_10km,
-            #             full_predictor_matrix_20km,
-            #             full_predictor_matrix_40km,
-            #             found_any_predictors,
-            #             found_all_predictors
-            #         ) = _read_predictors_one_example(
-            #             init_time_unix_sec=init_times_unix_sec[init_time_index],
-            #             nwp_model_names=nwp_model_names,
-            #             nwp_lead_times_hours=nwp_lead_times_hours,
-            #             nwp_model_to_field_names=nwp_model_to_field_names,
-            #             nwp_model_to_dir_name=nwp_model_to_dir_name,
-            #             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-            #             use_quantile_norm=nwp_use_quantile_norm,
-            #             patch_location_dict=None
-            #         )
-            #
-            #         print('full_predictor_matrix_2pt5km NaN fraction = {0:.f}'.format(
-            #             numpy.mean(numpy.isnan(full_predictor_matrix_2pt5km))
-            #         ))
-            #         print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
-            #     else:
-            #         found_any_predictors = True
-            #         found_all_predictors = True
-            # except:
-            #     warning_string = (
-            #         'POTENTIAL ERROR: Could not read predictors for init time '
-            #         '{0:s}.  Something went wrong in '
-            #         '`_read_predictors_one_example`.'
-            #     ).format(
-            #         time_conversion.unix_sec_to_string(
-            #             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
-            #         )
-            #     )
-            #
-            #     warnings.warn(warning_string)
-            #     full_target_matrix = None
-            #     full_baseline_matrix = None
-            #     full_predictor_matrix_2pt5km = None
-            #     full_predictor_matrix_10km = None
-            #     full_predictor_matrix_20km = None
-            #     full_predictor_matrix_40km = None
-            #     found_any_predictors = False
-            #     found_all_predictors = False
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+                found_any_predictors = False
+                found_all_predictors = False
 
             if not found_any_predictors:
                 init_time_index, init_times_unix_sec = __increment_init_time(
