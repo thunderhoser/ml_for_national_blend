@@ -5,6 +5,7 @@ import sys
 import pickle
 import warnings
 import numpy
+import xarray
 import keras
 from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
@@ -1249,19 +1250,29 @@ def _read_residual_baseline_one_example(
             [nwp_model_utils.WIND_GUST_10METRE_NAME]
         )
 
-        nwpft.drop_vars(names=[nwp_model_utils.DATA_KEY])
-        nwpft = nwpft.assign_coords({
-            nwp_model_utils.FIELD_DIM: field_names
-        })
+        data_dict = {}
+        for var_name in nwpft.data_vars:
+            if var_name == nwp_model_utils.DATA_KEY:
+                data_dict[var_name] = (
+                    nwpft[var_name].dims, data_matrix
+                )
+            else:
+                data_dict[var_name] = (
+                    nwpft[var_name].dims, nwpft[var_name].values
+                )
 
-        these_dims = (
-            nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
-            nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+        coord_dict = {}
+        for coord_name in nwpft.coords:
+            if coord_name == nwp_model_utils.FIELD_DIM:
+                coord_dict[coord_name] = field_names
+            else:
+                coord_dict[coord_name] = (
+                    nwpft.coords[coord_name].values
+                )
+
+        nwpft = xarray.Dataset(
+            data_vars=data_dict, coords=coord_dict
         )
-        nwpft = nwpft.assign({
-            nwp_model_utils.DATA_KEY: (these_dims, data_matrix)
-        })
-
         nwp_forecast_table_xarray = nwpft
 
     if patch_location_dict is not None:
