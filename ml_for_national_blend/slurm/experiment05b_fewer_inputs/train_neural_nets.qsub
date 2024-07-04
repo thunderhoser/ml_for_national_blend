@@ -41,7 +41,7 @@ NWP_MODEL_TO_FIELDS_DICT='{"wrf_arw":["pressure_mean_sea_level_pascals","pressur
 
 BATCH_SIZES=("025" "050" "075" "100" "025" "050" "075" "100")
 GRAD_ACCUM_STEP_COUNTS=(5 10 15 20 5 10 15 20 5 10 15 20 5 10 15 20)
-RESID_BASELINE_MODEL_NAMES=("ensemble" "ensemble" "ensemble" "ensemble" "hrrr" "hrrr" "hrrr" "hrrr")
+RESID_BASELINE_MODEL_NAMES=("ensemble" "ensemble" "ensemble" "ensemble" "gridded_gfs_mos" "gridded_gfs_mos" "gridded_gfs_mos" "gridded_gfs_mos")
 
 batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
 num_grad_accum_steps=${GRAD_ACCUM_STEP_COUNTS[$SLURM_ARRAY_TASK_ID]}
