@@ -1495,7 +1495,7 @@ def _read_predictors_one_example(
                 )
 
     found_any_predictors = False
-    found_all_predictors = False
+    found_all_predictors = True
 
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
@@ -2659,47 +2659,47 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
                 continue
 
-            full_baseline_matrix = _read_residual_baseline_one_example(
-                init_time_unix_sec=init_times_unix_sec[init_time_index],
-                nwp_model_name=resid_baseline_model_name,
-                nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                nwp_directory_name=resid_baseline_model_dir_name,
-                target_field_names=target_field_names,
-                patch_location_dict=None,
-                predict_dewpoint_depression=predict_dewpoint_depression,
-                predict_gust_factor=predict_gust_factor
-            )
+            # full_baseline_matrix = _read_residual_baseline_one_example(
+            #     init_time_unix_sec=init_times_unix_sec[init_time_index],
+            #     nwp_model_name=resid_baseline_model_name,
+            #     nwp_lead_time_hours=resid_baseline_lead_time_hours,
+            #     nwp_directory_name=resid_baseline_model_dir_name,
+            #     target_field_names=target_field_names,
+            #     patch_location_dict=None,
+            #     predict_dewpoint_depression=predict_dewpoint_depression,
+            #     predict_gust_factor=predict_gust_factor
+            # )
 
-            # try:
-            #     if do_residual_prediction and full_baseline_matrix is None:
-            #         full_baseline_matrix = _read_residual_baseline_one_example(
-            #             init_time_unix_sec=init_times_unix_sec[init_time_index],
-            #             nwp_model_name=resid_baseline_model_name,
-            #             nwp_lead_time_hours=resid_baseline_lead_time_hours,
-            #             nwp_directory_name=resid_baseline_model_dir_name,
-            #             target_field_names=target_field_names,
-            #             patch_location_dict=None,
-            #             predict_dewpoint_depression=predict_dewpoint_depression,
-            #             predict_gust_factor=predict_gust_factor
-            #         )
-            # except:
-            #     warning_string = (
-            #         'POTENTIAL ERROR: Could not read residual baseline for '
-            #         'init time {0:s}.  Something went wrong in '
-            #         '`_read_residual_baseline_one_example`.'
-            #     ).format(
-            #         time_conversion.unix_sec_to_string(
-            #             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
-            #         )
-            #     )
-            #
-            #     warnings.warn(warning_string)
-            #     full_target_matrix = None
-            #     full_baseline_matrix = None
-            #     full_predictor_matrix_2pt5km = None
-            #     full_predictor_matrix_10km = None
-            #     full_predictor_matrix_20km = None
-            #     full_predictor_matrix_40km = None
+            try:
+                if do_residual_prediction and full_baseline_matrix is None:
+                    full_baseline_matrix = _read_residual_baseline_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_name=resid_baseline_model_name,
+                        nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                        nwp_directory_name=resid_baseline_model_dir_name,
+                        target_field_names=target_field_names,
+                        patch_location_dict=None,
+                        predict_dewpoint_depression=predict_dewpoint_depression,
+                        predict_gust_factor=predict_gust_factor
+                    )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read residual baseline for '
+                    'init time {0:s}.  Something went wrong in '
+                    '`_read_residual_baseline_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
 
             if full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
@@ -2727,6 +2727,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         use_quantile_norm=nwp_use_quantile_norm,
                         patch_location_dict=None
                     )
+
+                    print('full_predictor_matrix_2pt5km NaN fraction = {0:.f}'.format(
+                        numpy.mean(numpy.isnan(full_predictor_matrix_2pt5km))
+                    ))
+                    print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
                 else:
                     found_any_predictors = True
                     found_all_predictors = True
