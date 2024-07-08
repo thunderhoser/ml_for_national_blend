@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_neural_nets_ungridded_simple"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=01:00:00
+#SBATCH --array=3
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_neural_nets_ungridded_simple_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment05b_fewer_inputs"
+TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+BATCH_SIZES=("025" "050" "075" "100" "025" "050" "075" "100")
+GRAD_ACCUM_STEP_COUNTS=(5 10 15 20 5 10 15 20 5 10 15 20 5 10 15 20)
+RESID_BASELINE_MODEL_NAMES=("ensemble" "ensemble" "ensemble" "ensemble" "gridded_gfs_mos" "gridded_gfs_mos" "gridded_gfs_mos" "gridded_gfs_mos")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+num_grad_accum_steps=${GRAD_ACCUM_STEP_COUNTS[$SLURM_ARRAY_TASK_ID]}
+resid_baseline_model_name=${RESID_BASELINE_MODEL_NAMES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_resid-baseline-model-name=${resid_baseline_model_name}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
+--first_init_time_string_by_period "2022-01-01-00" \
+--last_init_time_string_by_period "2022-12-31-18" \
+--num_bootstrap_reps=1 \
+--target_field_names "temperature_2m_agl_kelvins" \
+--input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+--num_relia_bins_by_target 65 \
+--min_relia_bin_edge_by_target -30 \
+--max_relia_bin_edge_by_target 35 \
+--per_grid_cell=0 \
+--keep_it_simple=1 \
+--output_file_name="${model_dir_name}/validation_full_grid/ungridded_evaluation_simple.nc"
