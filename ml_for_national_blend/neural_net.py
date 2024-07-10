@@ -1507,7 +1507,7 @@ def _read_predictors_one_example(
         found_all_predictors &= not numpy.any(
             numpy.isnan(predictor_matrix_2pt5km)
         )
-        print(numpy.mean(numpy.isnan(numpy.isnan(predictor_matrix_2pt5km))))
+        print(numpy.mean(numpy.isnan(predictor_matrix_2pt5km)))
         print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
         predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_2pt5km,
