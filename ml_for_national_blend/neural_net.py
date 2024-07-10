@@ -5,7 +5,6 @@ import sys
 import pickle
 import warnings
 import numpy
-import xarray
 import keras
 from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
@@ -35,7 +34,6 @@ import custom_losses
 import custom_metrics
 
 TOLERANCE = 1e-6
-MAX_ACCEPTABLE_NAN_FRACTION = 0.05
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
@@ -1250,29 +1248,19 @@ def _read_residual_baseline_one_example(
             [nwp_model_utils.WIND_GUST_10METRE_NAME]
         )
 
-        data_dict = {}
-        for var_name in nwpft.data_vars:
-            if var_name == nwp_model_utils.DATA_KEY:
-                data_dict[var_name] = (
-                    nwpft[var_name].dims, data_matrix
-                )
-            else:
-                data_dict[var_name] = (
-                    nwpft[var_name].dims, nwpft[var_name].values
-                )
+        nwpft.drop_vars(names=[nwp_model_utils.DATA_KEY])
+        nwpft = nwpft.assign_coords({
+            nwp_model_utils.FIELD_DIM: field_names
+        })
 
-        coord_dict = {}
-        for coord_name in nwpft.coords:
-            if coord_name == nwp_model_utils.FIELD_DIM:
-                coord_dict[coord_name] = field_names
-            else:
-                coord_dict[coord_name] = (
-                    nwpft.coords[coord_name].values
-                )
-
-        nwpft = xarray.Dataset(
-            data_vars=data_dict, coords=coord_dict
+        these_dims = (
+            nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
+            nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
         )
+        nwpft = nwpft.assign({
+            nwp_model_utils.DATA_KEY: (these_dims, data_matrix)
+        })
+
         nwp_forecast_table_xarray = nwpft
 
     if patch_location_dict is not None:
@@ -1507,7 +1495,7 @@ def _read_predictors_one_example(
                 )
 
     found_any_predictors = False
-    found_all_predictors = True
+    found_all_predictors = False
 
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
@@ -1515,9 +1503,8 @@ def _read_predictors_one_example(
         predictor_matrix_2pt5km = numpy.concatenate(
             predictor_matrices_2pt5km, axis=-1
         )
-        found_all_predictors &= (
-            numpy.mean(numpy.isnan(predictor_matrix_2pt5km)) <
-            MAX_ACCEPTABLE_NAN_FRACTION
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_2pt5km)
         )
         predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_2pt5km,
@@ -1533,9 +1520,8 @@ def _read_predictors_one_example(
         predictor_matrix_10km = numpy.concatenate(
             predictor_matrices_10km, axis=-1
         )
-        found_all_predictors &= (
-            numpy.mean(numpy.isnan(predictor_matrix_10km)) <
-            MAX_ACCEPTABLE_NAN_FRACTION
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_10km)
         )
         predictor_matrix_10km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_10km,
@@ -1551,9 +1537,8 @@ def _read_predictors_one_example(
         predictor_matrix_20km = numpy.concatenate(
             predictor_matrices_20km, axis=-1
         )
-        found_all_predictors &= (
-            numpy.mean(numpy.isnan(predictor_matrix_20km)) <
-            MAX_ACCEPTABLE_NAN_FRACTION
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_20km)
         )
         predictor_matrix_20km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_20km,
@@ -1569,9 +1554,8 @@ def _read_predictors_one_example(
         predictor_matrix_40km = numpy.concatenate(
             predictor_matrices_40km, axis=-1
         )
-        found_all_predictors &= (
-            numpy.mean(numpy.isnan(predictor_matrix_40km)) <
-            MAX_ACCEPTABLE_NAN_FRACTION
+        found_all_predictors &= not numpy.any(
+            numpy.isnan(predictor_matrix_40km)
         )
         predictor_matrix_40km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_40km,
@@ -1614,16 +1598,31 @@ def _find_relevant_init_times(first_time_by_period_unix_sec,
     else:
         nn_init_time_interval_sec = 6 * HOURS_TO_SECONDS
 
-    relevant_init_times_unix_sec = numpy.concatenate([
-        time_periods.range_and_interval_to_list(
-            start_time_unix_sec=f,
-            end_time_unix_sec=l,
+    num_periods = len(first_time_by_period_unix_sec)
+    relevant_init_times_unix_sec = numpy.array([], dtype=int)
+
+    for i in range(num_periods):
+        these_init_times_unix_sec = time_periods.range_and_interval_to_list(
+            start_time_unix_sec=first_time_by_period_unix_sec[i],
+            end_time_unix_sec=last_time_by_period_unix_sec[i],
             time_interval_sec=nn_init_time_interval_sec,
             include_endpoint=True
         )
-        for f, l in
-        zip(first_time_by_period_unix_sec, last_time_by_period_unix_sec)
-    ])
+
+        # TODO(thunderhoser): This if-condition is designed to deal with a
+        # situation where nn_init_time_interval_sec = 43200 (12 hours) and
+        # first_init_time = last_init_time != a multiple of 12 hours.
+        if (
+                first_time_by_period_unix_sec[i] ==
+                last_time_by_period_unix_sec[i]
+                and first_time_by_period_unix_sec[i]
+                not in these_init_times_unix_sec
+        ):
+            continue
+
+        relevant_init_times_unix_sec = numpy.concatenate([
+            relevant_init_times_unix_sec, these_init_times_unix_sec
+        ])
 
     return misc_utils.remove_unused_days(relevant_init_times_unix_sec)
 
@@ -2662,15 +2661,13 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
 
                 warnings.warn(warning_string)
                 full_target_matrix = None
-
-            if full_target_matrix is None:
-                full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
+            if full_target_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2701,9 +2698,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
-                full_baseline_matrix = None
-
-            if full_baseline_matrix is None:
                 full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
@@ -2711,6 +2705,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
+            if full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2736,11 +2731,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         use_quantile_norm=nwp_use_quantile_norm,
                         patch_location_dict=None
                     )
-
-                    print('full_predictor_matrix_2pt5km NaN fraction = {0:.4f}'.format(
-                        numpy.mean(numpy.isnan(full_predictor_matrix_2pt5km))
-                    ))
-                    print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
                 else:
                     found_any_predictors = True
                     found_all_predictors = True
@@ -2756,17 +2746,16 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
 
                 warnings.warn(warning_string)
-                found_any_predictors = False
-                found_all_predictors = False
-
-            if not found_any_predictors:
                 full_target_matrix = None
                 full_baseline_matrix = None
                 full_predictor_matrix_2pt5km = None
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                found_any_predictors = False
+                found_all_predictors = False
 
+            if not found_any_predictors:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2774,13 +2763,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 continue
 
             if require_all_predictors and not found_all_predictors:
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec

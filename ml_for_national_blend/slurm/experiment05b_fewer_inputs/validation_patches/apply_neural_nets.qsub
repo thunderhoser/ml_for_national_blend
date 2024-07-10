@@ -48,7 +48,7 @@ INIT_TIME_STRINGS=("2022-01-01-00" "2022-01-01-06" "2022-01-01-12" "2022-01-01-1
 i=0
 
 while [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
-    python3 -u "${CODE_DIR_NAME}/apply_neural_net_with_fancy_patches.py" \
+    python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
     --input_model_file_name="${model_dir_name}/model.keras" \
     --init_time_string="${INIT_TIME_STRINGS[$i]}" \
     --nwp_model_names "wrf_arw" \
