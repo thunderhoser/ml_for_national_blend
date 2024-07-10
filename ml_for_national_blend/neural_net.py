@@ -1495,7 +1495,7 @@ def _read_predictors_one_example(
                 )
 
     found_any_predictors = False
-    found_all_predictors = False
+    found_all_predictors = True
 
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
