@@ -1496,7 +1496,6 @@ def _read_predictors_one_example(
 
     found_any_predictors = False
     found_all_predictors = True
-    print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
 
     if predictor_matrices_2pt5km is None:
         predictor_matrix_2pt5km = None
@@ -1504,11 +1503,15 @@ def _read_predictors_one_example(
         predictor_matrix_2pt5km = numpy.concatenate(
             predictor_matrices_2pt5km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_2pt5km)
+        nan_matrix = numpy.all(
+            numpy.isnan(predictor_matrix_2pt5km), axis=(0, 1)
         )
+        found_all_predictors &= not numpy.any(nan_matrix)
+
+        print(nan_matrix.shape)
         print(numpy.mean(numpy.isnan(predictor_matrix_2pt5km)))
         print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
+
         predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_2pt5km,
             lead_times_hours=nwp_lead_times_hours
@@ -1523,10 +1526,9 @@ def _read_predictors_one_example(
         predictor_matrix_10km = numpy.concatenate(
             predictor_matrices_10km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_10km)
-        )
-        print('found_all_predictors = {0:s}'.format('True' if found_all_predictors else 'False'))
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_10km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+
         predictor_matrix_10km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_10km,
             lead_times_hours=nwp_lead_times_hours
@@ -1541,9 +1543,9 @@ def _read_predictors_one_example(
         predictor_matrix_20km = numpy.concatenate(
             predictor_matrices_20km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_20km)
-        )
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_20km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+
         predictor_matrix_20km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_20km,
             lead_times_hours=nwp_lead_times_hours
@@ -1558,9 +1560,9 @@ def _read_predictors_one_example(
         predictor_matrix_40km = numpy.concatenate(
             predictor_matrices_40km, axis=-1
         )
-        found_all_predictors &= not numpy.any(
-            numpy.isnan(predictor_matrix_40km)
-        )
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_40km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+
         predictor_matrix_40km = __interp_predictors_by_lead_time(
             predictor_matrix=predictor_matrix_40km,
             lead_times_hours=nwp_lead_times_hours
