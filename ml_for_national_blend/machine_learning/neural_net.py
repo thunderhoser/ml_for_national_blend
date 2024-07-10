@@ -1591,16 +1591,31 @@ def _find_relevant_init_times(first_time_by_period_unix_sec,
     else:
         nn_init_time_interval_sec = 6 * HOURS_TO_SECONDS
 
-    relevant_init_times_unix_sec = numpy.concatenate([
-        time_periods.range_and_interval_to_list(
-            start_time_unix_sec=f,
-            end_time_unix_sec=l,
+    num_periods = len(first_time_by_period_unix_sec)
+    relevant_init_times_unix_sec = numpy.array([], dtype=int)
+
+    for i in range(num_periods):
+        these_init_times_unix_sec = time_periods.range_and_interval_to_list(
+            start_time_unix_sec=first_time_by_period_unix_sec[i],
+            end_time_unix_sec=last_time_by_period_unix_sec[i],
             time_interval_sec=nn_init_time_interval_sec,
             include_endpoint=True
         )
-        for f, l in
-        zip(first_time_by_period_unix_sec, last_time_by_period_unix_sec)
-    ])
+
+        # TODO(thunderhoser): This if-condition is designed to deal with a
+        # situation where nn_init_time_interval_sec = 43200 (12 hours) and
+        # first_init_time = last_init_time != a multiple of 12 hours.
+        if (
+                first_time_by_period_unix_sec[i] ==
+                last_time_by_period_unix_sec[i]
+                and first_time_by_period_unix_sec[i]
+                not in these_init_times_unix_sec
+        ):
+            continue
+
+        relevant_init_times_unix_sec = numpy.concatenate([
+            relevant_init_times_unix_sec, these_init_times_unix_sec
+        ])
 
     return misc_utils.remove_unused_days(relevant_init_times_unix_sec)
 
