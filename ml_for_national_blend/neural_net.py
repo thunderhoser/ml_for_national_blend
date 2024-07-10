@@ -1788,6 +1788,7 @@ def create_data(option_dict, init_time_unix_sec):
         target_matrix = None
 
     if target_matrix is None:
+        print('FOO1')
         return None
 
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
@@ -1821,6 +1822,7 @@ def create_data(option_dict, init_time_unix_sec):
             predictor_matrix_resid_baseline = None
 
         if predictor_matrix_resid_baseline is None:
+            print('FOO2')
             return None
 
         predictor_matrix_resid_baseline = numpy.expand_dims(
@@ -1866,8 +1868,10 @@ def create_data(option_dict, init_time_unix_sec):
         found_all_predictors = False
 
     if not found_any_predictors:
+        print('FOO3')
         return None
     if require_all_predictors and not found_all_predictors:
+        print('FOO4')
         return None
 
     if predictor_matrix_2pt5km is not None:
