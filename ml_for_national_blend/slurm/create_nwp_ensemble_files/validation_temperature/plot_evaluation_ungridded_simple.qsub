@@ -32,7 +32,7 @@ NWP_FORECAST_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_bl
 PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files"
 TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
-python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation_simple.py" \
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
 --input_eval_file_names "${PREDICTION_DIR_NAME}/validation_temperature/ungridded_evaluation_simple.nc" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
 --line_styles "solid" \
