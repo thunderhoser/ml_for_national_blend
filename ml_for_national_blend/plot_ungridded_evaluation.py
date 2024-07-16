@@ -176,6 +176,10 @@ def __change_file_name_for_nwp_forecasts(file_name):
         'wrf_arw/processed/interp_to_nbm_grid/prediction_files_48h'
     )
 
+    file_name = file_name.replace('48h_48h', '48h')
+    file_name = file_name.replace('24h_24h', '24h')
+    file_name = file_name.replace('51h_51h', '51h')
+
     return file_name
 
 
