@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="evaluate_model_gridded_simple"
+#SBATCH --job-name="evaluate_model_ungridded_simple"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -10,13 +10,13 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=12:00:00
-#SBATCH --array=0-9
+#SBATCH --array=8
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=evaluate_model_gridded_simple_%A_%a.out
+#SBATCH --output=evaluate_model_ungridded_simple_%A_%a.out
 
 conda init
 conda activate base
@@ -47,6 +47,6 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --num_relia_bins_by_target 65 \
 --min_relia_bin_edge_by_target -30 \
 --max_relia_bin_edge_by_target 35 \
---per_grid_cell=1 \
+--per_grid_cell=0 \
 --keep_it_simple=1 \
---output_file_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/${nwp_model_name}/processed/interp_to_nbm_grid/prediction_files_${lead_time_string}/validation_temperature/gridded_evaluation_simple.nc"
+--output_file_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/${nwp_model_name}/processed/interp_to_nbm_grid/prediction_files_${lead_time_string}/validation_temperature/ungridded_evaluation_simple.nc"
