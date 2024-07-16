@@ -13,8 +13,8 @@ from ml_for_national_blend.outside_code import error_checking
 TOLERANCE = 1e-6
 TIME_FORMAT = '%Y-%m-%d-%H'
 
-# TODO(thunderhoser): This will change.
-DEFAULT_INIT_TIME_INTERVAL_SEC = 6 * 3600
+HOURS_TO_SECONDS = 3600
+DEFAULT_INIT_TIME_INTERVAL_SEC = 6 * HOURS_TO_SECONDS  # TODO(thunderhoser): This will change.
 
 INIT_TIME_DIM = 'init_time'
 ROW_DIM = 'grid_row'
@@ -91,6 +91,66 @@ def find_files_for_period(
         time_interval_sec=DEFAULT_INIT_TIME_INTERVAL_SEC,
         include_endpoint=True
     )
+
+    prediction_file_names = []
+
+    for this_init_time_unix_sec in init_times_unix_sec:
+        this_file_name = find_file(
+            directory_name=directory_name,
+            init_time_unix_sec=this_init_time_unix_sec,
+            raise_error_if_missing=raise_error_if_any_missing
+        )
+
+        if os.path.isfile(this_file_name):
+            prediction_file_names.append(this_file_name)
+
+    if raise_error_if_all_missing and len(prediction_file_names) == 0:
+        error_string = (
+            'Cannot find any file in directory "{0:s}" from times {1:s} to '
+            '{2:s}.'
+        ).format(
+            directory_name,
+            time_conversion.unix_sec_to_string(
+                first_init_time_unix_sec, TIME_FORMAT
+            ),
+            time_conversion.unix_sec_to_string(
+                last_init_time_unix_sec, TIME_FORMAT
+            )
+        )
+        raise ValueError(error_string)
+
+    return prediction_file_names
+
+
+def find_rap_based_files_for_period(
+        directory_name, first_init_time_unix_sec, last_init_time_unix_sec,
+        raise_error_if_any_missing=False, raise_error_if_all_missing=True):
+    """Same as `find_files_for_period` but finds RAP-based forecasts.
+
+    :param directory_name: See doc for `find_files_for_period`.
+    :param first_init_time_unix_sec: Same.
+    :param last_init_time_unix_sec: Same.
+    :param raise_error_if_any_missing: Same.
+    :param raise_error_if_all_missing: Same.
+    :return: prediction_file_names: Same.
+    :raises: ValueError: if all files are missing and
+        `raise_error_if_all_missing == True`.
+    """
+
+    error_checking.assert_is_boolean(raise_error_if_any_missing)
+    error_checking.assert_is_boolean(raise_error_if_all_missing)
+
+    init_times_unix_sec = time_periods.range_and_interval_to_list(
+        start_time_unix_sec=first_init_time_unix_sec,
+        end_time_unix_sec=last_init_time_unix_sec,
+        time_interval_sec=3 * HOURS_TO_SECONDS,
+        include_endpoint=True
+    )
+
+    good_indices = numpy.where(
+        numpy.invert(numpy.mod(init_times_unix_sec, 6 * HOURS_TO_SECONDS) == 0)
+    )[0]
+    init_times_unix_sec = init_times_unix_sec[good_indices]
 
     prediction_file_names = []
 

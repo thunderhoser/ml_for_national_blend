@@ -168,13 +168,32 @@ def _convert_nwp_forecasts_1init(
     urma_field_names = list(URMA_FIELD_TO_NWP_FIELD.keys())
     urma_field_names.sort()
 
-    these_matrices = [
-        nwp_model_utils.get_field(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            field_name=URMA_FIELD_TO_NWP_FIELD[f]
-        )[0, ...]
-        for f in urma_field_names
-    ]
+    num_fields = len(urma_field_names)
+    these_matrices = [None] * num_fields
+
+    for j in range(num_fields):
+        try:
+            these_matrices[j] = nwp_model_utils.get_field(
+                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                field_name=URMA_FIELD_TO_NWP_FIELD[urma_field_names[j]]
+            )[0, ...]
+        except:
+            pass
+
+    first_good_index = int(1e10)
+    for j in range(num_fields):
+        if these_matrices[j] is not None:
+            first_good_index = j
+            break
+
+    for j in range(num_fields):
+        if these_matrices[j] is not None:
+            continue
+
+        these_matrices[j] = numpy.full(
+            these_matrices[first_good_index].shape, numpy.nan
+        )
+
     prediction_matrix = numpy.stack(these_matrices, axis=-1)
 
     print('Reading URMA labels from: "{0:s}"...'.format(urma_file_name))
