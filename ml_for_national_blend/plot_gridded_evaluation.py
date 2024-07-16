@@ -20,7 +20,6 @@ import error_checking
 import border_io
 import urma_utils
 import evaluation
-import neural_net
 import plotting_utils
 import target_plotting
 
@@ -354,19 +353,9 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
 
         raise ValueError(error_string)
 
-    model_file_name = (
-        evaluation_table_xarray.attrs[evaluation.MODEL_FILE_KEY]
+    target_field_names = (
+        evaluation_table_xarray.coords[evaluation.FIELD_DIM].values
     )
-    model_metafile_name = neural_net.find_metafile(
-        model_file_name=model_file_name, raise_error_if_missing=True
-    )
-
-    print('Reading metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-    generator_option_dict = model_metadata_dict[
-        neural_net.TRAINING_OPTIONS_KEY
-    ]
-    target_field_names = generator_option_dict[neural_net.TARGET_FIELDS_KEY]
     num_target_fields = len(target_field_names)
 
     etx = evaluation_table_xarray
