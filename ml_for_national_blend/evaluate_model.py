@@ -236,6 +236,25 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
         f for sublist in prediction_file_names_2d_list for f in sublist
     ]
 
+    if len(prediction_file_names) == 0:
+        prediction_file_names_2d_list = [
+            prediction_io.find_rap_based_files_for_period(
+                directory_name=prediction_dir_name,
+                first_init_time_unix_sec=f,
+                last_init_time_unix_sec=l,
+                raise_error_if_any_missing=False,
+                raise_error_if_all_missing=False
+            )
+            for f, l in zip(
+                first_init_time_by_period_unix_sec,
+                last_init_time_by_period_unix_sec
+            )
+        ]
+
+        prediction_file_names = [
+            f for sublist in prediction_file_names_2d_list for f in sublist
+        ]
+
     result_table_xarray = evaluation.get_scores_with_bootstrapping(
         prediction_file_names=prediction_file_names,
         num_bootstrap_reps=num_bootstrap_reps,
