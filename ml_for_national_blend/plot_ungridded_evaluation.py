@@ -128,6 +128,57 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
+def __change_file_name_for_nwp_forecasts(file_name):
+    """Deals with the fact that I renamed directories manually.
+
+    :param file_name: File name.
+    :return: file_name: Updated version of input.
+    """
+
+    file_name = file_name.replace(
+        'ecmwf/processed/interp_to_nbm_grid/prediction_files',
+        'ecmwf/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'gefs/processed/interp_to_nbm_grid/prediction_files',
+        'gefs/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'gfs/processed/interp_to_nbm_grid/prediction_files',
+        'gfs/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'gridded_gfs_mos/processed/interp_to_nbm_grid/prediction_files',
+        'gridded_gfs_mos/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'gridded_lamp/processed/interp_to_nbm_grid/prediction_files',
+        'gridded_lamp/processed/interp_to_nbm_grid/prediction_files_24h'
+    )
+    file_name = file_name.replace(
+        'hrrr/processed/interp_to_nbm_grid/prediction_files',
+        'hrrr/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'nam/processed/interp_to_nbm_grid/prediction_files',
+        'nam/processed/interp_to_nbm_grid/prediction_files_51h'
+    )
+    file_name = file_name.replace(
+        'nam_nest/processed/interp_to_nbm_grid/prediction_files',
+        'nam_nest/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'rap/processed/interp_to_nbm_grid/prediction_files',
+        'rap/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+    file_name = file_name.replace(
+        'wrf_arw/processed/interp_to_nbm_grid/prediction_files',
+        'wrf_arw/processed/interp_to_nbm_grid/prediction_files_48h'
+    )
+
+    return file_name
+
+
 def _plot_attributes_diagram(
         evaluation_tables_xarray, line_styles, line_colours,
         set_descriptions_abbrev, set_descriptions_verbose, confidence_level,
@@ -449,6 +500,8 @@ def _run(evaluation_file_names, target_normalization_file_name,
         model_file_name = (
             evaluation_tables_xarray[i].attrs[evaluation.MODEL_FILE_KEY]
         )
+        model_file_name = __change_file_name_for_nwp_forecasts(model_file_name)
+
         model_metafile_name = neural_net.find_metafile(
             model_file_name=model_file_name, raise_error_if_missing=True
         )
@@ -560,6 +613,11 @@ def _run(evaluation_file_names, target_normalization_file_name,
         prediction_file_names = evaluation_tables_xarray[i].attrs[
             evaluation.PREDICTION_FILES_KEY
         ]
+        prediction_file_names = [
+            __change_file_name_for_nwp_forecasts(f)
+            for f in prediction_file_names
+        ]
+
         num_times = len(prediction_file_names)
         error_matrix = numpy.array([], dtype=float)
 
