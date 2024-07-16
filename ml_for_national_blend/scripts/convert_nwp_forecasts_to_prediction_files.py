@@ -18,14 +18,13 @@ from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
-from ml_for_national_blend.machine_learning import \
-    neural_net_with_fancy_patches as neural_net
+from ml_for_national_blend.utils import nbm_utils
+from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import \
     longitude_conversion as lng_conversion
 from ml_for_national_blend.outside_code import \
     temperature_conversions as temperature_conv
-from ml_for_national_blend.outside_code import error_checking
 
 # TODO(thunderhoser): The way I create NWP-ensemble files, "NaN"s in the
 # wind-gust field are replaced by the sustained wind speed.  This will fuck up
@@ -129,6 +128,13 @@ def _convert_nwp_forecasts_1init(
     :param prediction_dir_name: Same.
     """
 
+    nwp_model_name = interp_nwp_model_io.file_name_to_model_name(
+        nwp_forecast_file_name
+    )
+    downsampling_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+        nwp_model_name
+    )
+
     init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
         nwp_forecast_file_name
     )
@@ -149,6 +155,15 @@ def _convert_nwp_forecasts_1init(
     nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
         nwp_forecast_file_name
     )
+
+    if downsampling_factor > 1:
+        nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            model_name=nwp_model_name,
+            use_nearest_neigh=False,
+            interp_to_full_resolution=True,
+            proj_object=nbm_utils.NBM_PROJECTION_OBJECT
+        )
 
     urma_field_names = list(URMA_FIELD_TO_NWP_FIELD.keys())
     urma_field_names.sort()
@@ -287,10 +302,10 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
     :param prediction_dir_name: Same.
     """
 
-    downsampling_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
-        nwp_model_name
-    )
-    error_checking.assert_equals(downsampling_factor, 1)
+    # downsampling_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+    #     nwp_model_name
+    # )
+    # error_checking.assert_equals(downsampling_factor, 1)
 
     first_init_time_unix_sec = time_conversion.string_to_unix_sec(
         first_init_time_string, TIME_FORMAT
@@ -307,6 +322,24 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
         raise_error_if_all_missing=True,
         raise_error_if_any_missing=False
     )
+
+    init_times_unix_sec = numpy.array([
+        interp_nwp_model_io.file_name_to_init_time(f)
+        for f in nwp_forecast_file_names
+    ], dtype=int)
+
+    if nwp_model_name == nwp_model_utils.RAP_MODEL_NAME:
+        good_indices = numpy.where(numpy.logical_and(
+            numpy.mod(init_times_unix_sec, 3 * HOURS_TO_SECONDS) == 0,
+            numpy.mod(init_times_unix_sec, 6 * HOURS_TO_SECONDS) != 0
+        ))[0]
+    else:
+        good_indices = numpy.where(
+            numpy.mod(init_times_unix_sec, 6 * HOURS_TO_SECONDS) == 0
+        )[0]
+
+    del init_times_unix_sec
+    nwp_forecast_file_names = [nwp_forecast_file_names[k] for k in good_indices]
 
     for this_forecast_file_name in nwp_forecast_file_names:
         _convert_nwp_forecasts_1init(
