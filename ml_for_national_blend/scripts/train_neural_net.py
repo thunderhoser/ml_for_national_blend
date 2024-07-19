@@ -54,6 +54,7 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 def _run(template_file_name, output_dir_name,
          nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
          nwp_normalization_file_name, nwp_use_quantile_norm,
+         backup_nwp_model_name, backup_nwp_dir_name,
          target_lead_time_hours, target_field_names,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
@@ -85,6 +86,8 @@ def _run(template_file_name, output_dir_name,
     :param nwp_model_to_field_names: Same.
     :param nwp_normalization_file_name: Same.
     :param nwp_use_quantile_norm: Same.
+    :param backup_nwp_model_name: Same.
+    :param backup_nwp_dir_name: Same.
     :param target_lead_time_hours: Same.
     :param target_field_names: Same.
     :param target_normalization_file_name: Same.
@@ -176,6 +179,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
         neural_net.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
         neural_net.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
+        neural_net.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
+        neural_net.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
@@ -260,6 +265,12 @@ if __name__ == '__main__':
         nwp_use_quantile_norm=bool(getattr(
             INPUT_ARG_OBJECT, training_args.NWP_USE_QUANTILE_NORM_ARG_NAME
         )),
+        backup_nwp_model_name=getattr(
+            INPUT_ARG_OBJECT, training_args.BACKUP_NWP_MODEL_ARG_NAME
+        ),
+        backup_nwp_dir_name=getattr(
+            INPUT_ARG_OBJECT, training_args.BACKUP_NWP_DIR_ARG_NAME
+        ),
         target_lead_time_hours=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME
         ),

@@ -5,16 +5,15 @@ import pickle
 import warnings
 import numpy
 import keras
-from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
 from ml_for_national_blend.outside_code import number_rounding
-from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import \
+    temperature_conversions as temperature_conv
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import nwp_model_io
-from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.io import nbm_constant_io
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.utils import nbm_utils
@@ -23,6 +22,7 @@ from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nbm_constant_utils
 from ml_for_national_blend.utils import normalization
+from ml_for_national_blend.machine_learning import nwp_input
 from ml_for_national_blend.machine_learning import custom_losses
 from ml_for_national_blend.machine_learning import custom_metrics
 
@@ -32,8 +32,6 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
 
 DEFAULT_GUST_FACTOR = 1.5
-
-POSSIBLE_GRID_SPACINGS_KM = numpy.array([2.5, 10, 20, 40])
 POSSIBLE_DOWNSAMPLING_FACTORS = numpy.array([1, 4, 8, 16], dtype=int)
 
 FIRST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
@@ -43,6 +41,8 @@ NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
 NWP_NORM_FILE_KEY = 'nwp_normalization_file_name'
 NWP_USE_QUANTILE_NORM_KEY = 'nwp_use_quantile_norm'
+BACKUP_NWP_MODEL_KEY = 'backup_nwp_model_name'
+BACKUP_NWP_DIR_KEY = 'backup_nwp_directory_name'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_hours'
 TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_DIR_KEY = 'target_dir_name'
@@ -103,70 +103,6 @@ PATCH_START_ROW_KEY = 'patch_start_row_2pt5km'
 PATCH_START_COLUMN_KEY = 'patch_start_column_2pt5km'
 
 
-def __nwp_2m_dewpoint_to_depression(nwp_forecast_table_xarray):
-    """Converts 2-metre NWP dewpoints to dewpoint depressions.
-
-    :param nwp_forecast_table_xarray: xarray table in format returned by
-        `interp_nwp_model_io.read_file`.
-    :return: nwp_forecast_table_xarray: Same, except that dewpoints have been
-        replaced with dewpoint depressions.
-    """
-
-    dewpoint_matrix_kelvins = nwp_model_utils.get_field(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        field_name=nwp_model_utils.DEWPOINT_2METRE_NAME
-    )
-    temperature_matrix_kelvins = nwp_model_utils.get_field(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        field_name=nwp_model_utils.TEMPERATURE_2METRE_NAME
-    )
-    dewp_depression_matrix_kelvins = (
-        temperature_matrix_kelvins - dewpoint_matrix_kelvins
-    )
-
-    k = numpy.where(
-        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
-        nwp_model_utils.DEWPOINT_2METRE_NAME
-    )[0][0]
-
-    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
-    data_matrix[..., k] = dewp_depression_matrix_kelvins
-
-    return nwp_forecast_table_xarray.assign({
-        nwp_model_utils.DATA_KEY: (
-            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
-            data_matrix
-        )
-    })
-
-
-def __nwp_2m_temp_to_celsius(nwp_forecast_table_xarray):
-    """Converts 2-metre NWP temperatures from Kelvins to Celsius.
-
-    :param nwp_forecast_table_xarray: xarray table in format returned by
-        `interp_nwp_model_io.read_file`.
-    :return: nwp_forecast_table_xarray: Same, except that temperatures have been
-        converted to Celsius.
-    """
-
-    k = numpy.where(
-        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
-        nwp_model_utils.TEMPERATURE_2METRE_NAME
-    )[0][0]
-
-    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
-    data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
-        data_matrix[..., k]
-    )
-
-    return nwp_forecast_table_xarray.assign({
-        nwp_model_utils.DATA_KEY: (
-            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
-            data_matrix
-        )
-    })
-
-
 def __predicted_2m_depression_to_dewpoint(prediction_matrix,
                                           target_field_names):
     """Converts 2-metre dewpoint depression in predictions to dewpoint temp.
@@ -197,55 +133,6 @@ def __predicted_2m_depression_to_dewpoint(prediction_matrix,
     )
 
     return prediction_matrix
-
-
-def __nwp_10m_gust_speed_to_factor(nwp_forecast_table_xarray):
-    """Converts 10-metre NWP gust speeds to gust factors.
-
-    *** Actually, gust factors minus one. ***
-
-    :param nwp_forecast_table_xarray: xarray table in format returned by
-        `interp_nwp_model_io.read_file`.
-    :return: nwp_forecast_table_xarray: Same, except that gust speeds have been
-        replaced with gust factors.
-    """
-
-    k_inds = numpy.where(
-        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
-        nwp_model_utils.WIND_GUST_10METRE_NAME
-    )[0]
-
-    if len(k_inds) == 0:
-        return nwp_forecast_table_xarray
-
-    u_wind_matrix_m_s01 = nwp_model_utils.get_field(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        field_name=nwp_model_utils.U_WIND_10METRE_NAME
-    )
-    v_wind_matrix_m_s01 = nwp_model_utils.get_field(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        field_name=nwp_model_utils.V_WIND_10METRE_NAME
-    )
-    sustained_speed_matrix_m_s01 = numpy.sqrt(
-        u_wind_matrix_m_s01 ** 2 + v_wind_matrix_m_s01 ** 2
-    )
-    gust_speed_matrix_m_s01 = nwp_model_utils.get_field(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        field_name=nwp_model_utils.WIND_GUST_10METRE_NAME
-    )
-
-    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
-    k = k_inds[0]
-    data_matrix[..., k] = (
-        gust_speed_matrix_m_s01 / sustained_speed_matrix_m_s01 - 1.
-    )
-
-    return nwp_forecast_table_xarray.assign({
-        nwp_model_utils.DATA_KEY: (
-            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
-            data_matrix
-        )
-    })
 
 
 def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
@@ -285,141 +172,6 @@ def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
     )
 
     return prediction_matrix
-
-
-def __interp_predictors_by_lead_time(predictor_matrix, lead_times_hours):
-    """Interpolates predictors to fill missing lead times.
-
-    M = number of rows in grid
-    N = number of columns in grid
-    L = number of lead times
-    P = number of predictor variables
-
-    :param predictor_matrix: M-by-N-by-L-by-P numpy array of predictor values.
-    :param lead_times_hours: length-L numpy array of lead times.
-    :return: predictor_matrix: Same as input, though maybe with fewer NaN's.
-    """
-
-    num_predictors = predictor_matrix.shape[-1]
-
-    for p in range(num_predictors):
-        missing_lead_time_flags = numpy.all(
-            numpy.isnan(predictor_matrix[..., p]),
-            axis=(0, 1)
-        )
-        missing_lead_time_indices = numpy.where(missing_lead_time_flags)[0]
-        filled_lead_time_indices = numpy.where(
-            numpy.invert(missing_lead_time_flags)
-        )[0]
-
-        if len(filled_lead_time_indices) == 0:
-            continue
-
-        missing_lead_time_indices = [
-            k for k in missing_lead_time_indices if
-            k >= numpy.min(filled_lead_time_indices)
-        ]
-        missing_lead_time_indices = [
-            k for k in missing_lead_time_indices if
-            k < numpy.max(filled_lead_time_indices)
-        ]
-
-        if len(missing_lead_time_indices) == 0:
-            continue
-
-        interp_object = interp1d(
-            x=lead_times_hours[filled_lead_time_indices],
-            y=predictor_matrix[..., filled_lead_time_indices, p],
-            axis=2,
-            kind='linear',
-            bounds_error=True,
-            assume_sorted=True
-        )
-
-        predictor_matrix[..., missing_lead_time_indices, p] = interp_object(
-            lead_times_hours[missing_lead_time_indices]
-        )
-
-    return predictor_matrix
-
-
-def __get_grid_dimensions(grid_spacing_km, patch_location_dict):
-    """Determines grid dimensions for neural network.
-
-    :param grid_spacing_km: Grid spacing (must be 2.5, 10, 20, or 40 km).
-    :param patch_location_dict: Dictionary produced by
-        `misc_utils.determine_patch_locations`.  If you are training with the
-        full grid (not the patchwise approach), make this None.
-    :return: num_rows: Number of rows in grid.
-    :return: num_columns: Number of columns in grid.
-    """
-
-    k = numpy.argmin(
-        numpy.absolute(grid_spacing_km - POSSIBLE_GRID_SPACINGS_KM)
-    )
-
-    if k == 0:
-        if patch_location_dict is None:
-            num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
-                nwp_model_utils.HRRR_MODEL_NAME
-            )
-        else:
-            num_rows = numpy.diff(
-                patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY]
-            )[0] + 1
-
-            num_columns = numpy.diff(
-                patch_location_dict[misc_utils.COLUMN_LIMITS_2PT5KM_KEY]
-            )[0] + 1
-
-        return num_rows, num_columns
-
-    if k == 1:
-        if patch_location_dict is None:
-            num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
-                nwp_model_utils.RAP_MODEL_NAME
-            )
-        else:
-            num_rows = numpy.diff(
-                patch_location_dict[misc_utils.ROW_LIMITS_10KM_KEY]
-            )[0] + 1
-
-            num_columns = numpy.diff(
-                patch_location_dict[misc_utils.COLUMN_LIMITS_10KM_KEY]
-            )[0] + 1
-
-        return num_rows, num_columns
-
-    if k == 2:
-        if patch_location_dict is None:
-            num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
-                nwp_model_utils.GFS_MODEL_NAME
-            )
-        else:
-            num_rows = numpy.diff(
-                patch_location_dict[misc_utils.ROW_LIMITS_20KM_KEY]
-            )[0] + 1
-
-            num_columns = numpy.diff(
-                patch_location_dict[misc_utils.COLUMN_LIMITS_20KM_KEY]
-            )[0] + 1
-
-        return num_rows, num_columns
-
-    if patch_location_dict is None:
-        num_rows, num_columns = nwp_model_utils.model_to_nbm_grid_size(
-            nwp_model_utils.GEFS_MODEL_NAME
-        )
-    else:
-        num_rows = numpy.diff(
-            patch_location_dict[misc_utils.ROW_LIMITS_40KM_KEY]
-        )[0] + 1
-
-        num_columns = numpy.diff(
-            patch_location_dict[misc_utils.COLUMN_LIMITS_40KM_KEY]
-        )[0] + 1
-
-    return num_rows, num_columns
 
 
 def __make_trapezoidal_weight_matrix(patch_size_2pt5km_pixels,
@@ -519,23 +271,6 @@ def __update_patch_metalocation_dict(patch_metalocation_dict):
     patch_end_column_2pt5km = (
         pmld[PATCH_START_COLUMN_KEY] + num_columns_in_patch - 1
     )
-
-    # if pmld[PATCH_START_ROW_KEY] < 0:
-    #     patch_end_row_2pt5km = num_rows_in_patch - 1
-    #     patch_end_column_2pt5km = num_columns_in_patch - 1
-    # elif patch_end_column_2pt5km == num_columns_in_full_grid - 1:
-    #     if patch_end_row_2pt5km == num_rows_in_full_grid - 1:
-    #         patch_end_row_2pt5km = -1
-    #         patch_end_column_2pt5km = -1
-    #     else:
-    #         patch_end_row_2pt5km += (
-    #             num_rows_in_patch - 2 * patch_overlap_size_2pt5km_pixels
-    #         )
-    #         patch_end_column_2pt5km = num_columns_in_patch - 1
-    # else:
-    #     patch_end_column_2pt5km += (
-    #         num_columns_in_patch - 2 * patch_overlap_size_2pt5km_pixels
-    #     )
 
     if pmld[PATCH_START_ROW_KEY] < 0:
         patch_end_row_2pt5km = num_rows_in_patch - 1
@@ -702,6 +437,8 @@ def _check_generator_args(option_dict):
         error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
 
     error_checking.assert_is_boolean(option_dict[NWP_USE_QUANTILE_NORM_KEY])
+    error_checking.assert_is_string(option_dict[BACKUP_NWP_MODEL_KEY])
+    error_checking.assert_is_string(option_dict[BACKUP_NWP_DIR_KEY])
 
     error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
     error_checking.assert_is_greater(option_dict[TARGET_LEAD_TIME_KEY], 0)
@@ -728,7 +465,7 @@ def _check_generator_args(option_dict):
         nbm_constant_utils.check_field_name(this_field_name)
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
-    # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
+    error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 1)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
 
     if option_dict[PATCH_SIZE_KEY] is None:
@@ -792,113 +529,6 @@ def _check_generator_args(option_dict):
     return option_dict
 
 
-def _init_predictor_matrices_1example(
-        nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
-        patch_location_dict):
-    """Initializes predictor matrices for one example.
-
-    :param nwp_model_names: 1-D list with names of NWP models.
-    :param nwp_model_to_field_names: Dictionary.  For details, see documentation
-        for `data_generator`.
-    :param num_nwp_lead_times: Number of lead times.
-    :param patch_location_dict: Dictionary produced by
-        `misc_utils.determine_patch_locations`.  If you are training with the
-        full grid (not the patchwise approach), make this None.
-    :return: predictor_matrices_2pt5km: 1-D list of numpy arrays for 2.5-km
-        resolution.  One array per 2.5-km model.  If there are no 2.5-km models,
-        this is None instead of a list.
-    :return: predictor_matrices_10km: Same but for 10-km models.
-    :return: predictor_matrices_20km: Same but for 20-km models.
-    :return: predictor_matrices_40km: Same but for 40-km models.
-    """
-
-    downsampling_factors = numpy.array([
-        nwp_model_utils.model_to_nbm_downsampling_factor(m)
-        for m in nwp_model_names
-    ], dtype=int)
-
-    model_indices = numpy.where(downsampling_factors == 1)[0]
-    num_rows, num_columns = __get_grid_dimensions(
-        grid_spacing_km=2.5,
-        patch_location_dict=patch_location_dict
-    )
-
-    if len(model_indices) == 0:
-        predictor_matrices_2pt5km = None
-    else:
-        first_dim = (num_rows, num_columns, num_nwp_lead_times)
-
-        predictor_matrices_2pt5km = [
-            numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
-                numpy.nan
-            )
-            for k in model_indices
-        ]
-
-    model_indices = numpy.where(downsampling_factors == 4)[0]
-    num_rows, num_columns = __get_grid_dimensions(
-        grid_spacing_km=10.,
-        patch_location_dict=patch_location_dict
-    )
-
-    if len(model_indices) == 0:
-        predictor_matrices_10km = None
-    else:
-        first_dim = (num_rows, num_columns, num_nwp_lead_times)
-
-        predictor_matrices_10km = [
-            numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
-                numpy.nan
-            )
-            for k in model_indices
-        ]
-
-    model_indices = numpy.where(downsampling_factors == 8)[0]
-    num_rows, num_columns = __get_grid_dimensions(
-        grid_spacing_km=20.,
-        patch_location_dict=patch_location_dict
-    )
-
-    if len(model_indices) == 0:
-        predictor_matrices_20km = None
-    else:
-        first_dim = (num_rows, num_columns, num_nwp_lead_times)
-
-        predictor_matrices_20km = [
-            numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
-                numpy.nan
-            )
-            for k in model_indices
-        ]
-
-    model_indices = numpy.where(downsampling_factors == 16)[0]
-    num_rows, num_columns = __get_grid_dimensions(
-        grid_spacing_km=40.,
-        patch_location_dict=patch_location_dict
-    )
-
-    if len(model_indices) == 0:
-        predictor_matrices_40km = None
-    else:
-        first_dim = (num_rows, num_columns, num_nwp_lead_times)
-
-        predictor_matrices_40km = [
-            numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
-                numpy.nan
-            )
-            for k in model_indices
-        ]
-
-    return (
-        predictor_matrices_2pt5km, predictor_matrices_10km,
-        predictor_matrices_20km, predictor_matrices_40km
-    )
-
-
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
         num_target_fields, num_examples_per_batch, do_residual_prediction,
@@ -933,7 +563,7 @@ def _init_matrices_1batch(
     ], dtype=int)
 
     model_indices = numpy.where(downsampling_factors == 1)[0]
-    num_rows, num_columns = __get_grid_dimensions(
+    num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=2.5,
         patch_location_dict=patch_location_dict
     )
@@ -967,7 +597,7 @@ def _init_matrices_1batch(
         ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 4)[0]
-    num_rows, num_columns = __get_grid_dimensions(
+    num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=10.,
         patch_location_dict=patch_location_dict
     )
@@ -988,7 +618,7 @@ def _init_matrices_1batch(
         ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 8)[0]
-    num_rows, num_columns = __get_grid_dimensions(
+    num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=20.,
         patch_location_dict=patch_location_dict
     )
@@ -1009,7 +639,7 @@ def _init_matrices_1batch(
         ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 16)[0]
-    num_rows, num_columns = __get_grid_dimensions(
+    num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=40.,
         patch_location_dict=patch_location_dict
     )
@@ -1100,8 +730,6 @@ def _read_targets_one_example(
         data_matrix = urma_table_xarray[urma_utils.DATA_KEY].values
 
         if urma_utils.TEMPERATURE_2METRE_NAME in target_field_names:
-            print('Converting target temperatures from K to deg C...')
-
             k = numpy.where(
                 urma_table_xarray.coords[urma_utils.FIELD_DIM].values ==
                 urma_utils.TEMPERATURE_2METRE_NAME
@@ -1112,8 +740,6 @@ def _read_targets_one_example(
             )
 
         if urma_utils.DEWPOINT_2METRE_NAME in target_field_names:
-            print('Converting target dewpoints from K to deg C...')
-
             k = numpy.where(
                 urma_table_xarray.coords[urma_utils.FIELD_DIM].values ==
                 urma_utils.DEWPOINT_2METRE_NAME
@@ -1150,421 +776,6 @@ def _read_targets_one_example(
         target_matrix = target_matrix[i_start:i_end, j_start:j_end]
 
     return target_matrix
-
-
-def _read_residual_baseline_one_example(
-        init_time_unix_sec, nwp_model_name, nwp_lead_time_hours,
-        nwp_directory_name, target_field_names, patch_location_dict,
-        predict_dewpoint_depression, predict_gust_factor):
-    """Reads residual baseline for one example.
-
-    M = number of rows in NBM grid (2.5-km target grid)
-    N = number of columns in NBM grid (2.5-km target grid)
-    F = number of target fields
-
-    Should be used only if the NN is doing residual prediction, i.e., predicting
-    the departure between the URMA truth and an NWP forecast.
-
-    :param init_time_unix_sec: Forecast-initialization time.
-    :param nwp_model_name: Name of NWP model used to create residual baseline.
-    :param nwp_lead_time_hours: NWP lead time used to create residual baseline.
-    :param nwp_directory_name: Path to NWP data.  Relevant files therein will be
-        found by `interp_nwp_model_io.find_file`.
-    :param target_field_names: See documentation for `data_generator`.
-    :param patch_location_dict: Dictionary produced by
-        `misc_utils.determine_patch_locations`.  If you are training with the
-        full grid (not the patchwise approach), make this None.
-    :param predict_dewpoint_depression: Boolean flag.  If True, the NN is
-        predicting dewpoint depression instead of dewpoint.
-    :param predict_gust_factor: Boolean flag.  If True, the NN is predicting
-        gust factor instead of gust speed.
-    :return: residual_baseline_matrix: M-by-N-by-F numpy array of baseline
-        predictions.  These are all unnormalized.
-    """
-
-    target_field_to_baseline_nwp_field = {
-        urma_utils.TEMPERATURE_2METRE_NAME:
-            nwp_model_utils.TEMPERATURE_2METRE_NAME,
-        urma_utils.DEWPOINT_2METRE_NAME: nwp_model_utils.DEWPOINT_2METRE_NAME,
-        urma_utils.U_WIND_10METRE_NAME: nwp_model_utils.U_WIND_10METRE_NAME,
-        urma_utils.V_WIND_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME,
-        urma_utils.WIND_GUST_10METRE_NAME:
-            nwp_model_utils.WIND_GUST_10METRE_NAME
-    }
-
-    input_file_name = interp_nwp_model_io.find_file(
-        directory_name=nwp_directory_name,
-        init_time_unix_sec=init_time_unix_sec,
-        forecast_hour=nwp_lead_time_hours,
-        model_name=nwp_model_name,
-        raise_error_if_missing=False
-    )
-
-    if not os.path.isfile(input_file_name):
-        warning_string = (
-            'POTENTIAL ERROR: Could not find file expected at: "{0:s}".  This '
-            'is needed for residual baseline.'
-        ).format(input_file_name)
-
-        warnings.warn(warning_string)
-        return None
-
-    print('Reading data from: "{0:s}"...'.format(input_file_name))
-    nwp_forecast_table_xarray = interp_nwp_model_io.read_file(input_file_name)
-
-    if (
-            nwp_model_utils.WIND_GUST_10METRE_NAME not in
-            nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values
-    ):
-        nwpft = nwp_forecast_table_xarray
-
-        u = numpy.where(
-            nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
-            nwp_model_utils.U_WIND_10METRE_NAME
-        )[0][0]
-        v = numpy.where(
-            nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
-            nwp_model_utils.V_WIND_10METRE_NAME
-        )[0][0]
-
-        gust_matrix = numpy.sqrt(
-            nwpft[nwp_model_utils.DATA_KEY].values[..., u] ** 2 +
-            nwpft[nwp_model_utils.DATA_KEY].values[..., v] ** 2
-        )
-        data_matrix = numpy.concatenate([
-            nwpft[nwp_model_utils.DATA_KEY].values,
-            numpy.expand_dims(gust_matrix, axis=-1)
-        ], axis=-1)
-
-        field_names = (
-            nwpft.coords[nwp_model_utils.FIELD_DIM].values.tolist() +
-            [nwp_model_utils.WIND_GUST_10METRE_NAME]
-        )
-
-        nwpft.drop_vars(names=[nwp_model_utils.DATA_KEY])
-        nwpft = nwpft.assign_coords({
-            nwp_model_utils.FIELD_DIM: field_names
-        })
-
-        these_dims = (
-            nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
-            nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
-        )
-        nwpft = nwpft.assign({
-            nwp_model_utils.DATA_KEY: (these_dims, data_matrix)
-        })
-
-        nwp_forecast_table_xarray = nwpft
-
-    if patch_location_dict is not None:
-        i_start = patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-        i_end = patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY][1]
-        j_start = patch_location_dict[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-        j_end = patch_location_dict[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1]
-
-        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            desired_row_indices=numpy.linspace(
-                i_start, i_end, num=i_end - i_start + 1, dtype=int
-            )
-        )
-
-        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            desired_column_indices=numpy.linspace(
-                j_start, j_end, num=j_end - j_start + 1, dtype=int
-            )
-        )
-
-    if predict_dewpoint_depression:
-        nwp_forecast_table_xarray = __nwp_2m_dewpoint_to_depression(
-            nwp_forecast_table_xarray
-        )
-
-    if predict_gust_factor:
-        nwp_forecast_table_xarray = __nwp_10m_gust_speed_to_factor(
-            nwp_forecast_table_xarray
-        )
-
-    nwp_forecast_table_xarray = __nwp_2m_temp_to_celsius(
-        nwp_forecast_table_xarray
-    )
-
-    these_matrices = [
-        nwp_model_utils.get_field(
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            field_name=target_field_to_baseline_nwp_field[f]
-        )[0, ...]
-        for f in target_field_names
-    ]
-    residual_baseline_matrix = numpy.stack(these_matrices, axis=-1)
-
-    num_fields = residual_baseline_matrix.shape[-1]
-    for k in range(num_fields):
-        residual_baseline_matrix[..., k] = misc_utils.fill_nans_by_nn_interp(
-            residual_baseline_matrix[..., k]
-        )
-
-    return residual_baseline_matrix
-
-
-def _read_predictors_one_example(
-        init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
-        nwp_model_to_field_names, nwp_model_to_dir_name,
-        nwp_norm_param_table_xarray, use_quantile_norm, patch_location_dict):
-    """Reads predictor fields for one example.
-
-    :param init_time_unix_sec: Forecast-initialization time.
-    :param nwp_model_names: 1-D list with names of NWP models used to create
-        predictors.
-    :param nwp_lead_times_hours: See documentation for `data_generator`.
-    :param nwp_model_to_field_names: Same.
-    :param nwp_model_to_dir_name: Same.
-    :param nwp_norm_param_table_xarray: xarray table with normalization
-        parameters for predictor variables.  If you do not want to normalize (or
-        if the input directory already contains normalized data), this should be
-        None.
-    :param use_quantile_norm: See documentation for `data_generator`.
-    :param patch_location_dict: Dictionary produced by
-        `misc_utils.determine_patch_locations`.  If you are training with the
-        full grid (not the patchwise approach), make this None.
-    :return: predictor_matrix_2pt5km: Same as output from `data_generator` but
-        without first axis.
-    :return: predictor_matrix_10km: Same as output from `data_generator` but
-        without first axis.
-    :return: predictor_matrix_20km: Same as output from `data_generator` but
-        without first axis.
-    :return: predictor_matrix_40km: Same as output from `data_generator` but
-        without first axis.
-    :return: found_any_predictors: Boolean flag.  If True, at least one output
-        matrix contains a real value.  If False, the output matrices are all NaN
-        or None.
-    :return: found_all_predictors: Boolean flag.  If True, there are no "NaN"s
-        in the predictor matrices.
-    """
-
-    num_nwp_models = len(nwp_model_names)
-    num_nwp_lead_times = len(nwp_lead_times_hours)
-
-    nwp_downsampling_factors = numpy.array([
-        nwp_model_utils.model_to_nbm_downsampling_factor(m)
-        for m in nwp_model_names
-    ], dtype=int)
-
-    (
-        predictor_matrices_2pt5km, predictor_matrices_10km,
-        predictor_matrices_20km, predictor_matrices_40km
-    ) = _init_predictor_matrices_1example(
-        nwp_model_names=nwp_model_names,
-        nwp_model_to_field_names=nwp_model_to_field_names,
-        num_nwp_lead_times=num_nwp_lead_times,
-        patch_location_dict=patch_location_dict
-    )
-
-    for i in range(num_nwp_models):
-        for j in range(num_nwp_lead_times):
-            if nwp_model_names[i] == nwp_model_utils.RAP_MODEL_NAME:
-                adjusted_init_time_unix_sec = (
-                    init_time_unix_sec + 3 * HOURS_TO_SECONDS
-                )
-                adjusted_lead_time_hours = nwp_lead_times_hours[j] - 3
-                if adjusted_lead_time_hours < 1:
-                    continue
-
-                this_file_name = interp_nwp_model_io.find_file(
-                    directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
-                    init_time_unix_sec=adjusted_init_time_unix_sec,
-                    forecast_hour=adjusted_lead_time_hours,
-                    model_name=nwp_model_names[i],
-                    raise_error_if_missing=False
-                )
-            else:
-                # TODO(thunderhoser): Need an input arg that dictates whether to
-                # use init times every 6 hours or 12 hours.
-                try:
-                    nwp_model_utils.check_init_time(
-                        init_time_unix_sec=init_time_unix_sec,
-                        model_name=nwp_model_names[i]
-                    )
-                except:
-                    continue
-
-                this_file_name = interp_nwp_model_io.find_file(
-                    directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
-                    init_time_unix_sec=init_time_unix_sec,
-                    forecast_hour=nwp_lead_times_hours[j],
-                    model_name=nwp_model_names[i],
-                    raise_error_if_missing=False
-                )
-
-            # TODO(thunderhoser): For now, letting all missing files go.  Not
-            # sure if this is always the best decision, though.
-            if not os.path.isfile(this_file_name):
-                warning_string = (
-                    'POTENTIAL ERROR: Could not find file expected at: "{0:s}".'
-                    '  Filling predictor matrix with NaN, instead.'
-                ).format(this_file_name)
-
-                warnings.warn(warning_string)
-                continue
-
-            print('Reading data from: "{0:s}"...'.format(this_file_name))
-            nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
-                this_file_name
-            )
-            nwp_forecast_table_xarray = nwp_model_utils.subset_by_field(
-                nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                desired_field_names=nwp_model_to_field_names[nwp_model_names[i]]
-            )
-
-            if patch_location_dict is not None:
-                pld = patch_location_dict
-
-                if nwp_downsampling_factors[i] == 1:
-                    i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
-                    i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1]
-                    j_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
-                    j_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1]
-                elif nwp_downsampling_factors[i] == 4:
-                    i_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
-                    i_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1]
-                    j_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
-                    j_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1]
-                elif nwp_downsampling_factors[i] == 8:
-                    i_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
-                    i_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1]
-                    j_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
-                    j_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1]
-                else:
-                    i_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
-                    i_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1]
-                    j_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
-                    j_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1]
-
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_row_indices=numpy.linspace(
-                        i_start, i_end, num=i_end - i_start + 1, dtype=int
-                    )
-                )
-
-                nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    desired_column_indices=numpy.linspace(
-                        j_start, j_end, num=j_end - j_start + 1, dtype=int
-                    )
-                )
-
-            if nwp_norm_param_table_xarray is not None:
-                print('Normalizing predictor variables to z-scores...')
-                nwp_forecast_table_xarray = (
-                    normalization.normalize_nwp_data(
-                        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                        norm_param_table_xarray=nwp_norm_param_table_xarray,
-                        use_quantile_norm=use_quantile_norm
-                    )
-                )
-
-            nwpft = nwp_forecast_table_xarray
-            matrix_index = numpy.sum(
-                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
-            )
-
-            if nwp_downsampling_factors[i] == 1:
-                predictor_matrices_2pt5km[matrix_index][..., j, :] = (
-                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
-                )
-            elif nwp_downsampling_factors[i] == 4:
-                predictor_matrices_10km[matrix_index][..., j, :] = (
-                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
-                )
-            elif nwp_downsampling_factors[i] == 8:
-                predictor_matrices_20km[matrix_index][..., j, :] = (
-                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
-                )
-            else:
-                predictor_matrices_40km[matrix_index][..., j, :] = (
-                    nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
-                )
-
-    found_any_predictors = False
-    found_all_predictors = True
-
-    if predictor_matrices_2pt5km is None:
-        predictor_matrix_2pt5km = None
-    else:
-        predictor_matrix_2pt5km = numpy.concatenate(
-            predictor_matrices_2pt5km, axis=-1
-        )
-        nan_matrix = numpy.all(
-            numpy.isnan(predictor_matrix_2pt5km), axis=(0, 1)
-        )
-        found_all_predictors &= not numpy.any(nan_matrix)
-
-        predictor_matrix_2pt5km = __interp_predictors_by_lead_time(
-            predictor_matrix=predictor_matrix_2pt5km,
-            lead_times_hours=nwp_lead_times_hours
-        )
-        found_any_predictors |= not numpy.all(
-            numpy.isnan(predictor_matrix_2pt5km)
-        )
-
-    if predictor_matrices_10km is None:
-        predictor_matrix_10km = None
-    else:
-        predictor_matrix_10km = numpy.concatenate(
-            predictor_matrices_10km, axis=-1
-        )
-        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_10km), axis=(0, 1))
-        found_all_predictors &= not numpy.any(nan_matrix)
-
-        predictor_matrix_10km = __interp_predictors_by_lead_time(
-            predictor_matrix=predictor_matrix_10km,
-            lead_times_hours=nwp_lead_times_hours
-        )
-        found_any_predictors |= not numpy.all(
-            numpy.isnan(predictor_matrix_10km)
-        )
-
-    if predictor_matrices_20km is None:
-        predictor_matrix_20km = None
-    else:
-        predictor_matrix_20km = numpy.concatenate(
-            predictor_matrices_20km, axis=-1
-        )
-        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_20km), axis=(0, 1))
-        found_all_predictors &= not numpy.any(nan_matrix)
-
-        predictor_matrix_20km = __interp_predictors_by_lead_time(
-            predictor_matrix=predictor_matrix_20km,
-            lead_times_hours=nwp_lead_times_hours
-        )
-        found_any_predictors |= not numpy.all(
-            numpy.isnan(predictor_matrix_20km)
-        )
-
-    if predictor_matrices_40km is None:
-        predictor_matrix_40km = None
-    else:
-        predictor_matrix_40km = numpy.concatenate(
-            predictor_matrices_40km, axis=-1
-        )
-        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_40km), axis=(0, 1))
-        found_all_predictors &= not numpy.any(nan_matrix)
-
-        predictor_matrix_40km = __interp_predictors_by_lead_time(
-            predictor_matrix=predictor_matrix_40km,
-            lead_times_hours=nwp_lead_times_hours
-        )
-        found_any_predictors |= not numpy.all(
-            numpy.isnan(predictor_matrix_40km)
-        )
-
-    return (
-        predictor_matrix_2pt5km, predictor_matrix_10km,
-        predictor_matrix_20km, predictor_matrix_40km,
-        found_any_predictors, found_all_predictors
-    )
 
 
 def _find_relevant_init_times(first_time_by_period_unix_sec,
@@ -1604,7 +815,7 @@ def _find_relevant_init_times(first_time_by_period_unix_sec,
             include_endpoint=True
         )
 
-        # TODO(thunderhoser): This if-condition is designed to deal with a
+        # TODO(thunderhoser): This HACKY if-condition is designed to deal with a
         # situation where nn_init_time_interval_sec = 43200 (12 hours) and
         # first_init_time = last_init_time != a multiple of 12 hours.
         if (
@@ -1663,6 +874,8 @@ def create_data(option_dict, init_time_unix_sec):
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
@@ -1683,7 +896,7 @@ def create_data(option_dict, init_time_unix_sec):
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
 
     if patch_size_2pt5km_pixels is None:
-        num_rows, num_columns = __get_grid_dimensions(
+        num_rows, num_columns = nwp_input.get_grid_dimensions(
             grid_spacing_km=2.5, patch_location_dict=None
         )
         mask_matrix_for_loss = numpy.full((num_rows, num_columns), 1, dtype=int)
@@ -1790,7 +1003,7 @@ def create_data(option_dict, init_time_unix_sec):
     if do_residual_prediction:
         try:
             predictor_matrix_resid_baseline = (
-                _read_residual_baseline_one_example(
+                nwp_input.read_residual_baseline_one_example(
                     init_time_unix_sec=init_time_unix_sec,
                     nwp_model_name=resid_baseline_model_name,
                     nwp_lead_time_hours=resid_baseline_lead_time_hours,
@@ -1805,7 +1018,7 @@ def create_data(option_dict, init_time_unix_sec):
             warning_string = (
                 'POTENTIAL ERROR: Could not read residual baseline for '
                 'init time {0:s}.  Something went wrong in '
-                '`_read_residual_baseline_one_example`.'
+                '`nwp_input.read_residual_baseline_one_example`.'
             ).format(
                 time_conversion.unix_sec_to_string(
                     init_time_unix_sec, '%Y-%m-%d-%H'
@@ -1832,7 +1045,7 @@ def create_data(option_dict, init_time_unix_sec):
             predictor_matrix_40km,
             found_any_predictors,
             found_all_predictors
-        ) = _read_predictors_one_example(
+        ) = nwp_input.read_predictors_one_example(
             init_time_unix_sec=init_time_unix_sec,
             nwp_model_names=nwp_model_names,
             nwp_lead_times_hours=nwp_lead_times_hours,
@@ -1840,12 +1053,15 @@ def create_data(option_dict, init_time_unix_sec):
             nwp_model_to_dir_name=nwp_model_to_dir_name,
             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
             use_quantile_norm=nwp_use_quantile_norm,
+            backup_nwp_model_name=backup_nwp_model_name,
+            backup_nwp_directory_name=backup_nwp_directory_name,
             patch_location_dict=patch_location_dict
         )
     except:
         warning_string = (
             'POTENTIAL ERROR: Could not read predictors for init time '
-            '{0:s}.  Something went wrong in `_read_predictors_one_example`.'
+            '{0:s}.  Something went wrong in '
+            '`nwp_input.read_predictors_one_example`.'
         ).format(
             time_conversion.unix_sec_to_string(
                 init_time_unix_sec, '%Y-%m-%d-%H'
@@ -2037,6 +1253,8 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
@@ -2140,7 +1358,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
 
     if do_residual_prediction:
         try:
-            full_baseline_matrix = _read_residual_baseline_one_example(
+            full_baseline_matrix = nwp_input.read_residual_baseline_one_example(
                 init_time_unix_sec=init_time_unix_sec,
                 nwp_model_name=resid_baseline_model_name,
                 nwp_lead_time_hours=resid_baseline_lead_time_hours,
@@ -2154,7 +1372,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             warning_string = (
                 'POTENTIAL ERROR: Could not read residual baseline for '
                 'init time {0:s}.  Something went wrong in '
-                '`_read_residual_baseline_one_example`.'
+                '`nwp_input.read_residual_baseline_one_example`.'
             ).format(
                 time_conversion.unix_sec_to_string(
                     init_time_unix_sec, '%Y-%m-%d-%H'
@@ -2177,7 +1395,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             full_predictor_matrix_40km,
             found_any_predictors,
             found_all_predictors
-        ) = _read_predictors_one_example(
+        ) = nwp_input.read_predictors_one_example(
             init_time_unix_sec=init_time_unix_sec,
             nwp_model_names=nwp_model_names,
             nwp_lead_times_hours=nwp_lead_times_hours,
@@ -2185,13 +1403,15 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             nwp_model_to_dir_name=nwp_model_to_dir_name,
             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
             use_quantile_norm=nwp_use_quantile_norm,
+            backup_nwp_model_name=backup_nwp_model_name,
+            backup_nwp_directory_name=backup_nwp_directory_name,
             patch_location_dict=None
         )
     except:
         warning_string = (
             'POTENTIAL ERROR: Could not read predictors for init time '
             '{0:s}.  Something went wrong in '
-            '`_read_predictors_one_example`.'
+            '`nwp_input.read_predictors_one_example`.'
         ).format(
             time_conversion.unix_sec_to_string(
                 init_time_unix_sec, '%Y-%m-%d-%H'
@@ -2272,16 +1492,11 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         patch_metalocation_dict = __update_patch_metalocation_dict(
             patch_metalocation_dict
         )
-        print(patch_metalocation_dict)
-
         patch_location_dict = misc_utils.determine_patch_locations(
             patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
             start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
             start_column_2pt5km=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
         )
-        print('\n\n\n\n\n\n\n')
-        print(patch_location_dict)
-        print('\n\n\n\n\n\n\n')
         pld = patch_location_dict
 
         j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
@@ -2458,6 +1673,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
@@ -2590,32 +1807,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             patch_metalocation_dict = __update_patch_metalocation_dict(
                 patch_metalocation_dict
             )
-            print(patch_metalocation_dict)
-            print('full_target_matrix.shape = {0:s}'.format(
-                'None' if full_target_matrix is None
-                else str(full_target_matrix.shape))
-            )
-            print('full_baseline_matrix.shape = {0:s}'.format(
-                'None' if full_baseline_matrix is None
-                else str(full_baseline_matrix.shape))
-            )
-            print('full_predictor_matrix_2pt5km.shape = {0:s}'.format(
-                'None' if full_predictor_matrix_2pt5km is None
-                else str(full_predictor_matrix_2pt5km.shape))
-            )
-            print('full_predictor_matrix_10km.shape = {0:s}'.format(
-                'None' if full_predictor_matrix_10km is None
-                else str(full_predictor_matrix_10km.shape))
-            )
-            print('full_predictor_matrix_20km.shape = {0:s}'.format(
-                'None' if full_predictor_matrix_20km is None
-                else str(full_predictor_matrix_20km.shape))
-            )
-            print('full_predictor_matrix_40km.shape = {0:s}'.format(
-                'None' if full_predictor_matrix_40km is None
-                else str(full_predictor_matrix_40km.shape))
-            )
-            print('\n')
 
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
                 full_target_matrix = None
@@ -2671,21 +1862,25 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
 
             try:
                 if do_residual_prediction and full_baseline_matrix is None:
-                    full_baseline_matrix = _read_residual_baseline_one_example(
-                        init_time_unix_sec=init_times_unix_sec[init_time_index],
-                        nwp_model_name=resid_baseline_model_name,
-                        nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                        nwp_directory_name=resid_baseline_model_dir_name,
-                        target_field_names=target_field_names,
-                        patch_location_dict=None,
-                        predict_dewpoint_depression=predict_dewpoint_depression,
-                        predict_gust_factor=predict_gust_factor
+                    full_baseline_matrix = (
+                        nwp_input.read_residual_baseline_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            nwp_model_name=resid_baseline_model_name,
+                            nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                            nwp_directory_name=resid_baseline_model_dir_name,
+                            target_field_names=target_field_names,
+                            patch_location_dict=None,
+                            predict_dewpoint_depression=
+                            predict_dewpoint_depression,
+                            predict_gust_factor=predict_gust_factor
+                        )
                     )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '
                     'init time {0:s}.  Something went wrong in '
-                    '`_read_residual_baseline_one_example`.'
+                    '`nwp_input.read_residual_baseline_one_example`.'
                 ).format(
                     time_conversion.unix_sec_to_string(
                         init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
@@ -2716,7 +1911,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         full_predictor_matrix_40km,
                         found_any_predictors,
                         found_all_predictors
-                    ) = _read_predictors_one_example(
+                    ) = nwp_input.read_predictors_one_example(
                         init_time_unix_sec=init_times_unix_sec[init_time_index],
                         nwp_model_names=nwp_model_names,
                         nwp_lead_times_hours=nwp_lead_times_hours,
@@ -2724,6 +1919,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         nwp_model_to_dir_name=nwp_model_to_dir_name,
                         nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
                         use_quantile_norm=nwp_use_quantile_norm,
+                        backup_nwp_model_name=backup_nwp_model_name,
+                        backup_nwp_directory_name=backup_nwp_directory_name,
                         patch_location_dict=None
                     )
                 else:
@@ -2733,7 +1930,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 warning_string = (
                     'POTENTIAL ERROR: Could not read predictors for init time '
                     '{0:s}.  Something went wrong in '
-                    '`_read_predictors_one_example`.'
+                    '`nwp_input.read_predictors_one_example`.'
                 ).format(
                     time_conversion.unix_sec_to_string(
                         init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
@@ -2770,9 +1967,6 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 start_column_2pt5km=
                 patch_metalocation_dict[PATCH_START_COLUMN_KEY]
             )
-            print('\n\n\n\n\n\n\n')
-            print(patch_location_dict)
-            print('\n\n\n\n\n\n\n')
             pld = patch_location_dict
 
             j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
@@ -2882,13 +2076,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 str(numpy.nanmax(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
             ))
 
-            predictor_matrix_resid_baseline[
-                numpy.isnan(predictor_matrix_resid_baseline)
-            ] = sentinel_value
-
-            # error_checking.assert_is_numpy_array_without_nan(
-            #     predictor_matrix_resid_baseline
-            # )
+            error_checking.assert_is_numpy_array_without_nan(
+                predictor_matrix_resid_baseline
+            )
 
         if predictor_matrix_10km is not None:
             print((
@@ -3012,6 +2202,10 @@ def data_generator(option_dict):
     option_dict["nwp_use_quantile_norm"]: Boolean flag.  If True, will normalize
         NWP predictors in two steps: quantiles, then z-scores.  If False, will
         do simple z-score normalization.
+    option_dict["backup_nwp_model_name"]: Name of backup model, used to fill
+        missing data.
+    option_dict["backup_nwp_directory_name"]: Directory for backup model.  Files
+        therein will be found by `interp_nwp_model_io.find_file`.
     option_dict["target_lead_time_hours"]: Lead time for target fields.
     option_dict["target_field_names"]: length-F list with names of target
         fields.  Each must be accepted by `urma_utils.check_field_name`.
@@ -3094,6 +2288,8 @@ def data_generator(option_dict):
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
@@ -3115,7 +2311,7 @@ def data_generator(option_dict):
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
 
     if patch_size_2pt5km_pixels is None:
-        num_rows, num_columns = __get_grid_dimensions(
+        num_rows, num_columns = nwp_input.get_grid_dimensions(
             grid_spacing_km=2.5, patch_location_dict=None
         )
         mask_matrix_for_loss = numpy.full((num_rows, num_columns), 1, dtype=int)
@@ -3134,10 +2330,6 @@ def data_generator(option_dict):
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
-
-    # nwp_model_names = [
-    #     m for m in nwp_model_names if m != nwp_model_utils.WRF_ARW_MODEL_NAME
-    # ]
 
     if nwp_normalization_file_name is None:
         nwp_norm_param_table_xarray = None
@@ -3283,21 +2475,25 @@ def data_generator(option_dict):
 
             if do_residual_prediction:
                 try:
-                    this_baseline_matrix = _read_residual_baseline_one_example(
-                        init_time_unix_sec=init_times_unix_sec[init_time_index],
-                        nwp_model_name=resid_baseline_model_name,
-                        nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                        nwp_directory_name=resid_baseline_model_dir_name,
-                        target_field_names=target_field_names,
-                        patch_location_dict=patch_location_dict,
-                        predict_dewpoint_depression=predict_dewpoint_depression,
-                        predict_gust_factor=predict_gust_factor
+                    this_baseline_matrix = (
+                        nwp_input.read_residual_baseline_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            nwp_model_name=resid_baseline_model_name,
+                            nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                            nwp_directory_name=resid_baseline_model_dir_name,
+                            target_field_names=target_field_names,
+                            patch_location_dict=patch_location_dict,
+                            predict_dewpoint_depression=
+                            predict_dewpoint_depression,
+                            predict_gust_factor=predict_gust_factor
+                        )
                     )
                 except:
                     warning_string = (
                         'POTENTIAL ERROR: Could not read residual baseline for '
                         'init time {0:s}.  Something went wrong in '
-                        '`_read_residual_baseline_one_example`.'
+                        '`nwp_input.read_residual_baseline_one_example`.'
                     ).format(
                         time_conversion.unix_sec_to_string(
                             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
@@ -3321,7 +2517,7 @@ def data_generator(option_dict):
                     this_predictor_matrix_40km,
                     found_any_predictors,
                     found_all_predictors
-                ) = _read_predictors_one_example(
+                ) = nwp_input.read_predictors_one_example(
                     init_time_unix_sec=init_times_unix_sec[init_time_index],
                     nwp_model_names=nwp_model_names,
                     nwp_lead_times_hours=nwp_lead_times_hours,
@@ -3329,13 +2525,15 @@ def data_generator(option_dict):
                     nwp_model_to_dir_name=nwp_model_to_dir_name,
                     nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
                     use_quantile_norm=nwp_use_quantile_norm,
-                    patch_location_dict=patch_location_dict
+                    patch_location_dict=patch_location_dict,
+                    backup_nwp_model_name=backup_nwp_model_name,
+                    backup_nwp_directory_name=backup_nwp_directory_name
                 )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read predictors for init time '
                     '{0:s}.  Something went wrong in '
-                    '`_read_predictors_one_example`.'
+                    '`nwp_input.read_predictors_one_example`.'
                 ).format(
                     time_conversion.unix_sec_to_string(
                         init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
