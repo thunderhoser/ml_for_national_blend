@@ -1126,7 +1126,8 @@ def read_predictors_one_example(
                 'predictor values with NaN.'
             ).format(
                 nwp_model_names[i],
-                backup_nwp_model_name,
+                'None' if backup_nwp_model_name is None
+                else backup_nwp_model_name,
                 time_conversion.unix_sec_to_string(
                     init_time_unix_sec, '%Y-%m-%d-%H'
                 )
