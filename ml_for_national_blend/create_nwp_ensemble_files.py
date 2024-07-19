@@ -5,7 +5,8 @@ Each output file has the following properties:
 - One init time
 - One lead time
 - Interpolated to the full-resolution (2.5-km) NBM grid
-- Contains forecasts of the five target variables
+- Contains forecasts of either [1] all predictor variables or [2] the five
+  target variables
 """
 
 import os
@@ -28,18 +29,12 @@ import interp_nwp_model_io
 import nbm_utils
 import misc_utils
 import nwp_model_utils
-import neural_net_with_fancy_patches as neural_net
+import nwp_input
 
-# TODO(thunderhoser): Missing lead times will eventually be an issue here.  For
-# example, if I want an ensemble-based 37-hour forecast, I will need to
-# interpolate between 36 and 39 hours for the models that have 3-hour time
-# steps.
-
-# TODO(thunderhoser): The best way to handle this may be to expand the
-# application of temporal interp in neural_net.py.  Currently, temporal interp
-# is used only for unexpectedly missing times -- i.e., forecast times that
-# should be available but are not found.  I could expand temporal interp to
-# expectedly missing times.
+# TODO(thunderhoser): When this script calls
+# `nwp_input.read_predictors_one_file`, it interpolates between missing lead
+# times -- so it is not completely "rigid".  Maybe I want to add the option to
+# disallow this interpolation?
 
 # TODO(thunderhoser): Another thing: this script uses data that have already
 # been interpolated to the NBM grid (or a downsampled version thereof), but
@@ -62,6 +57,7 @@ TARGET_FIELD_NAMES = [
 INPUT_DIRS_ARG_NAME = 'input_nwp_dir_names'
 NWP_MODELS_ARG_NAME = 'nwp_model_names'
 LEAD_TIMES_ARG_NAME = 'lead_times_hours'
+TARGETS_ONLY_ARG_NAME = 'targets_only'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 OUTPUT_DIR_ARG_NAME = 'output_ensemble_dir_name'
@@ -81,6 +77,10 @@ NWP_MODELS_HELP_STRING = (
 LEAD_TIMES_HELP_STRING = (
     'List of lead times.  This script will process forecasts at every lead '
     'time in the list.'
+)
+TARGETS_ONLY_HELP_STRING = (
+    'Boolean flag.  If 1, output files will contain only the five target '
+    'variables.  If 0, the output files will contain all variables.'
 )
 FIRST_INIT_TIME_HELP_STRING = (
     'This script will process model runs initialized at all times in the '
@@ -109,6 +109,10 @@ INPUT_ARG_PARSER.add_argument(
     help=LEAD_TIMES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TARGETS_ONLY_ARG_NAME, type=int, required=True,
+    help=TARGETS_ONLY_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=True,
     help=FIRST_INIT_TIME_HELP_STRING
 )
@@ -123,8 +127,9 @@ INPUT_ARG_PARSER.add_argument(
 
 
 def _extract_1model_from_matrices(
-        nwp_model_to_field_names, desired_nwp_model_name, data_matrix_2pt5km,
-        data_matrix_10km, data_matrix_20km, data_matrix_40km):
+        nwp_model_to_field_names, desired_nwp_model_name, targets_only,
+        data_matrix_2pt5km, data_matrix_10km, data_matrix_20km,
+        data_matrix_40km):
     """Extracts data for one model from set of data matrices.
 
     M = number of rows in desired model's grid
@@ -138,8 +143,10 @@ def _extract_1model_from_matrices(
         by `nwp_model_utils.check_field_name`.
     :param desired_nwp_model_name: Name of desired model.  Will extract data for
         this model only.
+    :param targets_only: Boolean flag.  If True, will ensemble only the five
+        target variables.  If False, will ensemble all variables.
     :param data_matrix_2pt5km: See documentation for
-        `neural_net._read_predictors_one_example`.
+        `nwp_input.read_predictors_one_example`.
     :param data_matrix_10km: Same.
     :param data_matrix_20km: Same.
     :param data_matrix_40km: Same.
@@ -218,34 +225,55 @@ def _extract_1model_from_matrices(
 
         desired_model_data_matrix = data_matrix_40km[..., 0, k_start:k_end]
 
-    if nwp_model_utils.WIND_GUST_10METRE_NAME not in current_field_names:
-        u = current_field_names.index(nwp_model_utils.U_WIND_10METRE_NAME)
-        v = current_field_names.index(nwp_model_utils.V_WIND_10METRE_NAME)
-        current_field_names.append(nwp_model_utils.WIND_GUST_10METRE_NAME)
+    if targets_only:
+        all_field_names = TARGET_FIELD_NAMES
 
-        fake_gust_matrix = numpy.sqrt(
-            desired_model_data_matrix[..., u] ** 2 +
-            desired_model_data_matrix[..., v] ** 2
-        )
-        desired_model_data_matrix = numpy.concatenate([
-            desired_model_data_matrix,
-            numpy.expand_dims(fake_gust_matrix, axis=-1)
-        ], axis=-1)
+        if nwp_model_utils.WIND_GUST_10METRE_NAME not in current_field_names:
+            u = current_field_names.index(nwp_model_utils.U_WIND_10METRE_NAME)
+            v = current_field_names.index(nwp_model_utils.V_WIND_10METRE_NAME)
+            current_field_names.append(nwp_model_utils.WIND_GUST_10METRE_NAME)
+
+            fake_gust_matrix = numpy.sqrt(
+                desired_model_data_matrix[..., u] ** 2 +
+                desired_model_data_matrix[..., v] ** 2
+            )
+            desired_model_data_matrix = numpy.concatenate([
+                desired_model_data_matrix,
+                numpy.expand_dims(fake_gust_matrix, axis=-1)
+            ], axis=-1)
+    else:
+        all_field_names = nwp_model_utils.ALL_FIELD_NAMES
+
+        for this_field_name in all_field_names:
+            if this_field_name in current_field_names:
+                continue
+
+            current_field_names.append(this_field_name)
+
+            nan_matrix = numpy.full(
+                desired_model_data_matrix[..., 0].shape, numpy.nan
+            )
+            desired_model_data_matrix = numpy.concatenate([
+                desired_model_data_matrix,
+                numpy.expand_dims(nan_matrix, axis=-1)
+            ], axis=-1)
 
     sort_indices = numpy.array(
-        [current_field_names.index(f) for f in TARGET_FIELD_NAMES],
+        [current_field_names.index(f) for f in all_field_names],
         dtype=int
     )
     return desired_model_data_matrix[..., sort_indices]
 
 
 def _create_ensemble_file_1init_1valid(
-        init_time_unix_sec, lead_time_hours, nwp_model_to_dir_name,
-        output_ensemble_dir_name):
+        init_time_unix_sec, lead_time_hours, targets_only,
+        nwp_model_to_dir_name, output_ensemble_dir_name):
     """Creates ensemble file for one init time and one valid time.
 
     :param init_time_unix_sec: Init time.
     :param lead_time_hours: Lead time.
+    :param targets_only: Boolean flag.  If True, will ensemble only the five
+        target variables.  If False, will ensemble all variables.
     :param nwp_model_to_dir_name: Dictionary, where each key is the name of an
         NWP model and the corresponding value is the directory path for data
         from said model.  NWP-model names must be accepted by
@@ -253,6 +281,11 @@ def _create_ensemble_file_1init_1valid(
         files will be found by `interp_nwp_model_io.find_file`.
     :param output_ensemble_dir_name: See documentation at top of this script.
     """
+    
+    if targets_only:
+        all_field_names = TARGET_FIELD_NAMES
+    else:
+        all_field_names = nwp_model_utils.ALL_FIELD_NAMES
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
@@ -263,7 +296,7 @@ def _create_ensemble_file_1init_1valid(
             this_model_name
         )
         desired_field_names = list(
-            set(TARGET_FIELD_NAMES) - set(missing_field_names)
+            set(all_field_names) - set(missing_field_names)
         )
         desired_field_names.sort()
 
@@ -280,7 +313,7 @@ def _create_ensemble_file_1init_1valid(
         data_matrix_20km,
         data_matrix_40km,
         found_any_data
-    ) = neural_net._read_predictors_one_example(
+    ) = nwp_input.read_predictors_one_example(
         init_time_unix_sec=init_time_unix_sec,
         nwp_model_names=nwp_model_names,
         nwp_lead_times_hours=numpy.array([lead_time_hours], dtype=int),
@@ -288,7 +321,10 @@ def _create_ensemble_file_1init_1valid(
         nwp_model_to_dir_name=nwp_model_to_dir_name,
         nwp_norm_param_table_xarray=None,
         use_quantile_norm=False,
-        patch_location_dict=None
+        backup_nwp_model_name=None,
+        backup_nwp_directory_name=None,
+        patch_location_dict=None,
+        rigid_flag=True
     )
 
     if not found_any_data:
@@ -308,7 +344,7 @@ def _create_ensemble_file_1init_1valid(
     num_models = len(nwp_model_names)
     num_rows = data_matrix_2pt5km.shape[0]
     num_columns = data_matrix_2pt5km.shape[1]
-    num_fields = len(TARGET_FIELD_NAMES)
+    num_fields = len(all_field_names)
 
     these_dims = (num_rows, num_columns, num_fields, num_models)
     ensemble_data_matrix_2pt5km = numpy.full(these_dims, numpy.nan)
@@ -317,6 +353,7 @@ def _create_ensemble_file_1init_1valid(
         current_data_matrix = _extract_1model_from_matrices(
             nwp_model_to_field_names=nwp_model_to_field_names,
             desired_nwp_model_name=nwp_model_names[i],
+            targets_only=targets_only,
             data_matrix_2pt5km=data_matrix_2pt5km,
             data_matrix_10km=data_matrix_10km,
             data_matrix_20km=data_matrix_20km,
@@ -352,7 +389,7 @@ def _create_ensemble_file_1init_1valid(
             nwp_model_utils.FORECAST_HOUR_DIM: numpy.array(
                 [lead_time_hours], dtype=int
             ),
-            nwp_model_utils.FIELD_DIM: TARGET_FIELD_NAMES
+            nwp_model_utils.FIELD_DIM: all_field_names
         }
 
         these_dims_2d = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
@@ -405,7 +442,7 @@ def _create_ensemble_file_1init_1valid(
         nwp_model_utils.FORECAST_HOUR_DIM: numpy.array(
             [lead_time_hours], dtype=int
         ),
-        nwp_model_utils.FIELD_DIM: TARGET_FIELD_NAMES
+        nwp_model_utils.FIELD_DIM: all_field_names
     }
 
     these_dims_2d = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
@@ -450,7 +487,7 @@ def _create_ensemble_file_1init_1valid(
     )
 
 
-def _run(input_nwp_dir_names, nwp_model_names, lead_times_hours,
+def _run(input_nwp_dir_names, nwp_model_names, lead_times_hours, targets_only,
          first_init_time_string, last_init_time_string,
          output_ensemble_dir_name):
     """Creates NWP-ensemble files.
@@ -460,6 +497,7 @@ def _run(input_nwp_dir_names, nwp_model_names, lead_times_hours,
     :param input_nwp_dir_names: See documentation at top of this script.
     :param nwp_model_names: Same.
     :param lead_times_hours: Same.
+    :param targets_only: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
     :param output_ensemble_dir_name: Same.
@@ -498,6 +536,7 @@ def _run(input_nwp_dir_names, nwp_model_names, lead_times_hours,
             _create_ensemble_file_1init_1valid(
                 init_time_unix_sec=this_init_time_unix_sec,
                 lead_time_hours=this_lead_time_hours,
+                targets_only=targets_only,
                 nwp_model_to_dir_name=nwp_model_to_dir_name,
                 output_ensemble_dir_name=output_ensemble_dir_name
             )
@@ -512,6 +551,7 @@ if __name__ == '__main__':
         lead_times_hours=numpy.array(
             getattr(INPUT_ARG_OBJECT, LEAD_TIMES_ARG_NAME), dtype=int
         ),
+        targets_only=bool(getattr(INPUT_ARG_OBJECT, TARGETS_ONLY_ARG_NAME)),
         first_init_time_string=getattr(
             INPUT_ARG_OBJECT, FIRST_INIT_TIME_ARG_NAME
         ),

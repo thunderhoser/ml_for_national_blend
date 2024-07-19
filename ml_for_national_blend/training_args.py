@@ -19,6 +19,8 @@ NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_MODEL_TO_FIELDS_ARG_NAME = 'nwp_model_to_field_names'
 NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'
 NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'
+BACKUP_NWP_MODEL_ARG_NAME = 'backup_nwp_model_name'
+BACKUP_NWP_DIR_ARG_NAME = 'backup_nwp_dir_name'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
@@ -97,6 +99,13 @@ NWP_USE_QUANTILE_NORM_HELP_STRING = (
     'Boolean flag.  If 1, will do two-step normalization: conversion to '
     'quantiles and then normal distribution (using inverse CDF).  If 0, will '
     'do simple z-score normalization.'
+)
+BACKUP_NWP_MODEL_HELP_STRING = (
+    'Name of backup NWP model, used to fill missing data.'
+)
+BACKUP_NWP_DIR_HELP_STRING = (
+    'Path to data directory for backup NWP model.  Files therein will be found '
+    'by `interp_nwp_model_io.find_file`.'
 )
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target variables.'
 TARGET_FIELDS_HELP_STRING = (
@@ -291,6 +300,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + NWP_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
         default=1, help=NWP_USE_QUANTILE_NORM_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + BACKUP_NWP_MODEL_ARG_NAME, type=str, required=True,
+        help=BACKUP_NWP_MODEL_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + BACKUP_NWP_DIR_ARG_NAME, type=str, required=True,
+        help=BACKUP_NWP_DIR_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_LEAD_TIME_ARG_NAME, type=int, required=True,
