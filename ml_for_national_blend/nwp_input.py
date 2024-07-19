@@ -491,9 +491,9 @@ def _find_predictors_1example_1model_rigid(
         print((
             'Informational message (NOT AN ERROR)...\n'
             'Desired NWP lead times:\n'
-            '{0:s}\n\n'
+            '{0:s}\n'
             'NWP files to be used:\n'
-            '{1:s}'
+            '{1:s}\n'
         ).format(
             str(nwp_lead_times_hours),
             str(pathless_forecast_file_names)

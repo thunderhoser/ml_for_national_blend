@@ -312,7 +312,8 @@ def _create_ensemble_file_1init_1valid(
         data_matrix_10km,
         data_matrix_20km,
         data_matrix_40km,
-        found_any_data
+        found_any_data,
+        _
     ) = nwp_input.read_predictors_one_example(
         init_time_unix_sec=init_time_unix_sec,
         nwp_model_names=nwp_model_names,
