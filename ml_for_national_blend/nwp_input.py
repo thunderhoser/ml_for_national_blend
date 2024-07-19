@@ -734,7 +734,7 @@ def _read_predictors_1example_1model(
         if predictor_matrix is None:
             these_dims = (
                 this_predictor_matrix.shape[0], this_predictor_matrix.shape[1],
-                num_lead_times, this_predictor_matrix.shape[3]
+                num_lead_times, this_predictor_matrix.shape[2]
             )
             predictor_matrix = numpy.full(these_dims, numpy.nan)
 
