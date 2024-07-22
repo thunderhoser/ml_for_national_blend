@@ -25,19 +25,29 @@ INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
 INPUT_DIMENSIONS_20KM_RES_KEY = 'input_dimensions_20km_res'
 INPUT_DIMENSIONS_40KM_RES_KEY = 'input_dimensions_40km_res'
 PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
+INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = 'input_dimensions_lagged_targets'
 USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
 
-NUM_CHANNELS_KEY = 'num_channels_by_level'
-POOLING_SIZE_KEY = 'pooling_size_by_level_px'
-ENCODER_NUM_CONV_LAYERS_KEY = 'encoder_num_conv_layers_by_level'
-ENCODER_DROPOUT_RATES_KEY = 'encoder_dropout_rate_by_level'
+NWP_ENCODER_NUM_CHANNELS_KEY = 'nwp_encoder_num_channels_by_level'
+NWP_POOLING_SIZE_KEY = 'nwp_pooling_size_by_level_px'
+NWP_ENCODER_NUM_CONV_LAYERS_KEY = 'nwp_encoder_num_conv_layers_by_level'
+NWP_ENCODER_DROPOUT_RATES_KEY = 'nwp_encoder_dropout_rate_by_level'
+NWP_FC_MODULE_NUM_CONV_LAYERS_KEY = 'nwp_forecast_module_num_conv_layers'
+NWP_FC_MODULE_DROPOUT_RATES_KEY = 'nwp_forecast_module_dropout_rates'
+NWP_FC_MODULE_USE_3D_CONV = 'nwp_forecast_module_use_3d_conv'
+
+LAGTGT_ENCODER_NUM_CHANNELS_KEY = 'lagtgt_encoder_num_channels_by_level'
+LAGTGT_POOLING_SIZE_KEY = 'lagtgt_pooling_size_by_level_px'
+LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY = 'lagtgt_encoder_num_conv_layers_by_level'
+LAGTGT_ENCODER_DROPOUT_RATES_KEY = 'lagtgt_encoder_dropout_rate_by_level'
+LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY = 'lagtgt_forecast_module_num_conv_layers'
+LAGTGT_FC_MODULE_DROPOUT_RATES_KEY = 'lagtgt_forecast_module_dropout_rates'
+LAGTGT_FC_MODULE_USE_3D_CONV = 'lagtgt_forecast_module_use_3d_conv'
+
+DECODER_NUM_CHANNELS_KEY = 'decoder_num_channels_by_level'
 DECODER_NUM_CONV_LAYERS_KEY = 'decoder_num_conv_layers_by_level'
 UPSAMPLING_DROPOUT_RATES_KEY = 'upsampling_dropout_rate_by_level'
 SKIP_DROPOUT_RATES_KEY = 'skip_dropout_rate_by_level'
-
-FC_MODULE_NUM_CONV_LAYERS_KEY = 'forecast_module_num_conv_layers'
-FC_MODULE_DROPOUT_RATES_KEY = 'forecast_module_dropout_rates'
-FC_MODULE_USE_3D_CONV = 'forecast_module_use_3d_conv'
 
 INCLUDE_PENULTIMATE_KEY = 'include_penultimate_conv'
 PENULTIMATE_DROPOUT_RATE_KEY = 'penultimate_conv_dropout_rate'
@@ -58,16 +68,16 @@ OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 METRIC_FUNCTIONS_KEY = 'metric_function_list'
 
 DEFAULT_OPTION_DICT = {
-    ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
+    # ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(9, 2, dtype=int),
     DECODER_NUM_CONV_LAYERS_KEY: numpy.full(8, 2, dtype=int),
-    POOLING_SIZE_KEY: numpy.full(8, 2, dtype=int),
-    NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96, 96], dtype=int),
-    ENCODER_DROPOUT_RATES_KEY: numpy.full(9, 0.),
+    # POOLING_SIZE_KEY: numpy.full(8, 2, dtype=int),
+    # NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64, 96, 96], dtype=int),
+    # ENCODER_DROPOUT_RATES_KEY: numpy.full(9, 0.),
     UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(8, 0.),
     SKIP_DROPOUT_RATES_KEY: numpy.full(8, 0.),
-    FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    FC_MODULE_USE_3D_CONV: True,
+    # FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
+    # FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    # FC_MODULE_USE_3D_CONV: True,
     INCLUDE_PENULTIMATE_KEY: True,
     PENULTIMATE_DROPOUT_RATE_KEY: 0.,
     INNER_ACTIV_FUNCTION_KEY: architecture_utils.RELU_FUNCTION_STRING,
@@ -83,7 +93,6 @@ def check_input_args(option_dict):
     """Error-checks input arguments.
 
     L = number of levels
-    F = number of convolutional layers in forecasting module
 
     :param option_dict: Dictionary with the following keys.
     option_dict["input_dimensions_2pt5km_res"]:
@@ -96,32 +105,52 @@ def check_input_args(option_dict):
     option_dict["input_dimensions_40km_res"]: Same but for 40-km NWP forecasts.
     option_dict["input_dimensions_predn_baseline"]: Same but for prediction
         baseline.
+    option_dict["input_dimensions_lagged_targets"]: Same but for lagged targets.
     option_dict["use_residual_blocks"]: Boolean flag.  If True (False), the NN
         will use residual (simple conv) blocks.
-    option_dict["num_channels_by_level"]: length-(L + 1) numpy array with number
-        of channels (feature maps) at each level.
-    option_dict["pooling_size_by_level_px"]: length-L numpy array with size of
-        max-pooling window for each level.  For example, if you want 2-by-2
-        pooling at the [j]th level, make pooling_size_by_level_px[j] = 2.
-    option_dict["encoder_num_conv_layers_by_level"]: length-(L + 1) numpy array
-        with number of conv layers in the encoder block at each level.
-    option_dict["encoder_dropout_rate_by_level"]: length-(L + 1) numpy array
-        with dropout rate on encoder side for each level.  Use number <= 0 to
+    option_dict["nwp_encoder_num_channels_by_level"]: length-(L + 1) numpy array
+        with number of channels (feature maps) at each level of NWP-encoder.
+    option_dict["lagtgt_encoder_num_channels_by_level"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_pooling_size_by_level_px"]: length-L numpy array with size
+        of max-pooling window at each level of NWP-encoder.  For example, if you
+        want 2-by-2 pooling at the [j]th level,
+        make pooling_size_by_level_px[j] = 2.
+    option_dict["lagtgt_pooling_size_by_level_px"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_encoder_num_conv_layers_by_level"]: length-(L + 1) numpy
+        array with number of conv layers at each level of NWP-encoder.
+    option_dict["lagtgt_encoder_num_conv_layers_by_level"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_encoder_dropout_rate_by_level"]: length-(L + 1) numpy array
+        with dropout rate at each level of NWP-encoder.  Use numbers <= 0 to
         indicate no-dropout.
+    option_dict["lagtgt_encoder_dropout_rate_by_level"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_forecast_module_num_conv_layers"]: Number of conv layers in
+        forecasting module at end of NWP-encoder.
+    option_dict["lagtgt_forecast_module_num_conv_layers"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_forecast_module_dropout_rates"]: length-F numpy array
+        (where F = nwp_forecast_module_num_conv_layers) with dropout rate for
+        each conv layer in NWP-forecasting module.  Use numbers <= 0 to indicate
+        no-dropout.
+    option_dict["lagtgt_forecast_module_dropout_rates"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["nwp_forecast_module_use_3d_conv"]: Boolean flag.  Determines
+        whether NWP-forecasting module will use 2-D or 3-D convolution.
+    option_dict["lagtgt_forecast_module_use_3d_conv"]: Same but for lagged
+        targets.  If you do not want to use lagged targets, make this None.
+    option_dict["decoder_num_channels_by_level"]: length-L numpy array with
+        number of channels (feature maps) at each level of decoder block.
     option_dict["decoder_num_conv_layers_by_level"]: length-L numpy array
-        with number of conv layers in the decoder block at each level.
+        with number of conv layers at each level of decoder block.
     option_dict["upsampling_dropout_rate_by_level"]: length-L numpy array with
-        dropout rate in upconv layer at each level.  Use number <= 0 to indicate
-        no-dropout.
+        dropout rate in upconv layer at each level of decoder block.  Use
+        numbers <= 0 to indicate no-dropout.
     option_dict["skip_dropout_rate_by_level"]: length-L numpy array with dropout
-        rate in skip connection at each level.  Use number <= 0 to indicate
-        no-dropout.
-    option_dict["forecast_module_num_conv_layers"]: F in the above definitions.
-    option_dict["forecast_module_dropout_rates"]: length-F numpy array with
-        dropout rate for each conv layer in forecasting module.  Use number
-        <= 0 to indicate no-dropout.
-    option_dict["forecast_module_use_3d_conv"]: Boolean flag.  Determines
-        whether forecasting module will use 2-D or 3-D convolution.
+        rate in skip connection at each level of decoder block.  Use
+        numbers <= 0 to indicate no-dropout.
     option_dict["include_penultimate_conv"]: Boolean flag.  If True, will put in
         extra conv layer (with 3 x 3 filter) before final pixelwise conv.
     option_dict["penultimate_conv_dropout_rate"]: Dropout rate for penultimate
@@ -234,42 +263,151 @@ def check_input_args(option_dict):
             option_dict[INPUT_DIMENSIONS_40KM_RES_KEY], 0
         )
 
+    if option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY] is not None:
+        error_checking.assert_is_numpy_array(
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY],
+            exact_dimensions=numpy.array([4], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY], 0
+        )
+
     error_checking.assert_is_numpy_array(
-        option_dict[NUM_CHANNELS_KEY], num_dimensions=1
+        option_dict[NWP_ENCODER_NUM_CHANNELS_KEY], num_dimensions=1
     )
-    error_checking.assert_is_integer_numpy_array(option_dict[NUM_CHANNELS_KEY])
-    error_checking.assert_is_geq_numpy_array(option_dict[NUM_CHANNELS_KEY], 1)
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[NWP_ENCODER_NUM_CHANNELS_KEY]
+    )
+    error_checking.assert_is_geq_numpy_array(
+        option_dict[NWP_ENCODER_NUM_CHANNELS_KEY], 1
+    )
 
-    num_levels = len(option_dict[NUM_CHANNELS_KEY]) - 1
+    num_levels = len(option_dict[NWP_ENCODER_NUM_CHANNELS_KEY]) - 1
 
     error_checking.assert_is_numpy_array(
-        option_dict[POOLING_SIZE_KEY],
+        option_dict[NWP_POOLING_SIZE_KEY],
         exact_dimensions=numpy.array([num_levels], dtype=int)
     )
     error_checking.assert_is_integer_numpy_array(
-        option_dict[POOLING_SIZE_KEY]
+        option_dict[NWP_POOLING_SIZE_KEY]
     )
     error_checking.assert_is_geq_numpy_array(
-        option_dict[POOLING_SIZE_KEY], 2
+        option_dict[NWP_POOLING_SIZE_KEY], 2
     )
 
     error_checking.assert_is_numpy_array(
-        option_dict[ENCODER_NUM_CONV_LAYERS_KEY],
+        option_dict[NWP_ENCODER_NUM_CONV_LAYERS_KEY],
         exact_dimensions=numpy.array([num_levels + 1], dtype=int)
     )
     error_checking.assert_is_integer_numpy_array(
-        option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
+        option_dict[NWP_ENCODER_NUM_CONV_LAYERS_KEY]
     )
     error_checking.assert_is_geq_numpy_array(
-        option_dict[ENCODER_NUM_CONV_LAYERS_KEY], 1
+        option_dict[NWP_ENCODER_NUM_CONV_LAYERS_KEY], 1
     )
 
     error_checking.assert_is_numpy_array(
-        option_dict[ENCODER_DROPOUT_RATES_KEY],
+        option_dict[NWP_ENCODER_DROPOUT_RATES_KEY],
         exact_dimensions=numpy.array([num_levels + 1], dtype=int)
     )
     error_checking.assert_is_leq_numpy_array(
-        option_dict[ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
+        option_dict[NWP_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
+    )
+
+    nwp_fc_module_num_conv_layers = option_dict[
+        NWP_FC_MODULE_NUM_CONV_LAYERS_KEY
+    ]
+    error_checking.assert_is_integer(nwp_fc_module_num_conv_layers)
+    error_checking.assert_is_greater(nwp_fc_module_num_conv_layers, 0)
+
+    expected_dim = numpy.array([nwp_fc_module_num_conv_layers], dtype=int)
+
+    nwp_fc_module_dropout_rates = option_dict[NWP_FC_MODULE_DROPOUT_RATES_KEY]
+    error_checking.assert_is_numpy_array(
+        nwp_fc_module_dropout_rates, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_leq_numpy_array(
+        nwp_fc_module_dropout_rates, 1., allow_nan=True
+    )
+
+    error_checking.assert_is_boolean(option_dict[NWP_FC_MODULE_USE_3D_CONV])
+
+    if option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY] is not None:
+        error_checking.assert_is_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CHANNELS_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CHANNELS_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CHANNELS_KEY], 1
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[LAGTGT_POOLING_SIZE_KEY],
+            exact_dimensions=numpy.array([num_levels], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[LAGTGT_POOLING_SIZE_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[LAGTGT_POOLING_SIZE_KEY], 2
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY], 1
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[LAGTGT_ENCODER_DROPOUT_RATES_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_leq_numpy_array(
+            option_dict[LAGTGT_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
+        )
+
+        lagtgt_fc_module_num_conv_layers = option_dict[
+            LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY
+        ]
+        error_checking.assert_is_integer(lagtgt_fc_module_num_conv_layers)
+        error_checking.assert_is_greater(lagtgt_fc_module_num_conv_layers, 0)
+
+        expected_dim = numpy.array([lagtgt_fc_module_num_conv_layers], dtype=int)
+
+        lagtgt_fc_module_dropout_rates = option_dict[
+            LAGTGT_FC_MODULE_DROPOUT_RATES_KEY
+        ]
+        error_checking.assert_is_numpy_array(
+            lagtgt_fc_module_dropout_rates, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_leq_numpy_array(
+            lagtgt_fc_module_dropout_rates, 1., allow_nan=True
+        )
+
+        error_checking.assert_is_boolean(
+            option_dict[LAGTGT_FC_MODULE_USE_3D_CONV]
+        )
+
+    error_checking.assert_is_numpy_array(
+        option_dict[DECODER_NUM_CHANNELS_KEY],
+        exact_dimensions=numpy.array([num_levels], dtype=int)
+    )
+    error_checking.assert_is_integer_numpy_array(
+        option_dict[DECODER_NUM_CHANNELS_KEY]
+    )
+    error_checking.assert_is_geq_numpy_array(
+        option_dict[DECODER_NUM_CHANNELS_KEY], 1
     )
 
     error_checking.assert_is_numpy_array(
@@ -298,22 +436,6 @@ def check_input_args(option_dict):
     error_checking.assert_is_leq_numpy_array(
         option_dict[SKIP_DROPOUT_RATES_KEY], 1., allow_nan=True
     )
-
-    fc_module_num_conv_layers = option_dict[FC_MODULE_NUM_CONV_LAYERS_KEY]
-    error_checking.assert_is_integer(fc_module_num_conv_layers)
-    error_checking.assert_is_greater(fc_module_num_conv_layers, 0)
-
-    expected_dim = numpy.array([fc_module_num_conv_layers], dtype=int)
-
-    fc_module_dropout_rates = option_dict[FC_MODULE_DROPOUT_RATES_KEY]
-    error_checking.assert_is_numpy_array(
-        fc_module_dropout_rates, exact_dimensions=expected_dim
-    )
-    error_checking.assert_is_leq_numpy_array(
-        fc_module_dropout_rates, 1., allow_nan=True
-    )
-
-    error_checking.assert_is_boolean(option_dict[FC_MODULE_USE_3D_CONV])
 
     error_checking.assert_is_boolean(option_dict[INCLUDE_PENULTIMATE_KEY])
     error_checking.assert_is_leq(
@@ -377,16 +499,20 @@ def create_model(option_dict):
     assert input_dimensions_predn_baseline is None
     assert not use_residual_blocks
 
-    num_channels_by_level = option_dict[NUM_CHANNELS_KEY]
-    pooling_size_by_level_px = option_dict[POOLING_SIZE_KEY]
-    num_encoder_conv_layers_by_level = option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
-    encoder_dropout_rate_by_level = option_dict[ENCODER_DROPOUT_RATES_KEY]
+    num_channels_by_level = option_dict[NWP_ENCODER_NUM_CHANNELS_KEY]
+    pooling_size_by_level_px = option_dict[NWP_POOLING_SIZE_KEY]
+    num_encoder_conv_layers_by_level = option_dict[
+        NWP_ENCODER_NUM_CONV_LAYERS_KEY
+    ]
+    encoder_dropout_rate_by_level = option_dict[NWP_ENCODER_DROPOUT_RATES_KEY]
     num_decoder_conv_layers_by_level = option_dict[DECODER_NUM_CONV_LAYERS_KEY]
     upsampling_dropout_rate_by_level = option_dict[UPSAMPLING_DROPOUT_RATES_KEY]
     skip_dropout_rate_by_level = option_dict[SKIP_DROPOUT_RATES_KEY]
-    forecast_module_num_conv_layers = option_dict[FC_MODULE_NUM_CONV_LAYERS_KEY]
-    forecast_module_dropout_rates = option_dict[FC_MODULE_DROPOUT_RATES_KEY]
-    forecast_module_use_3d_conv = option_dict[FC_MODULE_USE_3D_CONV]
+    forecast_module_num_conv_layers = option_dict[
+        NWP_FC_MODULE_NUM_CONV_LAYERS_KEY
+    ]
+    forecast_module_dropout_rates = option_dict[NWP_FC_MODULE_DROPOUT_RATES_KEY]
+    forecast_module_use_3d_conv = option_dict[NWP_FC_MODULE_USE_3D_CONV]
     include_penultimate_conv = option_dict[INCLUDE_PENULTIMATE_KEY]
     penultimate_conv_dropout_rate = option_dict[PENULTIMATE_DROPOUT_RATE_KEY]
     inner_activ_function_name = option_dict[INNER_ACTIV_FUNCTION_KEY]

@@ -23,19 +23,41 @@ INPUT_DIMENSIONS_10KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_10KM_RES_KEY
 INPUT_DIMENSIONS_20KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_20KM_RES_KEY
 INPUT_DIMENSIONS_40KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_40KM_RES_KEY
 PREDN_BASELINE_DIMENSIONS_KEY = chiu_net_arch.PREDN_BASELINE_DIMENSIONS_KEY
+INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = (
+    chiu_net_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY
+)
 USE_RESIDUAL_BLOCKS_KEY = chiu_net_arch.USE_RESIDUAL_BLOCKS_KEY
 
-NUM_CHANNELS_KEY = chiu_net_arch.NUM_CHANNELS_KEY
-POOLING_SIZE_KEY = chiu_net_arch.POOLING_SIZE_KEY
-ENCODER_NUM_CONV_LAYERS_KEY = chiu_net_arch.ENCODER_NUM_CONV_LAYERS_KEY
-ENCODER_DROPOUT_RATES_KEY = chiu_net_arch.ENCODER_DROPOUT_RATES_KEY
+NWP_ENCODER_NUM_CHANNELS_KEY = chiu_net_arch.NWP_ENCODER_NUM_CHANNELS_KEY
+NWP_POOLING_SIZE_KEY = chiu_net_arch.NWP_POOLING_SIZE_KEY
+NWP_ENCODER_NUM_CONV_LAYERS_KEY = chiu_net_arch.NWP_ENCODER_NUM_CONV_LAYERS_KEY
+NWP_ENCODER_DROPOUT_RATES_KEY = chiu_net_arch.NWP_ENCODER_DROPOUT_RATES_KEY
+NWP_FC_MODULE_NUM_CONV_LAYERS_KEY = (
+    chiu_net_arch.NWP_FC_MODULE_NUM_CONV_LAYERS_KEY
+)
+NWP_FC_MODULE_DROPOUT_RATES_KEY = chiu_net_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY
+NWP_FC_MODULE_USE_3D_CONV = chiu_net_arch.NWP_FC_MODULE_USE_3D_CONV
+
+LAGTGT_ENCODER_NUM_CHANNELS_KEY = chiu_net_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY
+LAGTGT_POOLING_SIZE_KEY = chiu_net_arch.LAGTGT_POOLING_SIZE_KEY
+LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY = (
+    chiu_net_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY
+)
+LAGTGT_ENCODER_DROPOUT_RATES_KEY = (
+    chiu_net_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY
+)
+LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY = (
+    chiu_net_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY
+)
+LAGTGT_FC_MODULE_DROPOUT_RATES_KEY = (
+    chiu_net_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY
+)
+LAGTGT_FC_MODULE_USE_3D_CONV = chiu_net_arch.LAGTGT_FC_MODULE_USE_3D_CONV
+
+DECODER_NUM_CHANNELS_KEY = chiu_net_arch.DECODER_NUM_CHANNELS_KEY
 DECODER_NUM_CONV_LAYERS_KEY = chiu_net_arch.DECODER_NUM_CONV_LAYERS_KEY
 UPSAMPLING_DROPOUT_RATES_KEY = chiu_net_arch.UPSAMPLING_DROPOUT_RATES_KEY
 SKIP_DROPOUT_RATES_KEY = chiu_net_arch.SKIP_DROPOUT_RATES_KEY
-
-FC_MODULE_NUM_CONV_LAYERS_KEY = chiu_net_arch.FC_MODULE_NUM_CONV_LAYERS_KEY
-FC_MODULE_DROPOUT_RATES_KEY = chiu_net_arch.FC_MODULE_DROPOUT_RATES_KEY
-FC_MODULE_USE_3D_CONV = chiu_net_arch.FC_MODULE_USE_3D_CONV
 
 INCLUDE_PENULTIMATE_KEY = chiu_net_arch.INCLUDE_PENULTIMATE_KEY
 PENULTIMATE_DROPOUT_RATE_KEY = chiu_net_arch.PENULTIMATE_DROPOUT_RATE_KEY
@@ -508,47 +530,66 @@ def create_model(option_dict):
         `keras.models.Model`.
     """
 
-    # TODO(thunderhoser): Another idea: use lagged URMA fields as predictors.
-
     option_dict = chiu_net_arch.check_input_args(option_dict)
+    optd = option_dict
 
-    input_dimensions_const = option_dict[INPUT_DIMENSIONS_CONST_KEY]
-    input_dimensions_2pt5km_res = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
-    input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
-    input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
-    input_dimensions_40km_res = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY]
-    input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
-    use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
+    input_dimensions_const = optd[INPUT_DIMENSIONS_CONST_KEY]
+    input_dimensions_2pt5km_res = optd[INPUT_DIMENSIONS_2PT5KM_RES_KEY]
+    input_dimensions_lagged_targets = optd[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY]
+    input_dimensions_10km_res = optd[INPUT_DIMENSIONS_10KM_RES_KEY]
+    input_dimensions_20km_res = optd[INPUT_DIMENSIONS_20KM_RES_KEY]
+    input_dimensions_40km_res = optd[INPUT_DIMENSIONS_40KM_RES_KEY]
+    input_dimensions_predn_baseline = optd[PREDN_BASELINE_DIMENSIONS_KEY]
+    use_residual_blocks = optd[USE_RESIDUAL_BLOCKS_KEY]
 
-    num_channels_by_level = option_dict[NUM_CHANNELS_KEY]
-    pooling_size_by_level_px = option_dict[POOLING_SIZE_KEY]
-    num_encoder_conv_layers_by_level = option_dict[ENCODER_NUM_CONV_LAYERS_KEY]
-    encoder_dropout_rate_by_level = option_dict[ENCODER_DROPOUT_RATES_KEY]
-    num_decoder_conv_layers_by_level = option_dict[DECODER_NUM_CONV_LAYERS_KEY]
-    upsampling_dropout_rate_by_level = option_dict[UPSAMPLING_DROPOUT_RATES_KEY]
-    skip_dropout_rate_by_level = option_dict[SKIP_DROPOUT_RATES_KEY]
+    nwp_encoder_num_channels_by_level = optd[NWP_ENCODER_NUM_CHANNELS_KEY]
+    nwp_pooling_size_by_level_px = optd[NWP_POOLING_SIZE_KEY]
+    nwp_encoder_num_conv_layers_by_level = optd[NWP_ENCODER_NUM_CONV_LAYERS_KEY]
+    nwp_encoder_dropout_rate_by_level = optd[NWP_ENCODER_DROPOUT_RATES_KEY]
+    nwp_forecast_module_num_conv_layers = optd[
+        NWP_FC_MODULE_NUM_CONV_LAYERS_KEY
+    ]
+    nwp_forecast_module_dropout_rates = optd[NWP_FC_MODULE_DROPOUT_RATES_KEY]
+    nwp_forecast_module_use_3d_conv = optd[NWP_FC_MODULE_USE_3D_CONV]
 
-    forecast_module_num_conv_layers = option_dict[FC_MODULE_NUM_CONV_LAYERS_KEY]
-    forecast_module_dropout_rates = option_dict[FC_MODULE_DROPOUT_RATES_KEY]
-    forecast_module_use_3d_conv = option_dict[FC_MODULE_USE_3D_CONV]
+    lagtgt_encoder_num_channels_by_level = optd[LAGTGT_ENCODER_NUM_CHANNELS_KEY]
+    lagtgt_pooling_size_by_level_px = optd[LAGTGT_POOLING_SIZE_KEY]
+    lagtgt_encoder_num_conv_layers_by_level = optd[
+        LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY
+    ]
+    lagtgt_encoder_dropout_rate_by_level = optd[
+        LAGTGT_ENCODER_DROPOUT_RATES_KEY
+    ]
+    lagtgt_forecast_module_num_conv_layers = optd[
+        LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY
+    ]
+    lagtgt_forecast_module_dropout_rates = optd[
+        LAGTGT_FC_MODULE_DROPOUT_RATES_KEY
+    ]
+    lagtgt_forecast_module_use_3d_conv = optd[LAGTGT_FC_MODULE_USE_3D_CONV]
 
-    include_penultimate_conv = option_dict[INCLUDE_PENULTIMATE_KEY]
-    penultimate_conv_dropout_rate = option_dict[PENULTIMATE_DROPOUT_RATE_KEY]
-    inner_activ_function_name = option_dict[INNER_ACTIV_FUNCTION_KEY]
-    inner_activ_function_alpha = option_dict[INNER_ACTIV_FUNCTION_ALPHA_KEY]
-    output_activ_function_name = option_dict[OUTPUT_ACTIV_FUNCTION_KEY]
-    output_activ_function_alpha = option_dict[OUTPUT_ACTIV_FUNCTION_ALPHA_KEY]
-    l1_weight = option_dict[L1_WEIGHT_KEY]
-    l2_weight = option_dict[L2_WEIGHT_KEY]
-    use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
-    ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
-    num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
-    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    decoder_num_channels_by_level = optd[DECODER_NUM_CHANNELS_KEY]
+    num_decoder_conv_layers_by_level = optd[DECODER_NUM_CONV_LAYERS_KEY]
+    upsampling_dropout_rate_by_level = optd[UPSAMPLING_DROPOUT_RATES_KEY]
+    skip_dropout_rate_by_level = optd[SKIP_DROPOUT_RATES_KEY]
 
-    loss_function = option_dict[LOSS_FUNCTION_KEY]
-    optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
-    metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
+    include_penultimate_conv = optd[INCLUDE_PENULTIMATE_KEY]
+    penultimate_conv_dropout_rate = optd[PENULTIMATE_DROPOUT_RATE_KEY]
+    inner_activ_function_name = optd[INNER_ACTIV_FUNCTION_KEY]
+    inner_activ_function_alpha = optd[INNER_ACTIV_FUNCTION_ALPHA_KEY]
+    output_activ_function_name = optd[OUTPUT_ACTIV_FUNCTION_KEY]
+    output_activ_function_alpha = optd[OUTPUT_ACTIV_FUNCTION_ALPHA_KEY]
+    l1_weight = optd[L1_WEIGHT_KEY]
+    l2_weight = optd[L2_WEIGHT_KEY]
+    use_batch_normalization = optd[USE_BATCH_NORM_KEY]
+    ensemble_size = optd[ENSEMBLE_SIZE_KEY]
+    num_output_channels = optd[NUM_OUTPUT_CHANNELS_KEY]
+    predict_gust_factor = optd[PREDICT_GUST_FACTOR_KEY]
+    predict_dewpoint_depression = optd[PREDICT_DEWPOINT_DEPRESSION_KEY]
+
+    loss_function = optd[LOSS_FUNCTION_KEY]
+    optimizer_function = optd[OPTIMIZER_FUNCTION_KEY]
+    metric_function_list = optd[METRIC_FUNCTIONS_KEY]
 
     num_lead_times = input_dimensions_2pt5km_res[2]
 
@@ -559,6 +600,21 @@ def create_model(option_dict):
     layer_object_2pt5km_res = keras.layers.Permute(
         dims=(3, 1, 2, 4), name='2pt5km_put-time-first'
     )(input_layer_object_2pt5km_res)
+
+    if input_dimensions_lagged_targets is None:
+        input_layer_object_lagged_targets = None
+        layer_object_lagged_targets = None
+        num_lag_times = 0
+    else:
+        input_layer_object_lagged_targets = keras.layers.Input(
+            shape=tuple(input_dimensions_lagged_targets.tolist()),
+            name='lagtgt_inputs'
+        )
+        layer_object_lagged_targets = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='lagtgt_put-time-first'
+        )(input_layer_object_lagged_targets)
+
+        num_lag_times = input_dimensions_lagged_targets[2]
 
     if input_dimensions_predn_baseline is None:
         input_layer_object_predn_baseline = None
@@ -592,6 +648,19 @@ def create_model(option_dict):
         )(
             [layer_object_2pt5km_res, this_layer_object]
         )
+
+        if num_lag_times > 0:
+            this_layer_object = keras.layers.Concatenate(
+                axis=-4, name='const_add-lag-times'
+            )(
+                num_lag_times * [layer_object_const]
+            )
+
+            layer_object_lagged_targets = keras.layers.Concatenate(
+                axis=-1, name='const_concat-with-lagtgt'
+            )(
+                [layer_object_lagged_targets, this_layer_object]
+            )
 
     if input_dimensions_10km_res is None:
         input_layer_object_10km_res = None
@@ -633,9 +702,10 @@ def create_model(option_dict):
         l1_weight=l1_weight, l2_weight=l2_weight
     )
 
-    num_levels = len(pooling_size_by_level_px)
-    encoder_conv_layer_objects = [None] * (num_levels + 1)
-    encoder_pooling_layer_objects = [None] * num_levels
+    num_levels = len(nwp_pooling_size_by_level_px)
+    nwp_encoder_conv_layer_objects = [None] * (num_levels + 1)
+    nwp_fcst_module_layer_objects = [None] * (num_levels + 1)
+    nwp_encoder_pooling_layer_objects = [None] * num_levels
 
     if input_dimensions_10km_res is not None:
         num_levels_to_fill = 2
@@ -652,52 +722,52 @@ def create_model(option_dict):
         if i == 0:
             this_input_layer_object = layer_object_2pt5km_res
         else:
-            this_input_layer_object = encoder_pooling_layer_objects[i - 1]
+            this_input_layer_object = nwp_encoder_pooling_layer_objects[i - 1]
 
-        encoder_conv_layer_objects[i] = _get_2d_conv_block(
+        nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            num_conv_layers=num_encoder_conv_layers_by_level[i],
+            num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
-            num_filters=num_channels_by_level[i],
+            num_filters=nwp_encoder_num_channels_by_level[i],
             do_time_distributed_conv=True,
             regularizer_object=regularizer_object,
             activation_function_name=inner_activ_function_name,
             activation_function_alpha=inner_activ_function_alpha,
-            dropout_rates=encoder_dropout_rate_by_level[i],
+            dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
-            basic_layer_name='encoder_level{0:d}'.format(i)
+            basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
-        this_name = 'encoder_level{0:d}_pooling'.format(i)
+        this_name = 'nwp_encoder_level{0:d}_pooling'.format(i)
         this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-            num_rows_in_window=pooling_size_by_level_px[i],
-            num_columns_in_window=pooling_size_by_level_px[i],
-            num_rows_per_stride=pooling_size_by_level_px[i],
-            num_columns_per_stride=pooling_size_by_level_px[i],
+            num_rows_in_window=nwp_pooling_size_by_level_px[i],
+            num_columns_in_window=nwp_pooling_size_by_level_px[i],
+            num_rows_per_stride=nwp_pooling_size_by_level_px[i],
+            num_columns_per_stride=nwp_pooling_size_by_level_px[i],
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(encoder_conv_layer_objects[i])
+        )(nwp_encoder_conv_layer_objects[i])
 
     num_levels_filled = num_levels_to_fill + 0
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
         this_layer_object = _crop_layer(
-            target_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_10km_res,
             cropping_layer_name='10km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
         this_name = '10km_concat-with-finer'
-        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], this_layer_object]
+            [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         if input_dimensions_20km_res is not None:
@@ -715,223 +785,320 @@ def create_model(option_dict):
             if i == 0:
                 this_input_layer_object = layer_object_10km_res
             else:
-                this_input_layer_object = encoder_pooling_layer_objects[i - 1]
+                this_input_layer_object = nwp_encoder_pooling_layer_objects[
+                    i - 1
+                ]
 
-            encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=this_input_layer_object,
                 do_residual=use_residual_blocks,
-                num_conv_layers=num_encoder_conv_layers_by_level[i],
+                num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
                 filter_size_px=3,
-                num_filters=num_channels_by_level[i],
+                num_filters=nwp_encoder_num_channels_by_level[i],
                 do_time_distributed_conv=True,
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
                 activation_function_alpha=inner_activ_function_alpha,
-                dropout_rates=encoder_dropout_rate_by_level[i],
+                dropout_rates=nwp_encoder_dropout_rate_by_level[i],
                 use_batch_norm=use_batch_normalization,
-                basic_layer_name='encoder_level{0:d}'.format(i)
+                basic_layer_name='nwp_encoder_level{0:d}'.format(i)
             )
 
-            this_name = 'encoder_level{0:d}_pooling'.format(i)
+            this_name = 'nwp_encoder_level{0:d}_pooling'.format(i)
             this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-                num_rows_in_window=pooling_size_by_level_px[i],
-                num_columns_in_window=pooling_size_by_level_px[i],
-                num_rows_per_stride=pooling_size_by_level_px[i],
-                num_columns_per_stride=pooling_size_by_level_px[i],
+                num_rows_in_window=nwp_pooling_size_by_level_px[i],
+                num_columns_in_window=nwp_pooling_size_by_level_px[i],
+                num_rows_per_stride=nwp_pooling_size_by_level_px[i],
+                num_columns_per_stride=nwp_pooling_size_by_level_px[i],
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+            nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
-            )(encoder_conv_layer_objects[i])
+            )(nwp_encoder_pooling_layer_objects[i])
 
         num_levels_filled += num_levels_to_fill
 
     if input_dimensions_20km_res is not None:
         i = num_levels_filled - 1
         this_layer_object = _crop_layer(
-            target_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_20km_res,
             cropping_layer_name='20km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
         this_name = '20km_concat-with-finer'
-        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], this_layer_object]
+            [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         i = num_levels_filled
         if i == 0:
             this_input_layer_object = layer_object_20km_res
         else:
-            this_input_layer_object = encoder_pooling_layer_objects[i - 1]
+            this_input_layer_object = nwp_encoder_pooling_layer_objects[i - 1]
 
-        encoder_conv_layer_objects[i] = _get_2d_conv_block(
+        nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            num_conv_layers=num_encoder_conv_layers_by_level[i],
+            num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
-            num_filters=num_channels_by_level[i],
+            num_filters=nwp_encoder_num_channels_by_level[i],
             do_time_distributed_conv=True,
             regularizer_object=regularizer_object,
             activation_function_name=inner_activ_function_name,
             activation_function_alpha=inner_activ_function_alpha,
-            dropout_rates=encoder_dropout_rate_by_level[i],
+            dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
-            basic_layer_name='encoder_level{0:d}'.format(i)
+            basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
-        this_name = 'encoder_level{0:d}_pooling'.format(i)
+        this_name = 'nwp_encoder_level{0:d}_pooling'.format(i)
         this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-            num_rows_in_window=pooling_size_by_level_px[i],
-            num_columns_in_window=pooling_size_by_level_px[i],
-            num_rows_per_stride=pooling_size_by_level_px[i],
-            num_columns_per_stride=pooling_size_by_level_px[i],
+            num_rows_in_window=nwp_pooling_size_by_level_px[i],
+            num_columns_in_window=nwp_pooling_size_by_level_px[i],
+            num_rows_per_stride=nwp_pooling_size_by_level_px[i],
+            num_columns_per_stride=nwp_pooling_size_by_level_px[i],
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(encoder_conv_layer_objects[i])
+        )(nwp_encoder_pooling_layer_objects[i])
 
         num_levels_filled += 1
 
     if input_dimensions_40km_res is not None:
         i = num_levels_filled - 1
         this_layer_object = _crop_layer(
-            target_layer_object=encoder_pooling_layer_objects[i],
+            target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_40km_res,
             cropping_layer_name='40km_concat-cropping',
             num_spatiotemporal_dims=3
         )
 
         this_name = '40km_concat-with-finer'
-        encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
             axis=-1, name=this_name
         )(
-            [encoder_pooling_layer_objects[i], this_layer_object]
+            [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
 
         i = num_levels_filled
         if i == 0:
             this_input_layer_object = layer_object_40km_res
         else:
-            this_input_layer_object = encoder_pooling_layer_objects[i - 1]
+            this_input_layer_object = nwp_encoder_pooling_layer_objects[i - 1]
 
-        encoder_conv_layer_objects[i] = _get_2d_conv_block(
+        nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            num_conv_layers=num_encoder_conv_layers_by_level[i],
+            num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
-            num_filters=num_channels_by_level[i],
+            num_filters=nwp_encoder_num_channels_by_level[i],
             do_time_distributed_conv=True,
             regularizer_object=regularizer_object,
             activation_function_name=inner_activ_function_name,
             activation_function_alpha=inner_activ_function_alpha,
-            dropout_rates=encoder_dropout_rate_by_level[i],
+            dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
-            basic_layer_name='encoder_level{0:d}'.format(i)
+            basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
-        this_name = 'encoder_level{0:d}_pooling'.format(i)
+        this_name = 'nwp_encoder_level{0:d}_pooling'.format(i)
         this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-            num_rows_in_window=pooling_size_by_level_px[i],
-            num_columns_in_window=pooling_size_by_level_px[i],
-            num_rows_per_stride=pooling_size_by_level_px[i],
-            num_columns_per_stride=pooling_size_by_level_px[i],
+            num_rows_in_window=nwp_pooling_size_by_level_px[i],
+            num_columns_in_window=nwp_pooling_size_by_level_px[i],
+            num_rows_per_stride=nwp_pooling_size_by_level_px[i],
+            num_columns_per_stride=nwp_pooling_size_by_level_px[i],
             pooling_type_string=architecture_utils.MAX_POOLING_STRING,
             layer_name=this_name
         )
-        encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+        nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(encoder_conv_layer_objects[i])
+        )(nwp_encoder_pooling_layer_objects[i])
 
         num_levels_filled += 1
 
     for i in range(num_levels_filled, num_levels + 1):
-        encoder_conv_layer_objects[i] = _get_2d_conv_block(
-            input_layer_object=encoder_pooling_layer_objects[i - 1],
+        nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=nwp_encoder_pooling_layer_objects[i - 1],
             do_residual=use_residual_blocks,
-            num_conv_layers=num_encoder_conv_layers_by_level[i],
+            num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
-            num_filters=num_channels_by_level[i],
+            num_filters=nwp_encoder_num_channels_by_level[i],
             do_time_distributed_conv=True,
             regularizer_object=regularizer_object,
             activation_function_name=inner_activ_function_name,
             activation_function_alpha=inner_activ_function_alpha,
-            dropout_rates=encoder_dropout_rate_by_level[i],
+            dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
-            basic_layer_name='encoder_level{0:d}'.format(i)
+            basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
         if i != num_levels:
-            this_name = 'encoder_level{0:d}_pooling'.format(i)
+            this_name = 'nwp_encoder_level{0:d}_pooling'.format(i)
             this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
-                num_rows_in_window=pooling_size_by_level_px[i],
-                num_columns_in_window=pooling_size_by_level_px[i],
-                num_rows_per_stride=pooling_size_by_level_px[i],
-                num_columns_per_stride=pooling_size_by_level_px[i],
+                num_rows_in_window=nwp_pooling_size_by_level_px[i],
+                num_columns_in_window=nwp_pooling_size_by_level_px[i],
+                num_rows_per_stride=nwp_pooling_size_by_level_px[i],
+                num_columns_per_stride=nwp_pooling_size_by_level_px[i],
                 pooling_type_string=architecture_utils.MAX_POOLING_STRING,
                 layer_name=this_name
             )
-            encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+            nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
-            )(encoder_conv_layer_objects[i])
-
-    fcst_module_layer_objects = [None] * (num_levels + 1)
+            )(nwp_encoder_pooling_layer_objects[i])
 
     for i in range(num_levels + 1):
-        this_name = 'fcst_level{0:d}_put-time-last'.format(i)
-        fcst_module_layer_objects[i] = keras.layers.Permute(
+        this_name = 'nwp_fcst_level{0:d}_put-time-last'.format(i)
+        nwp_fcst_module_layer_objects[i] = keras.layers.Permute(
             dims=(2, 3, 1, 4), name=this_name
-        )(encoder_conv_layer_objects[i])
+        )(nwp_encoder_conv_layer_objects[i])
 
-        if forecast_module_use_3d_conv:
-            fcst_module_layer_objects[i] = _get_3d_conv_block(
-                input_layer_object=fcst_module_layer_objects[i],
+        if nwp_forecast_module_use_3d_conv:
+            nwp_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=nwp_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                num_conv_layers=forecast_module_num_conv_layers,
+                num_conv_layers=nwp_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
                 activation_function_alpha=inner_activ_function_alpha,
-                dropout_rates=forecast_module_dropout_rates,
+                dropout_rates=nwp_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
-                basic_layer_name='fcst_level{0:d}'.format(i)
+                basic_layer_name='nwp_fcst_level{0:d}'.format(i)
             )
         else:
-            orig_dims = fcst_module_layer_objects[i].shape
+            orig_dims = nwp_fcst_module_layer_objects[i].shape
             new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
-            this_name = 'fcst_level{0:d}_remove-time-dim'.format(i)
-            fcst_module_layer_objects[i] = keras.layers.Reshape(
+            this_name = 'nwp_fcst_level{0:d}_remove-time-dim'.format(i)
+            nwp_fcst_module_layer_objects[i] = keras.layers.Reshape(
                 target_shape=new_dims, name=this_name
-            )(fcst_module_layer_objects[i])
+            )(nwp_fcst_module_layer_objects[i])
 
-            fcst_module_layer_objects[i] = _get_2d_conv_block(
-                input_layer_object=fcst_module_layer_objects[i],
+            nwp_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=nwp_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                num_conv_layers=forecast_module_num_conv_layers,
+                num_conv_layers=nwp_forecast_module_num_conv_layers,
                 filter_size_px=1,
-                num_filters=num_channels_by_level[i],
+                num_filters=nwp_encoder_num_channels_by_level[i],
                 do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
                 activation_function_alpha=inner_activ_function_alpha,
-                dropout_rates=forecast_module_dropout_rates,
+                dropout_rates=nwp_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
-                basic_layer_name='fcst_level{0:d}'.format(i)
+                basic_layer_name='nwp_fcst_level{0:d}'.format(i)
             )
+
+    lagtgt_encoder_conv_layer_objects = [None] * (num_levels + 1)
+    lagtgt_fcst_module_layer_objects = [None] * (num_levels + 1)
+    lagtgt_encoder_pooling_layer_objects = [None] * num_levels
+    loop_max = num_levels + 1 if num_lag_times > 0 else 0
+
+    for i in range(loop_max):
+        if i == 0:
+            this_input_layer_object = layer_object_lagged_targets
+        else:
+            this_input_layer_object = lagtgt_encoder_pooling_layer_objects[
+                i - 1
+            ]
+
+        lagtgt_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=this_input_layer_object,
+            do_residual=use_residual_blocks,
+            num_conv_layers=lagtgt_encoder_num_conv_layers_by_level[i],
+            filter_size_px=3,
+            num_filters=lagtgt_encoder_num_channels_by_level[i],
+            do_time_distributed_conv=True,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=lagtgt_encoder_dropout_rate_by_level[i],
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='lagtgt_encoder_level{0:d}'.format(i)
+        )
+
+        this_name = 'lagtgt_fcst_level{0:d}_put-time-last'.format(i)
+        lagtgt_fcst_module_layer_objects[i] = keras.layers.Permute(
+            dims=(2, 3, 1, 4), name=this_name
+        )(lagtgt_fcst_module_layer_objects[i])
+
+        if lagtgt_forecast_module_use_3d_conv:
+            lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_forecast_module_num_conv_layers,
+                filter_size_px=1,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_forecast_module_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
+            )
+        else:
+            orig_dims = lagtgt_fcst_module_layer_objects[i].shape
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+
+            this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
+            lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(lagtgt_fcst_module_layer_objects[i])
+
+            lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_forecast_module_num_conv_layers,
+                filter_size_px=1,
+                num_filters=lagtgt_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_forecast_module_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
+            )
+
+        if i == num_levels:
+            break
+
+        this_name = 'lagtgt_encoder_level{0:d}_pooling'.format(i)
+        this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+            num_rows_in_window=lagtgt_pooling_size_by_level_px[i],
+            num_columns_in_window=lagtgt_pooling_size_by_level_px[i],
+            num_rows_per_stride=lagtgt_pooling_size_by_level_px[i],
+            num_columns_per_stride=lagtgt_pooling_size_by_level_px[i],
+            pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+            layer_name=this_name
+        )
+        lagtgt_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+            this_pooling_layer_object, name=this_name
+        )(lagtgt_encoder_pooling_layer_objects[i])
 
     last_conv_layer_matrix = numpy.full(
         (num_levels + 1, num_levels + 1), '', dtype=object
     )
 
     for i in range(num_levels + 1):
-        last_conv_layer_matrix[i, 0] = fcst_module_layer_objects[i]
+        if num_lag_times == 0:
+            last_conv_layer_matrix[i, 0] = nwp_fcst_module_layer_objects[i]
+        else:
+            this_name = 'fcst_level{0:d}_concat'.format(i)
+
+            last_conv_layer_matrix[i, 0] = keras.layers.Concatenate(
+                axis=-1, name=this_name
+            )([
+                nwp_fcst_module_layer_objects[i],
+                lagtgt_fcst_module_layer_objects[i]
+            ])
+
         i_new = i + 0
         j = 0
 
@@ -952,7 +1119,7 @@ def create_model(option_dict):
             )
 
             this_num_channels = int(numpy.round(
-                0.5 * num_channels_by_level[i_new]
+                0.5 * decoder_num_channels_by_level[i_new]
             ))
 
             last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
@@ -973,7 +1140,7 @@ def create_model(option_dict):
             last_conv_layer_matrix[i_new, j] = _create_skip_connection(
                 input_layer_objects=
                 last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
-                num_output_channels=num_channels_by_level[i_new],
+                num_output_channels=decoder_num_channels_by_level[i_new],
                 current_level_num=i_new,
                 regularizer_object=regularizer_object
             )
@@ -983,7 +1150,7 @@ def create_model(option_dict):
                 do_residual=use_residual_blocks,
                 num_conv_layers=num_decoder_conv_layers_by_level[i_new],
                 filter_size_px=3,
-                num_filters=num_channels_by_level[i_new],
+                num_filters=decoder_num_channels_by_level[i_new],
                 do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
@@ -1223,7 +1390,8 @@ def create_model(option_dict):
 
     input_layer_objects = [
         l for l in [
-            input_layer_object_2pt5km_res, input_layer_object_const,
+            input_layer_object_2pt5km_res,
+            input_layer_object_const, input_layer_object_lagged_targets,
             input_layer_object_10km_res, input_layer_object_20km_res,
             input_layer_object_40km_res, input_layer_object_predn_baseline
         ] if l is not None

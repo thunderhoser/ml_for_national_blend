@@ -57,6 +57,7 @@ TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
 NBM_CONSTANT_FIELDS_KEY = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
+COMPARE_TO_BASELINE_IN_LOSS_KEY = 'compare_to_baseline_in_loss'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 PATCH_SIZE_KEY = 'patch_size_2pt5km_pixels'
@@ -88,6 +89,8 @@ VALIDATION_OPTIONS_KEY = 'validation_option_dict'
 LOSS_FUNCTION_KEY = 'loss_function_string'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 METRIC_FUNCTIONS_KEY = 'metric_function_strings'
+CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
+CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
@@ -96,9 +99,10 @@ PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY,
-    PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY,
-    PATCH_OVERLAP_FOR_FAST_GEN_KEY
+    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY,
+    CHIU_NET_ARCHITECTURE_KEY, CHIU_NET_PP_ARCHITECTURE_KEY,
+    PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
+    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY
 ]
 
 NUM_FULL_ROWS_KEY = 'num_rows_in_full_grid'
@@ -516,11 +520,15 @@ def _check_generator_args(option_dict):
     if not option_dict[DO_RESIDUAL_PREDICTION_KEY]:
         assert option_dict[TARGET_NORM_FILE_KEY] is None
 
+        option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
         option_dict[RESID_BASELINE_MODEL_KEY] = None
         option_dict[RESID_BASELINE_MODEL_DIR_KEY] = None
         option_dict[RESID_BASELINE_LEAD_TIME_KEY] = -1
         return option_dict
 
+    error_checking.assert_is_boolean(
+        option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
+    )
     error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_KEY])
     error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_DIR_KEY])
     error_checking.assert_is_integer(option_dict[RESID_BASELINE_LEAD_TIME_KEY])
@@ -1689,6 +1697,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
+    compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
@@ -1780,6 +1789,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     full_predictor_matrix_10km = None
     full_predictor_matrix_20km = None
     full_predictor_matrix_40km = None
+    num_target_fields = len(target_field_names)
 
     while True:
         dummy_patch_location_dict = misc_utils.determine_patch_locations(
@@ -1794,11 +1804,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
-            num_target_fields=len(target_field_names),
+            num_target_fields=num_target_fields,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=dummy_patch_location_dict,
             do_residual_prediction=do_residual_prediction
         )
+
+        if compare_to_baseline_in_loss:
+            new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
+            target_matrix = numpy.full(new_dims, numpy.nan)
 
         if full_nbm_constant_matrix is None:
             nbm_constant_matrix = None
@@ -1883,6 +1897,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                             predict_gust_factor=predict_gust_factor
                         )
                     )
+
+                    if compare_to_baseline_in_loss:
+                        full_target_matrix = numpy.concatenate(
+                            [full_target_matrix, full_baseline_matrix], axis=-1
+                        )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '
@@ -1902,7 +1921,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
-            if full_baseline_matrix is None:
+            if do_residual_prediction and full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -1986,7 +2005,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_target_matrix[j_start:j_end, k_start:k_end, ...]
             )
 
-            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+            # TODO(thunderhoser): This can happen along edges of grid for
+            # earlier URMA data.
+            if numpy.any(numpy.isnan(
+                    target_matrix[i, ..., :num_target_fields]
+            )):
                 continue
 
             if do_residual_prediction:
@@ -2232,6 +2255,10 @@ def data_generator(option_dict):
     option_dict["nbm_constant_file_name"]: Path to file with NBM constant
         fields (readable by `nbm_constant_io.read_file`).  If you do not want
         NBM-constant predictors, make this None.
+    option_dict["compare_to_baseline_in_loss"]: Boolean flag.  If True, the loss
+        function involves comparing to the residual baseline.  In other words,
+        the loss function involves a skill score, except with the residual
+        baseline instead of climo.
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
@@ -2281,10 +2308,16 @@ def data_generator(option_dict):
     predictor_matrices[5]: E-by-M-by-N-by-F numpy array of baseline values for
         residual prediction.
 
-    :return: target_matrix: E-by-M-by-N-by-(F + 1) numpy array of targets at
-        2.5-km resolution.  The first F channels are actual target values; the
-        last channel is a binary mask, where 1 (0) indicates that the pixel
-        should (not) be considered in the loss function.
+    :return: target_matrix: If `compare_to_baseline_in_loss == False`, this is
+        an E-by-M-by-N-by-(F + 1) numpy array of targets at 2.5-km resolution.
+        The first F channels are actual target values; the last channel is a
+        binary mask, where 1 (0) indicates that the pixel should (not) be
+        considered in the loss function.
+
+    If `compare_to_baseline_in_loss == True`, this is an E-by-M-by-N-by-(2F + 1)
+        numpy array, where target_matrix[:F] contains actual values of the
+        target fields; target_matrix[F:-1] contains baseline-forecast values of
+        the target fields; and target_matrix[..., -1] contains the binary mask.
     """
 
     option_dict = _check_generator_args(option_dict)
@@ -2304,6 +2337,7 @@ def data_generator(option_dict):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
+    compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
@@ -2386,6 +2420,7 @@ def data_generator(option_dict):
         )
 
     init_time_index = len(init_times_unix_sec)
+    num_target_fields = len(target_field_names)
 
     while True:
         if patch_size_2pt5km_pixels is None:
@@ -2403,11 +2438,15 @@ def data_generator(option_dict):
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
-            num_target_fields=len(target_field_names),
+            num_target_fields=num_target_fields,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=patch_location_dict,
             do_residual_prediction=do_residual_prediction
         )
+
+        if compare_to_baseline_in_loss:
+            new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
+            target_matrix = numpy.full(new_dims, numpy.nan)
 
         if full_nbm_constant_matrix is None:
             nbm_constant_matrix = None
@@ -2463,7 +2502,7 @@ def data_generator(option_dict):
                 continue
 
             i = num_examples_in_memory + 0
-            target_matrix[i, ...] = this_target_matrix
+            target_matrix[i, ..., :num_target_fields] = this_target_matrix
 
             if nbm_constant_matrix is not None:
                 pld = patch_location_dict
@@ -2515,6 +2554,11 @@ def data_generator(option_dict):
                     continue
 
                 predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
+
+                if compare_to_baseline_in_loss:
+                    target_matrix[i, ..., num_target_fields:] = (
+                        this_baseline_matrix
+                    )
 
             try:
                 (
@@ -2700,9 +2744,11 @@ def train_model(
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
         loss_function_string, optimizer_function_string,
-        metric_function_strings, plateau_patience_epochs,
-        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
-        patch_overlap_fast_gen_2pt5km_pixels, output_dir_name):
+        metric_function_strings,
+        chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
+        output_dir_name):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -2729,6 +2775,12 @@ def train_model(
     :param metric_function_strings: 1-D list with names of metrics.  Each string
         should be formatted such that `eval(metric_function_strings[i])` returns
         the actual metric function.
+    :param chiu_net_architecture_dict: Dictionary with architecture options for
+        `chiu_net_architecture.create_model`.  If the model being trained is not
+        a Chiu-net, make this None.
+    :param chiu_net_pp_architecture_dict: Dictionary with architecture options
+        for `chiu_net_pp_architecture.create_model`.  If the model being trained
+        is not a Chiu-net++, make this None.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
         where N = plateau_patience_epochs.
@@ -2778,7 +2830,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
+    model_file_name = '{0:s}/model.weights.h5'.format(output_dir_name)
     history_file_name = '{0:s}/history.csv'.format(output_dir_name)
 
     try:
@@ -2792,7 +2844,7 @@ def train_model(
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min',
+        save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
@@ -2844,6 +2896,8 @@ def train_model(
         loss_function_string=loss_function_string,
         optimizer_function_string=optimizer_function_string,
         metric_function_strings=metric_function_strings,
+        chiu_net_architecture_dict=chiu_net_architecture_dict,
+        chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -3166,9 +3220,10 @@ def write_metafile(
         pickle_file_name, num_epochs, num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
         validation_option_dict, loss_function_string, optimizer_function_string,
-        metric_function_strings, plateau_patience_epochs,
-        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
-        patch_overlap_fast_gen_2pt5km_pixels):
+        metric_function_strings,
+        chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -3180,6 +3235,8 @@ def write_metafile(
     :param loss_function_string: Same.
     :param optimizer_function_string: Same.
     :param metric_function_strings: Same.
+    :param chiu_net_architecture_dict: Same.
+    :param chiu_net_pp_architecture_dict: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -3195,6 +3252,8 @@ def write_metafile(
         LOSS_FUNCTION_KEY: loss_function_string,
         OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
         METRIC_FUNCTIONS_KEY: metric_function_strings,
+        CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
+        CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
@@ -3221,6 +3280,8 @@ def read_metafile(pickle_file_name):
     metadata_dict["loss_function_string"]: Same.
     metadata_dict["optimizer_function_string"]: Same.
     metadata_dict["metric_function_strings"]: Same.
+    metadata_dict["chiu_net_architecture_dict"]: Same.
+    metadata_dict["chiu_net_pp_architecture_dict"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -3237,6 +3298,10 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
+    if CHIU_NET_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NET_ARCHITECTURE_KEY] = None
+    if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
 
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -3247,6 +3312,9 @@ def read_metafile(pickle_file_name):
     if REQUIRE_ALL_PREDICTORS_KEY not in training_option_dict:
         training_option_dict[REQUIRE_ALL_PREDICTORS_KEY] = False
         validation_option_dict[REQUIRE_ALL_PREDICTORS_KEY] = False
+    if COMPARE_TO_BASELINE_IN_LOSS_KEY not in training_option_dict:
+        training_option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
+        validation_option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
@@ -3276,8 +3344,49 @@ def read_model(hdf5_file_name):
         model_file_name=hdf5_file_name, raise_error_if_missing=True
     )
     metadata_dict = read_metafile(metafile_name)
-
     print(metadata_dict[LOSS_FUNCTION_KEY])
+
+    chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
+    if chiu_net_architecture_dict is not None:
+        import chiu_net_architecture
+
+        arch_dict = chiu_net_architecture_dict
+
+        for this_key in [
+                chiu_net_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
+    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    if chiu_net_pp_architecture_dict is not None:
+        import \
+            chiu_net_pp_architecture
+
+        arch_dict = chiu_net_pp_architecture_dict
+
+        for this_key in [
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_pp_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
