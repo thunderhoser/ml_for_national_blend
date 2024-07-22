@@ -1027,7 +1027,7 @@ def create_model(option_dict):
         this_name = 'lagtgt_fcst_level{0:d}_put-time-last'.format(i)
         lagtgt_fcst_module_layer_objects[i] = keras.layers.Permute(
             dims=(2, 3, 1, 4), name=this_name
-        )(lagtgt_fcst_module_layer_objects[i])
+        )(lagtgt_encoder_conv_layer_objects[i])
 
         if lagtgt_forecast_module_use_3d_conv:
             lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
