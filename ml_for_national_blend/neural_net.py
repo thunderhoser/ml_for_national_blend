@@ -3243,9 +3243,6 @@ def write_metafile(
     :param patch_overlap_fast_gen_2pt5km_pixels: Same.
     """
 
-    print(loss_function_string)
-    print(chiu_net_pp_architecture_dict)
-
     metadata_dict = {
         NUM_EPOCHS_KEY: num_epochs,
         NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,

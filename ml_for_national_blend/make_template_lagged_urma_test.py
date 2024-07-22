@@ -297,13 +297,13 @@ def _run():
                 model_file_name=output_file_name,
                 raise_error_if_missing=False
             )
-            option_dict[neural_net.LOSS_FUNCTION_KEY] = (
+            option_dict[chiu_net_pp_arch.LOSS_FUNCTION_KEY] = (
                 LOSS_FUNCTION_STRING
             )
-            option_dict[neural_net.METRIC_FUNCTIONS_KEY] = (
+            option_dict[chiu_net_pp_arch.METRIC_FUNCTIONS_KEY] = (
                 METRIC_FUNCTION_STRINGS
             )
-            option_dict[neural_net.OPTIMIZER_FUNCTION_KEY] = (
+            option_dict[chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY] = (
                 optimizer_function_string
             )
 
