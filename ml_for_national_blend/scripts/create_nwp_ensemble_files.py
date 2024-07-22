@@ -273,7 +273,7 @@ def _create_ensemble_file_1init_1valid(
         files will be found by `interp_nwp_model_io.find_file`.
     :param output_ensemble_dir_name: See documentation at top of this script.
     """
-    
+
     if targets_only:
         all_field_names = TARGET_FIELD_NAMES
     else:
@@ -304,7 +304,8 @@ def _create_ensemble_file_1init_1valid(
         data_matrix_10km,
         data_matrix_20km,
         data_matrix_40km,
-        found_any_data
+        found_any_data,
+        _
     ) = nwp_input.read_predictors_one_example(
         init_time_unix_sec=init_time_unix_sec,
         nwp_model_names=nwp_model_names,

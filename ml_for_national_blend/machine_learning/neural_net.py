@@ -5,6 +5,7 @@ import pickle
 import warnings
 import numpy
 import keras
+import pandas
 from tensorflow.keras.saving import load_model
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
@@ -2772,14 +2773,20 @@ def train_model(
     validation_option_dict = _check_generator_args(validation_option_dict)
 
     model_file_name = '{0:s}/model.keras'.format(output_dir_name)
+    history_file_name = '{0:s}/history.csv'.format(output_dir_name)
+
+    try:
+        history_table_pandas = pandas.read_csv(history_file_name)
+        initial_epoch = history_table_pandas['epoch'].max() + 1
+    except:
+        initial_epoch = 0
 
     history_object = keras.callbacks.CSVLogger(
-        filename='{0:s}/history.csv'.format(output_dir_name),
-        separator=',', append=False
+        filename=history_file_name, separator=',', append=True
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min',
+        save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
@@ -2792,7 +2799,7 @@ def train_model(
         min_delta=0., cooldown=0
     )
     backup_object = keras.callbacks.BackupAndRestore(
-        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+        backup_dir_name, save_freq='epoch', delete_checkpoint=False
     )
 
     list_of_callback_objects = [
@@ -2841,7 +2848,10 @@ def train_model(
     model_object.fit(
         x=training_generator,
         steps_per_epoch=num_training_batches_per_epoch,
-        epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
+        epochs=num_epochs,
+        initial_epoch=initial_epoch,
+        verbose=1,
+        callbacks=list_of_callback_objects,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch
     )

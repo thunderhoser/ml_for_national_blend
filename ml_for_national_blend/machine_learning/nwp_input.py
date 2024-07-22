@@ -484,9 +484,9 @@ def _find_predictors_1example_1model_rigid(
         print((
             'Informational message (NOT AN ERROR)...\n'
             'Desired NWP lead times:\n'
-            '{0:s}\n\n'
+            '{0:s}\n'
             'NWP files to be used:\n'
-            '{1:s}'
+            '{1:s}\n'
         ).format(
             str(nwp_lead_times_hours),
             str(pathless_forecast_file_names)
@@ -727,7 +727,7 @@ def _read_predictors_1example_1model(
         if predictor_matrix is None:
             these_dims = (
                 this_predictor_matrix.shape[0], this_predictor_matrix.shape[1],
-                num_lead_times, this_predictor_matrix.shape[3]
+                num_lead_times, this_predictor_matrix.shape[2]
             )
             predictor_matrix = numpy.full(these_dims, numpy.nan)
 
@@ -1119,7 +1119,8 @@ def read_predictors_one_example(
                 'predictor values with NaN.'
             ).format(
                 nwp_model_names[i],
-                backup_nwp_model_name,
+                'None' if backup_nwp_model_name is None
+                else backup_nwp_model_name,
                 time_conversion.unix_sec_to_string(
                     init_time_unix_sec, '%Y-%m-%d-%H'
                 )
