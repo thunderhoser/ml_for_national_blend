@@ -815,7 +815,7 @@ def create_model(option_dict):
             )
             nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
-            )(nwp_encoder_pooling_layer_objects[i])
+            )(nwp_encoder_conv_layer_objects[i])
 
         num_levels_filled += num_levels_to_fill
 
@@ -867,7 +867,7 @@ def create_model(option_dict):
         )
         nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(nwp_encoder_pooling_layer_objects[i])
+        )(nwp_encoder_conv_layer_objects[i])
 
         num_levels_filled += 1
 
@@ -919,7 +919,7 @@ def create_model(option_dict):
         )
         nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(nwp_encoder_pooling_layer_objects[i])
+        )(nwp_encoder_conv_layer_objects[i])
 
         num_levels_filled += 1
 
@@ -951,7 +951,7 @@ def create_model(option_dict):
             )
             nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
-            )(nwp_encoder_pooling_layer_objects[i])
+            )(nwp_encoder_conv_layer_objects[i])
 
     for i in range(num_levels + 1):
         this_name = 'nwp_fcst_level{0:d}_put-time-last'.format(i)
@@ -1080,7 +1080,7 @@ def create_model(option_dict):
         )
         lagtgt_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object, name=this_name
-        )(lagtgt_encoder_pooling_layer_objects[i])
+        )(lagtgt_encoder_conv_layer_objects[i])
 
     last_conv_layer_matrix = numpy.full(
         (num_levels + 1, num_levels + 1), '', dtype=object
