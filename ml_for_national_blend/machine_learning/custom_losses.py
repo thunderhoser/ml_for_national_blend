@@ -2,8 +2,23 @@
 
 import numpy
 import tensorflow
+import tensorflow.math as tf_math
 from tensorflow.keras import backend as K
 from ml_for_national_blend.outside_code import error_checking
+
+
+def __get_num_target_fields(prediction_tensor, expect_ensemble):
+    """Determines number of target fields.
+
+    :param prediction_tensor: See documentation for `mean_squared_error`.
+    :param expect_ensemble: Same.
+    :return: num_target_fields: Integer.
+    """
+
+    if expect_ensemble:
+        return prediction_tensor.shape[-2]
+
+    return prediction_tensor.shape[-1]
 
 
 def _log2(input_tensor):
@@ -145,14 +160,21 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
         :return: loss: Mean squared error.
         """
 
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-        relevant_target_tensor = target_tensor[..., :-1]
+        relevant_target_tensor = target_tensor[..., :num_target_fields]
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 relevant_target_tensor, axis=-1
+            )
+            mask_weight_tensor = K.expand_dims(
+                mask_weight_tensor, axis=-1
             )
 
         squared_error_tensor = (relevant_target_tensor - prediction_tensor) ** 2
@@ -204,14 +226,21 @@ def dual_weighted_mse(
         :return: loss: Mean squared error.
         """
 
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-        relevant_target_tensor = target_tensor[..., :-1]
+        relevant_target_tensor = target_tensor[..., :num_target_fields]
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 relevant_target_tensor, axis=-1
+            )
+            mask_weight_tensor = K.expand_dims(
+                mask_weight_tensor, axis=-1
             )
 
         dual_weight_tensor = dual_weight_exponent * K.maximum(
@@ -238,6 +267,130 @@ def dual_weighted_mse(
             K.sum(mask_weight_tensor * error_tensor) /
             K.sum(mask_weight_tensor * K.ones_like(error_tensor))
         )
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dual_weighted_msess(
+        channel_weights, function_name, dual_weight_exponent=1.,
+        expect_ensemble=True, test_mode=False):
+    """Creates MSESS loss function.
+
+    MSESS = mean-squared-error skill score
+
+    :param channel_weights: See documentation for `dual_weighted_mse`.
+    :param function_name: Same.
+    :param dual_weight_exponent: Same.
+    :param expect_ensemble: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_geq(dual_weight_exponent, 1.)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(test_mode)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE skill score).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: DWMSE skill score.
+        """
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        relevant_target_tensor = target_tensor[..., :num_target_fields]
+        relevant_baseline_prediction_tensor = (
+            target_tensor[..., num_target_fields:-1]
+        )
+
+        # Ensure compatible tensor shapes.
+        if expect_ensemble:
+            mask_weight_tensor = K.expand_dims(
+                mask_weight_tensor, axis=-1
+            )
+            relevant_target_tensor = K.expand_dims(
+                relevant_target_tensor, axis=-1
+            )
+            relevant_baseline_prediction_tensor = K.expand_dims(
+                relevant_baseline_prediction_tensor, axis=-1
+            )
+
+        # Create dual-weight tensor.
+        dual_weight_tensor = dual_weight_exponent * K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(prediction_tensor)
+        )
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+
+        # Create channel-weight tensor.
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+        if expect_ensemble:
+            channel_weight_tensor = K.expand_dims(
+                channel_weight_tensor, axis=-1
+            )
+
+        # Compute dual-weighted MSE.
+        error_tensor = (
+            channel_weight_tensor * dual_weight_tensor *
+            (relevant_target_tensor - prediction_tensor) ** 2
+        )
+        actual_dwmse = (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        # Create dual-weight tensor for baseline.
+        dual_weight_tensor = dual_weight_exponent * K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_baseline_prediction_tensor)
+        )
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+
+        # Compute dual-weighted MSE for baseline.
+        error_tensor = (
+            channel_weight_tensor * dual_weight_tensor *
+            (relevant_target_tensor - relevant_baseline_prediction_tensor) ** 2
+        )
+
+        nan_mask_tensor = tf_math.is_finite(error_tensor)
+        error_tensor = tensorflow.where(
+            nan_mask_tensor, error_tensor, tensorflow.zeros_like(error_tensor)
+        )
+
+        mask_weight_tensor = mask_weight_tensor * K.ones_like(error_tensor)
+        mask_weight_tensor = tensorflow.where(
+            nan_mask_tensor,
+            mask_weight_tensor, tensorflow.zeros_like(mask_weight_tensor)
+        )
+
+        baseline_dwmse = (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        # Return negative skill score.
+        return (actual_dwmse - baseline_dwmse) / baseline_dwmse
 
     loss.__name__ = function_name
     return loss
@@ -420,10 +573,14 @@ def dual_weighted_mse_with_constraints(
         :return: loss: DWMSE.
         """
 
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-        relevant_target_tensor = target_tensor[..., :-1]
+        relevant_target_tensor = target_tensor[..., :num_target_fields]
 
         prediction_tensor = process_dewpoint_predictions(
             prediction_tensor=prediction_tensor,
@@ -440,6 +597,9 @@ def dual_weighted_mse_with_constraints(
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 relevant_target_tensor, axis=-1
+            )
+            mask_weight_tensor = K.expand_dims(
+                mask_weight_tensor, axis=-1
             )
 
         dual_weight_tensor = dual_weight_exponent * K.maximum(

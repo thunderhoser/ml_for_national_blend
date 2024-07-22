@@ -1691,6 +1691,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
+    compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
@@ -1782,6 +1783,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     full_predictor_matrix_10km = None
     full_predictor_matrix_20km = None
     full_predictor_matrix_40km = None
+    num_target_fields = len(target_field_names)
 
     while True:
         dummy_patch_location_dict = misc_utils.determine_patch_locations(
@@ -1796,11 +1798,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
-            num_target_fields=len(target_field_names),
+            num_target_fields=num_target_fields,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=dummy_patch_location_dict,
             do_residual_prediction=do_residual_prediction
         )
+
+        if compare_to_baseline_in_loss:
+            new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
+            target_matrix = numpy.full(new_dims, numpy.nan)
 
         if full_nbm_constant_matrix is None:
             nbm_constant_matrix = None
@@ -1885,6 +1891,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                             predict_gust_factor=predict_gust_factor
                         )
                     )
+
+                    if compare_to_baseline_in_loss:
+                        full_target_matrix = numpy.concatenate(
+                            [full_target_matrix, full_baseline_matrix], axis=-1
+                        )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '
@@ -1904,7 +1915,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
 
-            if full_baseline_matrix is None:
+            if do_residual_prediction and full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -1988,7 +1999,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_target_matrix[j_start:j_end, k_start:k_end, ...]
             )
 
-            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+            # TODO(thunderhoser): This can happen along edges of grid for
+            # earlier URMA data.
+            if numpy.any(numpy.isnan(
+                    target_matrix[i, ..., :num_target_fields]
+            )):
                 continue
 
             if do_residual_prediction:
@@ -3332,8 +3347,8 @@ def read_model(hdf5_file_name):
         arch_dict = chiu_net_architecture_dict
 
         for this_key in [
-            chiu_net_architecture.LOSS_FUNCTION_KEY,
-            chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_net_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -3353,8 +3368,8 @@ def read_model(hdf5_file_name):
         arch_dict = chiu_net_pp_architecture_dict
 
         for this_key in [
-            chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
-            chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
