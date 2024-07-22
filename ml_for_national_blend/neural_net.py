@@ -1,30 +1,37 @@
 """Methods for neural network (NN) training and inference."""
 
 import os
+import sys
 import pickle
 import warnings
 import numpy
 import keras
+import pandas
 from tensorflow.keras.saving import load_model
-from ml_for_national_blend.outside_code import time_conversion
-from ml_for_national_blend.outside_code import time_periods
-from ml_for_national_blend.outside_code import number_rounding
-from ml_for_national_blend.outside_code import \
-    temperature_conversions as temperature_conv
-from ml_for_national_blend.outside_code import file_system_utils
-from ml_for_national_blend.outside_code import error_checking
-from ml_for_national_blend.io import nwp_model_io
-from ml_for_national_blend.io import nbm_constant_io
-from ml_for_national_blend.io import urma_io
-from ml_for_national_blend.utils import nbm_utils
-from ml_for_national_blend.utils import misc_utils
-from ml_for_national_blend.utils import nwp_model_utils
-from ml_for_national_blend.utils import urma_utils
-from ml_for_national_blend.utils import nbm_constant_utils
-from ml_for_national_blend.utils import normalization
-from ml_for_national_blend.machine_learning import nwp_input
-from ml_for_national_blend.machine_learning import custom_losses
-from ml_for_national_blend.machine_learning import custom_metrics
+
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
+
+import time_conversion
+import time_periods
+import number_rounding
+import temperature_conversions as temperature_conv
+import file_system_utils
+import error_checking
+import nwp_model_io
+import nbm_constant_io
+import urma_io
+import nbm_utils
+import misc_utils
+import nwp_model_utils
+import urma_utils
+import nbm_constant_utils
+import normalization
+import nwp_input
+import custom_losses
+import custom_metrics
 
 TOLERANCE = 1e-6
 
@@ -2772,14 +2779,20 @@ def train_model(
     validation_option_dict = _check_generator_args(validation_option_dict)
 
     model_file_name = '{0:s}/model.keras'.format(output_dir_name)
+    history_file_name = '{0:s}/history.csv'.format(output_dir_name)
+
+    try:
+        history_table_pandas = pandas.read_csv(history_file_name)
+        initial_epoch = history_table_pandas['epoch'].max() + 1
+    except:
+        initial_epoch = 0
 
     history_object = keras.callbacks.CSVLogger(
-        filename='{0:s}/history.csv'.format(output_dir_name),
-        separator=',', append=False
+        filename=history_file_name, separator=',', append=True
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min',
+        save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
@@ -2792,7 +2805,7 @@ def train_model(
         min_delta=0., cooldown=0
     )
     backup_object = keras.callbacks.BackupAndRestore(
-        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+        backup_dir_name, save_freq='epoch', delete_checkpoint=False
     )
 
     list_of_callback_objects = [
@@ -2841,7 +2854,10 @@ def train_model(
     model_object.fit(
         x=training_generator,
         steps_per_epoch=num_training_batches_per_epoch,
-        epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
+        epochs=num_epochs,
+        initial_epoch=initial_epoch,
+        verbose=1,
+        callbacks=list_of_callback_objects,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch
     )

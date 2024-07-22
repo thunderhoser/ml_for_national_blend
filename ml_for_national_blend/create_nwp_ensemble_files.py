@@ -281,7 +281,7 @@ def _create_ensemble_file_1init_1valid(
         files will be found by `interp_nwp_model_io.find_file`.
     :param output_ensemble_dir_name: See documentation at top of this script.
     """
-    
+
     if targets_only:
         all_field_names = TARGET_FIELD_NAMES
     else:
