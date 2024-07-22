@@ -2792,7 +2792,7 @@ def train_model(
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=True, mode='min',
+        save_best_only=True, save_weights_only=False, mode='min',
         save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
