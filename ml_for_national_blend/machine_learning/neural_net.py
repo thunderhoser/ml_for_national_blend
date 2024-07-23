@@ -1001,6 +1001,7 @@ def create_data(option_dict, init_time_unix_sec):
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
@@ -1058,6 +1059,11 @@ def create_data(option_dict, init_time_unix_sec):
     error_checking.assert_equals(len(init_times_unix_sec), 1)
     init_time_unix_sec = init_times_unix_sec[0]
 
+    if target_lag_times_hours is None:
+        num_target_lag_times = 0
+    else:
+        num_target_lag_times = len(target_lag_times_hours)
+
     # Do actual stuff.
     if nbm_constant_file_name is None:
         full_nbm_constant_matrix = None
@@ -1079,12 +1085,11 @@ def create_data(option_dict, init_time_unix_sec):
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
 
+    # TODO(thunderhoser): Add input args to create_data that allow for non-
+    # random patch location.
     if patch_size_2pt5km_pixels is None:
         patch_location_dict = None
     else:
-
-        # TODO(thunderhoser): Add input args to create_data that allow for non-
-        # random patch location.
         patch_location_dict = misc_utils.determine_patch_locations(
             patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
         )
@@ -1116,6 +1121,48 @@ def create_data(option_dict, init_time_unix_sec):
         return None
 
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
+
+    if num_target_lag_times > 0:
+        try:
+            these_matrices = [
+                _read_targets_one_example(
+                    init_time_unix_sec=init_time_unix_sec,
+                    target_lead_time_hours=-1 * l,
+                    target_field_names=target_field_names,
+                    target_dir_name=target_dir_name,
+                    target_norm_param_table_xarray=
+                    target_norm_param_table_xarray,
+                    use_quantile_norm=targets_use_quantile_norm,
+                    patch_location_dict=None
+                )
+                for l in target_lag_times_hours
+            ]
+
+            predictor_matrix_lagged_targets = numpy.stack(
+                these_matrices, axis=-2
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read lagged targets for init '
+                'time {0:s}.  Something went wrong in '
+                '`_read_targets_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            predictor_matrix_lagged_targets = None
+
+        if predictor_matrix_lagged_targets is None:
+            return None
+
+        predictor_matrix_lagged_targets = numpy.expand_dims(
+            predictor_matrix_lagged_targets, axis=0
+        )
+    else:
+        predictor_matrix_lagged_targets = None
 
     if do_residual_prediction:
         try:
@@ -1246,92 +1293,21 @@ def create_data(option_dict, init_time_unix_sec):
     target_matrix = numpy.concatenate(
         [target_matrix, mask_matrix_for_loss], axis=-1
     )
-    print((
-        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
-    ).format(
-        str(target_matrix.shape),
-        numpy.mean(numpy.isnan(target_matrix))
-    ))
 
-    if predictor_matrix_2pt5km is not None:
-        print((
-            'Shape of 2.5-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_2pt5km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
-        ))
-
-        predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_resid_baseline is not None:
-        print((
-            'Shape of residual baseline matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_resid_baseline.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
-        ))
-
-        error_checking.assert_is_numpy_array_without_nan(
-            predictor_matrix_resid_baseline
-        )
-
-    if nbm_constant_matrix is not None:
-        print('Shape of NBM-constant matrix: {0:s}'.format(
-            str(nbm_constant_matrix.shape)
-        ))
-
-    if predictor_matrix_10km is not None:
-        print((
-            'Shape of 10-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_10km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_10km))
-        ))
-
-        predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_20km is not None:
-        print((
-            'Shape of 20-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_20km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_20km))
-        ))
-
-        predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_40km is not None:
-        print((
-            'Shape of 40-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_40km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_40km))
-        ))
-
-        predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
-            sentinel_value
-        )
-
-    predictor_matrices = [
-        m for m in [
-            predictor_matrix_2pt5km, nbm_constant_matrix,
-            predictor_matrix_10km, predictor_matrix_20km,
-            predictor_matrix_40km, predictor_matrix_resid_baseline
-        ]
-        if m is not None
-    ]
-
-    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+    predictor_matrices = __report_data_properties(
+        predictor_matrix_2pt5km=predictor_matrix_2pt5km,
+        nbm_constant_matrix=nbm_constant_matrix,
+        predictor_matrix_lagged_targets=predictor_matrix_lagged_targets,
+        predictor_matrix_10km=predictor_matrix_10km,
+        predictor_matrix_20km=predictor_matrix_20km,
+        predictor_matrix_40km=predictor_matrix_40km,
+        predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
+        target_matrix=target_matrix,
+        sentinel_value=sentinel_value
+    )
 
     return {
-        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
         TARGET_MATRIX_KEY: target_matrix,
         INIT_TIMES_KEY: numpy.full(1, init_time_unix_sec),
         LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
@@ -1374,6 +1350,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
@@ -1441,6 +1418,12 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
 
+    num_target_fields = len(target_field_names)
+    if target_lag_times_hours is None:
+        num_target_lag_times = 0
+    else:
+        num_target_lag_times = len(target_lag_times_hours)
+
     try:
         full_target_matrix = _read_targets_one_example(
             init_time_unix_sec=init_time_unix_sec,
@@ -1465,6 +1448,47 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         return None
 
     if full_target_matrix is None:
+        return None
+
+    if num_target_lag_times > 0:
+        try:
+            these_matrices = [
+                _read_targets_one_example(
+                    init_time_unix_sec=init_time_unix_sec,
+                    target_lead_time_hours=-1 * l,
+                    target_field_names=target_field_names,
+                    target_dir_name=target_dir_name,
+                    target_norm_param_table_xarray=
+                    target_norm_param_table_xarray,
+                    use_quantile_norm=targets_use_quantile_norm,
+                    patch_location_dict=None
+                )
+                for l in target_lag_times_hours
+            ]
+
+            full_predictor_matrix_lagged_targets = numpy.stack(
+                these_matrices, axis=-2
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read lagged targets for init '
+                'time {0:s}.  Something went wrong in '
+                '`_read_targets_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            return None
+    else:
+        full_predictor_matrix_lagged_targets = None
+
+    if (
+            num_target_lag_times > 0 and
+            full_predictor_matrix_lagged_targets is None
+    ):
         return None
 
     if do_residual_prediction:
@@ -1569,12 +1593,13 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     (
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, target_matrix
+        predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
+        target_matrix
     ) = _init_matrices_1batch(
         nwp_model_names=nwp_model_names,
         nwp_model_to_field_names=nwp_model_to_field_names,
         num_nwp_lead_times=len(nwp_lead_times_hours),
-        num_target_fields=len(target_field_names),
+        num_target_fields=num_target_fields,
         num_target_lag_times=num_target_lag_times,
         num_examples_per_batch=num_patches,
         patch_location_dict=dummy_patch_location_dict,
@@ -1631,6 +1656,11 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 full_baseline_matrix[j_start:j_end, k_start:k_end, ...]
             )
 
+        if predictor_matrix_lagged_targets is not None:
+            predictor_matrix_lagged_targets[i, ...] = (
+                full_predictor_matrix_lagged_targets[j_start:j_end, k_start:k_end, ...]
+            )
+
         if predictor_matrix_2pt5km is not None:
             predictor_matrix_2pt5km[i, ...] = (
                 full_predictor_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
@@ -1674,92 +1704,21 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     target_matrix = numpy.concatenate(
         [target_matrix, mask_matrix_for_loss], axis=-1
     )
-    print((
-        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
-    ).format(
-        str(target_matrix.shape),
-        numpy.mean(numpy.isnan(target_matrix))
-    ))
 
-    if nbm_constant_matrix is not None:
-        print('Shape of NBM-constant matrix: {0:s}'.format(
-            str(nbm_constant_matrix.shape)
-        ))
-
-    if predictor_matrix_resid_baseline is not None:
-        print((
-            'Shape of residual baseline matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_resid_baseline.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
-        ))
-
-        error_checking.assert_is_numpy_array_without_nan(
-            predictor_matrix_resid_baseline
-        )
-
-    if predictor_matrix_2pt5km is not None:
-        print((
-            'Shape of 2.5-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_2pt5km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
-        ))
-
-        predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_10km is not None:
-        print((
-            'Shape of 10-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_10km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_10km))
-        ))
-
-        predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_20km is not None:
-        print((
-            'Shape of 20-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_20km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_20km))
-        ))
-
-        predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
-            sentinel_value
-        )
-
-    if predictor_matrix_40km is not None:
-        print((
-            'Shape of 40-km predictor matrix and NaN fraction: {0:s}, {1:.04f}'
-        ).format(
-            str(predictor_matrix_40km.shape),
-            numpy.mean(numpy.isnan(predictor_matrix_40km))
-        ))
-
-        predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
-            sentinel_value
-        )
-
-    predictor_matrices = [
-        m for m in [
-            predictor_matrix_2pt5km, nbm_constant_matrix,
-            predictor_matrix_10km, predictor_matrix_20km,
-            predictor_matrix_40km, predictor_matrix_resid_baseline
-        ]
-        if m is not None
-    ]
-
-    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+    predictor_matrices = __report_data_properties(
+        predictor_matrix_2pt5km=predictor_matrix_2pt5km,
+        nbm_constant_matrix=nbm_constant_matrix,
+        predictor_matrix_lagged_targets=predictor_matrix_lagged_targets,
+        predictor_matrix_10km=predictor_matrix_10km,
+        predictor_matrix_20km=predictor_matrix_20km,
+        predictor_matrix_40km=predictor_matrix_40km,
+        predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
+        target_matrix=target_matrix,
+        sentinel_value=sentinel_value
+    )
 
     return {
-        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
         TARGET_MATRIX_KEY: target_matrix,
         INIT_TIMES_KEY: numpy.full(num_patches, init_time_unix_sec),
         LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
@@ -1991,7 +1950,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         _read_targets_one_example(
                             init_time_unix_sec=
                             init_times_unix_sec[init_time_index],
-                            target_lead_time_hours=l,
+                            target_lead_time_hours=-1 * l,
                             target_field_names=target_field_names,
                             target_dir_name=target_dir_name,
                             target_norm_param_table_xarray=
@@ -2053,9 +2012,32 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                     )
 
                     if compare_to_baseline_in_loss:
-                        full_target_matrix = numpy.concatenate(
-                            [full_target_matrix, full_baseline_matrix], axis=-1
-                        )
+                        if predict_dewpoint_depression or predict_gust_factor:
+                            raw_baseline_matrix = (
+                                nwp_input.read_residual_baseline_one_example(
+                                    init_time_unix_sec=
+                                    init_times_unix_sec[init_time_index],
+                                    nwp_model_name=resid_baseline_model_name,
+                                    nwp_lead_time_hours=
+                                    resid_baseline_lead_time_hours,
+                                    nwp_directory_name=
+                                    resid_baseline_model_dir_name,
+                                    target_field_names=target_field_names,
+                                    patch_location_dict=None,
+                                    predict_dewpoint_depression=False,
+                                    predict_gust_factor=False
+                                )
+                            )
+
+                            full_target_matrix = numpy.concatenate(
+                                [full_target_matrix, raw_baseline_matrix],
+                                axis=-1
+                            )
+                        else:
+                            full_target_matrix = numpy.concatenate(
+                                [full_target_matrix, full_baseline_matrix],
+                                axis=-1
+                            )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read residual baseline for '
@@ -2252,6 +2234,7 @@ def data_generator(option_dict):
     P = number of NWP fields (predictor variables) at 2.5-km resolution
     C = number of constant fields (at 2.5-km resolution)
     L = number of NWP lead times
+    l = number of lag times for target fields used in predictors
     F = number of target fields
 
     m = number of rows in 10-km grid
@@ -2298,6 +2281,9 @@ def data_generator(option_dict):
     option_dict["target_lead_time_hours"]: Lead time for target fields.
     option_dict["target_field_names"]: length-F list with names of target
         fields.  Each must be accepted by `urma_utils.check_field_name`.
+    option_dict["target_lag_times_hours"]: length-l numpy array of lag times for
+        target fields used in predictors.  If you do not want to include lagged
+        targets in the predictors, make this None.
     option_dict["target_dir_name"]: Path to directory with target fields (i.e.,
         URMA data).  Files within this directory will be found by
         `urma_io.find_file` and read by `urma_io.read_file`.
@@ -2357,13 +2343,15 @@ def data_generator(option_dict):
         2.5-km resolution.
     predictor_matrices[1]: E-by-M-by-N-by-C numpy array of NBM-constant
         predictors, also at 2.5-km resolution.
-    predictor_matrices[2]: E-by-m-by-n-by-L-by-p numpy array of predictors at
+    predictor_matrices[2]: E-by-M-by-N-by-l-by-F numpy array of lagged targets
+        at 2.5-km resolution.
+    predictor_matrices[3]: E-by-m-by-n-by-L-by-p numpy array of predictors at
         10-km resolution.
-    predictor_matrices[3]: E-by-mm-by-nn-by-L-by-pp numpy array of predictors at
+    predictor_matrices[4]: E-by-mm-by-nn-by-L-by-pp numpy array of predictors at
         20-km resolution.
-    predictor_matrices[4]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
+    predictor_matrices[5]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
         at 40-km resolution.
-    predictor_matrices[5]: E-by-M-by-N-by-F numpy array of baseline values for
+    predictor_matrices[6]: E-by-M-by-N-by-F numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: If `compare_to_baseline_in_loss == False`, this is
@@ -2390,6 +2378,7 @@ def data_generator(option_dict):
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
@@ -2473,6 +2462,10 @@ def data_generator(option_dict):
 
     init_time_index = len(init_times_unix_sec)
     num_target_fields = len(target_field_names)
+    if target_lag_times_hours is None:
+        num_target_lag_times = 0
+    else:
+        num_target_lag_times = len(target_lag_times_hours)
 
     while True:
         if patch_size_2pt5km_pixels is None:
@@ -2485,7 +2478,8 @@ def data_generator(option_dict):
         (
             predictor_matrix_2pt5km, predictor_matrix_10km,
             predictor_matrix_20km, predictor_matrix_40km,
-            predictor_matrix_resid_baseline, target_matrix
+            predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
+            target_matrix
         ) = _init_matrices_1batch(
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
@@ -2572,7 +2566,51 @@ def data_generator(option_dict):
                         full_nbm_constant_matrix[j_start:j_end, k_start:k_end]
                     )
 
+            if num_target_lag_times > 0:
+                try:
+                    these_matrices = [
+                        _read_targets_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            target_lead_time_hours=-1 * l,
+                            target_field_names=target_field_names,
+                            target_dir_name=target_dir_name,
+                            target_norm_param_table_xarray=
+                            target_norm_param_table_xarray,
+                            use_quantile_norm=targets_use_quantile_norm,
+                            patch_location_dict=patch_location_dict
+                        )
+                        for l in target_lag_times_hours
+                    ]
+
+                    this_predictor_matrix_lagged_targets = numpy.stack(
+                        these_matrices, axis=-2
+                    )
+                except:
+                    warning_string = (
+                        'POTENTIAL ERROR: Could not read lagged targets for '
+                        'init time {0:s}.  Something went wrong in '
+                        '`_read_targets_one_example`.'
+                    ).format(
+                        time_conversion.unix_sec_to_string(
+                            init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                        )
+                    )
+
+                    warnings.warn(warning_string)
+                    this_predictor_matrix_lagged_targets = None
+
+                if this_predictor_matrix_lagged_targets is None:
+                    init_time_index += 1
+                    continue
+
+                predictor_matrix_lagged_targets[i, ...] = (
+                    this_predictor_matrix_lagged_targets
+                )
+
             if do_residual_prediction:
+                this_raw_baseline_matrix = None
+
                 try:
                     this_baseline_matrix = (
                         nwp_input.read_residual_baseline_one_example(
@@ -2588,6 +2626,24 @@ def data_generator(option_dict):
                             predict_gust_factor=predict_gust_factor
                         )
                     )
+
+                    if compare_to_baseline_in_loss:
+                        if predict_dewpoint_depression or predict_gust_factor:
+                            this_raw_baseline_matrix = (
+                                nwp_input.read_residual_baseline_one_example(
+                                    init_time_unix_sec=
+                                    init_times_unix_sec[init_time_index],
+                                    nwp_model_name=resid_baseline_model_name,
+                                    nwp_lead_time_hours=
+                                    resid_baseline_lead_time_hours,
+                                    nwp_directory_name=
+                                    resid_baseline_model_dir_name,
+                                    target_field_names=target_field_names,
+                                    patch_location_dict=patch_location_dict,
+                                    predict_dewpoint_depression=False,
+                                    predict_gust_factor=False
+                                )
+                            )
                 except:
                     warning_string = (
                         'POTENTIAL ERROR: Could not read residual baseline for '
@@ -2609,10 +2665,14 @@ def data_generator(option_dict):
                 predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
 
                 if compare_to_baseline_in_loss:
-                    target_matrix[i, ..., num_target_fields:] = (
-                        this_baseline_matrix
-                    )
-
+                    if this_raw_baseline_matrix is None:
+                        target_matrix[i, ..., num_target_fields:] = (
+                            this_baseline_matrix
+                        )
+                    else:
+                        target_matrix[i, ..., num_target_fields:] = (
+                            this_raw_baseline_matrix
+                        )
             try:
                 (
                     this_predictor_matrix_2pt5km,
@@ -2676,118 +2736,17 @@ def data_generator(option_dict):
             [target_matrix, mask_matrix_for_loss], axis=-1
         )
 
-        error_checking.assert_is_numpy_array_without_nan(target_matrix)
-        print((
-            'Shape of 2.5-km target matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(target_matrix.shape),
-            numpy.mean(numpy.isnan(target_matrix))
-        ))
-
-        if predictor_matrix_2pt5km is not None:
-            print((
-                'Shape of 2.5-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_2pt5km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
-            ))
-
-            predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
-                sentinel_value
-            )
-
-        if nbm_constant_matrix is not None:
-            print('Shape of NBM-constant predictor matrix: {0:s}'.format(
-                str(nbm_constant_matrix.shape)
-            ))
-
-        if predictor_matrix_resid_baseline is not None:
-            print((
-                'Shape of residual baseline matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_resid_baseline.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
-            ))
-
-            print('Min values in residual baseline matrix: {0:s}'.format(
-                str(numpy.nanmin(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
-            ))
-            print('Max values in residual baseline matrix: {0:s}'.format(
-                str(numpy.nanmax(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
-            ))
-
-            error_checking.assert_is_numpy_array_without_nan(
-                predictor_matrix_resid_baseline
-            )
-
-        if predictor_matrix_10km is not None:
-            print((
-                'Shape of 10-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_10km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_10km))
-            ))
-
-            predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
-                sentinel_value
-            )
-
-        if predictor_matrix_20km is not None:
-            print((
-                'Shape of 20-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_20km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_20km))
-            ))
-
-            predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
-                sentinel_value
-            )
-
-        if predictor_matrix_40km is not None:
-            print((
-                'Shape of 40-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_40km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_40km))
-            ))
-
-            predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
-                sentinel_value
-            )
-
-        predictor_matrices = {}
-        if predictor_matrix_2pt5km is not None:
-            predictor_matrices.update({
-                '2pt5km_inputs': predictor_matrix_2pt5km.astype('float32')
-            })
-        if nbm_constant_matrix is not None:
-            predictor_matrices.update({
-                'const_inputs': nbm_constant_matrix.astype('float32')
-            })
-        if predictor_matrix_10km is not None:
-            predictor_matrices.update({
-                '10km_inputs': predictor_matrix_10km.astype('float32')
-            })
-        if predictor_matrix_20km is not None:
-            predictor_matrices.update({
-                '20km_inputs': predictor_matrix_20km.astype('float32')
-            })
-        if predictor_matrix_40km is not None:
-            predictor_matrices.update({
-                '40km_inputs': predictor_matrix_40km.astype('float32')
-            })
-        if predictor_matrix_resid_baseline is not None:
-            predictor_matrices.update({
-                'resid_baseline_inputs':
-                    predictor_matrix_resid_baseline.astype('float32')
-            })
+        predictor_matrices = __report_data_properties(
+            predictor_matrix_2pt5km=predictor_matrix_2pt5km,
+            nbm_constant_matrix=nbm_constant_matrix,
+            predictor_matrix_lagged_targets=predictor_matrix_lagged_targets,
+            predictor_matrix_10km=predictor_matrix_10km,
+            predictor_matrix_20km=predictor_matrix_20km,
+            predictor_matrix_40km=predictor_matrix_40km,
+            predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
+            target_matrix=target_matrix,
+            sentinel_value=sentinel_value
+        )
 
         yield predictor_matrices, target_matrix
 
@@ -3368,6 +3327,9 @@ def read_metafile(pickle_file_name):
     if COMPARE_TO_BASELINE_IN_LOSS_KEY not in training_option_dict:
         training_option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
         validation_option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
+    if TARGET_LAG_TIMES_KEY not in training_option_dict:
+        training_option_dict[TARGET_LAG_TIMES_KEY] = None
+        validation_option_dict[TARGET_LAG_TIMES_KEY] = None
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict

@@ -55,7 +55,7 @@ def _run(template_file_name, output_dir_name,
          nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
          nwp_normalization_file_name, nwp_use_quantile_norm,
          backup_nwp_model_name, backup_nwp_dir_name,
-         target_lead_time_hours, target_field_names,
+         target_lead_time_hours, target_field_names, target_lag_times_hours,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
          num_examples_per_batch, sentinel_value,
@@ -90,6 +90,7 @@ def _run(template_file_name, output_dir_name,
     :param backup_nwp_dir_name: Same.
     :param target_lead_time_hours: Same.
     :param target_field_names: Same.
+    :param target_lag_times_hours: Same.
     :param target_normalization_file_name: Same.
     :param targets_use_quantile_norm: Same.
     :param nbm_constant_field_names: Same.
@@ -144,6 +145,8 @@ def _run(template_file_name, output_dir_name,
     if len(nbm_constant_field_names) == 1 and nbm_constant_field_names[0] == '':
         nbm_constant_file_name = None
         nbm_constant_field_names = []
+    if len(target_lag_times_hours) == 1 and target_lag_times_hours[0] <= 0:
+        target_lag_times_hours = None
 
     nwp_model_to_training_dir_name = _process_nwp_directories(
         nwp_directory_names=nwp_dir_names_for_training,
@@ -183,6 +186,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
+        neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
@@ -217,6 +221,7 @@ def _run(template_file_name, output_dir_name,
     )
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+    mmd = model_metadata_dict
 
     neural_net.train_model(
         model_object=model_object,
@@ -225,12 +230,12 @@ def _run(template_file_name, output_dir_name,
         training_option_dict=training_option_dict,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
-        loss_function_string=
-        model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
-        optimizer_function_string=
-        model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
-        metric_function_strings=
-        model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
+        loss_function_string=mmd[neural_net.LOSS_FUNCTION_KEY],
+        optimizer_function_string=mmd[neural_net.OPTIMIZER_FUNCTION_KEY],
+        metric_function_strings=mmd[neural_net.METRIC_FUNCTIONS_KEY],
+        chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
+        chiu_net_pp_architecture_dict=
+        mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -276,6 +281,10 @@ if __name__ == '__main__':
         ),
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
+        ),
+        target_lag_times_hours=numpy.array(
+            getattr(INPUT_ARG_OBJECT, training_args.TARGET_LAG_TIMES_ARG_NAME),
+            dtype=int
         ),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORMALIZATION_FILE_ARG_NAME

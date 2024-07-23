@@ -1,6 +1,5 @@
 """Custom metrics."""
 
-import numpy
 import tensorflow
 from tensorflow.keras import backend as K
 from ml_for_national_blend.outside_code import error_checking
@@ -9,33 +8,6 @@ from ml_for_national_blend.machine_learning import custom_losses
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 LARGE_NEGATIVE_VALUE = -1e6
 LARGE_POSITIVE_VALUE = 1e6
-
-
-def _check_index_args(u_wind_index, v_wind_index, gust_index,
-                      temperature_index, dewpoint_index):
-    """Error-checks index arguments.
-
-    :param u_wind_index: See doc for `max_prediction`.
-    :param v_wind_index: Same.
-    :param gust_index: Same.
-    :param temperature_index: Same.
-    :param dewpoint_index: Same.
-    """
-
-    error_checking.assert_is_integer(u_wind_index)
-    error_checking.assert_is_integer(v_wind_index)
-    error_checking.assert_is_integer(gust_index)
-    error_checking.assert_is_integer(temperature_index)
-    error_checking.assert_is_integer(dewpoint_index)
-
-    all_indices = [
-        u_wind_index, v_wind_index, gust_index,
-        temperature_index, dewpoint_index
-    ]
-    all_indices = [i for i in all_indices if i >= 0]
-    all_indices = numpy.array(all_indices, dtype=int)
-
-    assert len(all_indices) == len(numpy.unique(all_indices))
 
 
 def max_prediction(
@@ -47,6 +19,12 @@ def max_prediction(
     For the following input args -- u_wind_index, v_wind_index, gust_index,
     temperature_index, dewpoint_index -- if said quantity is not a target
     variable, just make the argument negative!
+
+    E = number of examples
+    M = number of grid rows
+    N = number of grid columns
+    T = number of target variables (channels)
+    S = ensemble size
 
     :param channel_index: Will compute metric for the [k]th channel, where
         k = `channel_index`.
@@ -72,7 +50,7 @@ def max_prediction(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -83,19 +61,13 @@ def max_prediction(
     def metric(target_tensor, prediction_tensor):
         """Computes metric (max prediction).
 
-        E = number of examples
-        M = number of grid rows
-        N = number of grid columns
-        T = number of target variables (channels)
-        S = ensemble size
-
         :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
             target_tensor[..., :-1] contains the actual target values and
             target_tensor[..., -1] contains weights.
         :param prediction_tensor: Tensor of predicted values.  If
             expect_ensemble == True, will expect dimensions E x M x N x T x S.
             Otherwise, will expect E x M x N x T.
-        :return: metric: Max prediction.
+        :return: scalar_max_prediction: Max prediction (a scalar value).
         """
 
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
@@ -156,7 +128,7 @@ def spatial_max_bias(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -169,7 +141,7 @@ def spatial_max_bias(
 
         :param target_tensor: See doc for `max_prediction`.
         :param prediction_tensor: See doc for `max_prediction`.
-        :return: metric: Bias in spatial max.
+        :return: scalar_spatial_max_bias: Bias in spatial max (a scalar value).
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
@@ -245,7 +217,7 @@ def min_prediction(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -258,7 +230,7 @@ def min_prediction(
 
         :param target_tensor: See doc for `max_prediction`.
         :param prediction_tensor: See doc for `max_prediction`.
-        :return: metric: Minimum prediction.
+        :return: scalar_min_prediction: Min prediction (a scalar value).
         """
 
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
@@ -319,7 +291,7 @@ def spatial_min_bias(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -332,7 +304,7 @@ def spatial_min_bias(
 
         :param target_tensor: See doc for `max_prediction`.
         :param prediction_tensor: See doc for `max_prediction`.
-        :return: metric: Bias in spatial minimum.
+        :return: scalar_spatial_min_bias: Bias in spatial min (a scalar value).
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
@@ -408,7 +380,7 @@ def mean_squared_error(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -421,7 +393,7 @@ def mean_squared_error(
 
         :param target_tensor: See doc for `max_prediction`.
         :param prediction_tensor: Same.
-        :return: metric: MSE.
+        :return: scalar_mse: MSE (a scalar value).
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
@@ -494,7 +466,7 @@ def dual_weighted_mse(
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
-    _check_index_args(
+    custom_losses.check_index_args(
         u_wind_index=u_wind_index,
         v_wind_index=v_wind_index,
         gust_index=gust_index,
@@ -507,7 +479,7 @@ def dual_weighted_mse(
 
         :param target_tensor: See doc for `max_prediction`.
         :param prediction_tensor: Same.
-        :return: metric: DWMSE.
+        :return: scalar_dwmse: DWMSE (a scalar value).
         """
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
