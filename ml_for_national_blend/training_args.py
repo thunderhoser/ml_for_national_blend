@@ -118,7 +118,7 @@ TARGET_FIELDS_HELP_STRING = (
 TARGET_LAG_TIMES_HELP_STRING = (
     'List of lag times for target fields used in the predictors.  If you do '
     'not want to use target fields in the predictors, make this a 1-element '
-    'list with a non-positive number -- for example, [-1].'
+    'list with a negative number -- for example, [-1].'
 )
 TARGET_NORMALIZATION_FILE_HELP_STRING = (
     'Path to normalization file for target variables (will be read by '

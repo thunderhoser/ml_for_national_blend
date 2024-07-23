@@ -153,7 +153,7 @@ def _run(template_file_name, output_dir_name,
     if len(nbm_constant_field_names) == 1 and nbm_constant_field_names[0] == '':
         nbm_constant_file_name = None
         nbm_constant_field_names = []
-    if len(target_lag_times_hours) == 1 and target_lag_times_hours[0] <= 0:
+    if len(target_lag_times_hours) == 1 and target_lag_times_hours[0] < 0:
         target_lag_times_hours = None
 
     nwp_model_to_training_dir_name = _process_nwp_directories(
