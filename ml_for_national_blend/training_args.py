@@ -23,6 +23,7 @@ BACKUP_NWP_MODEL_ARG_NAME = 'backup_nwp_model_name'
 BACKUP_NWP_DIR_ARG_NAME = 'backup_nwp_dir_name'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
+TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_hours'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
@@ -113,6 +114,11 @@ TARGET_FIELDS_HELP_STRING = (
     'be in the following list:\n{0:s}'
 ).format(
     str(urma_utils.ALL_FIELD_NAMES)
+)
+TARGET_LAG_TIMES_HELP_STRING = (
+    'List of lag times for target fields used in the predictors.  If you do '
+    'not want to use target fields in the predictors, make this a 1-element '
+    'list with a non-positive number -- for example, [-1].'
 )
 TARGET_NORMALIZATION_FILE_HELP_STRING = (
     'Path to normalization file for target variables (will be read by '
@@ -316,6 +322,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+', required=True,
         help=TARGET_FIELDS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + TARGET_LAG_TIMES_ARG_NAME, type=int, nargs='+', required=True,
+        help=TARGET_LAG_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_NORMALIZATION_FILE_ARG_NAME, type=str, required=False,
