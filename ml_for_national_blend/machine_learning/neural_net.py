@@ -46,6 +46,7 @@ BACKUP_NWP_MODEL_KEY = 'backup_nwp_model_name'
 BACKUP_NWP_DIR_KEY = 'backup_nwp_directory_name'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_hours'
 TARGET_FIELDS_KEY = 'target_field_names'
+TARGET_LAG_TIMES_KEY = 'target_lag_times_hours'
 TARGET_DIR_KEY = 'target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
@@ -106,6 +107,99 @@ NUM_PATCH_COLUMNS_KEY = 'num_columns_in_patch'
 PATCH_OVERLAP_SIZE_KEY = 'patch_overlap_size_2pt5km_pixels'
 PATCH_START_ROW_KEY = 'patch_start_row_2pt5km'
 PATCH_START_COLUMN_KEY = 'patch_start_column_2pt5km'
+
+
+def __report_data_properties(
+        predictor_matrix_2pt5km, nbm_constant_matrix,
+        predictor_matrix_lagged_targets, predictor_matrix_10km,
+        predictor_matrix_20km, predictor_matrix_40km,
+        predictor_matrix_resid_baseline, target_matrix, sentinel_value):
+    """Reports data properties at end of data-generator or data-creator.
+
+    :param predictor_matrix_2pt5km: See output doc for `data_generator`.
+    :param nbm_constant_matrix: Same.
+    :param predictor_matrix_lagged_targets: Same.
+    :param predictor_matrix_10km: Same.
+    :param predictor_matrix_20km: Same.
+    :param predictor_matrix_40km: Same.
+    :param predictor_matrix_resid_baseline: Same.
+    :param target_matrix: Same.
+    :param sentinel_value: See input doc for `data_generator`.
+    :return: predictor_matrices: Tuple with 32-bit predictor matrices.
+    """
+
+    error_checking.assert_is_numpy_array_without_nan(target_matrix)
+    print((
+        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
+    ).format(
+        str(target_matrix.shape),
+        numpy.mean(numpy.isnan(target_matrix))
+    ))
+
+    predictor_matrices = (
+        predictor_matrix_2pt5km, nbm_constant_matrix,
+        predictor_matrix_lagged_targets, predictor_matrix_10km,
+        predictor_matrix_20km, predictor_matrix_40km,
+        predictor_matrix_resid_baseline
+    )
+    pred_matrix_descriptions = [
+        '2.5-km predictor matrix', 'NBM-constant predictor matrix',
+        'lagged-target predictor matrix', '10-km predictor matrix',
+        '20-km predictor matrix', '40-km predictor matrix',
+        'residual baseline matrix'
+    ]
+    allow_nan_flags = [
+        True, False, True, True, True, True, False
+    ]
+
+    for k in range(len(predictor_matrices)):
+        if predictor_matrices[k] is None:
+            continue
+
+        print('Shape of {0:s} and NaN fraction: {1:s}, {2:.04f}'.format(
+            pred_matrix_descriptions[k],
+            str(predictor_matrices[k].shape),
+            numpy.mean(numpy.isnan(predictor_matrices[k]))
+        ))
+
+        if allow_nan_flags[k]:
+            predictor_matrices[k][numpy.isnan(predictor_matrices[k])] = (
+                sentinel_value
+            )
+        else:
+            error_checking.assert_is_numpy_array_without_nan(
+                predictor_matrices[k]
+            )
+
+    if predictor_matrix_resid_baseline is not None:
+        these_min = numpy.nanmin(
+            predictor_matrix_resid_baseline, axis=(0, 1, 2)
+        )
+        these_max = numpy.nanmin(
+            predictor_matrix_resid_baseline, axis=(0, 1, 2)
+        )
+
+        print('Min values in residual baseline matrix: {0:s}'.format(
+            str(these_min)
+        ))
+        print('Max values in residual baseline matrix: {0:s}'.format(
+            str(these_max)
+        ))
+
+    # predictor_keys = [
+    #     '2pt5km_inputs', 'const_inputs', 'lagtgt_inputs', '10km_inputs',
+    #     '20km_inputs', '40km_inputs', 'resid_baseline_inputs'
+    # ]
+    # predictor_dict = dict(zip(predictor_keys, predictor_matrices))
+    # predictor_dict = {
+    #     key: value.astype('float32')
+    #     for key, value in predictor_dict.items()
+    #     if value is not None
+    # }
+
+    return tuple(
+        pm.astype('float32') for pm in predictor_matrices if pm is not None
+    )
 
 
 def __predicted_2m_depression_to_dewpoint(prediction_matrix,
@@ -438,9 +532,7 @@ def _check_generator_args(option_dict):
         for this_field_name in nwp_model_to_field_names[this_model_name]:
             nwp_model_utils.check_field_name(this_field_name)
 
-    if option_dict[NWP_NORM_FILE_KEY] is not None:
-        error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
-
+    error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[NWP_USE_QUANTILE_NORM_KEY])
     error_checking.assert_is_string(option_dict[BACKUP_NWP_MODEL_KEY])
     error_checking.assert_is_string(option_dict[BACKUP_NWP_DIR_KEY])
@@ -451,10 +543,22 @@ def _check_generator_args(option_dict):
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         urma_utils.check_field_name(this_field_name)
 
-    error_checking.assert_is_string(option_dict[TARGET_DIR_KEY])
-    if option_dict[TARGET_NORM_FILE_KEY] is not None:
-        error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
+    if option_dict[TARGET_LAG_TIMES_KEY] is not None:
+        error_checking.assert_is_numpy_array(
+            option_dict[TARGET_LAG_TIMES_KEY], num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[TARGET_LAG_TIMES_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[TARGET_LAG_TIMES_KEY], 0
+        )
+        option_dict[TARGET_LAG_TIMES_KEY] = numpy.unique(
+            option_dict[TARGET_LAG_TIMES_KEY]
+        )[::-1]
 
+    error_checking.assert_is_string(option_dict[TARGET_DIR_KEY])
+    error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[TARGETS_USE_QUANTILE_NORM_KEY])
 
     if (
@@ -493,8 +597,6 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
 
     if option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]:
-        assert option_dict[TARGET_NORM_FILE_KEY] is None
-
         assert (
             urma_utils.DEWPOINT_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
@@ -502,8 +604,6 @@ def _check_generator_args(option_dict):
         option_dict[TARGET_FIELDS_KEY].append(urma_utils.DEWPOINT_2METRE_NAME)
 
     if option_dict[PREDICT_GUST_FACTOR_KEY]:
-        assert option_dict[TARGET_NORM_FILE_KEY] is None
-
         assert (
             urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
@@ -512,8 +612,6 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
     if not option_dict[DO_RESIDUAL_PREDICTION_KEY]:
-        assert option_dict[TARGET_NORM_FILE_KEY] is None
-
         option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
         option_dict[RESID_BASELINE_MODEL_KEY] = None
         option_dict[RESID_BASELINE_MODEL_DIR_KEY] = None
@@ -540,8 +638,8 @@ def _check_generator_args(option_dict):
 
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
-        num_target_fields, num_examples_per_batch, do_residual_prediction,
-        patch_location_dict):
+        num_target_fields, num_target_lag_times, num_examples_per_batch,
+        do_residual_prediction, patch_location_dict):
     """Initializes predictor and target matrices for one batch.
 
     :param nwp_model_names: 1-D list with names of NWP models.
@@ -549,6 +647,8 @@ def _init_matrices_1batch(
         for `data_generator`.
     :param num_nwp_lead_times: Number of lead times.
     :param num_target_fields: Number of target fields.
+    :param num_target_lag_times: Number of lag times for targets, to be used in
+        the predictor variables.  This can be 0.
     :param num_examples_per_batch: Batch size.
     :param do_residual_prediction: Boolean flag.  If True, the NN is predicting
         difference between a given NWP forecast and the URMA truth.  If True,
@@ -563,6 +663,7 @@ def _init_matrices_1batch(
     :return: predictor_matrix_20km: Same but for 20-km models.
     :return: predictor_matrix_40km: Same but for 40-km models.
     :return: predictor_matrix_resid_baseline: Same but for residual baseline.
+    :return: predictor_matrix_lagged_targets: Same but for lagged targets.
     :return: target_matrix: Same but for target fields.
     """
 
@@ -589,6 +690,15 @@ def _init_matrices_1batch(
         )
     else:
         predictor_matrix_resid_baseline = None
+
+    if num_target_lag_times == 0:
+        predictor_matrix_lagged_targets = None
+    else:
+        predictor_matrix_lagged_targets = numpy.full(
+            (num_examples_per_batch, num_rows, num_columns,
+             num_target_lag_times, num_target_fields),
+            numpy.nan
+        )
 
     if len(model_indices) == 0:
         predictor_matrix_2pt5km = None
@@ -671,7 +781,8 @@ def _init_matrices_1batch(
     return (
         predictor_matrix_2pt5km, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, target_matrix
+        predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
+        target_matrix
     )
 
 
@@ -692,15 +803,18 @@ def _read_targets_one_example(
     :param target_field_names: Same.
     :param target_dir_name: Same.
     :param target_norm_param_table_xarray: xarray table with normalization
-        parameters for target variables.  If you do not want to normalize (or
-        if the input directory already contains normalized data), this should be
-        None.
+        parameters for target variables.
     :param use_quantile_norm: See documentation for `data_generator`.
     :param patch_location_dict: Dictionary produced by
         `misc_utils.determine_patch_locations`.  If you are training with the
         full grid (not the patchwise approach), make this None.
     :return: target_matrix: M-by-N-by-F numpy array of target values.
     """
+
+    if target_lead_time_hours > 0:
+        target_norm_param_table_xarray = None
+    else:
+        assert target_norm_param_table_xarray is not None
 
     target_valid_time_unix_sec = (
         init_time_unix_sec + HOURS_TO_SECONDS * target_lead_time_hours
@@ -921,25 +1035,19 @@ def create_data(option_dict, init_time_unix_sec):
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    if nwp_normalization_file_name is None:
-        nwp_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            nwp_normalization_file_name
-        ))
-        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-            nwp_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        nwp_normalization_file_name
+    ))
+    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+        nwp_normalization_file_name
+    )
 
-    if target_normalization_file_name is None:
-        target_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            target_normalization_file_name
-        ))
-        target_norm_param_table_xarray = urma_io.read_normalization_file(
-            target_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        target_normalization_file_name
+    ))
+    target_norm_param_table_xarray = urma_io.read_normalization_file(
+        target_normalization_file_name
+    )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -987,8 +1095,8 @@ def create_data(option_dict, init_time_unix_sec):
             target_lead_time_hours=target_lead_time_hours,
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
-            target_norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=targets_use_quantile_norm,
+            target_norm_param_table_xarray=None,
+            use_quantile_norm=False,
             patch_location_dict=patch_location_dict
         )
     except:
@@ -1289,25 +1397,19 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    if nwp_normalization_file_name is None:
-        nwp_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            nwp_normalization_file_name
-        ))
-        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-            nwp_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        nwp_normalization_file_name
+    ))
+    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+        nwp_normalization_file_name
+    )
 
-    if target_normalization_file_name is None:
-        target_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            target_normalization_file_name
-        ))
-        target_norm_param_table_xarray = urma_io.read_normalization_file(
-            target_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        target_normalization_file_name
+    ))
+    target_norm_param_table_xarray = urma_io.read_normalization_file(
+        target_normalization_file_name
+    )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -1345,8 +1447,8 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             target_lead_time_hours=target_lead_time_hours,
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
-            target_norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=targets_use_quantile_norm,
+            target_norm_param_table_xarray=None,
+            use_quantile_norm=False,
             patch_location_dict=None
         )
     except:
@@ -1473,6 +1575,7 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         nwp_model_to_field_names=nwp_model_to_field_names,
         num_nwp_lead_times=len(nwp_lead_times_hours),
         num_target_fields=len(target_field_names),
+        num_target_lag_times=num_target_lag_times,
         num_examples_per_batch=num_patches,
         patch_location_dict=dummy_patch_location_dict,
         do_residual_prediction=do_residual_prediction
@@ -1686,6 +1789,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
     target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
@@ -1722,25 +1826,19 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    if nwp_normalization_file_name is None:
-        nwp_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            nwp_normalization_file_name
-        ))
-        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-            nwp_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        nwp_normalization_file_name
+    ))
+    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+        nwp_normalization_file_name
+    )
 
-    if target_normalization_file_name is None:
-        target_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            target_normalization_file_name
-        ))
-        target_norm_param_table_xarray = urma_io.read_normalization_file(
-            target_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        target_normalization_file_name
+    ))
+    target_norm_param_table_xarray = urma_io.read_normalization_file(
+        target_normalization_file_name
+    )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -1783,7 +1881,13 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     full_predictor_matrix_10km = None
     full_predictor_matrix_20km = None
     full_predictor_matrix_40km = None
+    full_predictor_matrix_lagged_targets = None
+
     num_target_fields = len(target_field_names)
+    if target_lag_times_hours is None:
+        num_target_lag_times = 0
+    else:
+        num_target_lag_times = len(target_lag_times_hours)
 
     while True:
         dummy_patch_location_dict = misc_utils.determine_patch_locations(
@@ -1793,12 +1897,14 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
         (
             predictor_matrix_2pt5km, predictor_matrix_10km,
             predictor_matrix_20km, predictor_matrix_40km,
-            predictor_matrix_resid_baseline, target_matrix
+            predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
+            target_matrix
         ) = _init_matrices_1batch(
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
             num_target_fields=num_target_fields,
+            num_target_lag_times=num_target_lag_times,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=dummy_patch_location_dict,
             do_residual_prediction=do_residual_prediction
@@ -1830,6 +1936,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -1844,9 +1951,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                         target_lead_time_hours=target_lead_time_hours,
                         target_field_names=target_field_names,
                         target_dir_name=target_dir_name,
-                        target_norm_param_table_xarray=
-                        target_norm_param_table_xarray,
-                        use_quantile_norm=targets_use_quantile_norm,
+                        target_norm_param_table_xarray=None,
+                        use_quantile_norm=False,
                         patch_location_dict=None
                     )
             except:
@@ -1867,8 +1973,62 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
 
             if full_target_matrix is None:
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            try:
+                if (
+                        num_target_lag_times > 0 and
+                        full_predictor_matrix_lagged_targets is None
+                ):
+                    these_matrices = [
+                        _read_targets_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            target_lead_time_hours=l,
+                            target_field_names=target_field_names,
+                            target_dir_name=target_dir_name,
+                            target_norm_param_table_xarray=
+                            target_norm_param_table_xarray,
+                            use_quantile_norm=targets_use_quantile_norm,
+                            patch_location_dict=None
+                        )
+                        for l in target_lag_times_hours
+                    ]
+
+                    full_predictor_matrix_lagged_targets = numpy.stack(
+                        these_matrices, axis=-2
+                    )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read lagged targets for init '
+                    'time {0:s}.  Something went wrong in '
+                    '`_read_targets_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
+
+            if (
+                    num_target_lag_times > 0 and
+                    full_predictor_matrix_lagged_targets is None
+            ):
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -1914,6 +2074,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
 
             if do_residual_prediction and full_baseline_matrix is None:
                 init_time_index, init_times_unix_sec = __increment_init_time(
@@ -1964,6 +2125,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
                 found_any_predictors = False
                 found_all_predictors = False
 
@@ -2009,6 +2171,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             if do_residual_prediction:
                 predictor_matrix_resid_baseline[i, ...] = (
                     full_baseline_matrix[j_start:j_end, k_start:k_end, ...]
+                )
+
+            if predictor_matrix_lagged_targets is not None:
+                predictor_matrix_lagged_targets[i, ...] = (
+                    full_predictor_matrix_lagged_targets[j_start:j_end, k_start:k_end, ...]
                 )
 
             if predictor_matrix_2pt5km is not None:
@@ -2057,118 +2224,17 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             [target_matrix, mask_matrix_for_loss], axis=-1
         )
 
-        error_checking.assert_is_numpy_array_without_nan(target_matrix)
-        print((
-            'Shape of 2.5-km target matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(target_matrix.shape),
-            numpy.mean(numpy.isnan(target_matrix))
-        ))
-
-        if predictor_matrix_2pt5km is not None:
-            print((
-                'Shape of 2.5-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_2pt5km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_2pt5km))
-            ))
-
-            predictor_matrix_2pt5km[numpy.isnan(predictor_matrix_2pt5km)] = (
-                sentinel_value
-            )
-
-        if nbm_constant_matrix is not None:
-            print('Shape of NBM-constant predictor matrix: {0:s}'.format(
-                str(nbm_constant_matrix.shape)
-            ))
-
-        if predictor_matrix_resid_baseline is not None:
-            print((
-                'Shape of residual baseline matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_resid_baseline.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_resid_baseline))
-            ))
-
-            print('Min values in residual baseline matrix: {0:s}'.format(
-                str(numpy.nanmin(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
-            ))
-            print('Max values in residual baseline matrix: {0:s}'.format(
-                str(numpy.nanmax(predictor_matrix_resid_baseline, axis=(0, 1, 2)))
-            ))
-
-            error_checking.assert_is_numpy_array_without_nan(
-                predictor_matrix_resid_baseline
-            )
-
-        if predictor_matrix_10km is not None:
-            print((
-                'Shape of 10-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_10km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_10km))
-            ))
-
-            predictor_matrix_10km[numpy.isnan(predictor_matrix_10km)] = (
-                sentinel_value
-            )
-
-        if predictor_matrix_20km is not None:
-            print((
-                'Shape of 20-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_20km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_20km))
-            ))
-
-            predictor_matrix_20km[numpy.isnan(predictor_matrix_20km)] = (
-                sentinel_value
-            )
-
-        if predictor_matrix_40km is not None:
-            print((
-                'Shape of 40-km predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(predictor_matrix_40km.shape),
-                numpy.mean(numpy.isnan(predictor_matrix_40km))
-            ))
-
-            predictor_matrix_40km[numpy.isnan(predictor_matrix_40km)] = (
-                sentinel_value
-            )
-
-        predictor_matrices = {}
-        if predictor_matrix_2pt5km is not None:
-            predictor_matrices.update({
-                '2pt5km_inputs': predictor_matrix_2pt5km.astype('float32')
-            })
-        if nbm_constant_matrix is not None:
-            predictor_matrices.update({
-                'const_inputs': nbm_constant_matrix.astype('float32')
-            })
-        if predictor_matrix_10km is not None:
-            predictor_matrices.update({
-                '10km_inputs': predictor_matrix_10km.astype('float32')
-            })
-        if predictor_matrix_20km is not None:
-            predictor_matrices.update({
-                '20km_inputs': predictor_matrix_20km.astype('float32')
-            })
-        if predictor_matrix_40km is not None:
-            predictor_matrices.update({
-                '40km_inputs': predictor_matrix_40km.astype('float32')
-            })
-        if predictor_matrix_resid_baseline is not None:
-            predictor_matrices.update({
-                'resid_baseline_inputs':
-                    predictor_matrix_resid_baseline.astype('float32')
-            })
+        predictor_matrices = __report_data_properties(
+            predictor_matrix_2pt5km=predictor_matrix_2pt5km,
+            nbm_constant_matrix=nbm_constant_matrix,
+            predictor_matrix_lagged_targets=predictor_matrix_lagged_targets,
+            predictor_matrix_10km=predictor_matrix_10km,
+            predictor_matrix_20km=predictor_matrix_20km,
+            predictor_matrix_40km=predictor_matrix_40km,
+            predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
+            target_matrix=target_matrix,
+            sentinel_value=sentinel_value
+        )
 
         yield predictor_matrices, target_matrix
 
@@ -2221,8 +2287,7 @@ def data_generator(option_dict):
         `nwp_model_utils.check_field_name`.
     option_dict["nwp_normalization_file_name"]: Path to file with normalization
         params for NWP data (readable by
-        `nwp_model_io.read_normalization_file`).  If you do not want to
-        normalize NWP predictors, make this None.
+        `nwp_model_io.read_normalization_file`).
     option_dict["nwp_use_quantile_norm"]: Boolean flag.  If True, will normalize
         NWP predictors in two steps: quantiles, then z-scores.  If False, will
         do simple z-score normalization.
@@ -2237,9 +2302,8 @@ def data_generator(option_dict):
         URMA data).  Files within this directory will be found by
         `urma_io.find_file` and read by `urma_io.read_file`.
     option_dict["target_normalization_file_name"]: Path to file with
-        normalization params for target fields (readable by
-        `urma_io.read_normalization_file`).  If you do not want to normalize
-        targets, make this None.
+        normalization params for lagged target fields in predictors (readable by
+        `urma_io.read_normalization_file`).
     option_dict["targets_use_quantile_norm"]: Same as "nwp_use_quantile_norm"
         but for target fields.
     option_dict["nbm_constant_field_names"]: length-C list with names of NBM
@@ -2366,25 +2430,19 @@ def data_generator(option_dict):
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    if nwp_normalization_file_name is None:
-        nwp_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            nwp_normalization_file_name
-        ))
-        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-            nwp_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        nwp_normalization_file_name
+    ))
+    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+        nwp_normalization_file_name
+    )
 
-    if target_normalization_file_name is None:
-        target_norm_param_table_xarray = None
-    else:
-        print('Reading normalization params from: "{0:s}"...'.format(
-            target_normalization_file_name
-        ))
-        target_norm_param_table_xarray = urma_io.read_normalization_file(
-            target_normalization_file_name
-        )
+    print('Reading normalization params from: "{0:s}"...'.format(
+        target_normalization_file_name
+    ))
+    target_norm_param_table_xarray = urma_io.read_normalization_file(
+        target_normalization_file_name
+    )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -2433,6 +2491,7 @@ def data_generator(option_dict):
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
             num_target_fields=num_target_fields,
+            num_target_lag_times=num_target_lag_times,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=patch_location_dict,
             do_residual_prediction=do_residual_prediction
@@ -2470,8 +2529,8 @@ def data_generator(option_dict):
                     target_lead_time_hours=target_lead_time_hours,
                     target_field_names=target_field_names,
                     target_dir_name=target_dir_name,
-                    target_norm_param_table_xarray=target_norm_param_table_xarray,
-                    use_quantile_norm=targets_use_quantile_norm,
+                    target_norm_param_table_xarray=None,
+                    use_quantile_norm=False,
                     patch_location_dict=patch_location_dict
                 )
 
