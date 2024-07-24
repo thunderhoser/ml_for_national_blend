@@ -129,11 +129,15 @@ def __report_data_properties(
     """
 
     error_checking.assert_is_numpy_array_without_nan(target_matrix)
+
     print((
-        'Shape of 2.5-km target matrix and NaN fraction: {0:s}, {1:.04f}'
+        'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f} ... '
+        'min/max = {2:.4f}/{3:.4f}'
     ).format(
         str(target_matrix.shape),
-        numpy.mean(numpy.isnan(target_matrix))
+        numpy.mean(numpy.isnan(target_matrix)),
+        numpy.min(target_matrix),
+        numpy.max(target_matrix)
     ))
 
     predictor_matrices = (
@@ -156,10 +160,15 @@ def __report_data_properties(
         if predictor_matrices[k] is None:
             continue
 
-        print('Shape of {0:s} and NaN fraction: {1:s}, {2:.04f}'.format(
+        print((
+            'Shape of {0:s}: {1:s} ... NaN fraction = {2:.4f} ... '
+            'min/max = {3:.4f}/{4:.4f}'
+        ).format(
             pred_matrix_descriptions[k],
             str(predictor_matrices[k].shape),
-            numpy.mean(numpy.isnan(predictor_matrices[k]))
+            numpy.mean(numpy.isnan(predictor_matrices[k])),
+            numpy.nanmin(predictor_matrices[k]),
+            numpy.nanmax(predictor_matrices[k])
         ))
 
         if allow_nan_flags[k]:
