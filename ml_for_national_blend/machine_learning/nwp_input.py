@@ -555,28 +555,39 @@ def _find_predictors_1example_1model(
         )
 
         if nwp_forecast_file_names is None:
-            print((
-                'Informational message (NOT AN ERROR):\n'
-                'Could NOT find predictors for init time {0:s} '
-                '({1:d} hours before desired) and NWP model "{2:s}"'
-            ).format(
-                time_conversion.unix_sec_to_string(
-                    try_init_times_unix_sec[i], '%Y-%m-%d-%H'
-                ),
-                try_init_time_offsets_hours[i],
-                try_nwp_model_names[i]
-            ))
+            pass
+
+            # print((
+            #     'Could NOT find predictors for init time {0:s} '
+            #     '({1:d} hours before desired) and NWP model "{2:s}"'
+            # ).format(
+            #     time_conversion.unix_sec_to_string(
+            #         try_init_times_unix_sec[i], '%Y-%m-%d-%H'
+            #     ),
+            #     try_init_time_offsets_hours[i],
+            #     try_nwp_model_names[i]
+            # ))
         else:
+            found_lead_times_hours = numpy.array([
+                interp_nwp_model_io.file_name_to_forecast_hour(f)
+                for f in nwp_forecast_file_names
+            ], dtype=int)
+
             print((
-                'Informational message (NOT AN ERROR):\n'
-                'Yay!  Found predictors for init time {0:s} '
-                '({1:d} hours before desired) and NWP model "{2:s}"\n\n'
+                'Wanted predictors for NWP model "{0:s}" at init time {1:s} '
+                'and lead times {2:s} hours.  FOUND predictors for model '
+                '"{3:s}" at init time {4:s} and lead times {5:s} hours.'
             ).format(
+                nwp_model_name,
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                ),
+                str(nwp_lead_times_hours),
+                try_nwp_model_names[i],
                 time_conversion.unix_sec_to_string(
                     try_init_times_unix_sec[i], '%Y-%m-%d-%H'
                 ),
-                try_init_time_offsets_hours[i],
-                try_nwp_model_names[i]
+                str(found_lead_times_hours)
             ))
 
             break
