@@ -27,21 +27,21 @@ OUTPUT_DIR_NAME = (
     'experiment07_bells_and_whistles/templates'
 )
 
-LOSS_FUNCTION = custom_losses.dual_weighted_mse(
+LOSS_FUNCTION = custom_losses.dual_weighted_msess(
     channel_weights=numpy.array([1.]),
     u_wind_index=-1, v_wind_index=-1, gust_index=-1,
     temperature_index=-1, dewpoint_index=-1,
     expect_ensemble=False,
-    function_name='loss_dwmse'
+    function_name='loss_dwmsess'
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_mse('
+    'custom_losses.dual_weighted_msess('
     'channel_weights=numpy.array([1.]), '
     'u_wind_index=-1, v_wind_index=-1, gust_index=-1, '
     'temperature_index=-1, dewpoint_index=-1, '
     'expect_ensemble=False, '
-    'function_name="loss_dwmse"'
+    'function_name="loss_dwmsess"'
     ')'
 )
 
