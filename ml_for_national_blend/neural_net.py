@@ -2071,6 +2071,28 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
                 continue
 
+            # TODO(thunderhoser): HACK.
+            if full_predictor_matrix_2pt5km is None:
+                (
+                    full_predictor_matrix_2pt5km,
+                    full_predictor_matrix_10km,
+                    full_predictor_matrix_20km,
+                    full_predictor_matrix_40km,
+                    found_any_predictors,
+                    found_all_predictors
+                ) = nwp_input.read_predictors_one_example(
+                    init_time_unix_sec=init_times_unix_sec[init_time_index],
+                    nwp_model_names=nwp_model_names,
+                    nwp_lead_times_hours=nwp_lead_times_hours,
+                    nwp_model_to_field_names=nwp_model_to_field_names,
+                    nwp_model_to_dir_name=nwp_model_to_dir_name,
+                    nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                    use_quantile_norm=nwp_use_quantile_norm,
+                    backup_nwp_model_name=backup_nwp_model_name,
+                    backup_nwp_directory_name=backup_nwp_directory_name,
+                    patch_location_dict=None
+                )
+
             try:
                 if full_predictor_matrix_2pt5km is None:
                     (
