@@ -175,7 +175,7 @@ def __report_data_properties(
         these_min = numpy.nanmin(
             predictor_matrix_resid_baseline, axis=(0, 1, 2)
         )
-        these_max = numpy.nanmin(
+        these_max = numpy.nanmax(
             predictor_matrix_resid_baseline, axis=(0, 1, 2)
         )
 

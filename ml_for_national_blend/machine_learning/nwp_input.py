@@ -482,11 +482,9 @@ def _find_predictors_1example_1model_rigid(
         ]
 
         print((
-            'Informational message (NOT AN ERROR)...\n'
-            'Desired NWP lead times:\n'
-            '{0:s}\n'
-            'NWP files to be used:\n'
-            '{1:s}\n'
+            'Informational message (NOT AN ERROR):\n'
+            'Desired NWP lead times: {0:s}\n'
+            'NWP files to be used: {1:s}'
         ).format(
             str(nwp_lead_times_hours),
             str(pathless_forecast_file_names)
@@ -558,7 +556,7 @@ def _find_predictors_1example_1model(
 
         if nwp_forecast_file_names is None:
             print((
-                'Informational message (NOT AN ERROR)...\n'
+                'Informational message (NOT AN ERROR):\n'
                 'Could NOT find predictors for init time {0:s} '
                 '({1:d} hours before desired) and NWP model "{2:s}"'
             ).format(
@@ -570,9 +568,9 @@ def _find_predictors_1example_1model(
             ))
         else:
             print((
-                'Informational message (NOT AN ERROR)...\n'
+                'Informational message (NOT AN ERROR):\n'
                 'Yay!  Found predictors for init time {0:s} '
-                '({1:d} hours before desired) and NWP model "{2:s}"'
+                '({1:d} hours before desired) and NWP model "{2:s}"\n\n'
             ).format(
                 time_conversion.unix_sec_to_string(
                     try_init_times_unix_sec[i], '%Y-%m-%d-%H'
