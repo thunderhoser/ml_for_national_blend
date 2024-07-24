@@ -2857,8 +2857,10 @@ def train_model(
     try:
         history_table_pandas = pandas.read_csv(history_file_name)
         initial_epoch = history_table_pandas['epoch'].max() + 1
+        best_validation_loss = history_table_pandas['val_loss'].min()
     except:
         initial_epoch = 0
+        best_validation_loss = numpy.inf
 
     history_object = keras.callbacks.CSVLogger(
         filename=history_file_name, separator=',', append=True
@@ -2868,6 +2870,8 @@ def train_model(
         save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
+    checkpoint_object.best = best_validation_loss
+
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=0.,
         patience=early_stopping_patience_epochs, verbose=1, mode='min'
