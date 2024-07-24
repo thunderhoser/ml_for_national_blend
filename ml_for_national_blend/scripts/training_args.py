@@ -20,6 +20,7 @@ TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
+COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
@@ -131,6 +132,11 @@ NBM_CONSTANT_FILE_HELP_STRING = (
     'Path to file with NBM constant fields (readable by '
     '`nbm_constant_io.read_file`).  If you do not want NBM-constant '
     'predictors, make this an empty string.'
+)
+COMPARE_TO_BASELINE_HELP_STRING = (
+    'Boolean flag.  If 1, the loss function involves comparing to the residual '
+    'baseline.  In other words, the loss function involves a skill score, '
+    'except with the residual baseline instead of climo.'
 )
 BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
@@ -334,6 +340,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + NBM_CONSTANT_FILE_ARG_NAME, type=str, required=True,
         help=NBM_CONSTANT_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + COMPARE_TO_BASELINE_ARG_NAME, type=int, required=True,
+        help=COMPARE_TO_BASELINE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + BATCH_SIZE_ARG_NAME, type=int, required=True,

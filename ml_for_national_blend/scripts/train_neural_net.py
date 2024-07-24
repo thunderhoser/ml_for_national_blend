@@ -58,7 +58,7 @@ def _run(template_file_name, output_dir_name,
          target_lead_time_hours, target_field_names, target_lag_times_hours,
          target_normalization_file_name, targets_use_quantile_norm,
          nbm_constant_field_names, nbm_constant_file_name,
-         num_examples_per_batch, sentinel_value,
+         compare_to_baseline_in_loss, num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          require_all_predictors,
@@ -95,6 +95,7 @@ def _run(template_file_name, output_dir_name,
     :param targets_use_quantile_norm: Same.
     :param nbm_constant_field_names: Same.
     :param nbm_constant_file_name: Same.
+    :param compare_to_baseline_in_loss: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
@@ -192,6 +193,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
         neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
+        neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: compare_to_baseline_in_loss,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
         neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY: predict_dewpoint_depression,
@@ -298,6 +300,9 @@ if __name__ == '__main__':
         nbm_constant_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.NBM_CONSTANT_FILE_ARG_NAME
         ),
+        compare_to_baseline_in_loss=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.COMPARE_TO_BASELINE_ARG_NAME
+        )),
         num_examples_per_batch=getattr(
             INPUT_ARG_OBJECT, training_args.BATCH_SIZE_ARG_NAME
         ),
