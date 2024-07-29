@@ -39,7 +39,7 @@ L2_WEIGHTS=("0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.00000
 batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
 l2_weight=${L2_WEIGHTS[$SLURM_ARRAY_TASK_ID]}
 
-output_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}"
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
