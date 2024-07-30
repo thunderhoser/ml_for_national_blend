@@ -1241,6 +1241,7 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
     quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
 
     for j in range(len(field_names)):
+        print(field_names[j])
         j_new = numpy.where(
             nbmct.coords[nbm_constant_utils.FIELD_DIM].values == field_names[j]
         )[0][0]
