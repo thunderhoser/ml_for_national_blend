@@ -83,11 +83,9 @@ def _update_norm_params_1var_1file(norm_param_dict, new_data_matrix,
 
     first_index = file_index * num_sample_values_per_file
     last_index = first_index + num_sample_values_per_file
-    print('FOO')
     percentile_levels = numpy.linspace(
         0, 100, num=num_sample_values_per_file, dtype=float
     )
-    print('BAR')
     norm_param_dict[SAMPLE_VALUES_KEY][first_index:last_index] = (
         numpy.nanpercentile(new_data_matrix, percentile_levels)
     )
@@ -1229,7 +1227,7 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
 
     num_sample_values_total = min([
         nbmct[nbm_constant_utils.DATA_KEY].values[..., 0].size,
-        int(1e5)
+        int(5e5)
     ])
 
     norm_param_dict_dict = {}
