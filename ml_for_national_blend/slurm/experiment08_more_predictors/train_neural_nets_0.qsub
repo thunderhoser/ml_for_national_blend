@@ -128,8 +128,8 @@ while true; do
     --nwp_dir_names_for_validation "/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" \
     --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
     --num_epochs=1000 \
-    --num_training_batches_per_epoch=$(( num_grad_accum_steps * 160 )) \
-    --num_validation_batches_per_epoch=$(( num_grad_accum_steps * 80 )) \
+    --num_training_batches_per_epoch=800 \
+    --num_validation_batches_per_epoch=400 \
     --plateau_patience_epochs=10 \
     --plateau_learning_rate_multiplier=0.9 \
     --early_stopping_patience_epochs=10000
