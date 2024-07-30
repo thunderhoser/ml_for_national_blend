@@ -26,7 +26,11 @@ QUANTILE_KEY = 'quantile'
 
 LAND_SEA_MASK_NAME = 'land_sea_mask_land1'
 OROGRAPHIC_HEIGHT_NAME = 'orographic_height_m_asl'
-ALL_FIELD_NAMES = [LAND_SEA_MASK_NAME, OROGRAPHIC_HEIGHT_NAME]
+LATITUDE_NAME = 'latitude_matrix_deg_n'
+LONGITUDE_NAME = 'longitude_matrix_deg_e'
+ALL_FIELD_NAMES = [
+    LAND_SEA_MASK_NAME, OROGRAPHIC_HEIGHT_NAME, LATITUDE_NAME, LONGITUDE_NAME
+]
 
 
 def check_field_name(field_name):
