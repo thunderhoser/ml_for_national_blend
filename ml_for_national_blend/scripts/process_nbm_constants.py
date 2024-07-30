@@ -98,6 +98,45 @@ def _run(input_file_names, field_names, wgrib2_exe_name, temporary_dir_name,
         data_vars=[nbm_constant_utils.DATA_KEY],
         coords='minimal', compat='identical', join='exact'
     )
+    nbmct = nbm_constant_table_xarray
+
+    latitude_matrix_deg_n = nbmct[nbm_constant_utils.LATITUDE_KEY].values
+    longitude_matrix_deg_e = nbmct[nbm_constant_utils.LONGITUDE_KEY].values
+    data_matrix = numpy.concatenate([
+        nbmct[nbm_constant_utils.DATA_KEY].values,
+        numpy.expand_dims(latitude_matrix_deg_n, axis=-1),
+        numpy.expand_dims(longitude_matrix_deg_e, axis=-1)
+    ], axis=-1)
+
+    new_field_names = [
+        nbm_constant_utils.LATITUDE_NAME, nbm_constant_utils.LONGITUDE_NAME
+    ]
+    field_names = (
+        nbmct.coords[nbm_constant_utils.FIELD_DIM].values.tolist()
+        + new_field_names
+    )
+
+    coord_dict = {}
+    for this_dim in nbmct.coords:
+        if this_dim == nbm_constant_utils.FIELD_DIM:
+            coord_dict[this_dim] = field_names
+        else:
+            coord_dict[this_dim] = nbmct.coords[this_dim].values
+
+    main_data_dict = {}
+    for this_key in nbmct.data_vars:
+        if this_key == nbm_constant_utils.DATA_KEY:
+            main_data_dict[this_key] = (
+                nbmct[this_key].dims, data_matrix
+            )
+        else:
+            main_data_dict[this_key] = (
+                nbmct[this_key].dims, nbmct[this_key].values
+            )
+
+    nbm_constant_table_xarray = xarray.Dataset(
+        data_vars=main_data_dict, coords=coord_dict
+    )
 
     print('Writing data to file: "{0:s}"...'.format(output_file_name))
     nbm_constant_io.write_file(
