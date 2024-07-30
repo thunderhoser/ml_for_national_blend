@@ -1,0 +1,37 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="get_norm_params_for_nbm_const"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=get_norm_params_for_nbm_const_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+set WORKING_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nbm_constants/new"
+set INPUT_FILE_NAME="${WORKING_DIR_NAME}/nbm_constants.nc"
+set OUTPUT_FILE_NAME="${WORKING_DIR_NAME}/normalization_params.nc"
+
+python3 -u "${CODE_DIR_NAME}/get_norm_params_for_nbm_const.py" \
+--input_nbm_constant_file_name="${INPUT_FILE_NAME}" \
+--num_quantiles=1001 \
+--output_norm_file_name="${OUTPUT_FILE_NAME}"
