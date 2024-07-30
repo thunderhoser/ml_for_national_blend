@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_neural_nets_ungridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=04:00:00
+#SBATCH --array=0-19
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_neural_nets_ungridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment07_bells_and_whistles"
+TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+BATCH_SIZES=("025" "050" "075" "100" "025" "050" "075" "100" "025" "050" "075" "100" "025" "050" "075" "100" "025" "050" "075" "100")
+L2_WEIGHTS=("0.0000001000" "0.0000001000" "0.0000001000" "0.0000001000" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000003162" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000010000" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000031623" "0.0000100000" "0.0000100000" "0.0000100000" "0.0000100000")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+l2_weight=${L2_WEIGHTS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_l2-weight=${l2_weight}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
+--first_init_time_string_by_period "2022-01-01-00" \
+--last_init_time_string_by_period "2022-12-31-18" \
+--num_bootstrap_reps=1 \
+--target_field_names "temperature_2m_agl_kelvins" \
+--input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+--num_relia_bins_by_target 65 \
+--min_relia_bin_edge_by_target -30 \
+--max_relia_bin_edge_by_target 35 \
+--per_grid_cell=0 \
+--keep_it_simple=0 \
+--output_file_name="${model_dir_name}/validation_full_grid/ungridded_evaluation.nc"
