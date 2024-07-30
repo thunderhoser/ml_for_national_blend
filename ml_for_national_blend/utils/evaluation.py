@@ -368,14 +368,19 @@ def _get_rel_curve_one_scalar(
     real_target_values = target_values[real_indices]
     real_predicted_values = predicted_values[real_indices]
 
-    bin_index_by_example = histograms.create_histogram(
-        input_values=real_target_values if invert else real_predicted_values,
-        num_bins=num_bins, min_value=min_bin_edge, max_value=max_bin_edge
-    )[0]
-
     mean_predictions = numpy.full(num_bins, numpy.nan)
     mean_observations = numpy.full(num_bins, numpy.nan)
     example_counts = numpy.full(num_bins, numpy.nan)
+
+    if len(real_indices) == 0:
+        return mean_predictions, mean_observations, example_counts
+
+    bin_index_by_example = histograms.create_histogram(
+        input_values=real_target_values if invert else real_predicted_values,
+        num_bins=num_bins,
+        min_value=min_bin_edge,
+        max_value=max_bin_edge
+    )[0]
 
     for i in range(num_bins):
         these_example_indices = numpy.where(bin_index_by_example == i)[0]
@@ -627,15 +632,16 @@ def _get_scores_one_replicate(
                             numpy.isnan(full_prediction_matrix[:, i, j, k])
                         )))[0]
 
-                        (
-                            t[KS_STATISTIC_KEY].values[i, j, k],
-                            t[KS_P_VALUE_KEY].values[i, j, k]
-                        ) = ks_2samp(
-                            full_target_matrix[real_indices, i, j, k],
-                            full_prediction_matrix[real_indices, i, j, k],
-                            alternative='two-sided',
-                            mode='auto'
-                        )
+                        if len(real_indices) > 0:
+                            (
+                                t[KS_STATISTIC_KEY].values[i, j, k],
+                                t[KS_P_VALUE_KEY].values[i, j, k]
+                            ) = ks_2samp(
+                                full_target_matrix[real_indices, i, j, k],
+                                full_prediction_matrix[real_indices, i, j, k],
+                                alternative='two-sided',
+                                mode='auto'
+                            )
         else:
             (
                 t[RELIABILITY_X_KEY].values[k, :num_bins, rep_idx],
@@ -693,15 +699,16 @@ def _get_scores_one_replicate(
                     numpy.isnan(full_prediction_matrix[..., k])
                 )))
 
-                (
-                    t[KS_STATISTIC_KEY].values[k],
-                    t[KS_P_VALUE_KEY].values[k]
-                ) = ks_2samp(
-                    numpy.ravel(full_target_matrix[..., k][real_indices]),
-                    numpy.ravel(full_prediction_matrix[..., k][real_indices]),
-                    alternative='two-sided',
-                    mode='auto'
-                )
+                if len(real_indices) > 0:
+                    (
+                        t[KS_STATISTIC_KEY].values[k],
+                        t[KS_P_VALUE_KEY].values[k]
+                    ) = ks_2samp(
+                        numpy.ravel(full_target_matrix[..., k][real_indices]),
+                        numpy.ravel(full_prediction_matrix[..., k][real_indices]),
+                        alternative='two-sided',
+                        mode='auto'
+                    )
 
     return t
 
