@@ -83,9 +83,11 @@ def _update_norm_params_1var_1file(norm_param_dict, new_data_matrix,
 
     first_index = file_index * num_sample_values_per_file
     last_index = first_index + num_sample_values_per_file
+    print('FOO')
     percentile_levels = numpy.linspace(
         0, 100, num=num_sample_values_per_file, dtype=float
     )
+    print('BAR')
     norm_param_dict[SAMPLE_VALUES_KEY][first_index:last_index] = (
         numpy.nanpercentile(new_data_matrix, percentile_levels)
     )
