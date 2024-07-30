@@ -1227,9 +1227,10 @@ def get_normalization_params_for_nbm_const(nbm_constant_file_name,
     if nbm_constant_utils.LAND_SEA_MASK_NAME in field_names:
         field_names.remove(nbm_constant_utils.LAND_SEA_MASK_NAME)
 
-    num_sample_values_total = (
-        nbmct[nbm_constant_utils.DATA_KEY].values[..., 0].size
-    )
+    num_sample_values_total = min([
+        nbmct[nbm_constant_utils.DATA_KEY].values[..., 0].size,
+        int(1e5)
+    ])
 
     norm_param_dict_dict = {}
     for this_field_name in field_names:
