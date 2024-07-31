@@ -438,7 +438,10 @@ def model_to_projection(model_name):
     :return: proj_object: Instance of `pyproj.Proj`.
     """
 
-    check_model_name(model_name=model_name, allow_ensemble=False)
+    check_model_name(model_name=model_name, allow_ensemble=True)
+
+    if model_name == ENSEMBLE_MODEL_NAME:
+        return nbm_utils.NBM_PROJECTION_OBJECT
 
     if model_name == HRRR_MODEL_NAME:
         return pyproj.Proj(
@@ -557,7 +560,11 @@ def read_model_coords(netcdf_file_name=None, model_name=None):
     """
 
     if netcdf_file_name is None:
-        check_model_name(model_name=model_name, allow_ensemble=False)
+        check_model_name(model_name=model_name, allow_ensemble=True)
+
+        if model_name == ENSEMBLE_MODEL_NAME:
+            return nbm_utils.read_coords()
+
         netcdf_file_name = '{0:s}/{1:s}_coords.nc'.format(
             THIS_DIRECTORY_NAME, model_name
         )
@@ -697,7 +704,7 @@ def interp_data_to_nbm_grid(
         forecasts.
     """
 
-    check_model_name(model_name=model_name, allow_ensemble=False)
+    check_model_name(model_name=model_name, allow_ensemble=True)
     error_checking.assert_is_boolean(use_nearest_neigh)
     error_checking.assert_is_boolean(interp_to_full_resolution)
 
