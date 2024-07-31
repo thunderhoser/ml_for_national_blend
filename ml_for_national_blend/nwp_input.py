@@ -729,6 +729,9 @@ def _read_predictors_1example_1model(
             )
 
         if downsampling_factor != desired_downsampling_factor:
+            print('Downsampling factor = {0:d}'.format(downsampling_factor))
+            print('Desired downsampling factor = {0:d}'.format(desired_downsampling_factor))
+
             nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
                 nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                 model_name=nwp_model_name,
@@ -736,6 +739,8 @@ def _read_predictors_1example_1model(
                 interp_to_full_resolution=False,
                 proj_object=nbm_utils.NBM_PROJECTION_OBJECT
             )
+
+            print(nwp_forecast_table_xarray)
 
         nwpft = nwp_forecast_table_xarray
         this_predictor_matrix = nwpft[nwp_model_utils.DATA_KEY].values[0, ...]
@@ -1123,7 +1128,7 @@ def read_predictors_one_example(
 
                 print('Backup model = {0:s}'.format(backup_nwp_model_name))
                 print('Desired model = {0:s}'.format(nwp_model_names[i]))
-                if this_predictor_matrix is None:
+                if this_predictor_matrix is not None:
                     print('Shape of this_predictor_matrix = {0:s}'.format(str(this_predictor_matrix.shape)))
                 print('Shape of new_predictor_matrix = {0:s}'.format(str(new_predictor_matrix.shape)))
 
