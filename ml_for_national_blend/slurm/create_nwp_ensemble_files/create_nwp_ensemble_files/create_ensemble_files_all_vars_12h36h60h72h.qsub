@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#SBATCH --job-name="create_ensemble_files_all_vars_24h"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --job-name="create_ensemble_files_all_vars_12h36h60h72h"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
@@ -11,14 +11,14 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=24:00:00
+#SBATCH --time=08:00:00
 #SBATCH --array=0-83%50
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=create_ensemble_files_all_vars_24h_%A_%a.out
+#SBATCH --output=create_ensemble_files_all_vars_12h36h60h72h_%A_%a.out
 
 conda init
 conda activate base
@@ -42,7 +42,7 @@ last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
 python3 -u "${CODE_DIR_NAME}/create_nwp_ensemble_files.py" \
 --input_nwp_dir_names "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_gfs_mos/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_lamp/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/wrf_arw/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ecmwf/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gefs/processed/interp_to_nbm_grid" \
 --nwp_model_names "hrrr" "gridded_gfs_mos" "gridded_lamp" "nam_nest" "wrf_arw" "nam" "rap" "gfs" "ecmwf" "gefs" \
---lead_times_hours 24 \
+--lead_times_hours 12 36 60 72 \
 --targets_only=0 \
 --first_init_time_string="${first_init_time_string}" \
 --last_init_time_string="${last_init_time_string}" \
