@@ -5,6 +5,7 @@ import sys
 import copy
 import numpy
 import xarray
+from numba import njit
 from scipy.stats import ks_2samp
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -12,7 +13,6 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
-import histograms
 import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
@@ -65,6 +65,37 @@ INV_RELIABILITY_COUNT_KEY = 'inv_reliability_count'
 
 MODEL_FILE_KEY = 'model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
+
+
+@njit
+def __find_examples_in_each_bin(example_to_bin_indices, num_bins):
+    """Creates list of data examples in each bin.
+
+    E = number of examples
+    B = number of bins
+
+    :param example_to_bin_indices: length-E numpy array indexing examples to
+        bins.  example_to_bin_indices[i] = j indicates that the (i)th example is
+        a member of the (j)th bin.
+    :param num_bins: Total number of bins (B in the above definitions).
+    :return: example_indices_by_bin: length-B list, where the (j)th element is a
+        1-D numpy array with the indices of examples belonging to the (j)th bin.
+    """
+
+    bin_sizes = numpy.zeros(num_bins, dtype=numpy.int64)
+    for j in example_to_bin_indices:
+        bin_sizes[j] += 1
+
+    example_indices_by_bin = [
+        numpy.empty(bs, dtype=numpy.int64) for bs in bin_sizes
+    ]
+
+    bin_counters = numpy.zeros(num_bins, dtype=numpy.int64)
+    for i, j in enumerate(example_to_bin_indices):
+        example_indices_by_bin[j][bin_counters[j]] = i
+        bin_counters[j] += 1
+
+    return example_indices_by_bin
 
 
 def _get_mse_one_scalar(target_values, predicted_values, per_grid_cell):
@@ -383,24 +414,36 @@ def _get_rel_curve_one_scalar(
     if len(real_indices) == 0:
         return mean_predictions, mean_observations, example_counts
 
-    bin_index_by_example = histograms.create_histogram(
-        input_values=real_target_values if invert else real_predicted_values,
-        num_bins=num_bins,
-        min_value=min_bin_edge,
-        max_value=max_bin_edge
-    )[0]
+    # example_to_bin_indices = histograms.create_histogram(
+    #     input_values=real_target_values if invert else real_predicted_values,
+    #     num_bins=num_bins,
+    #     min_value=min_bin_edge,
+    #     max_value=max_bin_edge
+    # )[0]
 
-    for i in range(num_bins):
-        these_example_indices = numpy.where(bin_index_by_example == i)[0]
-        if len(these_example_indices) == 0:
+    bin_cutoffs = numpy.linspace(min_bin_edge, max_bin_edge, num=num_bins + 1)
+    example_to_bin_indices = numpy.digitize(
+        real_target_values if invert else real_predicted_values,
+        bin_cutoffs,
+        right=False
+    ) - 1
+    example_to_bin_indices = numpy.clip(example_to_bin_indices, 0, num_bins - 1)
+
+    example_indices_by_bin = __find_examples_in_each_bin(
+        example_to_bin_indices=example_to_bin_indices,
+        num_bins=num_bins
+    )
+
+    for j in range(num_bins):
+        if len(example_indices_by_bin[j]) == 0:
             continue
 
-        example_counts[i] = len(these_example_indices)
-        mean_predictions[i] = numpy.mean(
-            real_predicted_values[these_example_indices]
+        example_counts[j] = len(example_indices_by_bin[j])
+        mean_predictions[j] = numpy.mean(
+            real_predicted_values[example_indices_by_bin[j]]
         )
-        mean_observations[i] = numpy.mean(
-            real_target_values[these_example_indices]
+        mean_observations[j] = numpy.mean(
+            real_target_values[example_indices_by_bin[j]]
         )
 
     return mean_predictions, mean_observations, example_counts
