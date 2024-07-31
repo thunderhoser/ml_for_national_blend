@@ -754,6 +754,10 @@ def interp_data_to_nbm_grid(
             nbm_longitude_matrix_deg_e[::dsf, ::dsf][:-1, :-1]
         )
 
+    print('Downsampling factor = {0:d}'.format(downsampling_factor))
+    print('Size of nbm_latitude_matrix_deg_n = {0:s}'.format(str(nbm_latitude_matrix_deg_n.shape)))
+    print('Size of nbm_longitude_matrix_deg_e = {0:s}'.format(str(nbm_longitude_matrix_deg_e.shape)))
+
     if proj_object is None:
         nbm_x_matrix_metres = nbm_longitude_matrix_deg_e
         nbm_y_matrix_metres = nbm_latitude_matrix_deg_n
