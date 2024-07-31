@@ -1121,6 +1121,12 @@ def read_predictors_one_example(
                     use_quantile_norm=use_quantile_norm
                 )
 
+                print('Backup model = {0:s}'.format(backup_nwp_model_name))
+                print('Desired model = {0:s}'.format(nwp_model_names[i]))
+                if this_predictor_matrix is None:
+                    print('Shape of this_predictor_matrix = {0:s}'.format(str(this_predictor_matrix.shape)))
+                print('Shape of new_predictor_matrix = {0:s}'.format(str(new_predictor_matrix.shape)))
+
                 if this_predictor_matrix is None:
                     this_predictor_matrix = new_predictor_matrix
                 else:
