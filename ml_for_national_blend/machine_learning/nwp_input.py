@@ -724,7 +724,7 @@ def _read_predictors_1example_1model(
         if downsampling_factor != desired_downsampling_factor:
             nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
                 nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                model_name=nwp_model_name,
+                model_name=desired_nwp_model_name,
                 use_nearest_neigh=False,
                 interp_to_full_resolution=False,
                 proj_object=nbm_utils.NBM_PROJECTION_OBJECT
