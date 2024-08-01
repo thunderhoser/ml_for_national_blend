@@ -129,7 +129,7 @@ while true; do
     --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
     --num_epochs=1000 \
     --num_training_batches_per_epoch=800 \
-    --num_validation_batches_per_epoch=1600 \
+    --num_validation_batches_per_epoch=400 \
     --plateau_patience_epochs=10 \
     --plateau_learning_rate_multiplier=0.9 \
     --early_stopping_patience_epochs=10000
