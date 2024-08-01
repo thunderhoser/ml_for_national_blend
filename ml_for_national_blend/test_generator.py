@@ -217,7 +217,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
         )
 
-    for _ in range(20):
+    for _ in range(6):
         predictor_matrices, target_matrix = next(training_generator)
     target_matrix = target_matrix[0, ...]
 
