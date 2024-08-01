@@ -244,7 +244,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_2pt5km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_2pt5km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_2pt5km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     for i in range(len(nwp_lead_times_hours)):
         for j in range(len(field_names_2pt5km)):
@@ -480,7 +480,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_10km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_10km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_10km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_10km) > 0:
         predictor_matrix_10km = predictor_matrices[next_matrix_index][0, ...]
@@ -578,7 +578,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_20km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_20km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_20km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_20km) > 0:
         predictor_matrix_20km = predictor_matrices[next_matrix_index][0, ...]
@@ -676,7 +676,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_40km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_40km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_40km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_40km) > 0:
         predictor_matrix_40km = predictor_matrices[next_matrix_index][0, ...]
