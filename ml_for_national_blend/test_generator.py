@@ -532,8 +532,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         predictor_matrix_10km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_10km)):
@@ -644,8 +644,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         predictor_matrix_20km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_20km)):
@@ -756,8 +756,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         predictor_matrix_40km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_40km)):
