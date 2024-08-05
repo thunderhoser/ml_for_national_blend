@@ -3,7 +3,7 @@
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
-TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'
+TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'  # FOO
 OUTPUT_DIR_ARG_NAME = 'output_model_dir_name'
 
 NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
@@ -20,7 +20,7 @@ TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
-COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'
+COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'  # FOO
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
@@ -41,18 +41,18 @@ LAST_TRAINING_TIMES_ARG_NAME = 'last_init_time_strings_for_training'
 TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'
 TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'
 
-FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'
-LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'
-VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'
-VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'
+FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'  # FOO
+LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'  # FOO
+VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'  # FOO
+VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'  # FOO
 
-NUM_EPOCHS_ARG_NAME = 'num_epochs'
-NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'
-NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
+NUM_EPOCHS_ARG_NAME = 'num_epochs'  # FOO
+NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'  # FOO
+NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'  # FOO
 
-PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'
-PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'
-EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'
+PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'  # FOO
+PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'  # FOO
+EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'  # FOO
 
 TEMPLATE_FILE_HELP_STRING = (
     'Path to template file, containing model architecture.  This will be read '

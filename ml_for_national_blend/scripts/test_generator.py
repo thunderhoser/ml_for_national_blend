@@ -11,9 +11,11 @@ from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import gg_plotting_utils
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking
+from ml_for_national_blend.io import border_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import nbm_constant_utils
 from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.plotting import plotting_utils
 from ml_for_national_blend.scripts import test_generator_args
 
 TOLERANCE = 1e-6
@@ -201,6 +203,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
     }
 
+    border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
+
     if patch_overlap_size_2pt5km_pixels is None:
         training_generator = neural_net.data_generator(training_option_dict)
     else:
@@ -209,7 +213,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
         )
 
-    for _ in range(20):
+    for _ in range(6):
         predictor_matrices, target_matrix = next(training_generator)
     target_matrix = target_matrix[0, ...]
 
@@ -236,7 +240,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_2pt5km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_2pt5km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_2pt5km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     for i in range(len(nwp_lead_times_hours)):
         for j in range(len(field_names_2pt5km)):
@@ -290,6 +294,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
                 extend_min=True, extend_max=True
+            )
+
+            plotting_utils.plot_borders(
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                axes_object=axes_object,
+                line_colour=numpy.full(3, 0.)
+            )
+            plotting_utils.plot_grid_lines(
+                plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                axes_object=axes_object,
+                meridian_spacing_deg=20.,
+                parallel_spacing_deg=10.
             )
 
             axes_object.set_xlim(
@@ -355,6 +373,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
             extend_min=True, extend_max=True
+        )
+
+        plotting_utils.plot_borders(
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            axes_object=axes_object,
+            line_colour=numpy.full(3, 0.)
+        )
+        plotting_utils.plot_grid_lines(
+            plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+            plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+            axes_object=axes_object,
+            meridian_spacing_deg=20.,
+            parallel_spacing_deg=10.
         )
 
         axes_object.set_xlim(
@@ -439,6 +471,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     extend_min=True, extend_max=True
                 )
 
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
                 axes_object.set_xlim(
                     numpy.min(longitude_matrix_deg_e),
                     numpy.max(longitude_matrix_deg_e)
@@ -472,14 +518,14 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_10km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_10km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_10km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_10km) > 0:
         predictor_matrix_10km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_10km)):
@@ -535,6 +581,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     extend_min=True, extend_max=True
                 )
 
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
                 axes_object.set_xlim(
                     numpy.min(this_longitude_matrix_deg_e),
                     numpy.max(this_longitude_matrix_deg_e)
@@ -570,14 +630,14 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_20km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_20km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_20km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_20km) > 0:
         predictor_matrix_20km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_20km)):
@@ -633,6 +693,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     extend_min=True, extend_max=True
                 )
 
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
                 axes_object.set_xlim(
                     numpy.min(this_longitude_matrix_deg_e),
                     numpy.max(this_longitude_matrix_deg_e)
@@ -668,14 +742,14 @@ def _run(output_dir_name, nwp_lead_times_hours,
             continue
 
         field_names_40km += nwp_model_to_field_names[this_model_name]
-        nwp_model_names_40km += len(nwp_model_to_field_names[this_model_name])
+        nwp_model_names_40km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_40km) > 0:
         predictor_matrix_40km = predictor_matrices[next_matrix_index][0, ...]
         next_matrix_index += 1
 
-        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16][:-1, :-1]
-        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16][:-1, :-1]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16]
 
         for i in range(len(nwp_lead_times_hours)):
             for j in range(len(field_names_40km)):
@@ -729,6 +803,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     colour_norm_object=colour_norm_object,
                     orientation_string='vertical',
                     extend_min=True, extend_max=True
+                )
+
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
                 )
 
                 axes_object.set_xlim(
@@ -818,6 +906,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 extend_min=True, extend_max=True
             )
 
+            plotting_utils.plot_borders(
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                axes_object=axes_object,
+                line_colour=numpy.full(3, 0.)
+            )
+            plotting_utils.plot_grid_lines(
+                plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                axes_object=axes_object,
+                meridian_spacing_deg=20.,
+                parallel_spacing_deg=10.
+            )
+
             axes_object.set_xlim(
                 numpy.min(longitude_matrix_deg_e),
                 numpy.max(longitude_matrix_deg_e)
@@ -893,6 +995,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
             extend_min=True, extend_max=True
         )
 
+        plotting_utils.plot_borders(
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            axes_object=axes_object,
+            line_colour=numpy.full(3, 0.)
+        )
+        plotting_utils.plot_grid_lines(
+            plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+            plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+            axes_object=axes_object,
+            meridian_spacing_deg=20.,
+            parallel_spacing_deg=10.
+        )
+
         axes_object.set_xlim(
             numpy.min(longitude_matrix_deg_e),
             numpy.max(longitude_matrix_deg_e)
@@ -966,6 +1082,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
             extend_min=True, extend_max=True
         )
 
+        plotting_utils.plot_borders(
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            axes_object=axes_object,
+            line_colour=numpy.full(3, 0.)
+        )
+        plotting_utils.plot_grid_lines(
+            plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+            plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+            axes_object=axes_object,
+            meridian_spacing_deg=20.,
+            parallel_spacing_deg=10.
+        )
+
         axes_object.set_xlim(
             numpy.min(longitude_matrix_deg_e),
             numpy.max(longitude_matrix_deg_e)
@@ -976,7 +1106,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
         )
         axes_object.set_title('Baseline-comparison {0:s}'.format(target_field_names[j]))
 
-        output_file_name = '{0:s}/{1:s}comparison.jpg'.format(
+        output_file_name = '{0:s}/{1:s}_comparison.jpg'.format(
             output_dir_name, target_field_names[j]
         )
 
@@ -1024,6 +1154,20 @@ def _run(output_dir_name, nwp_lead_times_hours,
         colour_norm_object=colour_norm_object,
         orientation_string='vertical',
         extend_min=True, extend_max=True
+    )
+
+    plotting_utils.plot_borders(
+        border_latitudes_deg_n=border_latitudes_deg_n,
+        border_longitudes_deg_e=border_longitudes_deg_e,
+        axes_object=axes_object,
+        line_colour=numpy.full(3, 0.)
+    )
+    plotting_utils.plot_grid_lines(
+        plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+        plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+        axes_object=axes_object,
+        meridian_spacing_deg=20.,
+        parallel_spacing_deg=10.
     )
 
     axes_object.set_xlim(
