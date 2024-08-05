@@ -3,9 +3,11 @@
 import os
 import warnings
 import numpy
+import xarray
 from scipy.interpolate import interp1d
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
+from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import misc_utils
@@ -17,6 +19,114 @@ HOURS_TO_SECONDS = 3600
 MAX_INTERPOLATION_TIME_HOURS = 24
 
 POSSIBLE_GRID_SPACINGS_KM = numpy.array([2.5, 10, 20, 40])
+
+TARGET_FIELD_TO_NWP_FIELD = {
+    urma_utils.TEMPERATURE_2METRE_NAME: nwp_model_utils.TEMPERATURE_2METRE_NAME,
+    urma_utils.DEWPOINT_2METRE_NAME: nwp_model_utils.DEWPOINT_2METRE_NAME,
+    urma_utils.U_WIND_10METRE_NAME: nwp_model_utils.U_WIND_10METRE_NAME,
+    urma_utils.V_WIND_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME,
+    urma_utils.WIND_GUST_10METRE_NAME: nwp_model_utils.WIND_GUST_10METRE_NAME
+}
+
+
+def __nwp_forecast_to_urma_table(nwp_forecast_matrix, target_field_names):
+    """Converts NWP forecasts to URMA table.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    F = number of target fields
+
+    :param nwp_forecast_matrix: M-by-N-by-F numpy array of NWP-forecast target
+        fields.
+    :param target_field_names: length-F list of target fields.
+    :return: urma_table_xarray: xarray table in format returned by
+        `urma_io.read_file`.
+    """
+
+    these_dims = (
+        urma_utils.VALID_TIME_DIM, urma_utils.ROW_DIM,
+        urma_utils.COLUMN_DIM, urma_utils.FIELD_DIM
+    )
+    main_data_dict = {
+        urma_utils.DATA_KEY: (
+            these_dims, numpy.expand_dims(nwp_forecast_matrix, axis=0)
+        )
+    }
+
+    coord_dict = {urma_utils.FIELD_DIM: target_field_names}
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
+def __read_targets_one_example(
+        valid_time_unix_sec, target_field_names, target_dir_name,
+        target_norm_param_table_xarray, use_quantile_norm, patch_location_dict):
+    """Reads target fields for one example.
+
+    M = number of rows in NBM grid (2.5-km target grid)
+    N = number of columns in NBM grid (2.5-km target grid)
+    F = number of target fields
+
+    :param valid_time_unix_sec: Valid time.
+    :param target_field_names: See documentation for
+        `neural_net.data_generator`.
+    :param target_dir_name: Same.
+    :param target_norm_param_table_xarray: xarray table with normalization
+        parameters for target variables.
+    :param use_quantile_norm: See documentation for `neural_net.data_generator`.
+    :param patch_location_dict: Dictionary produced by
+        `misc_utils.determine_patch_locations`.  If you are training with the
+        full grid (not the patchwise approach), make this None.
+    :return: target_matrix: M-by-N-by-F numpy array of target values.
+    """
+
+    valid_date_string = time_conversion.unix_sec_to_string(
+        valid_time_unix_sec, urma_io.DATE_FORMAT
+    )
+    urma_file_name = urma_io.find_file(
+        directory_name=target_dir_name,
+        valid_date_string=valid_date_string,
+        raise_error_if_missing=False
+    )
+
+    if not os.path.isfile(urma_file_name):
+        warning_string = (
+            'POTENTIAL ERROR: Could not find file expected at: "{0:s}"'
+        ).format(urma_file_name)
+
+        warnings.warn(warning_string)
+        return None
+
+    print('Reading data from: "{0:s}"...'.format(urma_file_name))
+    urma_table_xarray = urma_io.read_file(urma_file_name)
+    urma_table_xarray = urma_utils.subset_by_time(
+        urma_table_xarray=urma_table_xarray,
+        desired_times_unix_sec=numpy.array([valid_time_unix_sec], dtype=int)
+    )
+    urma_table_xarray = urma_utils.subset_by_field(
+        urma_table_xarray=urma_table_xarray,
+        desired_field_names=target_field_names
+    )
+    urma_table_xarray = normalization.normalize_targets(
+        urma_table_xarray=urma_table_xarray,
+        norm_param_table_xarray=target_norm_param_table_xarray,
+        use_quantile_norm=use_quantile_norm
+    )
+
+    target_matrix = numpy.transpose(
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
+        axes=(1, 0, 2)
+    )
+
+    if patch_location_dict is not None:
+        i_start = patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+        i_end = patch_location_dict[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+        j_start = patch_location_dict[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+        j_end = patch_location_dict[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+
+        target_matrix = target_matrix[i_start:i_end, j_start:j_end]
+
+    return target_matrix
 
 
 def _convert_2m_dewp_to_depression(nwp_forecast_table_xarray):
@@ -860,16 +970,6 @@ def read_residual_baseline_one_example(
         predictions.  These are all unnormalized.
     """
 
-    target_field_to_baseline_nwp_field = {
-        urma_utils.TEMPERATURE_2METRE_NAME:
-            nwp_model_utils.TEMPERATURE_2METRE_NAME,
-        urma_utils.DEWPOINT_2METRE_NAME: nwp_model_utils.DEWPOINT_2METRE_NAME,
-        urma_utils.U_WIND_10METRE_NAME: nwp_model_utils.U_WIND_10METRE_NAME,
-        urma_utils.V_WIND_10METRE_NAME: nwp_model_utils.V_WIND_10METRE_NAME,
-        urma_utils.WIND_GUST_10METRE_NAME:
-            nwp_model_utils.WIND_GUST_10METRE_NAME
-    }
-
     input_file_name = interp_nwp_model_io.find_file(
         directory_name=nwp_directory_name,
         init_time_unix_sec=init_time_unix_sec,
@@ -971,7 +1071,7 @@ def read_residual_baseline_one_example(
     these_matrices = [
         nwp_model_utils.get_field(
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            field_name=target_field_to_baseline_nwp_field[f]
+            field_name=TARGET_FIELD_TO_NWP_FIELD[f]
         )[0, ...]
         for f in target_field_names
     ]
@@ -984,6 +1084,325 @@ def read_residual_baseline_one_example(
         )
 
     return residual_baseline_matrix
+
+
+def nwp_models_to_target_fields(nwp_model_names, target_field_names):
+    """Returns dictionary mapping NWP models to target fields.
+
+    :param nwp_model_names: 1-D list with names of NWP models used in
+        predictors.  Each must be accepted by
+        `nwp_model_utils.check_model_name`.
+    :param target_field_names: 1-D list with names of target fields.  Each must
+        be accepted by `urma_utils.check_field_name`.
+    :return: nwp_model_to_field_names: Dictionary, where each key is the name of
+        an NWP model (taken directly from the input list `nwp_model_names`).
+        Each value is a list of target variables forecast by the given NWP
+        model, with item in the list being a string accepted by
+        `nwp_model_utils.check_field_name`.
+    """
+
+    for this_model_name in nwp_model_names:
+        nwp_model_utils.check_model_name(
+            model_name=this_model_name, allow_ensemble=True
+        )
+    for this_field_name in target_field_names:
+        urma_utils.check_field_name(this_field_name)
+
+    nwp_model_to_field_names = dict()
+
+    for this_model_name in nwp_model_names:
+        nwp_model_to_field_names[this_model_name] = []
+        unavailable_field_names = nwp_model_utils.model_to_maybe_missing_fields(
+            this_model_name
+        )
+
+        for this_target_field_name in target_field_names:
+            this_field_name = TARGET_FIELD_TO_NWP_FIELD[this_target_field_name]
+            if this_field_name in unavailable_field_names:
+                continue
+
+            nwp_model_to_field_names[this_model_name].append(this_field_name)
+
+    return nwp_model_to_field_names
+
+
+def read_recent_biases_one_example(
+        init_time_unix_sec, nwp_model_names, nwp_init_time_lags_hours,
+        nwp_lead_times_hours, nwp_model_to_dir_name,
+        target_field_names, target_dir_name,
+        target_norm_param_table_xarray, use_quantile_norm,
+        backup_nwp_model_name, backup_nwp_directory_name,
+        patch_location_dict):
+    """Reads recent-bias fields for one example.
+
+    M = number of rows in NBM grid (2.5-km target grid)
+    N = number of columns in NBM grid (2.5-km target grid)
+    B = number of lag times for recent NWP bias
+    F = number of target fields
+
+    m = number of rows in 10-km grid
+    n = number of columns in 10-km grid
+    mm = number of rows in 20-km grid
+    nn = number of columns in 20-km grid
+    mmm = number of rows in 40-km grid
+    nnn = number of columns in 40-km grid
+
+    :param init_time_unix_sec: Forecast-initialization time for NN.
+    :param nwp_model_names: 1-D list with names of NWP models used to create
+        predictors.
+    :param nwp_init_time_lags_hours: length-B numpy array of lag times.
+    :param nwp_lead_times_hours: length-B numpy array of lead times.
+    :param nwp_model_to_dir_name: See documentation for
+        `neural_net.data_generator`.
+    :param target_field_names: Same.
+    :param target_dir_name: Same.
+    :param target_norm_param_table_xarray: xarray table with normalization
+        parameters for target variables.
+    :param use_quantile_norm: See documentation for
+        `neural_net.data_generator`.
+    :param backup_nwp_model_name: Same.
+    :param backup_nwp_directory_name: Same.
+    :param patch_location_dict: Dictionary produced by
+        `misc_utils.determine_patch_locations`.  If you are training with the
+        full grid (not the patchwise approach), make this None.
+    :return: predictor_matrix_2pt5km: numpy array of recent model biases.
+        This will be a 4-D numpy array, and the first three dimensions will be
+        M x N x B.
+    :return: predictor_matrix_10km: Same, except the first three dimensions of
+        this array will be m x n x B.  Also, if there are no 10-km NWP models,
+        this may be None.
+    :return: predictor_matrix_20km: Same, except the first three dimensions of
+        this array will be mm x nn x B.  Also, if there are no 20-km NWP models,
+        this may be None.
+    :return: predictor_matrix_40km: Same, except the first three dimensions of
+        this array will be mmm x nnn x B.  Also, if there are no 40-km NWP
+        models, this may be None.
+    :return: found_any_predictors: Boolean flag.  If True, at least one output
+        matrix contains a real value.  If False, the output matrices are all NaN
+        or None.
+    :return: found_all_predictors: Boolean flag.  If True, there are no "NaN"s
+        in the predictor matrices.
+    """
+
+    # Housekeeping.
+    nwp_model_to_field_names = nwp_models_to_target_fields(
+        nwp_model_names=nwp_model_names,
+        target_field_names=target_field_names
+    )
+    nwp_downsampling_factors = numpy.array([
+        nwp_model_utils.model_to_nbm_downsampling_factor(m)
+        for m in nwp_model_names
+    ], dtype=int)
+
+    num_nwp_models = len(nwp_model_names)
+    num_recent_bias_times = len(nwp_init_time_lags_hours)
+
+    (
+        predictor_matrices_2pt5km, predictor_matrices_10km,
+        predictor_matrices_20km, predictor_matrices_40km
+    ) = _init_predictor_matrices_1example(
+        nwp_model_names=nwp_model_names,
+        nwp_model_to_field_names=nwp_model_to_field_names,
+        num_nwp_lead_times=num_recent_bias_times,
+        patch_location_dict=patch_location_dict
+    )
+
+    # Do actual stuff.
+    for j in range(num_recent_bias_times):
+        this_init_time_unix_sec = (
+            init_time_unix_sec -
+            nwp_init_time_lags_hours[j] * HOURS_TO_SECONDS
+        )
+        these_lead_times_hours = numpy.array(
+            [nwp_lead_times_hours[j]], dtype=int
+        )
+        these_valid_times_unix_sec = (
+            this_init_time_unix_sec +
+            these_lead_times_hours * HOURS_TO_SECONDS
+        )
+
+        this_target_matrix = __read_targets_one_example(
+            valid_time_unix_sec=these_valid_times_unix_sec[0],
+            target_field_names=target_field_names,
+            target_dir_name=target_dir_name,
+            target_norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=use_quantile_norm,
+            patch_location_dict=patch_location_dict
+        )
+
+        if this_target_matrix is None:
+            warning_string = (
+                'POTENTIAL ERROR: Cannot find any URMA data at valid time '
+                '{0:s}.  Filling recent-bias values with NaN.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    these_valid_times_unix_sec[0], '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            continue
+
+        for i in range(num_nwp_models):
+            these_forecast_file_names = _find_predictors_1example_1model(
+                init_time_unix_sec=this_init_time_unix_sec,
+                nwp_model_name=nwp_model_names[i],
+                nwp_lead_times_hours=these_lead_times_hours,
+                nwp_directory_name=nwp_model_to_dir_name[nwp_model_names[i]],
+                backup_nwp_model_name=backup_nwp_model_name,
+                backup_nwp_directory_name=backup_nwp_directory_name,
+                rigid_flag=False
+            )
+
+            if these_forecast_file_names is None:
+                this_forecast_matrix = None
+            else:
+                this_forecast_matrix = _read_predictors_1example_1model(
+                    nwp_forecast_file_names=these_forecast_file_names,
+                    desired_nwp_model_name=nwp_model_names[i],
+                    desired_valid_times_unix_sec=these_valid_times_unix_sec,
+                    field_names=nwp_model_to_field_names[nwp_model_names[i]],
+                    patch_location_dict=patch_location_dict,
+                    nwp_norm_param_table_xarray=None,
+                    use_quantile_norm=False
+                )
+
+                if numpy.all(numpy.isnan(this_forecast_matrix)):
+                    this_forecast_matrix = None
+
+            if this_forecast_matrix is None:
+                these_forecast_file_names = _find_predictors_1example_1model(
+                    init_time_unix_sec=this_init_time_unix_sec,
+                    nwp_model_name=backup_nwp_model_name,
+                    nwp_lead_times_hours=these_lead_times_hours,
+                    nwp_directory_name=backup_nwp_directory_name,
+                    backup_nwp_model_name=backup_nwp_model_name,
+                    backup_nwp_directory_name=backup_nwp_directory_name,
+                    rigid_flag=False
+                )
+
+                if these_forecast_file_names is not None:
+                    this_forecast_matrix = _read_predictors_1example_1model(
+                        nwp_forecast_file_names=these_forecast_file_names,
+                        desired_nwp_model_name=nwp_model_names[i],
+                        desired_valid_times_unix_sec=these_valid_times_unix_sec,
+                        field_names=
+                        nwp_model_to_field_names[nwp_model_names[i]],
+                        patch_location_dict=patch_location_dict,
+                        nwp_norm_param_table_xarray=None,
+                        use_quantile_norm=False
+                    )
+
+                    if numpy.all(numpy.isnan(this_forecast_matrix)):
+                        this_forecast_matrix = None
+
+            if this_forecast_matrix is None:
+                warning_string = (
+                    'POTENTIAL ERROR: Cannot find any data for NWP model '
+                    '"{0:s}" (or backup model "{1:s}") at init time {2:s}.  '
+                    'Filling recent-bias values with NaN.'
+                ).format(
+                    nwp_model_names[i],
+                    'None' if backup_nwp_model_name is None
+                    else backup_nwp_model_name,
+                    time_conversion.unix_sec_to_string(
+                        init_time_unix_sec, '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                continue
+
+            this_urma_table_xarray = __nwp_forecast_to_urma_table(
+                nwp_forecast_matrix=this_forecast_matrix[..., 0, :],
+                target_field_names=target_field_names
+            )
+            this_urma_table_xarray = normalization.normalize_targets(
+                urma_table_xarray=this_urma_table_xarray,
+                norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=use_quantile_norm
+            )
+            this_forecast_matrix = (
+                this_urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
+            )
+
+            dsf = nwp_downsampling_factors[i]
+            this_bias_matrix = (
+                this_forecast_matrix - this_target_matrix[::dsf, ::dsf, ...]
+            )
+
+            matrix_index = numpy.sum(
+                nwp_downsampling_factors[:i] == nwp_downsampling_factors[i]
+            )
+            tbm = this_bias_matrix
+
+            if nwp_downsampling_factors[i] == 1:
+                predictor_matrices_2pt5km[matrix_index][..., j, :] = tbm
+            elif nwp_downsampling_factors[i] == 4:
+                predictor_matrices_10km[matrix_index][..., j, :] = tbm
+            elif nwp_downsampling_factors[i] == 8:
+                predictor_matrices_20km[matrix_index][..., j, :] = tbm
+            else:
+                predictor_matrices_40km[matrix_index][..., j, :] = tbm
+
+    found_any_predictors = False
+    found_all_predictors = True
+
+    if predictor_matrices_2pt5km is None:
+        predictor_matrix_2pt5km = None
+    else:
+        predictor_matrix_2pt5km = numpy.concatenate(
+            predictor_matrices_2pt5km, axis=-1
+        )
+        nan_matrix = numpy.all(
+            numpy.isnan(predictor_matrix_2pt5km), axis=(0, 1)
+        )
+        found_all_predictors &= not numpy.any(nan_matrix)
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_2pt5km)
+        )
+
+    if predictor_matrices_10km is None:
+        predictor_matrix_10km = None
+    else:
+        predictor_matrix_10km = numpy.concatenate(
+            predictor_matrices_10km, axis=-1
+        )
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_10km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_10km)
+        )
+
+    if predictor_matrices_20km is None:
+        predictor_matrix_20km = None
+    else:
+        predictor_matrix_20km = numpy.concatenate(
+            predictor_matrices_20km, axis=-1
+        )
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_20km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_20km)
+        )
+
+    if predictor_matrices_40km is None:
+        predictor_matrix_40km = None
+    else:
+        predictor_matrix_40km = numpy.concatenate(
+            predictor_matrices_40km, axis=-1
+        )
+        nan_matrix = numpy.all(numpy.isnan(predictor_matrix_40km), axis=(0, 1))
+        found_all_predictors &= not numpy.any(nan_matrix)
+        found_any_predictors |= not numpy.all(
+            numpy.isnan(predictor_matrix_40km)
+        )
+
+    return (
+        predictor_matrix_2pt5km, predictor_matrix_10km,
+        predictor_matrix_20km, predictor_matrix_40km,
+        found_any_predictors, found_all_predictors
+    )
 
 
 def read_predictors_one_example(
