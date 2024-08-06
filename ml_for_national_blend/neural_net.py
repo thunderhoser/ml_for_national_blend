@@ -2181,6 +2181,14 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         nwp_model_names=nwp_model_names
     )
 
+    # TODO(thunderhoser): This is a HACK.
+    if use_recent_biases:
+        good_indices = numpy.where(
+            numpy.mod(init_times_unix_sec, 24 * HOURS_TO_SECONDS) ==
+            18 * HOURS_TO_SECONDS
+        )[0]
+        init_times_unix_sec = init_times_unix_sec[good_indices]
+
     # Do actual stuff.
     if nbm_constant_file_name is None:
         full_nbm_constant_matrix = None
