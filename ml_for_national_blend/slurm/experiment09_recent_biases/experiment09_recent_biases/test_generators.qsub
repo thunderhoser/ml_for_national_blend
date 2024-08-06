@@ -3,7 +3,7 @@
 #SBATCH --job-name="test_generators"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
-#SBATCH --qos="bigmem"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
