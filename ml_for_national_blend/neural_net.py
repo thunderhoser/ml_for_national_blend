@@ -56,6 +56,8 @@ TARGET_LAG_TIMES_KEY = 'target_lag_times_hours'
 TARGET_DIR_KEY = 'target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
+RECENT_BIAS_LAG_TIMES_KEY = 'recent_bias_init_time_lags_hours'
+RECENT_BIAS_LEAD_TIMES_KEY = 'recent_bias_lead_times_hours'
 NBM_CONSTANT_FIELDS_KEY = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_KEY = 'nbm_constant_file_name'
 COMPARE_TO_BASELINE_IN_LOSS_KEY = 'compare_to_baseline_in_loss'
@@ -114,12 +116,27 @@ PATCH_OVERLAP_SIZE_KEY = 'patch_overlap_size_2pt5km_pixels'
 PATCH_START_ROW_KEY = 'patch_start_row_2pt5km'
 PATCH_START_COLUMN_KEY = 'patch_start_column_2pt5km'
 
+PREDICTOR_MATRIX_2PT5KM_KEY = 'predictor_matrix_2pt5km'
+PREDICTOR_MATRIX_10KM_KEY = 'predictor_matrix_10km'
+PREDICTOR_MATRIX_20KM_KEY = 'predictor_matrix_20km'
+PREDICTOR_MATRIX_40KM_KEY = 'predictor_matrix_40km'
+RECENT_BIAS_MATRIX_2PT5KM_KEY = 'recent_bias_matrix_2pt5km'
+RECENT_BIAS_MATRIX_10KM_KEY = 'recent_bias_matrix_10km'
+RECENT_BIAS_MATRIX_20KM_KEY = 'recent_bias_matrix_20km'
+RECENT_BIAS_MATRIX_40KM_KEY = 'recent_bias_matrix_40km'
+PREDICTOR_MATRIX_BASELINE_KEY = 'predictor_matrix_resid_baseline'
+PREDICTOR_MATRIX_LAGTGT_KEY = 'predictor_matrix_lagged_targets'
+# TARGET_MATRIX_KEY = 'target_matrix'
+
 
 def __report_data_properties(
         predictor_matrix_2pt5km, nbm_constant_matrix,
         predictor_matrix_lagged_targets, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, target_matrix, sentinel_value):
+        predictor_matrix_resid_baseline,
+        recent_bias_matrix_2pt5km, recent_bias_matrix_10km,
+        recent_bias_matrix_20km, recent_bias_matrix_40km,
+        target_matrix, sentinel_value, return_predictors_as_dict=False):
     """Reports data properties at end of data-generator or data-creator.
 
     :param predictor_matrix_2pt5km: See output doc for `data_generator`.
@@ -129,11 +146,19 @@ def __report_data_properties(
     :param predictor_matrix_20km: Same.
     :param predictor_matrix_40km: Same.
     :param predictor_matrix_resid_baseline: Same.
+    :param recent_bias_matrix_2pt5km: Same.
+    :param recent_bias_matrix_10km: Same.
+    :param recent_bias_matrix_20km: Same.
+    :param recent_bias_matrix_40km: Same.
     :param target_matrix: Same.
     :param sentinel_value: See input doc for `data_generator`.
-    :return: predictor_matrices: Tuple with 32-bit predictor matrices.
+    :param return_predictors_as_dict: Boolean flag.  If True (False), will
+        return predictor matrices as dictionary (tuple).
+    :return: predictor_matrices: Dictionary or tuple with 32-bit predictor
+        matrices.
     """
 
+    error_checking.assert_is_boolean(return_predictors_as_dict)
     error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
     print((
@@ -150,16 +175,33 @@ def __report_data_properties(
         predictor_matrix_2pt5km, nbm_constant_matrix,
         predictor_matrix_lagged_targets, predictor_matrix_10km,
         predictor_matrix_20km, predictor_matrix_40km,
+        recent_bias_matrix_2pt5km, recent_bias_matrix_10km,
+        recent_bias_matrix_20km, recent_bias_matrix_40km,
         predictor_matrix_resid_baseline
     )
     pred_matrix_descriptions = [
         '2.5-km predictor matrix', 'NBM-constant predictor matrix',
         'lagged-target predictor matrix', '10-km predictor matrix',
         '20-km predictor matrix', '40-km predictor matrix',
+        '2.5-km recent-bias matrix', '10-km recent-bias matrix',
+        '20-km recent-bias matrix', '40-km recent-bias matrix',
         'residual baseline matrix'
     ]
+    predictor_keys = [
+        '2pt5km_inputs', 'const_inputs',
+        'lagtgt_inputs', '10km_inputs',
+        '20km_inputs', '40km_inputs',
+        '2pt5km_rctbias', '10km_rctbias',
+        '20km_rctbias', '40km_rctbias',
+        'resid_baseline_inputs'
+    ]
     allow_nan_flags = [
-        True, False, True, True, True, True, False
+        True, False,
+        True, True,
+        True, True,
+        True, True,
+        True, True,
+        False
     ]
 
     for k in range(len(predictor_matrices)):
@@ -201,20 +243,17 @@ def __report_data_properties(
             str(these_max)
         ))
 
-    # predictor_keys = [
-    #     '2pt5km_inputs', 'const_inputs', 'lagtgt_inputs', '10km_inputs',
-    #     '20km_inputs', '40km_inputs', 'resid_baseline_inputs'
-    # ]
-    # predictor_dict = dict(zip(predictor_keys, predictor_matrices))
-    # predictor_dict = {
-    #     key: value.astype('float32')
-    #     for key, value in predictor_dict.items()
-    #     if value is not None
-    # }
+    if not return_predictors_as_dict:
+        return tuple(
+            pm.astype('float32') for pm in predictor_matrices if pm is not None
+        )
 
-    return tuple(
-        pm.astype('float32') for pm in predictor_matrices if pm is not None
-    )
+    predictor_dict = dict(zip(predictor_keys, predictor_matrices))
+    return {
+        key: value.astype('float32')
+        for key, value in predictor_dict.items()
+        if value is not None
+    }
 
 
 def __predicted_2m_depression_to_dewpoint(prediction_matrix,
@@ -576,6 +615,42 @@ def _check_generator_args(option_dict):
     error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[TARGETS_USE_QUANTILE_NORM_KEY])
 
+    use_recent_biases = not (
+        option_dict[RECENT_BIAS_LAG_TIMES_KEY] is None
+        or option_dict[RECENT_BIAS_LEAD_TIMES_KEY] is None
+    )
+
+    if use_recent_biases:
+        error_checking.assert_is_numpy_array(
+            option_dict[RECENT_BIAS_LAG_TIMES_KEY], num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[RECENT_BIAS_LAG_TIMES_KEY], 0
+        )
+
+        num_recent_bias_times = len(option_dict[RECENT_BIAS_LAG_TIMES_KEY])
+        expected_dim = numpy.array([num_recent_bias_times], dtype=int)
+
+        error_checking.assert_is_numpy_array(
+            option_dict[RECENT_BIAS_LEAD_TIMES_KEY],
+            exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[RECENT_BIAS_LEAD_TIMES_KEY], 0
+        )
+
+        lookahead_times_hours = (
+            option_dict[RECENT_BIAS_LEAD_TIMES_KEY] -
+            option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+        )
+        error_checking.assert_is_leq_numpy_array(lookahead_times_hours, 0)
+
     if (
             option_dict[NBM_CONSTANT_FILE_KEY] is None
             or len(option_dict[NBM_CONSTANT_FIELDS_KEY]) == 0
@@ -653,16 +728,18 @@ def _check_generator_args(option_dict):
 
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
-        num_target_fields, num_target_lag_times, num_examples_per_batch,
-        do_residual_prediction, patch_location_dict):
+        target_field_names, num_target_lag_times, num_recent_bias_times,
+        num_examples_per_batch, do_residual_prediction, patch_location_dict):
     """Initializes predictor and target matrices for one batch.
 
     :param nwp_model_names: 1-D list with names of NWP models.
     :param nwp_model_to_field_names: Dictionary.  For details, see documentation
         for `data_generator`.
     :param num_nwp_lead_times: Number of lead times.
-    :param num_target_fields: Number of target fields.
+    :param target_field_names: 1-D list with names of target fields.
     :param num_target_lag_times: Number of lag times for targets, to be used in
+        the predictor variables.  This can be 0.
+    :param num_recent_bias_times: Number of recent-bias times, to be used in
         the predictor variables.  This can be 0.
     :param num_examples_per_batch: Batch size.
     :param do_residual_prediction: Boolean flag.  If True, the NN is predicting
@@ -671,23 +748,41 @@ def _init_matrices_1batch(
     :param patch_location_dict: Dictionary produced by
         `misc_utils.determine_patch_locations`.  If you are training with the
         full grid (not the patchwise approach), make this None.
-    :return: predictor_matrix_2pt5km: numpy array for NWP data with 2.5-km
+
+    :return: matrix_dict: Dictionary with the following keys.
+    matrix_dict["predictor_matrix_2pt5km"]: numpy array for NWP data with 2.5-km
         resolution.  If there are no 2.5-km models, this is None instead of an
         array.
-    :return: predictor_matrix_10km: Same but for 10-km models.
-    :return: predictor_matrix_20km: Same but for 20-km models.
-    :return: predictor_matrix_40km: Same but for 40-km models.
-    :return: predictor_matrix_resid_baseline: Same but for residual baseline.
-    :return: predictor_matrix_lagged_targets: Same but for lagged targets.
-    :return: target_matrix: Same but for target fields.
+    matrix_dict["predictor_matrix_10km"]: Same but for 10-km models.
+    matrix_dict["predictor_matrix_20km"]: Same but for 20-km models.
+    matrix_dict["predictor_matrix_40km"]: Same but for 40-km models.
+    matrix_dict["recent_bias_matrix_2pt5km"]: numpy array with recent biases for
+        2.5-km NWP models.  If there are no 2.5-km models OR if
+        `num_recent_bias_times == 0`, this is None.
+    matrix_dict["recent_bias_matrix_10km"]: Same but for 10-km models.
+    matrix_dict["recent_bias_matrix_20km"]: Same but for 20-km models.
+    matrix_dict["recent_bias_matrix_40km"]: Same but for 40-km models.
+    matrix_dict["predictor_matrix_resid_baseline"]: Same but for residual
+        baseline.
+    matrix_dict["predictor_matrix_lagged_targets"]: Same but for lagged targets.
+    matrix_dict["target_matrix"]: Same but for target fields.
     """
+
+    num_target_fields = len(target_field_names)
+
+    if num_recent_bias_times > 0:
+        nwp_model_to_target_names = nwp_input.nwp_models_to_target_fields(
+            nwp_model_names=nwp_model_names,
+            target_field_names=target_field_names
+        )
+    else:
+        nwp_model_to_target_names = dict()
 
     downsampling_factors = numpy.array([
         nwp_model_utils.model_to_nbm_downsampling_factor(m)
         for m in nwp_model_names
     ], dtype=int)
 
-    model_indices = numpy.where(downsampling_factors == 1)[0]
     num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=2.5,
         patch_location_dict=patch_location_dict
@@ -715,6 +810,12 @@ def _init_matrices_1batch(
             numpy.nan
         )
 
+    nwp_to_fields = nwp_model_to_field_names
+    nwp_to_targets = nwp_model_to_target_names
+
+    model_indices = numpy.where(downsampling_factors == 1)[0]
+    recent_bias_matrix_2pt5km = None
+
     if len(model_indices) == 0:
         predictor_matrix_2pt5km = None
     else:
@@ -724,17 +825,32 @@ def _init_matrices_1batch(
 
         predictor_matrix_2pt5km = numpy.concatenate([
             numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
+                first_dim + (len(nwp_to_fields[nwp_model_names[k]]),),
                 numpy.nan
             )
             for k in model_indices
         ], axis=-1)
+
+        if num_recent_bias_times > 0:
+            first_dim = (
+                num_examples_per_batch, num_rows, num_columns,
+                num_recent_bias_times
+            )
+
+            recent_bias_matrix_2pt5km = numpy.concatenate([
+                numpy.full(
+                    first_dim + (len(nwp_to_targets[nwp_model_names[k]]),),
+                    numpy.nan
+                )
+                for k in model_indices
+            ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 4)[0]
     num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=10.,
         patch_location_dict=patch_location_dict
     )
+    recent_bias_matrix_10km = None
 
     if len(model_indices) == 0:
         predictor_matrix_10km = None
@@ -745,17 +861,32 @@ def _init_matrices_1batch(
 
         predictor_matrix_10km = numpy.concatenate([
             numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
+                first_dim + (len(nwp_to_fields[nwp_model_names[k]]),),
                 numpy.nan
             )
             for k in model_indices
         ], axis=-1)
+
+        if num_recent_bias_times > 0:
+            first_dim = (
+                num_examples_per_batch, num_rows, num_columns,
+                num_recent_bias_times
+            )
+
+            recent_bias_matrix_10km = numpy.concatenate([
+                numpy.full(
+                    first_dim + (len(nwp_to_targets[nwp_model_names[k]]),),
+                    numpy.nan
+                )
+                for k in model_indices
+            ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 8)[0]
     num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=20.,
         patch_location_dict=patch_location_dict
     )
+    recent_bias_matrix_20km = None
 
     if len(model_indices) == 0:
         predictor_matrix_20km = None
@@ -766,17 +897,32 @@ def _init_matrices_1batch(
 
         predictor_matrix_20km = numpy.concatenate([
             numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
+                first_dim + (len(nwp_to_fields[nwp_model_names[k]]),),
                 numpy.nan
             )
             for k in model_indices
         ], axis=-1)
+
+        if num_recent_bias_times > 0:
+            first_dim = (
+                num_examples_per_batch, num_rows, num_columns,
+                num_recent_bias_times
+            )
+
+            recent_bias_matrix_20km = numpy.concatenate([
+                numpy.full(
+                    first_dim + (len(nwp_to_targets[nwp_model_names[k]]),),
+                    numpy.nan
+                )
+                for k in model_indices
+            ], axis=-1)
 
     model_indices = numpy.where(downsampling_factors == 16)[0]
     num_rows, num_columns = nwp_input.get_grid_dimensions(
         grid_spacing_km=40.,
         patch_location_dict=patch_location_dict
     )
+    recent_bias_matrix_40km = None
 
     if len(model_indices) == 0:
         predictor_matrix_40km = None
@@ -787,18 +933,39 @@ def _init_matrices_1batch(
 
         predictor_matrix_40km = numpy.concatenate([
             numpy.full(
-                first_dim + (len(nwp_model_to_field_names[nwp_model_names[k]]),),
+                first_dim + (len(nwp_to_fields[nwp_model_names[k]]),),
                 numpy.nan
             )
             for k in model_indices
         ], axis=-1)
 
-    return (
-        predictor_matrix_2pt5km, predictor_matrix_10km,
-        predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
-        target_matrix
-    )
+        if num_recent_bias_times > 0:
+            first_dim = (
+                num_examples_per_batch, num_rows, num_columns,
+                num_recent_bias_times
+            )
+
+            recent_bias_matrix_40km = numpy.concatenate([
+                numpy.full(
+                    first_dim + (len(nwp_to_targets[nwp_model_names[k]]),),
+                    numpy.nan
+                )
+                for k in model_indices
+            ], axis=-1)
+
+    return {
+        PREDICTOR_MATRIX_2PT5KM_KEY: predictor_matrix_2pt5km,
+        PREDICTOR_MATRIX_10KM_KEY: predictor_matrix_10km,
+        PREDICTOR_MATRIX_20KM_KEY: predictor_matrix_20km,
+        PREDICTOR_MATRIX_40KM_KEY: predictor_matrix_40km,
+        RECENT_BIAS_MATRIX_2PT5KM_KEY: recent_bias_matrix_2pt5km,
+        RECENT_BIAS_MATRIX_10KM_KEY: recent_bias_matrix_10km,
+        RECENT_BIAS_MATRIX_20KM_KEY: recent_bias_matrix_20km,
+        RECENT_BIAS_MATRIX_40KM_KEY: recent_bias_matrix_40km,
+        PREDICTOR_MATRIX_BASELINE_KEY: predictor_matrix_resid_baseline,
+        PREDICTOR_MATRIX_LAGTGT_KEY: predictor_matrix_lagged_targets,
+        TARGET_MATRIX_KEY: target_matrix
+    }
 
 
 def _read_targets_one_example(
@@ -971,7 +1138,8 @@ def _find_relevant_init_times(first_time_by_period_unix_sec,
     return misc_utils.remove_unused_days(relevant_init_times_unix_sec)
 
 
-def create_data(option_dict, init_time_unix_sec):
+def create_data(option_dict, init_time_unix_sec,
+                return_predictors_as_dict=False):
     """Creates validation or testing data for neural network.
 
     E = number of examples (data samples) = 1
@@ -981,6 +1149,8 @@ def create_data(option_dict, init_time_unix_sec):
     :param option_dict: See documentation for `data_generator`.
     :param init_time_unix_sec: Will return data only for this initialization
         time.
+    :param return_predictors_as_dict: See documentation for
+        `__report_data_properties`.
     :return: data_dict: Dictionary with the following keys.
     data_dict["predictor_matrices"]: Same as output from `data_generator`.
     data_dict["target_matrix"]: Same as output from `data_generator`.
@@ -1020,6 +1190,8 @@ def create_data(option_dict, init_time_unix_sec):
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+    recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
@@ -1033,6 +1205,11 @@ def create_data(option_dict, init_time_unix_sec):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    use_recent_biases = not (
+        recent_bias_init_time_lags_hours is None
+        or recent_bias_lead_times_hours is None
+    )
 
     if patch_size_2pt5km_pixels is None:
         num_rows, num_columns = nwp_input.get_grid_dimensions(
@@ -1271,6 +1448,75 @@ def create_data(option_dict, init_time_unix_sec):
     if predictor_matrix_40km is not None:
         predictor_matrix_40km = numpy.expand_dims(predictor_matrix_40km, axis=0)
 
+    if use_recent_biases:
+        try:
+            (
+                recent_bias_matrix_2pt5km,
+                recent_bias_matrix_10km,
+                recent_bias_matrix_20km,
+                recent_bias_matrix_40km,
+                found_any_predictors,
+                found_all_predictors
+            ) = nwp_input.read_recent_biases_one_example(
+                init_time_unix_sec=init_time_unix_sec,
+                nwp_model_names=nwp_model_names,
+                nwp_init_time_lags_hours=recent_bias_init_time_lags_hours,
+                nwp_lead_times_hours=recent_bias_lead_times_hours,
+                nwp_model_to_dir_name=nwp_model_to_dir_name,
+                target_field_names=target_field_names,
+                target_dir_name=target_dir_name,
+                target_norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm,
+                backup_nwp_model_name=backup_nwp_model_name,
+                backup_nwp_directory_name=backup_nwp_directory_name,
+                patch_location_dict=patch_location_dict
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read recent biases for init time '
+                '{0:s}.  Something went wrong in '
+                '`nwp_input.read_recent_biases_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            recent_bias_matrix_2pt5km = None
+            recent_bias_matrix_10km = None
+            recent_bias_matrix_20km = None
+            recent_bias_matrix_40km = None
+            found_any_predictors = False
+            found_all_predictors = False
+
+        if not found_any_predictors:
+            return None
+        if require_all_predictors and not found_all_predictors:
+            return None
+
+        if recent_bias_matrix_2pt5km is not None:
+            recent_bias_matrix_2pt5km = numpy.expand_dims(
+                recent_bias_matrix_2pt5km, axis=0
+            )
+        if recent_bias_matrix_10km is not None:
+            recent_bias_matrix_10km = numpy.expand_dims(
+                recent_bias_matrix_10km, axis=0
+            )
+        if recent_bias_matrix_20km is not None:
+            recent_bias_matrix_20km = numpy.expand_dims(
+                recent_bias_matrix_20km, axis=0
+            )
+        if recent_bias_matrix_40km is not None:
+            recent_bias_matrix_40km = numpy.expand_dims(
+                recent_bias_matrix_40km, axis=0
+            )
+    else:
+        recent_bias_matrix_2pt5km = None
+        recent_bias_matrix_10km = None
+        recent_bias_matrix_20km = None
+        recent_bias_matrix_40km = None
+
     full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
         nbm_utils.read_coords()
     )
@@ -1316,9 +1562,14 @@ def create_data(option_dict, init_time_unix_sec):
         predictor_matrix_10km=predictor_matrix_10km,
         predictor_matrix_20km=predictor_matrix_20km,
         predictor_matrix_40km=predictor_matrix_40km,
+        recent_bias_matrix_2pt5km=recent_bias_matrix_2pt5km,
+        recent_bias_matrix_10km=recent_bias_matrix_10km,
+        recent_bias_matrix_20km=recent_bias_matrix_20km,
+        recent_bias_matrix_40km=recent_bias_matrix_40km,
         predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
         target_matrix=target_matrix,
-        sentinel_value=sentinel_value
+        sentinel_value=sentinel_value,
+        return_predictors_as_dict=return_predictors_as_dict
     )
 
     return {
@@ -1330,14 +1581,17 @@ def create_data(option_dict, init_time_unix_sec):
     }
 
 
-def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
-                             init_time_unix_sec):
+def create_data_fast_patches(
+        option_dict, patch_overlap_size_2pt5km_pixels, init_time_unix_sec,
+        return_predictors_as_dict=False):
     """Fast version of create_data for patchwise neural network.
 
     :param option_dict: See documentation for `data_generator_fast_patches`.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param init_time_unix_sec: Will return all patches for this initialization
         time.
+    :param return_predictors_as_dict: See documentation for
+        `__report_data_properties`.
     :return: data_dict: See documentation for `create_data`.
     """
 
@@ -1369,6 +1623,8 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+    recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
@@ -1382,6 +1638,15 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    use_recent_biases = not (
+        recent_bias_init_time_lags_hours is None
+        or recent_bias_lead_times_hours is None
+    )
+    if use_recent_biases:
+        num_recent_bias_times = len(recent_bias_init_time_lags_hours)
+    else:
+        num_recent_bias_times = 0
 
     error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
     error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
@@ -1433,7 +1698,6 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
 
-    num_target_fields = len(target_field_names)
     if target_lag_times_hours is None:
         num_target_lag_times = 0
     else:
@@ -1576,6 +1840,53 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     if require_all_predictors and not found_all_predictors:
         return None
 
+    if use_recent_biases:
+        try:
+            (
+                full_recent_bias_matrix_2pt5km,
+                full_recent_bias_matrix_10km,
+                full_recent_bias_matrix_20km,
+                full_recent_bias_matrix_40km,
+                found_any_predictors,
+                found_all_predictors
+            ) = nwp_input.read_recent_biases_one_example(
+                init_time_unix_sec=init_time_unix_sec,
+                nwp_model_names=nwp_model_names,
+                nwp_init_time_lags_hours=recent_bias_init_time_lags_hours,
+                nwp_lead_times_hours=recent_bias_lead_times_hours,
+                nwp_model_to_dir_name=nwp_model_to_dir_name,
+                target_field_names=target_field_names,
+                target_dir_name=target_dir_name,
+                target_norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm,
+                backup_nwp_model_name=backup_nwp_model_name,
+                backup_nwp_directory_name=backup_nwp_directory_name,
+                patch_location_dict=None
+            )
+        except:
+            warning_string = (
+                'POTENTIAL ERROR: Could not read recent biases for init time '
+                '{0:s}.  Something went wrong in '
+                '`nwp_input.read_recent_biases_one_example`.'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    init_time_unix_sec, '%Y-%m-%d-%H'
+                )
+            )
+
+            warnings.warn(warning_string)
+            return None
+
+        if not found_any_predictors:
+            return None
+        if require_all_predictors and not found_all_predictors:
+            return None
+    else:
+        full_recent_bias_matrix_2pt5km = None
+        full_recent_bias_matrix_10km = None
+        full_recent_bias_matrix_20km = None
+        full_recent_bias_matrix_40km = None
+
     patch_metalocation_dict = __init_patch_metalocation_dict(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
@@ -1605,21 +1916,32 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
     )
 
-    (
-        predictor_matrix_2pt5km, predictor_matrix_10km,
-        predictor_matrix_20km, predictor_matrix_40km,
-        predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
-        target_matrix
-    ) = _init_matrices_1batch(
+    matrix_dict = _init_matrices_1batch(
         nwp_model_names=nwp_model_names,
         nwp_model_to_field_names=nwp_model_to_field_names,
         num_nwp_lead_times=len(nwp_lead_times_hours),
-        num_target_fields=num_target_fields,
+        target_field_names=target_field_names,
+        num_recent_bias_times=num_recent_bias_times,
         num_target_lag_times=num_target_lag_times,
         num_examples_per_batch=num_patches,
         patch_location_dict=dummy_patch_location_dict,
         do_residual_prediction=do_residual_prediction
     )
+    predictor_matrix_2pt5km = matrix_dict[PREDICTOR_MATRIX_2PT5KM_KEY]
+    predictor_matrix_10km = matrix_dict[PREDICTOR_MATRIX_10KM_KEY]
+    predictor_matrix_20km = matrix_dict[PREDICTOR_MATRIX_20KM_KEY]
+    predictor_matrix_40km = matrix_dict[PREDICTOR_MATRIX_40KM_KEY]
+    recent_bias_matrix_2pt5km = matrix_dict[RECENT_BIAS_MATRIX_2PT5KM_KEY]
+    recent_bias_matrix_10km = matrix_dict[RECENT_BIAS_MATRIX_10KM_KEY]
+    recent_bias_matrix_20km = matrix_dict[RECENT_BIAS_MATRIX_20KM_KEY]
+    recent_bias_matrix_40km = matrix_dict[RECENT_BIAS_MATRIX_40KM_KEY]
+    predictor_matrix_resid_baseline = (
+        matrix_dict[PREDICTOR_MATRIX_BASELINE_KEY]
+    )
+    predictor_matrix_lagged_targets = (
+        matrix_dict[PREDICTOR_MATRIX_LAGTGT_KEY]
+    )
+    target_matrix = matrix_dict[TARGET_MATRIX_KEY]
 
     if full_nbm_constant_matrix is None:
         nbm_constant_matrix = None
@@ -1681,39 +2003,59 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 full_predictor_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
             )
 
+        if recent_bias_matrix_2pt5km is not None:
+            recent_bias_matrix_2pt5km[i, ...] = (
+                full_recent_bias_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
+            )
+
         if nbm_constant_matrix is not None:
             nbm_constant_matrix[i, ...] = (
                 full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
             )
 
-        if predictor_matrix_10km is not None:
-            j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
-            j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
-            k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
-            k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+        j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
 
+        if predictor_matrix_10km is not None:
             predictor_matrix_10km[i, ...] = (
                 full_predictor_matrix_10km[j_start:j_end, k_start:k_end, ...]
             )
 
-        if predictor_matrix_20km is not None:
-            j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
-            j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
-            k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
-            k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+        if recent_bias_matrix_10km is not None:
+            recent_bias_matrix_10km[i, ...] = (
+                full_recent_bias_matrix_10km[j_start:j_end, k_start:k_end, ...]
+            )
 
+        j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+
+        if predictor_matrix_20km is not None:
             predictor_matrix_20km[i, ...] = (
                 full_predictor_matrix_20km[j_start:j_end, k_start:k_end, ...]
             )
 
-        if predictor_matrix_40km is not None:
-            j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
-            j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
-            k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
-            k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+        if recent_bias_matrix_20km is not None:
+            recent_bias_matrix_20km[i, ...] = (
+                full_recent_bias_matrix_20km[j_start:j_end, k_start:k_end, ...]
+            )
 
+        j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
+        if predictor_matrix_40km is not None:
             predictor_matrix_40km[i, ...] = (
                 full_predictor_matrix_40km[j_start:j_end, k_start:k_end, ...]
+            )
+
+        if recent_bias_matrix_40km is not None:
+            recent_bias_matrix_40km[i, ...] = (
+                full_recent_bias_matrix_40km[j_start:j_end, k_start:k_end, ...]
             )
 
     target_matrix = numpy.concatenate(
@@ -1727,9 +2069,14 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         predictor_matrix_10km=predictor_matrix_10km,
         predictor_matrix_20km=predictor_matrix_20km,
         predictor_matrix_40km=predictor_matrix_40km,
+        recent_bias_matrix_2pt5km=recent_bias_matrix_2pt5km,
+        recent_bias_matrix_10km=recent_bias_matrix_10km,
+        recent_bias_matrix_20km=recent_bias_matrix_20km,
+        recent_bias_matrix_40km=recent_bias_matrix_40km,
         predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
         target_matrix=target_matrix,
-        sentinel_value=sentinel_value
+        sentinel_value=sentinel_value,
+        return_predictors_as_dict=return_predictors_as_dict
     )
 
     return {
@@ -1741,12 +2088,15 @@ def create_data_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     }
 
 
-def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
+def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
+                                return_predictors_as_dict=False):
     """Fast data-generator for patchwise training.
 
     :param option_dict: See documentation for `data_generator`.
     :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
         measured in number of pixels on the finest-resolution (2.5-km) grid.
+    :param return_predictors_as_dict: See documentation for
+        `__report_data_properties`.
     :return: predictor_matrices: See documentation for `data_generator`.
     :return: target_matrix: Same.
     """
@@ -1767,6 +2117,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+    recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
@@ -1782,6 +2134,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    use_recent_biases = not (
+        recent_bias_init_time_lags_hours is None
+        or recent_bias_lead_times_hours is None
+    )
+    if use_recent_biases:
+        num_recent_bias_times = len(recent_bias_init_time_lags_hours)
+    else:
+        num_recent_bias_times = 0
 
     mask_matrix_for_loss = __patch_buffer_to_mask(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
@@ -1855,6 +2216,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
     full_predictor_matrix_10km = None
     full_predictor_matrix_20km = None
     full_predictor_matrix_40km = None
+    full_recent_bias_matrix_2pt5km = None
+    full_recent_bias_matrix_10km = None
+    full_recent_bias_matrix_20km = None
+    full_recent_bias_matrix_40km = None
     full_predictor_matrix_lagged_targets = None
 
     num_target_fields = len(target_field_names)
@@ -1868,21 +2233,32 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
         )
 
-        (
-            predictor_matrix_2pt5km, predictor_matrix_10km,
-            predictor_matrix_20km, predictor_matrix_40km,
-            predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
-            target_matrix
-        ) = _init_matrices_1batch(
+        matrix_dict = _init_matrices_1batch(
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
-            num_target_fields=num_target_fields,
+            target_field_names=target_field_names,
             num_target_lag_times=num_target_lag_times,
+            num_recent_bias_times=num_recent_bias_times,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=dummy_patch_location_dict,
             do_residual_prediction=do_residual_prediction
         )
+        predictor_matrix_2pt5km = matrix_dict[PREDICTOR_MATRIX_2PT5KM_KEY]
+        predictor_matrix_10km = matrix_dict[PREDICTOR_MATRIX_10KM_KEY]
+        predictor_matrix_20km = matrix_dict[PREDICTOR_MATRIX_20KM_KEY]
+        predictor_matrix_40km = matrix_dict[PREDICTOR_MATRIX_40KM_KEY]
+        recent_bias_matrix_2pt5km = matrix_dict[RECENT_BIAS_MATRIX_2PT5KM_KEY]
+        recent_bias_matrix_10km = matrix_dict[RECENT_BIAS_MATRIX_10KM_KEY]
+        recent_bias_matrix_20km = matrix_dict[RECENT_BIAS_MATRIX_20KM_KEY]
+        recent_bias_matrix_40km = matrix_dict[RECENT_BIAS_MATRIX_40KM_KEY]
+        predictor_matrix_resid_baseline = (
+            matrix_dict[PREDICTOR_MATRIX_BASELINE_KEY]
+        )
+        predictor_matrix_lagged_targets = (
+            matrix_dict[PREDICTOR_MATRIX_LAGTGT_KEY]
+        )
+        target_matrix = matrix_dict[TARGET_MATRIX_KEY]
 
         if compare_to_baseline_in_loss:
             new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
@@ -1910,6 +2286,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
                 full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
@@ -1947,6 +2327,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
                 full_predictor_matrix_lagged_targets = None
 
             if full_target_matrix is None:
@@ -1997,6 +2381,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
                 full_predictor_matrix_lagged_targets = None
 
             if (
@@ -2071,6 +2459,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 full_predictor_matrix_10km = None
                 full_predictor_matrix_20km = None
                 full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
                 full_predictor_matrix_lagged_targets = None
 
             if do_residual_prediction and full_baseline_matrix is None:
@@ -2080,76 +2472,126 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                 )
                 continue
 
-            if full_predictor_matrix_2pt5km is None:
-                (
-                    full_predictor_matrix_2pt5km,
-                    full_predictor_matrix_10km,
-                    full_predictor_matrix_20km,
-                    full_predictor_matrix_40km,
-                    found_any_predictors,
-                    found_all_predictors
-                ) = nwp_input.read_predictors_one_example(
-                    init_time_unix_sec=init_times_unix_sec[init_time_index],
-                    nwp_model_names=nwp_model_names,
-                    nwp_lead_times_hours=nwp_lead_times_hours,
-                    nwp_model_to_field_names=nwp_model_to_field_names,
-                    nwp_model_to_dir_name=nwp_model_to_dir_name,
-                    nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-                    use_quantile_norm=nwp_use_quantile_norm,
-                    backup_nwp_model_name=backup_nwp_model_name,
-                    backup_nwp_directory_name=backup_nwp_directory_name,
-                    patch_location_dict=None
+            try:
+                if full_predictor_matrix_2pt5km is None:
+                    (
+                        full_predictor_matrix_2pt5km,
+                        full_predictor_matrix_10km,
+                        full_predictor_matrix_20km,
+                        full_predictor_matrix_40km,
+                        found_any_predictors,
+                        found_all_predictors
+                    ) = nwp_input.read_predictors_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_names=nwp_model_names,
+                        nwp_lead_times_hours=nwp_lead_times_hours,
+                        nwp_model_to_field_names=nwp_model_to_field_names,
+                        nwp_model_to_dir_name=nwp_model_to_dir_name,
+                        nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                        use_quantile_norm=nwp_use_quantile_norm,
+                        backup_nwp_model_name=backup_nwp_model_name,
+                        backup_nwp_directory_name=backup_nwp_directory_name,
+                        patch_location_dict=None
+                    )
+                else:
+                    found_any_predictors = True
+                    found_all_predictors = True
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read predictors for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`nwp_input.read_predictors_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
                 )
-            else:
-                found_any_predictors = True
-                found_all_predictors = True
 
-            # try:
-            #     if full_predictor_matrix_2pt5km is None:
-            #         (
-            #             full_predictor_matrix_2pt5km,
-            #             full_predictor_matrix_10km,
-            #             full_predictor_matrix_20km,
-            #             full_predictor_matrix_40km,
-            #             found_any_predictors,
-            #             found_all_predictors
-            #         ) = nwp_input.read_predictors_one_example(
-            #             init_time_unix_sec=init_times_unix_sec[init_time_index],
-            #             nwp_model_names=nwp_model_names,
-            #             nwp_lead_times_hours=nwp_lead_times_hours,
-            #             nwp_model_to_field_names=nwp_model_to_field_names,
-            #             nwp_model_to_dir_name=nwp_model_to_dir_name,
-            #             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
-            #             use_quantile_norm=nwp_use_quantile_norm,
-            #             backup_nwp_model_name=backup_nwp_model_name,
-            #             backup_nwp_directory_name=backup_nwp_directory_name,
-            #             patch_location_dict=None
-            #         )
-            #     else:
-            #         found_any_predictors = True
-            #         found_all_predictors = True
-            # except:
-            #     warning_string = (
-            #         'POTENTIAL ERROR: Could not read predictors for init time '
-            #         '{0:s}.  Something went wrong in '
-            #         '`nwp_input.read_predictors_one_example`.'
-            #     ).format(
-            #         time_conversion.unix_sec_to_string(
-            #             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
-            #         )
-            #     )
-            #
-            #     warnings.warn(warning_string)
-            #     full_target_matrix = None
-            #     full_baseline_matrix = None
-            #     full_predictor_matrix_2pt5km = None
-            #     full_predictor_matrix_10km = None
-            #     full_predictor_matrix_20km = None
-            #     full_predictor_matrix_40km = None
-            #     full_predictor_matrix_lagged_targets = None
-            #     found_any_predictors = False
-            #     found_all_predictors = False
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
+                found_any_predictors = False
+                found_all_predictors = False
 
+            if not found_any_predictors:
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            if require_all_predictors and not found_all_predictors:
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            try:
+                if use_recent_biases and full_recent_bias_matrix_2pt5km is None:
+                    (
+                        full_recent_bias_matrix_2pt5km,
+                        full_recent_bias_matrix_10km,
+                        full_recent_bias_matrix_20km,
+                        full_recent_bias_matrix_40km,
+                        found_any_predictors,
+                        found_all_predictors
+                    ) = nwp_input.read_recent_biases_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_names=nwp_model_names,
+                        nwp_init_time_lags_hours=
+                        recent_bias_init_time_lags_hours,
+                        nwp_lead_times_hours=recent_bias_lead_times_hours,
+                        nwp_model_to_dir_name=nwp_model_to_dir_name,
+                        target_field_names=target_field_names,
+                        target_dir_name=target_dir_name,
+                        target_norm_param_table_xarray=
+                        target_norm_param_table_xarray,
+                        use_quantile_norm=targets_use_quantile_norm,
+                        backup_nwp_model_name=backup_nwp_model_name,
+                        backup_nwp_directory_name=backup_nwp_directory_name,
+                        patch_location_dict=None
+                    )
+                else:
+                    found_any_predictors = True
+                    found_all_predictors = True
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read recent biases for init '
+                    'time {0:s}.  Something went wrong in '
+                    '`nwp_input.read_recent_biases_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
+                found_any_predictors = False
+                found_all_predictors = False
+
+            # TODO(thunderhoser): I don't think this condition needs to be
+            # `use_recent_biases and not found_any_predictors`?
             if not found_any_predictors:
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2209,34 +2651,54 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
                     full_nbm_constant_matrix[j_start:j_end, k_start:k_end, ...]
                 )
 
-            if predictor_matrix_10km is not None:
-                j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
-                j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
-                k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
-                k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+            if recent_bias_matrix_2pt5km is not None:
+                recent_bias_matrix_2pt5km[i, ...] = (
+                    full_recent_bias_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
+                )
 
+            j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+
+            if predictor_matrix_10km is not None:
                 predictor_matrix_10km[i, ...] = (
                     full_predictor_matrix_10km[j_start:j_end, k_start:k_end, ...]
                 )
 
-            if predictor_matrix_20km is not None:
-                j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
-                j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
-                k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
-                k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+            if recent_bias_matrix_10km is not None:
+                recent_bias_matrix_10km[i, ...] = (
+                    full_recent_bias_matrix_10km[j_start:j_end, k_start:k_end, ...]
+                )
 
+            j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+
+            if predictor_matrix_20km is not None:
                 predictor_matrix_20km[i, ...] = (
                     full_predictor_matrix_20km[j_start:j_end, k_start:k_end, ...]
                 )
 
-            if predictor_matrix_40km is not None:
-                j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
-                j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
-                k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
-                k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+            if recent_bias_matrix_20km is not None:
+                recent_bias_matrix_20km[i, ...] = (
+                    full_recent_bias_matrix_20km[j_start:j_end, k_start:k_end, ...]
+                )
 
+            j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
+            if predictor_matrix_40km is not None:
                 predictor_matrix_40km[i, ...] = (
                     full_predictor_matrix_40km[j_start:j_end, k_start:k_end, ...]
+                )
+
+            if recent_bias_matrix_40km is not None:
+                recent_bias_matrix_40km[i, ...] = (
+                    full_recent_bias_matrix_40km[j_start:j_end, k_start:k_end, ...]
                 )
 
             num_examples_in_memory += 1
@@ -2252,15 +2714,20 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels):
             predictor_matrix_10km=predictor_matrix_10km,
             predictor_matrix_20km=predictor_matrix_20km,
             predictor_matrix_40km=predictor_matrix_40km,
+            recent_bias_matrix_2pt5km=recent_bias_matrix_2pt5km,
+            recent_bias_matrix_10km=recent_bias_matrix_10km,
+            recent_bias_matrix_20km=recent_bias_matrix_20km,
+            recent_bias_matrix_40km=recent_bias_matrix_40km,
             predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
             target_matrix=target_matrix,
-            sentinel_value=sentinel_value
+            sentinel_value=sentinel_value,
+            return_predictors_as_dict=return_predictors_as_dict
         )
 
         yield predictor_matrices, target_matrix
 
 
-def data_generator(option_dict):
+def data_generator(option_dict, return_predictors_as_dict=False):
     """Generates training or validation data for neural network.
 
     Generators should be used only at training time, not at inference time.
@@ -2275,6 +2742,7 @@ def data_generator(option_dict):
     L = number of NWP lead times
     l = number of lag times for target fields used in predictors
     F = number of target fields
+    B = number of lag times for recent NWP bias
 
     m = number of rows in 10-km grid
     n = number of columns in 10-km grid
@@ -2331,6 +2799,12 @@ def data_generator(option_dict):
         `urma_io.read_normalization_file`).
     option_dict["targets_use_quantile_norm"]: Same as "nwp_use_quantile_norm"
         but for target fields.
+    option_dict["recent_bias_init_time_lags_hours"]: length-B numpy array of lag
+        times for recent NWP bias.  If you do not want predictors to include
+        recent NWP bias, make this None.
+    option_dict["recent_bias_lead_times_hours"]: length-B numpy array of lead
+        times for recent NWP bias.  If you do not want predictors to include
+        recent NWP bias, make this None.
     option_dict["nbm_constant_field_names"]: length-C list with names of NBM
         constant fields, to be used as predictors.  Each must be accepted by
         `nbm_constant_utils.check_field_name`.  If you do not want NBM-constant
@@ -2375,6 +2849,9 @@ def data_generator(option_dict):
         baseline fields.  Within this directory, relevant files will be found by
         `interp_nwp_model_io.find_file`.
 
+    :param return_predictors_as_dict: See documentation for
+        `__report_data_properties`.
+
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
 
@@ -2390,7 +2867,15 @@ def data_generator(option_dict):
         20-km resolution.
     predictor_matrices[5]: E-by-mmm-by-nnn-by-L-by-ppp numpy array of predictors
         at 40-km resolution.
-    predictor_matrices[6]: E-by-M-by-N-by-F numpy array of baseline values for
+    predictor_matrices[6]: E-by-M-by-N-by-B-by-? numpy array of recent NWP
+        biases at 2.5-km resolution.
+    predictor_matrices[7]: E-by-m-by-n-by-B-by-? numpy array of recent NWP
+        biases at 10-km resolution.
+    predictor_matrices[8]: E-by-mm-by-nn-by-B-by-? numpy array of recent NWP
+        biases at 20-km resolution.
+    predictor_matrices[9]: E-by-mmm-by-nnn-by-B-by-? numpy array of recent NWP
+        biases at 40-km resolution.
+    predictor_matrices[10]: E-by-M-by-N-by-F numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: If `compare_to_baseline_in_loss == False`, this is
@@ -2421,6 +2906,8 @@ def data_generator(option_dict):
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+    recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
     nbm_constant_field_names = option_dict[NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[NBM_CONSTANT_FILE_KEY]
     compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
@@ -2436,6 +2923,15 @@ def data_generator(option_dict):
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    use_recent_biases = not (
+        recent_bias_init_time_lags_hours is None
+        or recent_bias_lead_times_hours is None
+    )
+    if use_recent_biases:
+        num_recent_bias_times = len(recent_bias_init_time_lags_hours)
+    else:
+        num_recent_bias_times = 0
 
     if patch_size_2pt5km_pixels is None:
         num_rows, num_columns = nwp_input.get_grid_dimensions(
@@ -2514,21 +3010,32 @@ def data_generator(option_dict):
                 patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
             )
 
-        (
-            predictor_matrix_2pt5km, predictor_matrix_10km,
-            predictor_matrix_20km, predictor_matrix_40km,
-            predictor_matrix_resid_baseline, predictor_matrix_lagged_targets,
-            target_matrix
-        ) = _init_matrices_1batch(
+        matrix_dict = _init_matrices_1batch(
             nwp_model_names=nwp_model_names,
             nwp_model_to_field_names=nwp_model_to_field_names,
             num_nwp_lead_times=len(nwp_lead_times_hours),
-            num_target_fields=num_target_fields,
+            target_field_names=target_field_names,
+            num_recent_bias_times=num_recent_bias_times,
             num_target_lag_times=num_target_lag_times,
             num_examples_per_batch=num_examples_per_batch,
             patch_location_dict=patch_location_dict,
             do_residual_prediction=do_residual_prediction
         )
+        predictor_matrix_2pt5km = matrix_dict[PREDICTOR_MATRIX_2PT5KM_KEY]
+        predictor_matrix_10km = matrix_dict[PREDICTOR_MATRIX_10KM_KEY]
+        predictor_matrix_20km = matrix_dict[PREDICTOR_MATRIX_20KM_KEY]
+        predictor_matrix_40km = matrix_dict[PREDICTOR_MATRIX_40KM_KEY]
+        recent_bias_matrix_2pt5km = matrix_dict[RECENT_BIAS_MATRIX_2PT5KM_KEY]
+        recent_bias_matrix_10km = matrix_dict[RECENT_BIAS_MATRIX_10KM_KEY]
+        recent_bias_matrix_20km = matrix_dict[RECENT_BIAS_MATRIX_20KM_KEY]
+        recent_bias_matrix_40km = matrix_dict[RECENT_BIAS_MATRIX_40KM_KEY]
+        predictor_matrix_resid_baseline = (
+            matrix_dict[PREDICTOR_MATRIX_BASELINE_KEY]
+        )
+        predictor_matrix_lagged_targets = (
+            matrix_dict[PREDICTOR_MATRIX_LAGTGT_KEY]
+        )
+        target_matrix = matrix_dict[TARGET_MATRIX_KEY]
 
         if compare_to_baseline_in_loss:
             new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
@@ -2768,6 +3275,75 @@ def data_generator(option_dict):
             if predictor_matrix_40km is not None:
                 predictor_matrix_40km[i, ...] = this_predictor_matrix_40km
 
+            if use_recent_biases:
+                try:
+                    (
+                        this_recent_bias_matrix_2pt5km,
+                        this_recent_bias_matrix_10km,
+                        this_recent_bias_matrix_20km,
+                        this_recent_bias_matrix_40km,
+                        found_any_predictors,
+                        found_all_predictors
+                    ) = nwp_input.read_recent_biases_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_names=nwp_model_names,
+                        nwp_init_time_lags_hours=
+                        recent_bias_init_time_lags_hours,
+                        nwp_lead_times_hours=recent_bias_lead_times_hours,
+                        nwp_model_to_dir_name=nwp_model_to_dir_name,
+                        target_field_names=target_field_names,
+                        target_dir_name=target_dir_name,
+                        target_norm_param_table_xarray=
+                        target_norm_param_table_xarray,
+                        use_quantile_norm=targets_use_quantile_norm,
+                        backup_nwp_model_name=backup_nwp_model_name,
+                        backup_nwp_directory_name=backup_nwp_directory_name,
+                        patch_location_dict=patch_location_dict
+                    )
+                except:
+                    warning_string = (
+                        'POTENTIAL ERROR: Could not read recent biases for '
+                        'init time {0:s}.  Something went wrong in '
+                        '`nwp_input.read_recent_biases_one_example`.'
+                    ).format(
+                        time_conversion.unix_sec_to_string(
+                            init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                        )
+                    )
+
+                    warnings.warn(warning_string)
+                    this_recent_bias_matrix_2pt5km = None
+                    this_recent_bias_matrix_10km = None
+                    this_recent_bias_matrix_20km = None
+                    this_recent_bias_matrix_40km = None
+                    found_any_predictors = False
+                    found_all_predictors = False
+
+                if not found_any_predictors:
+                    init_time_index += 1
+                    continue
+
+                if require_all_predictors and not found_all_predictors:
+                    init_time_index += 1
+                    continue
+
+                if recent_bias_matrix_2pt5km is not None:
+                    recent_bias_matrix_2pt5km[i, ...] = (
+                        this_recent_bias_matrix_2pt5km
+                    )
+                if recent_bias_matrix_10km is not None:
+                    recent_bias_matrix_10km[i, ...] = (
+                        this_recent_bias_matrix_10km
+                    )
+                if recent_bias_matrix_20km is not None:
+                    recent_bias_matrix_20km[i, ...] = (
+                        this_recent_bias_matrix_20km
+                    )
+                if recent_bias_matrix_40km is not None:
+                    recent_bias_matrix_40km[i, ...] = (
+                        this_recent_bias_matrix_40km
+                    )
+
             num_examples_in_memory += 1
             init_time_index += 1
 
@@ -2782,9 +3358,14 @@ def data_generator(option_dict):
             predictor_matrix_10km=predictor_matrix_10km,
             predictor_matrix_20km=predictor_matrix_20km,
             predictor_matrix_40km=predictor_matrix_40km,
+            recent_bias_matrix_2pt5km=recent_bias_matrix_2pt5km,
+            recent_bias_matrix_10km=recent_bias_matrix_10km,
+            recent_bias_matrix_20km=recent_bias_matrix_20km,
+            recent_bias_matrix_40km=recent_bias_matrix_40km,
             predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
             target_matrix=target_matrix,
-            sentinel_value=sentinel_value
+            sentinel_value=sentinel_value,
+            return_predictors_as_dict=return_predictors_as_dict
         )
 
         yield predictor_matrices, target_matrix
@@ -3373,6 +3954,11 @@ def read_metafile(pickle_file_name):
     if TARGET_LAG_TIMES_KEY not in training_option_dict:
         training_option_dict[TARGET_LAG_TIMES_KEY] = None
         validation_option_dict[TARGET_LAG_TIMES_KEY] = None
+    if RECENT_BIAS_LAG_TIMES_KEY not in training_option_dict:
+        training_option_dict[RECENT_BIAS_LAG_TIMES_KEY] = None
+        validation_option_dict[RECENT_BIAS_LAG_TIMES_KEY] = None
+        training_option_dict[RECENT_BIAS_LEAD_TIMES_KEY] = None
+        validation_option_dict[RECENT_BIAS_LEAD_TIMES_KEY] = None
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict

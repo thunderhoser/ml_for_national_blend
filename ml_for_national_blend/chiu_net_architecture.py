@@ -24,6 +24,10 @@ INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'
 INPUT_DIMENSIONS_10KM_RES_KEY = 'input_dimensions_10km_res'
 INPUT_DIMENSIONS_20KM_RES_KEY = 'input_dimensions_20km_res'
 INPUT_DIMENSIONS_40KM_RES_KEY = 'input_dimensions_40km_res'
+INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY = 'input_dimensions_2pt5km_rctbias'
+INPUT_DIMENSIONS_10KM_RCTBIAS_KEY = 'input_dimensions_10km_rctbias'
+INPUT_DIMENSIONS_20KM_RCTBIAS_KEY = 'input_dimensions_20km_rctbias'
+INPUT_DIMENSIONS_40KM_RCTBIAS_KEY = 'input_dimensions_40km_rctbias'
 PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
 INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = 'input_dimensions_lagged_targets'
 USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
@@ -43,6 +47,14 @@ LAGTGT_ENCODER_DROPOUT_RATES_KEY = 'lagtgt_encoder_dropout_rate_by_level'
 LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY = 'lagtgt_forecast_module_num_conv_layers'
 LAGTGT_FC_MODULE_DROPOUT_RATES_KEY = 'lagtgt_forecast_module_dropout_rates'
 LAGTGT_FC_MODULE_USE_3D_CONV = 'lagtgt_forecast_module_use_3d_conv'
+
+RCTBIAS_ENCODER_NUM_CHANNELS_KEY = 'rctbias_encoder_num_channels_by_level'
+RCTBIAS_POOLING_SIZE_KEY = 'rctbias_pooling_size_by_level_px'
+RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY = 'rctbias_encoder_num_conv_layers_by_level'
+RCTBIAS_ENCODER_DROPOUT_RATES_KEY = 'rctbias_encoder_dropout_rate_by_level'
+RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY = 'rctbias_forecast_module_num_conv_layers'
+RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY = 'rctbias_forecast_module_dropout_rates'
+RCTBIAS_FC_MODULE_USE_3D_CONV = 'rctbias_forecast_module_use_3d_conv'
 
 DECODER_NUM_CHANNELS_KEY = 'decoder_num_channels_by_level'
 DECODER_NUM_CONV_LAYERS_KEY = 'decoder_num_conv_layers_by_level'
@@ -103,6 +115,14 @@ def check_input_args(option_dict):
     option_dict["input_dimensions_10km_res"]: Same but for 10-km NWP forecasts.
     option_dict["input_dimensions_20km_res"]: Same but for 20-km NWP forecasts.
     option_dict["input_dimensions_40km_res"]: Same but for 40-km NWP forecasts.
+    option_dict["input_dimensions_2pt5km_rctbias"]: Same but for recent bias of
+        2.5-km NWP forecasts.
+    option_dict["input_dimensions_10km_rctbias"]: Same but for recent bias of
+        10-km NWP forecasts.
+    option_dict["input_dimensions_20km_rctbias"]: Same but for recent bias of
+        20-km NWP forecasts.
+    option_dict["input_dimensions_40km_rctbias"]: Same but for recent bias of
+        40-km NWP forecasts.
     option_dict["input_dimensions_predn_baseline"]: Same but for prediction
         baseline.
     option_dict["input_dimensions_lagged_targets"]: Same but for lagged targets.
@@ -112,35 +132,49 @@ def check_input_args(option_dict):
         with number of channels (feature maps) at each level of NWP-encoder.
     option_dict["lagtgt_encoder_num_channels_by_level"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_encoder_num_channels_by_level"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_pooling_size_by_level_px"]: length-L numpy array with size
         of max-pooling window at each level of NWP-encoder.  For example, if you
         want 2-by-2 pooling at the [j]th level,
         make pooling_size_by_level_px[j] = 2.
     option_dict["lagtgt_pooling_size_by_level_px"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_pooling_size_by_level_px"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_encoder_num_conv_layers_by_level"]: length-(L + 1) numpy
         array with number of conv layers at each level of NWP-encoder.
     option_dict["lagtgt_encoder_num_conv_layers_by_level"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_encoder_num_conv_layers_by_level"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_encoder_dropout_rate_by_level"]: length-(L + 1) numpy array
         with dropout rate at each level of NWP-encoder.  Use numbers <= 0 to
         indicate no-dropout.
     option_dict["lagtgt_encoder_dropout_rate_by_level"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_encoder_dropout_rate_by_level"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_forecast_module_num_conv_layers"]: Number of conv layers in
         forecasting module at end of NWP-encoder.
     option_dict["lagtgt_forecast_module_num_conv_layers"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_forecast_module_num_conv_layers"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_forecast_module_dropout_rates"]: length-F numpy array
         (where F = nwp_forecast_module_num_conv_layers) with dropout rate for
         each conv layer in NWP-forecasting module.  Use numbers <= 0 to indicate
         no-dropout.
     option_dict["lagtgt_forecast_module_dropout_rates"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_forecast_module_dropout_rates"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["nwp_forecast_module_use_3d_conv"]: Boolean flag.  Determines
         whether NWP-forecasting module will use 2-D or 3-D convolution.
     option_dict["lagtgt_forecast_module_use_3d_conv"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
+    option_dict["rctbias_forecast_module_use_3d_conv"]: Same but for recent
+        NWP biases.  If you do not want to use recent biases, make this None.
     option_dict["decoder_num_channels_by_level"]: length-L numpy array with
         number of channels (feature maps) at each level of decoder block.
     option_dict["decoder_num_conv_layers_by_level"]: length-L numpy array
@@ -200,31 +234,28 @@ def check_input_args(option_dict):
         option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
     )
 
-    if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
-        num_rows = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
-        num_columns = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
-        num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
-        expected_array = numpy.array(
-            [num_rows, num_columns, num_channels], dtype=int
-        )
+    num_rows_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
+    num_columns_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
+    num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
 
+    if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
+        expected_dim = numpy.array(
+            [num_rows_2pt5km, num_columns_2pt5km, num_channels], dtype=int
+        )
         assert numpy.array_equal(
-            option_dict[PREDN_BASELINE_DIMENSIONS_KEY],
-            expected_array
+            option_dict[PREDN_BASELINE_DIMENSIONS_KEY], expected_dim
         )
 
     error_checking.assert_is_boolean(option_dict[USE_RESIDUAL_BLOCKS_KEY])
 
     if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY],
-            exact_dimensions=numpy.array([3], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY], 0
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_CONST_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_CONST_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_10KM_RES_KEY] is not None:
@@ -263,16 +294,64 @@ def check_input_args(option_dict):
             option_dict[INPUT_DIMENSIONS_40KM_RES_KEY], 0
         )
 
+    if option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY] is not None:
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY], expected_dim
+        )
+
+    if option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY] is not None:
+        num_rows_10km = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY][0]
+        num_columns_10km = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_10km, num_columns_10km,
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY], expected_dim
+        )
+
+    if option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY] is not None:
+        num_rows_20km = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY][0]
+        num_columns_20km = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_20km, num_columns_20km,
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY], expected_dim
+        )
+
+    if option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY] is not None:
+        num_rows_40km = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY][0]
+        num_columns_40km = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_40km, num_columns_40km,
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY], expected_dim
+        )
+
     if option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY], 0
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY][-2], num_channels
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY], expected_dim
         )
 
     error_checking.assert_is_numpy_array(
@@ -399,6 +478,74 @@ def check_input_args(option_dict):
             option_dict[LAGTGT_FC_MODULE_USE_3D_CONV]
         )
 
+    use_recent_biases = (
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY] is not None
+    )
+
+    if use_recent_biases:
+        error_checking.assert_is_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CHANNELS_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CHANNELS_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CHANNELS_KEY], 1
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[RCTBIAS_POOLING_SIZE_KEY],
+            exact_dimensions=numpy.array([num_levels], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[RCTBIAS_POOLING_SIZE_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[RCTBIAS_POOLING_SIZE_KEY], 2
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY]
+        )
+        error_checking.assert_is_geq_numpy_array(
+            option_dict[RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY], 1
+        )
+
+        error_checking.assert_is_numpy_array(
+            option_dict[RCTBIAS_ENCODER_DROPOUT_RATES_KEY],
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_leq_numpy_array(
+            option_dict[RCTBIAS_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
+        )
+
+        rctbias_fc_module_num_conv_layers = option_dict[
+            RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY
+        ]
+        error_checking.assert_is_integer(rctbias_fc_module_num_conv_layers)
+        error_checking.assert_is_greater(rctbias_fc_module_num_conv_layers, 0)
+
+        expected_dim = numpy.array([rctbias_fc_module_num_conv_layers], dtype=int)
+
+        rctbias_fc_module_dropout_rates = option_dict[
+            RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY
+        ]
+        error_checking.assert_is_numpy_array(
+            rctbias_fc_module_dropout_rates, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_leq_numpy_array(
+            rctbias_fc_module_dropout_rates, 1., allow_nan=True
+        )
+
+        error_checking.assert_is_boolean(
+            option_dict[RCTBIAS_FC_MODULE_USE_3D_CONV]
+        )
+
     error_checking.assert_is_numpy_array(
         option_dict[DECODER_NUM_CHANNELS_KEY],
         exact_dimensions=numpy.array([num_levels], dtype=int)
@@ -493,11 +640,26 @@ def create_model(option_dict):
     input_dimensions_10km_res = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY]
     input_dimensions_40km_res = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY]
+    input_dimensions_2pt5km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY]
+    )
+    input_dimensions_10km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY]
+    )
+    input_dimensions_20km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY]
+    )
+    input_dimensions_40km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY]
+    )
     input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
     use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
 
     assert input_dimensions_predn_baseline is None
     assert not use_residual_blocks
+
+    use_recent_biases = input_dimensions_2pt5km_rctbias is not None
+    assert not use_recent_biases
 
     num_channels_by_level = option_dict[NWP_ENCODER_NUM_CHANNELS_KEY]
     pooling_size_by_level_px = option_dict[NWP_POOLING_SIZE_KEY]
