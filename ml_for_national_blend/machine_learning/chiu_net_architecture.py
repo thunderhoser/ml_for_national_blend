@@ -226,31 +226,28 @@ def check_input_args(option_dict):
         option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY], 0
     )
 
-    if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
-        num_rows = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
-        num_columns = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
-        num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
-        expected_array = numpy.array(
-            [num_rows, num_columns, num_channels], dtype=int
-        )
+    num_rows_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
+    num_columns_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
+    num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
 
+    if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
+        expected_dim = numpy.array(
+            [num_rows_2pt5km, num_columns_2pt5km, num_channels], dtype=int
+        )
         assert numpy.array_equal(
-            option_dict[PREDN_BASELINE_DIMENSIONS_KEY],
-            expected_array
+            option_dict[PREDN_BASELINE_DIMENSIONS_KEY], expected_dim
         )
 
     error_checking.assert_is_boolean(option_dict[USE_RESIDUAL_BLOCKS_KEY])
 
     if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY],
-            exact_dimensions=numpy.array([3], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_CONST_KEY], 0
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_CONST_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_CONST_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_10KM_RES_KEY] is not None:
@@ -290,63 +287,63 @@ def check_input_args(option_dict):
         )
 
     if option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY], 0
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY], 0
+        num_rows_10km = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY][0]
+        num_columns_10km = option_dict[INPUT_DIMENSIONS_10KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_10km, num_columns_10km,
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY], 0
+        num_rows_20km = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY][0]
+        num_columns_20km = option_dict[INPUT_DIMENSIONS_20KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_20km, num_columns_20km,
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY], 0
+        num_rows_40km = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY][0]
+        num_columns_40km = option_dict[INPUT_DIMENSIONS_40KM_RES_KEY][1]
+        expected_dim = numpy.array([
+            num_rows_40km, num_columns_40km,
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY][-2],
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY][-1]
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY], expected_dim
         )
 
     if option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY],
-            exact_dimensions=numpy.array([4], dtype=int)
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY], 0
+        expected_dim = numpy.array([
+            num_rows_2pt5km, num_columns_2pt5km,
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY][-2], num_channels
+        ], dtype=int)
+
+        assert numpy.array_equal(
+            option_dict[INPUT_DIMENSIONS_LAGGED_TARGETS_KEY], expected_dim
         )
 
     error_checking.assert_is_numpy_array(
@@ -475,9 +472,6 @@ def check_input_args(option_dict):
 
     use_recent_biases = (
         option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY] is not None
-        or option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY] is not None
-        or option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY] is not None
-        or option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY] is not None
     )
 
     if use_recent_biases:
@@ -656,13 +650,7 @@ def create_model(option_dict):
     assert input_dimensions_predn_baseline is None
     assert not use_residual_blocks
 
-    use_recent_biases = (
-        input_dimensions_2pt5km_rctbias is not None
-        or input_dimensions_10km_rctbias is not None
-        or input_dimensions_20km_rctbias is not None
-        or input_dimensions_40km_rctbias is not None
-    )
-
+    use_recent_biases = input_dimensions_2pt5km_rctbias is not None
     assert not use_recent_biases
 
     num_channels_by_level = option_dict[NWP_ENCODER_NUM_CHANNELS_KEY]

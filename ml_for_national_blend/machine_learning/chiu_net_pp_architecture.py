@@ -644,13 +644,7 @@ def create_model(option_dict):
     optimizer_function = optd[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = optd[METRIC_FUNCTIONS_KEY]
 
-    use_recent_biases = (
-        input_dimensions_2pt5km_rctbias is not None
-        or input_dimensions_10km_rctbias is not None
-        or input_dimensions_20km_rctbias is not None
-        or input_dimensions_40km_rctbias is not None
-    )
-
+    use_recent_biases = input_dimensions_2pt5km_rctbias is not None
     num_lead_times = input_dimensions_2pt5km_res[2]
 
     input_layer_object_2pt5km_res = keras.layers.Input(
@@ -809,8 +803,6 @@ def create_model(option_dict):
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
     )
-
-    # TODO(thunderhoser): Do not allow input dims for main NWP predictors and recent biases to be independent.  Enforce connection.
 
     num_levels = len(nwp_pooling_size_by_level_px)
     nwp_encoder_conv_layer_objects = [None] * (num_levels + 1)
