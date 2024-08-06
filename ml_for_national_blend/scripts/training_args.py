@@ -3,7 +3,7 @@
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
-TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'  # FOO
+TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'
 OUTPUT_DIR_ARG_NAME = 'output_model_dir_name'
 
 NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
@@ -18,9 +18,11 @@ TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_hours'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
+RECENT_BIAS_LAG_TIMES_ARG_NAME = 'recent_bias_init_time_lags_hours'
+RECENT_BIAS_LEAD_TIMES_ARG_NAME = 'recent_bias_lead_times_hours'
 NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
-COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'  # FOO
+COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
@@ -41,18 +43,18 @@ LAST_TRAINING_TIMES_ARG_NAME = 'last_init_time_strings_for_training'
 TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'
 TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'
 
-FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'  # FOO
-LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'  # FOO
-VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'  # FOO
-VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'  # FOO
+FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'
+LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'
+VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'
+VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'
 
-NUM_EPOCHS_ARG_NAME = 'num_epochs'  # FOO
-NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'  # FOO
-NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'  # FOO
+NUM_EPOCHS_ARG_NAME = 'num_epochs'
+NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'
+NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
 
-PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'  # FOO
-PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'  # FOO
-EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'  # FOO
+PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'
+PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'
+EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'
 
 TEMPLATE_FILE_HELP_STRING = (
     'Path to template file, containing model architecture.  This will be read '
@@ -123,6 +125,17 @@ TARGET_NORMALIZATION_FILE_HELP_STRING = (
 )
 TARGETS_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for targets.'.format(
     NWP_USE_QUANTILE_NORM_ARG_NAME
+)
+RECENT_BIAS_LAG_TIMES_HELP_STRING = (
+    '1-D list of lag times for recent NWP bias.  If you do not want predictors '
+    'to include recent NWP bias, leave this argument alone.'
+)
+RECENT_BIAS_LEAD_TIMES_HELP_STRING = (
+    '1-D list of lead times for recent NWP bias (with same length as `{0:s}`).'
+    '  If you do not want predictors to include recent NWP bias, leave this '
+    'argument alone.'
+).format(
+    RECENT_BIAS_LAG_TIMES_ARG_NAME
 )
 NBM_CONSTANT_FIELDS_HELP_STRING = (
     'List of NBM constant fields to be used as predictors.  Each must be '
@@ -332,6 +345,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGETS_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
         default=1, help=TARGETS_USE_QUANTILE_NORM_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + RECENT_BIAS_LAG_TIMES_ARG_NAME, type=int, nargs='+',
+        required=False, default=[-1], help=RECENT_BIAS_LAG_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + RECENT_BIAS_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
+        required=False, default=[-1], help=RECENT_BIAS_LEAD_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + NBM_CONSTANT_FIELDS_ARG_NAME, type=str, nargs='+',

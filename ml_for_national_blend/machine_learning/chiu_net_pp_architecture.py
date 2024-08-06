@@ -15,6 +15,18 @@ INPUT_DIMENSIONS_2PT5KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY
 INPUT_DIMENSIONS_10KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_10KM_RES_KEY
 INPUT_DIMENSIONS_20KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_20KM_RES_KEY
 INPUT_DIMENSIONS_40KM_RES_KEY = chiu_net_arch.INPUT_DIMENSIONS_40KM_RES_KEY
+INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY = (
+    chiu_net_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY
+)
+INPUT_DIMENSIONS_10KM_RCTBIAS_KEY = (
+    chiu_net_arch.INPUT_DIMENSIONS_10KM_RCTBIAS_KEY
+)
+INPUT_DIMENSIONS_20KM_RCTBIAS_KEY = (
+    chiu_net_arch.INPUT_DIMENSIONS_20KM_RCTBIAS_KEY
+)
+INPUT_DIMENSIONS_40KM_RCTBIAS_KEY = (
+    chiu_net_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY
+)
 PREDN_BASELINE_DIMENSIONS_KEY = chiu_net_arch.PREDN_BASELINE_DIMENSIONS_KEY
 INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = (
     chiu_net_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY
@@ -46,6 +58,24 @@ LAGTGT_FC_MODULE_DROPOUT_RATES_KEY = (
     chiu_net_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY
 )
 LAGTGT_FC_MODULE_USE_3D_CONV = chiu_net_arch.LAGTGT_FC_MODULE_USE_3D_CONV
+
+RCTBIAS_ENCODER_NUM_CHANNELS_KEY = (
+    chiu_net_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY
+)
+RCTBIAS_POOLING_SIZE_KEY = chiu_net_arch.RCTBIAS_POOLING_SIZE_KEY
+RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY = (
+    chiu_net_arch.RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY
+)
+RCTBIAS_ENCODER_DROPOUT_RATES_KEY = (
+    chiu_net_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY
+)
+RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
+    chiu_net_arch.RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY
+)
+RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY = (
+    chiu_net_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY
+)
+RCTBIAS_FC_MODULE_USE_3D_CONV = chiu_net_arch.RCTBIAS_FC_MODULE_USE_3D_CONV
 
 DECODER_NUM_CHANNELS_KEY = chiu_net_arch.DECODER_NUM_CHANNELS_KEY
 DECODER_NUM_CONV_LAYERS_KEY = chiu_net_arch.DECODER_NUM_CONV_LAYERS_KEY
@@ -532,6 +562,18 @@ def create_model(option_dict):
     input_dimensions_10km_res = optd[INPUT_DIMENSIONS_10KM_RES_KEY]
     input_dimensions_20km_res = optd[INPUT_DIMENSIONS_20KM_RES_KEY]
     input_dimensions_40km_res = optd[INPUT_DIMENSIONS_40KM_RES_KEY]
+    input_dimensions_2pt5km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY]
+    )
+    input_dimensions_10km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_10KM_RCTBIAS_KEY]
+    )
+    input_dimensions_20km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_20KM_RCTBIAS_KEY]
+    )
+    input_dimensions_40km_rctbias = (
+        option_dict[INPUT_DIMENSIONS_40KM_RCTBIAS_KEY]
+    )
     input_dimensions_predn_baseline = optd[PREDN_BASELINE_DIMENSIONS_KEY]
     use_residual_blocks = optd[USE_RESIDUAL_BLOCKS_KEY]
 
@@ -561,6 +603,24 @@ def create_model(option_dict):
     ]
     lagtgt_forecast_module_use_3d_conv = optd[LAGTGT_FC_MODULE_USE_3D_CONV]
 
+    rctbias_encoder_num_channels_by_level = optd[
+        RCTBIAS_ENCODER_NUM_CHANNELS_KEY
+    ]
+    rctbias_pooling_size_by_level_px = optd[RCTBIAS_POOLING_SIZE_KEY]
+    rctbias_encoder_num_conv_layers_by_level = optd[
+        RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY
+    ]
+    rctbias_encoder_dropout_rate_by_level = optd[
+        RCTBIAS_ENCODER_DROPOUT_RATES_KEY
+    ]
+    rctbias_forecast_module_num_conv_layers = optd[
+        RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY
+    ]
+    rctbias_forecast_module_dropout_rates = optd[
+        RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY
+    ]
+    rctbias_forecast_module_use_3d_conv = optd[RCTBIAS_FC_MODULE_USE_3D_CONV]
+
     decoder_num_channels_by_level = optd[DECODER_NUM_CHANNELS_KEY]
     num_decoder_conv_layers_by_level = optd[DECODER_NUM_CONV_LAYERS_KEY]
     upsampling_dropout_rate_by_level = optd[UPSAMPLING_DROPOUT_RATES_KEY]
@@ -583,6 +643,13 @@ def create_model(option_dict):
     loss_function = optd[LOSS_FUNCTION_KEY]
     optimizer_function = optd[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = optd[METRIC_FUNCTIONS_KEY]
+
+    use_recent_biases = (
+        input_dimensions_2pt5km_rctbias is not None
+        or input_dimensions_10km_rctbias is not None
+        or input_dimensions_20km_rctbias is not None
+        or input_dimensions_40km_rctbias is not None
+    )
 
     num_lead_times = input_dimensions_2pt5km_res[2]
 
@@ -655,6 +722,18 @@ def create_model(option_dict):
                 [layer_object_lagged_targets, this_layer_object]
             )
 
+    if input_dimensions_2pt5km_rctbias is None:
+        input_layer_object_2pt5km_rctbias = None
+        layer_object_2pt5km_rctbias = None
+    else:
+        input_layer_object_2pt5km_rctbias = keras.layers.Input(
+            shape=tuple(input_dimensions_2pt5km_rctbias.tolist()),
+            name='2pt5km_rctbias'
+        )
+        layer_object_2pt5km_rctbias = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='2pt5km_rctbias_put-time-first'
+        )(input_layer_object_2pt5km_rctbias)
+
     if input_dimensions_10km_res is None:
         input_layer_object_10km_res = None
         layer_object_10km_res = None
@@ -666,6 +745,18 @@ def create_model(option_dict):
         layer_object_10km_res = keras.layers.Permute(
             dims=(3, 1, 2, 4), name='10km_put-time-first'
         )(input_layer_object_10km_res)
+
+    if input_dimensions_10km_rctbias is None:
+        input_layer_object_10km_rctbias = None
+        layer_object_10km_rctbias = None
+    else:
+        input_layer_object_10km_rctbias = keras.layers.Input(
+            shape=tuple(input_dimensions_10km_rctbias.tolist()),
+            name='10km_rctbias'
+        )
+        layer_object_10km_rctbias = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='10km_rctbias_put-time-first'
+        )(input_layer_object_10km_rctbias)
 
     if input_dimensions_20km_res is None:
         input_layer_object_20km_res = None
@@ -679,6 +770,18 @@ def create_model(option_dict):
             dims=(3, 1, 2, 4), name='20km_put-time-first'
         )(input_layer_object_20km_res)
 
+    if input_dimensions_20km_rctbias is None:
+        input_layer_object_20km_rctbias = None
+        layer_object_20km_rctbias = None
+    else:
+        input_layer_object_20km_rctbias = keras.layers.Input(
+            shape=tuple(input_dimensions_20km_rctbias.tolist()),
+            name='20km_rctbias'
+        )
+        layer_object_20km_rctbias = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='20km_rctbias_put-time-first'
+        )(input_layer_object_20km_rctbias)
+
     if input_dimensions_40km_res is None:
         input_layer_object_40km_res = None
         layer_object_40km_res = None
@@ -691,14 +794,32 @@ def create_model(option_dict):
             dims=(3, 1, 2, 4), name='40km_put-time-first'
         )(input_layer_object_40km_res)
 
+    if input_dimensions_40km_rctbias is None:
+        input_layer_object_40km_rctbias = None
+        layer_object_40km_rctbias = None
+    else:
+        input_layer_object_40km_rctbias = keras.layers.Input(
+            shape=tuple(input_dimensions_40km_rctbias.tolist()),
+            name='40km_rctbias'
+        )
+        layer_object_40km_rctbias = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='40km_rctbias_put-time-first'
+        )(input_layer_object_40km_rctbias)
+
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
     )
+
+    # TODO(thunderhoser): Do not allow input dims for main NWP predictors and recent biases to be independent.  Enforce connection.
 
     num_levels = len(nwp_pooling_size_by_level_px)
     nwp_encoder_conv_layer_objects = [None] * (num_levels + 1)
     nwp_fcst_module_layer_objects = [None] * (num_levels + 1)
     nwp_encoder_pooling_layer_objects = [None] * num_levels
+
+    rctbias_encoder_conv_layer_objects = [None] * (num_levels + 1)
+    rctbias_fcst_module_layer_objects = [None] * (num_levels + 1)
+    rctbias_encoder_pooling_layer_objects = [None] * num_levels
 
     if input_dimensions_10km_res is not None:
         num_levels_to_fill = 2
@@ -745,6 +866,44 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(nwp_encoder_conv_layer_objects[i])
 
+        if not use_recent_biases:
+            continue
+
+        if i == 0:
+            this_input_layer_object = layer_object_2pt5km_rctbias
+        else:
+            this_input_layer_object = (
+                rctbias_encoder_pooling_layer_objects[i - 1]
+            )
+
+        rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=this_input_layer_object,
+            do_residual=use_residual_blocks,
+            num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
+            filter_size_px=3,
+            num_filters=rctbias_encoder_num_channels_by_level[i],
+            do_time_distributed_conv=True,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
+        )
+
+        this_name = 'rctbias_encoder_level{0:d}_pooling'.format(i)
+        this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+            num_rows_in_window=rctbias_pooling_size_by_level_px[i],
+            num_columns_in_window=rctbias_pooling_size_by_level_px[i],
+            num_rows_per_stride=rctbias_pooling_size_by_level_px[i],
+            num_columns_per_stride=rctbias_pooling_size_by_level_px[i],
+            pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+            layer_name=this_name
+        )
+        rctbias_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+            this_pooling_layer_object, name=this_name
+        )(rctbias_encoder_conv_layer_objects[i])
+
     num_levels_filled = num_levels_to_fill + 0
 
     if input_dimensions_10km_res is not None:
@@ -762,6 +921,21 @@ def create_model(option_dict):
         )(
             [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
+
+        if use_recent_biases:
+            this_layer_object = _crop_layer(
+                target_layer_object=rctbias_encoder_pooling_layer_objects[i],
+                source_layer_object=layer_object_10km_rctbias,
+                cropping_layer_name='10km_rctbias_concat-cropping',
+                num_spatiotemporal_dims=3
+            )
+
+            this_name = '10km_rctbias_concat-with-finer'
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+                axis=-1, name=this_name
+            )(
+                [rctbias_encoder_pooling_layer_objects[i], this_layer_object]
+            )
 
         if input_dimensions_20km_res is not None:
             num_levels_to_fill = 1
@@ -810,6 +984,44 @@ def create_model(option_dict):
                 this_pooling_layer_object, name=this_name
             )(nwp_encoder_conv_layer_objects[i])
 
+            if not use_recent_biases:
+                continue
+
+            if i == 0:
+                this_input_layer_object = layer_object_10km_rctbias
+            else:
+                this_input_layer_object = (
+                    rctbias_encoder_pooling_layer_objects[i - 1]
+                )
+
+            rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=this_input_layer_object,
+                do_residual=use_residual_blocks,
+                num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
+                filter_size_px=3,
+                num_filters=rctbias_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=True,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
+            )
+
+            this_name = 'rctbias_encoder_level{0:d}_pooling'.format(i)
+            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+                num_rows_in_window=rctbias_pooling_size_by_level_px[i],
+                num_columns_in_window=rctbias_pooling_size_by_level_px[i],
+                num_rows_per_stride=rctbias_pooling_size_by_level_px[i],
+                num_columns_per_stride=rctbias_pooling_size_by_level_px[i],
+                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+                layer_name=this_name
+            )
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+                this_pooling_layer_object, name=this_name
+            )(rctbias_encoder_conv_layer_objects[i])
+
         num_levels_filled += num_levels_to_fill
 
     if input_dimensions_20km_res is not None:
@@ -827,6 +1039,21 @@ def create_model(option_dict):
         )(
             [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
+
+        if use_recent_biases:
+            this_layer_object = _crop_layer(
+                target_layer_object=rctbias_encoder_pooling_layer_objects[i],
+                source_layer_object=layer_object_20km_rctbias,
+                cropping_layer_name='20km_rctbias_concat-cropping',
+                num_spatiotemporal_dims=3
+            )
+
+            this_name = '20km_rctbias_concat-with-finer'
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+                axis=-1, name=this_name
+            )(
+                [rctbias_encoder_pooling_layer_objects[i], this_layer_object]
+            )
 
         i = num_levels_filled
         if i == 0:
@@ -862,6 +1089,42 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(nwp_encoder_conv_layer_objects[i])
 
+        if use_recent_biases:
+            if i == 0:
+                this_input_layer_object = layer_object_20km_rctbias
+            else:
+                this_input_layer_object = (
+                    rctbias_encoder_pooling_layer_objects[i - 1]
+                )
+
+            rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=this_input_layer_object,
+                do_residual=use_residual_blocks,
+                num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
+                filter_size_px=3,
+                num_filters=rctbias_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=True,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
+            )
+
+            this_name = 'rctbias_encoder_level{0:d}_pooling'.format(i)
+            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+                num_rows_in_window=rctbias_pooling_size_by_level_px[i],
+                num_columns_in_window=rctbias_pooling_size_by_level_px[i],
+                num_rows_per_stride=rctbias_pooling_size_by_level_px[i],
+                num_columns_per_stride=rctbias_pooling_size_by_level_px[i],
+                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+                layer_name=this_name
+            )
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+                this_pooling_layer_object, name=this_name
+            )(rctbias_encoder_conv_layer_objects[i])
+
         num_levels_filled += 1
 
     if input_dimensions_40km_res is not None:
@@ -879,6 +1142,21 @@ def create_model(option_dict):
         )(
             [nwp_encoder_pooling_layer_objects[i], this_layer_object]
         )
+
+        if use_recent_biases:
+            this_layer_object = _crop_layer(
+                target_layer_object=rctbias_encoder_pooling_layer_objects[i],
+                source_layer_object=layer_object_40km_rctbias,
+                cropping_layer_name='40km_rctbias_concat-cropping',
+                num_spatiotemporal_dims=3
+            )
+
+            this_name = '40km_rctbias_concat-with-finer'
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.Concatenate(
+                axis=-1, name=this_name
+            )(
+                [rctbias_encoder_pooling_layer_objects[i], this_layer_object]
+            )
 
         i = num_levels_filled
         if i == 0:
@@ -914,6 +1192,40 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(nwp_encoder_conv_layer_objects[i])
 
+        if use_recent_biases:
+            if i == 0:
+                this_input_layer_object = layer_object_40km_rctbias
+            else:
+                this_input_layer_object = rctbias_encoder_pooling_layer_objects[i - 1]
+
+            rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=this_input_layer_object,
+                do_residual=use_residual_blocks,
+                num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
+                filter_size_px=3,
+                num_filters=rctbias_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=True,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
+            )
+
+            this_name = 'rctbias_encoder_level{0:d}_pooling'.format(i)
+            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+                num_rows_in_window=rctbias_pooling_size_by_level_px[i],
+                num_columns_in_window=rctbias_pooling_size_by_level_px[i],
+                num_rows_per_stride=rctbias_pooling_size_by_level_px[i],
+                num_columns_per_stride=rctbias_pooling_size_by_level_px[i],
+                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+                layer_name=this_name
+            )
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+                this_pooling_layer_object, name=this_name
+            )(rctbias_encoder_conv_layer_objects[i])
+
         num_levels_filled += 1
 
     for i in range(num_levels_filled, num_levels + 1):
@@ -945,6 +1257,38 @@ def create_model(option_dict):
             nwp_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
                 this_pooling_layer_object, name=this_name
             )(nwp_encoder_conv_layer_objects[i])
+
+        if not use_recent_biases:
+            continue
+
+        rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=rctbias_encoder_pooling_layer_objects[i - 1],
+            do_residual=use_residual_blocks,
+            num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
+            filter_size_px=3,
+            num_filters=rctbias_encoder_num_channels_by_level[i],
+            do_time_distributed_conv=True,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
+        )
+
+        if i != num_levels:
+            this_name = 'rctbias_encoder_level{0:d}_pooling'.format(i)
+            this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
+                num_rows_in_window=rctbias_pooling_size_by_level_px[i],
+                num_columns_in_window=rctbias_pooling_size_by_level_px[i],
+                num_rows_per_stride=rctbias_pooling_size_by_level_px[i],
+                num_columns_per_stride=rctbias_pooling_size_by_level_px[i],
+                pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+                layer_name=this_name
+            )
+            rctbias_encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
+                this_pooling_layer_object, name=this_name
+            )(rctbias_encoder_conv_layer_objects[i])
 
     for i in range(num_levels + 1):
         this_name = 'nwp_fcst_level{0:d}_put-time-last'.format(i)
@@ -987,6 +1331,51 @@ def create_model(option_dict):
                 dropout_rates=nwp_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
                 basic_layer_name='nwp_fcst_level{0:d}'.format(i)
+            )
+
+        if not use_recent_biases:
+            continue
+
+        this_name = 'rctbias_fcst_level{0:d}_put-time-last'.format(i)
+        rctbias_fcst_module_layer_objects[i] = keras.layers.Permute(
+            dims=(2, 3, 1, 4), name=this_name
+        )(rctbias_encoder_conv_layer_objects[i])
+
+        if rctbias_forecast_module_use_3d_conv:
+            rctbias_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=rctbias_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=rctbias_forecast_module_num_conv_layers,
+                filter_size_px=1,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=rctbias_forecast_module_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='rctbias_fcst_level{0:d}'.format(i)
+            )
+        else:
+            orig_dims = rctbias_fcst_module_layer_objects[i].shape
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+
+            this_name = 'rctbias_fcst_level{0:d}_remove-time-dim'.format(i)
+            rctbias_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(rctbias_fcst_module_layer_objects[i])
+
+            rctbias_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=rctbias_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=rctbias_forecast_module_num_conv_layers,
+                filter_size_px=1,
+                num_filters=rctbias_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=rctbias_forecast_module_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='rctbias_fcst_level{0:d}'.format(i)
             )
 
     lagtgt_encoder_conv_layer_objects = [None] * (num_levels + 1)
@@ -1080,17 +1469,20 @@ def create_model(option_dict):
     )
 
     for i in range(num_levels + 1):
-        if num_lag_times == 0:
-            last_conv_layer_matrix[i, 0] = nwp_fcst_module_layer_objects[i]
+        these_layer_objects = [nwp_fcst_module_layer_objects[i]]
+        if use_recent_biases:
+            these_layer_objects.append(rctbias_fcst_module_layer_objects[i])
+        if num_lag_times > 0:
+            these_layer_objects.append(lagtgt_fcst_module_layer_objects[i])
+
+        if len(these_layer_objects) == 1:
+            last_conv_layer_matrix[i, 0] = these_layer_objects[0]
         else:
             this_name = 'fcst_level{0:d}_concat'.format(i)
 
             last_conv_layer_matrix[i, 0] = keras.layers.Concatenate(
                 axis=-1, name=this_name
-            )([
-                nwp_fcst_module_layer_objects[i],
-                lagtgt_fcst_module_layer_objects[i]
-            ])
+            )(these_layer_objects)
 
         i_new = i + 0
         j = 0
@@ -1383,10 +1775,12 @@ def create_model(option_dict):
 
     input_layer_objects = [
         l for l in [
-            input_layer_object_2pt5km_res,
-            input_layer_object_const, input_layer_object_lagged_targets,
-            input_layer_object_10km_res, input_layer_object_20km_res,
-            input_layer_object_40km_res, input_layer_object_predn_baseline
+            input_layer_object_2pt5km_res, input_layer_object_const,
+            input_layer_object_lagged_targets, input_layer_object_10km_res,
+            input_layer_object_20km_res, input_layer_object_40km_res,
+            input_layer_object_2pt5km_rctbias, input_layer_object_10km_rctbias,
+            input_layer_object_20km_rctbias, input_layer_object_40km_rctbias,
+            input_layer_object_predn_baseline
         ] if l is not None
     ]
 

@@ -57,6 +57,7 @@ def _run(template_file_name, output_dir_name,
          backup_nwp_model_name, backup_nwp_dir_name,
          target_lead_time_hours, target_field_names, target_lag_times_hours,
          target_normalization_file_name, targets_use_quantile_norm,
+         recent_bias_init_time_lags_hours, recent_bias_lead_times_hours,
          nbm_constant_field_names, nbm_constant_file_name,
          compare_to_baseline_in_loss, num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
@@ -93,6 +94,8 @@ def _run(template_file_name, output_dir_name,
     :param target_lag_times_hours: Same.
     :param target_normalization_file_name: Same.
     :param targets_use_quantile_norm: Same.
+    :param recent_bias_init_time_lags_hours: Same.
+    :param recent_bias_lead_times_hours: Same.
     :param nbm_constant_field_names: Same.
     :param nbm_constant_file_name: Same.
     :param compare_to_baseline_in_loss: Same.
@@ -149,6 +152,18 @@ def _run(template_file_name, output_dir_name,
     if len(target_lag_times_hours) == 1 and target_lag_times_hours[0] < 0:
         target_lag_times_hours = None
 
+    if (
+            len(recent_bias_init_time_lags_hours) == 1 and
+            recent_bias_init_time_lags_hours[0] < 0
+    ):
+        recent_bias_init_time_lags_hours = None
+
+    if (
+            len(recent_bias_lead_times_hours) == 1 and
+            recent_bias_lead_times_hours[0] < 0
+    ):
+        recent_bias_lead_times_hours = None
+
     nwp_model_to_training_dir_name = _process_nwp_directories(
         nwp_directory_names=nwp_dir_names_for_training,
         nwp_model_names=nwp_model_names
@@ -191,6 +206,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
+        neural_net.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
+        neural_net.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
         neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
         neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
         neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: compare_to_baseline_in_loss,
@@ -294,6 +311,20 @@ if __name__ == '__main__':
         targets_use_quantile_norm=bool(getattr(
             INPUT_ARG_OBJECT, training_args.TARGETS_USE_QUANTILE_NORM_ARG_NAME
         )),
+        recent_bias_init_time_lags_hours=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                training_args.RECENT_BIAS_LAG_TIMES_ARG_NAME
+            ),
+            dtype=int
+        ),
+        recent_bias_lead_times_hours=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                training_args.RECENT_BIAS_LEAD_TIMES_ARG_NAME
+            ),
+            dtype=int
+        ),
         nbm_constant_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.NBM_CONSTANT_FIELDS_ARG_NAME
         ),

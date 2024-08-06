@@ -15,6 +15,7 @@ from ml_for_national_blend.io import border_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import nbm_constant_utils
 from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import nwp_input
 from ml_for_national_blend.plotting import plotting_utils
 from ml_for_national_blend.scripts import test_generator_args
 
@@ -81,6 +82,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
          backup_nwp_model_name, backup_nwp_dir_name,
          target_lead_time_hours, target_field_names, target_lag_times_hours,
          target_normalization_file_name, targets_use_quantile_norm,
+         recent_bias_init_time_lags_hours, recent_bias_lead_times_hours,
          nbm_constant_field_names, nbm_constant_file_name,
          num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
@@ -109,6 +111,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
     :param target_lag_times_hours: Same.
     :param target_normalization_file_name: Same.
     :param targets_use_quantile_norm: Same.
+    :param recent_bias_init_time_lags_hours: Same.
+    :param recent_bias_lead_times_hours: Same.
     :param nbm_constant_field_names: Same.
     :param nbm_constant_file_name: Same.
     :param num_examples_per_batch: Same.
@@ -157,6 +161,18 @@ def _run(output_dir_name, nwp_lead_times_hours,
     assert nbm_constant_utils.LATITUDE_NAME in nbm_constant_field_names
     assert nbm_constant_utils.LONGITUDE_NAME in nbm_constant_field_names
 
+    if (
+            len(recent_bias_init_time_lags_hours) == 1 and
+            recent_bias_init_time_lags_hours[0] < 0
+    ):
+        recent_bias_init_time_lags_hours = None
+
+    if (
+            len(recent_bias_lead_times_hours) == 1 and
+            recent_bias_lead_times_hours[0] < 0
+    ):
+        recent_bias_lead_times_hours = None
+
     nwp_model_to_training_dir_name = _process_nwp_directories(
         nwp_directory_names=nwp_dir_names_for_training,
         nwp_model_names=nwp_model_names
@@ -187,6 +203,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
+        neural_net.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
+        neural_net.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
         neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
         neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
         neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: True,
@@ -203,27 +221,44 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
     }
 
+    use_recent_biases = not (
+        recent_bias_init_time_lags_hours is None
+        or recent_bias_lead_times_hours is None
+    )
+
+    if use_recent_biases:
+        nwp_model_to_target_names = nwp_input.nwp_models_to_target_fields(
+            nwp_model_names=nwp_model_names,
+            target_field_names=target_field_names
+        )
+    else:
+        nwp_model_to_target_names = dict()
+
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     if patch_overlap_size_2pt5km_pixels is None:
-        training_generator = neural_net.data_generator(training_option_dict)
+        training_generator = neural_net.data_generator(
+            option_dict=training_option_dict,
+            return_predictors_as_dict=True
+        )
     else:
         training_generator = neural_net.data_generator_fast_patches(
             option_dict=training_option_dict,
-            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+            patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+            return_predictors_as_dict=True
         )
 
     for _ in range(6):
-        predictor_matrices, target_matrix = next(training_generator)
+        predictor_matrix_dict, target_matrix = next(training_generator)
     target_matrix = target_matrix[0, ...]
 
     nwp_model_names = list(nwp_model_to_training_dir_name.keys())
     nwp_model_names.sort()
 
-    predictor_matrix_2pt5km = predictor_matrices[0][0, ...]
+    predictor_matrix_2pt5km = predictor_matrix_dict['2pt5km_inputs'][0, ...]
     predictor_matrix_2pt5km[predictor_matrix_2pt5km < -9000] = numpy.nan
 
-    nbm_constant_matrix = predictor_matrices[1][0, ...]
+    nbm_constant_matrix = predictor_matrix_dict['const_inputs'][0, ...]
     nbm_constant_matrix[nbm_constant_matrix < -9000] = numpy.nan
     lat_index = nbm_constant_field_names.index(nbm_constant_utils.LATITUDE_NAME)
     lng_index = nbm_constant_field_names.index(
@@ -409,13 +444,10 @@ def _run(output_dir_name, nwp_lead_times_hours,
         )
         pyplot.close(figure_object)
 
-    next_matrix_index = 2
-
     if target_lag_times_hours is not None:
         lagged_target_predictor_matrix = (
-            predictor_matrices[next_matrix_index][0, ...]
+            predictor_matrix_dict['lagtgt_inputs'][0, ...]
         )
-        next_matrix_index += 1
 
         for i in range(len(target_lag_times_hours)):
             for j in range(len(target_field_names)):
@@ -511,19 +543,123 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 )
                 pyplot.close(figure_object)
 
+    field_names_2pt5km = []
+    nwp_model_names_2pt5km = []
+    for this_model_name in nwp_model_names:
+        if nwp_model_utils.model_to_nbm_downsampling_factor(this_model_name) != 1:
+            continue
+        if not use_recent_biases:
+            continue
+
+        field_names_2pt5km += nwp_model_to_target_names[this_model_name]
+        nwp_model_names_2pt5km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
+
+    if len(field_names_2pt5km) > 0:
+        recent_bias_matrix_2pt5km = predictor_matrix_dict['2pt5km_rct_bias'][0, ...]
+
+        for i in range(recent_bias_init_time_lags_hours):
+            for j in range(len(field_names_2pt5km)):
+                this_data_matrix = recent_bias_matrix_2pt5km[..., i, j]
+                figure_object, axes_object = pyplot.subplots(
+                    1, 1, figsize=(15, 15)
+                )
+
+                colour_map_object = DIVERGING_COLOUR_MAP_OBJECT
+                max_colour_value = numpy.nanpercentile(
+                    numpy.absolute(this_data_matrix), 99.9
+                )
+                if numpy.isnan(max_colour_value):
+                    max_colour_value = TOLERANCE
+
+                max_colour_value = max([max_colour_value, TOLERANCE])
+                min_colour_value = -1 * max_colour_value
+
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
+                )
+                data_matrix_to_plot = this_data_matrix + 0.
+                data_matrix_to_plot = numpy.ma.masked_where(
+                    numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
+                )
+
+                axes_object.pcolor(
+                    longitude_matrix_deg_e, latitude_matrix_deg_n,
+                    data_matrix_to_plot,
+                    cmap=colour_map_object, norm=colour_norm_object,
+                    edgecolors='None', zorder=-1e11
+                )
+
+                gg_plotting_utils.plot_colour_bar(
+                    axes_object_or_matrix=axes_object,
+                    data_matrix=this_data_matrix,
+                    colour_map_object=colour_map_object,
+                    colour_norm_object=colour_norm_object,
+                    orientation_string='vertical',
+                    extend_min=True, extend_max=True
+                )
+
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
+                axes_object.set_xlim(
+                    numpy.min(longitude_matrix_deg_e),
+                    numpy.max(longitude_matrix_deg_e)
+                )
+                axes_object.set_ylim(
+                    numpy.min(latitude_matrix_deg_n),
+                    numpy.max(latitude_matrix_deg_n)
+                )
+
+                axes_object.set_title((
+                    'Bias in {0:s} {1:s} at {2:d}-hour lag time '
+                    'and {3:d}-hour lead time'
+                ).format(
+                    nwp_model_names_2pt5km[j],
+                    field_names_2pt5km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i]
+                ))
+
+                output_file_name = (
+                    '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
+                    '{4:s}.jpg'
+                ).format(
+                    output_dir_name,
+                    field_names_2pt5km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i],
+                    nwp_model_names_2pt5km[j].replace('_', '-')
+                )
+
+                print('Saving figure to: "{0:s}"...'.format(output_file_name))
+                figure_object.savefig(
+                    output_file_name, dpi=300, pad_inches=0, bbox_inches='tight'
+                )
+                pyplot.close(figure_object)
+
     field_names_10km = []
     nwp_model_names_10km = []
     for this_model_name in nwp_model_names:
-        if nwp_model_utils.model_to_nbm_downsampling_factor(this_model_name) != 4:
+        if nwp_model_utils.model_to_nbm_downsampling_factor(
+                this_model_name) != 4:
             continue
 
         field_names_10km += nwp_model_to_field_names[this_model_name]
         nwp_model_names_10km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_10km) > 0:
-        predictor_matrix_10km = predictor_matrices[next_matrix_index][0, ...]
-        next_matrix_index += 1
-
+        predictor_matrix_10km = predictor_matrix_dict['10km_inputs'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4]
 
@@ -623,6 +759,113 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 )
                 pyplot.close(figure_object)
 
+    field_names_10km = []
+    nwp_model_names_10km = []
+    for this_model_name in nwp_model_names:
+        if nwp_model_utils.model_to_nbm_downsampling_factor(this_model_name) != 4:
+            continue
+        if not use_recent_biases:
+            continue
+
+        field_names_10km += nwp_model_to_target_names[this_model_name]
+        nwp_model_names_10km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
+
+    if len(field_names_10km) > 0:
+        recent_bias_matrix_10km = predictor_matrix_dict['10km_rct_bias'][0, ...]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4]
+
+        for i in range(recent_bias_init_time_lags_hours):
+            for j in range(len(field_names_10km)):
+                this_data_matrix = recent_bias_matrix_10km[..., i, j]
+                figure_object, axes_object = pyplot.subplots(
+                    1, 1, figsize=(15, 15)
+                )
+
+                colour_map_object = DIVERGING_COLOUR_MAP_OBJECT
+                max_colour_value = numpy.nanpercentile(
+                    numpy.absolute(this_data_matrix), 99.9
+                )
+                if numpy.isnan(max_colour_value):
+                    max_colour_value = TOLERANCE
+
+                max_colour_value = max([max_colour_value, TOLERANCE])
+                min_colour_value = -1 * max_colour_value
+
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
+                )
+                data_matrix_to_plot = this_data_matrix + 0.
+                data_matrix_to_plot = numpy.ma.masked_where(
+                    numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
+                )
+
+                axes_object.pcolor(
+                    this_longitude_matrix_deg_e, this_latitude_matrix_deg_n,
+                    data_matrix_to_plot,
+                    cmap=colour_map_object, norm=colour_norm_object,
+                    edgecolors='None', zorder=-1e11
+                )
+
+                gg_plotting_utils.plot_colour_bar(
+                    axes_object_or_matrix=axes_object,
+                    data_matrix=this_data_matrix,
+                    colour_map_object=colour_map_object,
+                    colour_norm_object=colour_norm_object,
+                    orientation_string='vertical',
+                    extend_min=True, extend_max=True
+                )
+
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
+                axes_object.set_xlim(
+                    numpy.min(this_longitude_matrix_deg_e),
+                    numpy.max(this_longitude_matrix_deg_e)
+                )
+                axes_object.set_ylim(
+                    numpy.min(this_latitude_matrix_deg_n),
+                    numpy.max(this_latitude_matrix_deg_n)
+                )
+
+                axes_object.set_title((
+                    'Bias in {0:s} {1:s} at {2:d}-hour lag time '
+                    'and {3:d}-hour lead time'
+                ).format(
+                    nwp_model_names_10km[j],
+                    field_names_10km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i]
+                ))
+
+                output_file_name = (
+                    '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
+                    '{4:s}.jpg'
+                ).format(
+                    output_dir_name,
+                    field_names_10km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i],
+                    nwp_model_names_10km[j].replace('_', '-')
+                )
+
+                print('Saving figure to: "{0:s}"...'.format(output_file_name))
+                figure_object.savefig(
+                    output_file_name, dpi=300, pad_inches=0, bbox_inches='tight'
+                )
+                pyplot.close(figure_object)
+
     field_names_20km = []
     nwp_model_names_20km = []
     for this_model_name in nwp_model_names:
@@ -633,9 +876,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_20km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_20km) > 0:
-        predictor_matrix_20km = predictor_matrices[next_matrix_index][0, ...]
-        next_matrix_index += 1
-
+        predictor_matrix_20km = predictor_matrix_dict['20km_inputs'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8]
 
@@ -735,6 +976,113 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 )
                 pyplot.close(figure_object)
 
+    field_names_20km = []
+    nwp_model_names_20km = []
+    for this_model_name in nwp_model_names:
+        if nwp_model_utils.model_to_nbm_downsampling_factor(this_model_name) != 8:
+            continue
+        if not use_recent_biases:
+            continue
+
+        field_names_20km += nwp_model_to_target_names[this_model_name]
+        nwp_model_names_20km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
+
+    if len(field_names_20km) > 0:
+        recent_bias_matrix_20km = predictor_matrix_dict['20km_rct_bias'][0, ...]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8]
+
+        for i in range(recent_bias_init_time_lags_hours):
+            for j in range(len(field_names_20km)):
+                this_data_matrix = recent_bias_matrix_20km[..., i, j]
+                figure_object, axes_object = pyplot.subplots(
+                    1, 1, figsize=(15, 15)
+                )
+
+                colour_map_object = DIVERGING_COLOUR_MAP_OBJECT
+                max_colour_value = numpy.nanpercentile(
+                    numpy.absolute(this_data_matrix), 99.9
+                )
+                if numpy.isnan(max_colour_value):
+                    max_colour_value = TOLERANCE
+
+                max_colour_value = max([max_colour_value, TOLERANCE])
+                min_colour_value = -1 * max_colour_value
+
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
+                )
+                data_matrix_to_plot = this_data_matrix + 0.
+                data_matrix_to_plot = numpy.ma.masked_where(
+                    numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
+                )
+
+                axes_object.pcolor(
+                    this_longitude_matrix_deg_e, this_latitude_matrix_deg_n,
+                    data_matrix_to_plot,
+                    cmap=colour_map_object, norm=colour_norm_object,
+                    edgecolors='None', zorder=-1e11
+                )
+
+                gg_plotting_utils.plot_colour_bar(
+                    axes_object_or_matrix=axes_object,
+                    data_matrix=this_data_matrix,
+                    colour_map_object=colour_map_object,
+                    colour_norm_object=colour_norm_object,
+                    orientation_string='vertical',
+                    extend_min=True, extend_max=True
+                )
+
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
+                axes_object.set_xlim(
+                    numpy.min(this_longitude_matrix_deg_e),
+                    numpy.max(this_longitude_matrix_deg_e)
+                )
+                axes_object.set_ylim(
+                    numpy.min(this_latitude_matrix_deg_n),
+                    numpy.max(this_latitude_matrix_deg_n)
+                )
+
+                axes_object.set_title((
+                    'Bias in {0:s} {1:s} at {2:d}-hour lag time '
+                    'and {3:d}-hour lead time'
+                ).format(
+                    nwp_model_names_20km[j],
+                    field_names_20km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i]
+                ))
+
+                output_file_name = (
+                    '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
+                    '{4:s}.jpg'
+                ).format(
+                    output_dir_name,
+                    field_names_20km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i],
+                    nwp_model_names_20km[j].replace('_', '-')
+                )
+
+                print('Saving figure to: "{0:s}"...'.format(output_file_name))
+                figure_object.savefig(
+                    output_file_name, dpi=300, pad_inches=0, bbox_inches='tight'
+                )
+                pyplot.close(figure_object)
+
     field_names_40km = []
     nwp_model_names_40km = []
     for this_model_name in nwp_model_names:
@@ -745,9 +1093,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_40km += [this_model_name] * len(nwp_model_to_field_names[this_model_name])
 
     if len(field_names_40km) > 0:
-        predictor_matrix_40km = predictor_matrices[next_matrix_index][0, ...]
-        next_matrix_index += 1
-
+        predictor_matrix_40km = predictor_matrix_dict['40km_inputs'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16]
 
@@ -847,11 +1193,117 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 )
                 pyplot.close(figure_object)
 
+    field_names_40km = []
+    nwp_model_names_40km = []
+    for this_model_name in nwp_model_names:
+        if nwp_model_utils.model_to_nbm_downsampling_factor(this_model_name) != 16:
+            continue
+        if not use_recent_biases:
+            continue
+
+        field_names_40km += nwp_model_to_target_names[this_model_name]
+        nwp_model_names_40km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
+
+    if len(field_names_40km) > 0:
+        recent_bias_matrix_40km = predictor_matrix_dict['40km_rct_bias'][0, ...]
+        this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16]
+        this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16]
+
+        for i in range(recent_bias_init_time_lags_hours):
+            for j in range(len(field_names_40km)):
+                this_data_matrix = recent_bias_matrix_40km[..., i, j]
+                figure_object, axes_object = pyplot.subplots(
+                    1, 1, figsize=(15, 15)
+                )
+
+                colour_map_object = DIVERGING_COLOUR_MAP_OBJECT
+                max_colour_value = numpy.nanpercentile(
+                    numpy.absolute(this_data_matrix), 99.9
+                )
+                if numpy.isnan(max_colour_value):
+                    max_colour_value = TOLERANCE
+
+                max_colour_value = max([max_colour_value, TOLERANCE])
+                min_colour_value = -1 * max_colour_value
+
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
+                )
+                data_matrix_to_plot = this_data_matrix + 0.
+                data_matrix_to_plot = numpy.ma.masked_where(
+                    numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
+                )
+
+                axes_object.pcolor(
+                    this_longitude_matrix_deg_e, this_latitude_matrix_deg_n,
+                    data_matrix_to_plot,
+                    cmap=colour_map_object, norm=colour_norm_object,
+                    edgecolors='None', zorder=-1e11
+                )
+
+                gg_plotting_utils.plot_colour_bar(
+                    axes_object_or_matrix=axes_object,
+                    data_matrix=this_data_matrix,
+                    colour_map_object=colour_map_object,
+                    colour_norm_object=colour_norm_object,
+                    orientation_string='vertical',
+                    extend_min=True, extend_max=True
+                )
+
+                plotting_utils.plot_borders(
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    axes_object=axes_object,
+                    line_colour=numpy.full(3, 0.)
+                )
+                plotting_utils.plot_grid_lines(
+                    plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
+                    plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
+                    axes_object=axes_object,
+                    meridian_spacing_deg=20.,
+                    parallel_spacing_deg=10.
+                )
+
+                axes_object.set_xlim(
+                    numpy.min(this_longitude_matrix_deg_e),
+                    numpy.max(this_longitude_matrix_deg_e)
+                )
+                axes_object.set_ylim(
+                    numpy.min(this_latitude_matrix_deg_n),
+                    numpy.max(this_latitude_matrix_deg_n)
+                )
+
+                axes_object.set_title((
+                    'Bias in {0:s} {1:s} at {2:d}-hour lag time '
+                    'and {3:d}-hour lead time'
+                ).format(
+                    nwp_model_names_40km[j],
+                    field_names_40km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i]
+                ))
+
+                output_file_name = (
+                    '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
+                    '{4:s}.jpg'
+                ).format(
+                    output_dir_name,
+                    field_names_40km[j],
+                    recent_bias_init_time_lags_hours[i],
+                    recent_bias_lead_times_hours[i],
+                    nwp_model_names_40km[j].replace('_', '-')
+                )
+
+                print('Saving figure to: "{0:s}"...'.format(output_file_name))
+                figure_object.savefig(
+                    output_file_name, dpi=300, pad_inches=0, bbox_inches='tight'
+                )
+                pyplot.close(figure_object)
+
     if do_residual_prediction:
         predictor_matrix_resid_baseline = (
-            predictor_matrices[next_matrix_index][0, ...]
+            predictor_matrix_dict['resid_baseline_inputs'][0, ...]
         )
-        next_matrix_index += 1
 
         for j in range(len(target_field_names)):
             this_data_matrix = predictor_matrix_resid_baseline[..., j]
@@ -1233,6 +1685,20 @@ if __name__ == '__main__':
         targets_use_quantile_norm=bool(getattr(
             INPUT_ARG_OBJECT, test_generator_args.TARGETS_USE_QUANTILE_NORM_ARG_NAME
         )),
+        recent_bias_init_time_lags_hours=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                test_generator_args.RECENT_BIAS_LAG_TIMES_ARG_NAME
+            ),
+            dtype=int
+        ),
+        recent_bias_lead_times_hours=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                test_generator_args.RECENT_BIAS_LEAD_TIMES_ARG_NAME
+            ),
+            dtype=int
+        ),
         nbm_constant_field_names=getattr(
             INPUT_ARG_OBJECT, test_generator_args.NBM_CONSTANT_FIELDS_ARG_NAME
         ),
