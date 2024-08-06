@@ -62,13 +62,13 @@ METRIC_FUNCTION_STRINGS = [
     'custom_metrics.dual_weighted_mse(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=False, function_name="temp_dwmse_celsius3")'
 ]
 
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=25)
-OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.Nadam(gradient_accumulation_steps=25)'
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=5)
+OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.Nadam(gradient_accumulation_steps=5)'
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
 DEFAULT_OPTION_DICT = {
-    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([432, 432, 2], dtype=int),
+    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([432, 432, 4], dtype=int),
     # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([432, 432, 2, 22], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
