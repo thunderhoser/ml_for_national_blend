@@ -142,7 +142,7 @@ def _run():
                 [432, 432, LAG_TIME_COUNTS[j], 1], dtype=int
             )
             input_dims_2pt5km_rctbias = numpy.array(
-                [432, 432, NWP_LEAD_TIME_COUNTS[i], 3], dtype=int
+                [432, 432, LAG_TIME_COUNTS[j], 3], dtype=int
             )
 
             option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
