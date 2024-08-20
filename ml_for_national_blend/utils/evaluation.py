@@ -838,11 +838,13 @@ def confidence_interval_to_polygon(
 def read_inputs(prediction_file_names, target_field_names):
     """Reads inputs (predictions and targets) from many files.
 
-    :param prediction_file_names: 1-D list of paths to prediction files.  Each
-        file will be read by `prediction_io.read_file`.
+    P = number of files
+
+    :param prediction_file_names: length-F list of paths to prediction files.
+        Each file will be read by `prediction_io.read_file`.
     :param target_field_names: length-T list of field names desired.
-    :return: prediction_table_xarray: xarray table in format returned by
-        `prediction_io.read_file`.
+    :return: prediction_tables_xarray: length-F list of xarray tables in format
+        returned by `prediction_io.read_file`.
     """
 
     # TODO(thunderhoser): Put this in prediction_io.py.
@@ -858,6 +860,9 @@ def read_inputs(prediction_file_names, target_field_names):
         print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
         prediction_tables_xarray[i] = prediction_io.read_file(
             prediction_file_names[i]
+        )
+        prediction_tables_xarray[i] = prediction_io.take_ensemble_mean(
+            prediction_tables_xarray[i]
         )
         pt_i = prediction_tables_xarray[i]
 
@@ -876,21 +881,7 @@ def read_inputs(prediction_file_names, target_field_names):
         pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
         prediction_tables_xarray[i] = pt_i
 
-    # try:
-    #     return xarray.concat(
-    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
-    #         data_vars='all', coords='minimal', compat='identical', join='exact'
-    #     )
-    # except:
-    #     return xarray.concat(
-    #         prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
-    #         data_vars='all', coords='minimal', compat='identical'
-    #     )
-
-    return xarray.concat(
-        prediction_tables_xarray, dim=prediction_io.INIT_TIME_DIM,
-        data_vars='all', coords='minimal', compat='identical', join='exact'
-    )
+    return prediction_tables_xarray
 
 
 def get_scores_with_bootstrapping(
@@ -987,16 +978,24 @@ def get_scores_with_bootstrapping(
                 min_relia_bin_edge_by_target[j]
             )
 
-    prediction_table_xarray = read_inputs(
+    prediction_tables_xarray = read_inputs(
         prediction_file_names=prediction_file_names,
         target_field_names=target_field_names
     )
-    ptx = prediction_table_xarray
 
-    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
-    target_matrix = ptx[prediction_io.TARGET_KEY].values
-    model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
-    # prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
+    prediction_matrix = numpy.stack([
+        ptx[prediction_io.PREDICTION_KEY].values[..., 0]
+        for ptx in prediction_tables_xarray
+    ], axis=0)
+
+    target_matrix = numpy.stack([
+        ptx[prediction_io.TARGET_KEY].values
+        for ptx in prediction_tables_xarray
+    ], axis=0)
+
+    model_file_name = (
+        prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY]
+    )
 
     print('Reading mean (climo) values from: "{0:s}"...'.format(
         target_normalization_file_name
@@ -1184,9 +1183,15 @@ def get_scores_with_bootstrapping(
     main_data_dict.update(new_dict)
 
     if per_grid_cell:
-        ptx = prediction_table_xarray
-        latitude_matrix_deg_n = ptx[prediction_io.LATITUDE_KEY].values
-        longitude_matrix_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
+        latitude_matrix_deg_n = numpy.stack([
+            ptx[prediction_io.LATITUDE_KEY].values
+            for ptx in prediction_tables_xarray
+        ], axis=0)
+
+        longitude_matrix_deg_e = numpy.stack([
+            ptx[prediction_io.LONGITUDE_KEY].values
+            for ptx in prediction_tables_xarray
+        ], axis=0)
 
         latitude_diff_matrix_deg = (
             numpy.max(latitude_matrix_deg_n, axis=0) -

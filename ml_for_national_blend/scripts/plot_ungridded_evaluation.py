@@ -628,13 +628,10 @@ def _run(evaluation_file_names, target_normalization_file_name,
             )
             ptx = this_prediction_table_xarray
 
-            this_prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+            this_prediction_matrix = (
+                ptx[prediction_io.PREDICTION_KEY].values[..., 0]
+            )
             this_target_matrix = ptx[prediction_io.TARGET_KEY].values
-
-            if len(this_prediction_matrix.shape) > len(this_target_matrix.shape):
-                this_prediction_matrix = numpy.nanmean(
-                    this_prediction_matrix, axis=-1
-                )
 
             if error_matrix.size == 0:
                 error_matrix = numpy.full(

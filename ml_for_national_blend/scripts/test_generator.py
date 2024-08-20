@@ -555,9 +555,9 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_2pt5km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
 
     if len(field_names_2pt5km) > 0:
-        recent_bias_matrix_2pt5km = predictor_matrix_dict['2pt5km_rct_bias'][0, ...]
+        recent_bias_matrix_2pt5km = predictor_matrix_dict['2pt5km_rctbias'][0, ...]
 
-        for i in range(recent_bias_init_time_lags_hours):
+        for i in range(len(recent_bias_init_time_lags_hours)):
             for j in range(len(field_names_2pt5km)):
                 this_data_matrix = recent_bias_matrix_2pt5km[..., i, j]
                 figure_object, axes_object = pyplot.subplots(
@@ -771,11 +771,11 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_10km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
 
     if len(field_names_10km) > 0:
-        recent_bias_matrix_10km = predictor_matrix_dict['10km_rct_bias'][0, ...]
+        recent_bias_matrix_10km = predictor_matrix_dict['10km_rctbias'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::4, ::4]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::4, ::4]
 
-        for i in range(recent_bias_init_time_lags_hours):
+        for i in range(len(recent_bias_init_time_lags_hours)):
             for j in range(len(field_names_10km)):
                 this_data_matrix = recent_bias_matrix_10km[..., i, j]
                 figure_object, axes_object = pyplot.subplots(
@@ -988,11 +988,11 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_20km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
 
     if len(field_names_20km) > 0:
-        recent_bias_matrix_20km = predictor_matrix_dict['20km_rct_bias'][0, ...]
+        recent_bias_matrix_20km = predictor_matrix_dict['20km_rctbias'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::8, ::8]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::8, ::8]
 
-        for i in range(recent_bias_init_time_lags_hours):
+        for i in range(len(recent_bias_init_time_lags_hours)):
             for j in range(len(field_names_20km)):
                 this_data_matrix = recent_bias_matrix_20km[..., i, j]
                 figure_object, axes_object = pyplot.subplots(
@@ -1205,11 +1205,11 @@ def _run(output_dir_name, nwp_lead_times_hours,
         nwp_model_names_40km += [this_model_name] * len(nwp_model_to_target_names[this_model_name])
 
     if len(field_names_40km) > 0:
-        recent_bias_matrix_40km = predictor_matrix_dict['40km_rct_bias'][0, ...]
+        recent_bias_matrix_40km = predictor_matrix_dict['40km_rctbias'][0, ...]
         this_latitude_matrix_deg_n = latitude_matrix_deg_n[::16, ::16]
         this_longitude_matrix_deg_e = longitude_matrix_deg_e[::16, ::16]
 
-        for i in range(recent_bias_init_time_lags_hours):
+        for i in range(len(recent_bias_init_time_lags_hours)):
             for j in range(len(field_names_40km)):
                 this_data_matrix = recent_bias_matrix_40km[..., i, j]
                 figure_object, axes_object = pyplot.subplots(

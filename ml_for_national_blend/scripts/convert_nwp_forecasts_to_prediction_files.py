@@ -285,22 +285,20 @@ def _convert_nwp_forecasts_1init(
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.9,
         early_stopping_patience_epochs=100,
-        patch_overlap_fast_gen_2pt5km_pixels=None
+        patch_overlap_fast_gen_2pt5km_pixels=None,
+        chiu_net_architecture_dict=None,
+        chiu_net_pp_architecture_dict=None
     )
 
     print('Writing prediction file: "{0:s}"...'.format(output_file_name))
     prediction_io.write_file(
         netcdf_file_name=output_file_name,
-        target_matrix=numpy.expand_dims(target_matrix, axis=0),
-        prediction_matrix=numpy.expand_dims(prediction_matrix, axis=0),
-        latitude_matrix_deg_n=numpy.expand_dims(
-            nwp_latitude_matrix_deg_n, axis=0
-        ),
-        longitude_matrix_deg_e=numpy.expand_dims(
-            nwp_longitude_matrix_deg_e, axis=0
-        ),
+        target_matrix=target_matrix,
+        prediction_matrix=numpy.expand_dims(prediction_matrix, axis=-1),
+        latitude_matrix_deg_n=nwp_latitude_matrix_deg_n,
+        longitude_matrix_deg_e=nwp_longitude_matrix_deg_e,
         field_names=urma_field_names,
-        init_times_unix_sec=numpy.array([init_time_unix_sec], dtype=int),
+        init_time_unix_sec=init_time_unix_sec,
         model_file_name=dummy_model_file_name
     )
 

@@ -643,7 +643,7 @@ def _check_generator_args(option_dict):
             option_dict[RECENT_BIAS_LEAD_TIMES_KEY] -
             option_dict[RECENT_BIAS_LAG_TIMES_KEY]
         )
-        error_checking.assert_is_less_than_numpy_array(lookahead_times_hours, 0)
+        error_checking.assert_is_leq_numpy_array(lookahead_times_hours, 0)
 
     if (
             option_dict[NBM_CONSTANT_FILE_KEY] is None
@@ -1668,6 +1668,14 @@ def create_data_fast_patches(
         nwp_model_names=nwp_model_names
     )
 
+    # TODO(thunderhoser): This is a HACK.
+    if use_recent_biases:
+        good_indices = numpy.where(
+            numpy.mod(init_times_unix_sec, 24 * HOURS_TO_SECONDS) ==
+            18 * HOURS_TO_SECONDS
+        )[0]
+        init_times_unix_sec = init_times_unix_sec[good_indices]
+
     error_checking.assert_equals(len(init_times_unix_sec), 1)
     init_time_unix_sec = init_times_unix_sec[0]
 
@@ -2174,6 +2182,14 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         last_time_by_period_unix_sec=last_init_times_unix_sec,
         nwp_model_names=nwp_model_names
     )
+
+    # TODO(thunderhoser): This is a HACK.
+    if use_recent_biases:
+        good_indices = numpy.where(
+            numpy.mod(init_times_unix_sec, 24 * HOURS_TO_SECONDS) ==
+            18 * HOURS_TO_SECONDS
+        )[0]
+        init_times_unix_sec = init_times_unix_sec[good_indices]
 
     # Do actual stuff.
     if nbm_constant_file_name is None:
