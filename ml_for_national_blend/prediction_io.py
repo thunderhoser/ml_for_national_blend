@@ -23,11 +23,12 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
 DEFAULT_INIT_TIME_INTERVAL_SEC = 6 * HOURS_TO_SECONDS  # TODO(thunderhoser): This will change.
 
-INIT_TIME_DIM = 'init_time'
 ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
 FIELD_DIM = 'field'
 FIELD_CHAR_DIM = 'field_char'
+ENSEMBLE_MEMBER_DIM = 'ensemble_member'
+DUMMY_ENSEMBLE_MEMBER_DIM = 'dummy_ensemble_member'
 
 MODEL_FILE_KEY = 'model_file_name'
 INIT_TIME_KEY = 'init_time_unix_sec'
@@ -212,82 +213,117 @@ def read_file(netcdf_file_name):
     """
 
     prediction_table_xarray = xarray.open_dataset(netcdf_file_name)
+
     target_field_names = [
         f.decode('utf-8') for f in
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
-    init_times_unix_sec = numpy.round(
-        prediction_table_xarray[INIT_TIME_KEY].values
-    ).astype(int)
-
-    return prediction_table_xarray.assign({
+    prediction_table_xarray = prediction_table_xarray.assign({
         FIELD_NAME_KEY: (
             prediction_table_xarray[FIELD_NAME_KEY].dims,
             target_field_names
-        ),
-        INIT_TIME_KEY: (
-            prediction_table_xarray[INIT_TIME_KEY].dims,
-            init_times_unix_sec
         )
     })
+
+    if INIT_TIME_KEY not in prediction_table_xarray.data_vars:
+        return prediction_table_xarray
+
+    init_times_unix_sec = prediction_table_xarray[INIT_TIME_KEY].values
+    assert len(init_times_unix_sec) == 1
+
+    target_matrix = prediction_table_xarray[TARGET_KEY].values[0, ...]
+    prediction_matrix = numpy.expand_dims(
+        prediction_table_xarray[PREDICTION_KEY].values[0, ...],
+        axis=-1
+    )
+    latitude_matrix_deg_n = prediction_table_xarray[LATITUDE_KEY].values[0, ...]
+    longitude_matrix_deg_e = (
+        prediction_table_xarray[LONGITUDE_KEY].values[0, ...]
+    )
+
+    main_data_dict = {
+        TARGET_KEY: (
+            (ROW_DIM, COLUMN_DIM, FIELD_DIM),
+            target_matrix
+        ),
+        PREDICTION_KEY: (
+            (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM),
+            prediction_matrix
+        ),
+        LATITUDE_KEY: (
+            (ROW_DIM, COLUMN_DIM),
+            latitude_matrix_deg_n
+        ),
+        LONGITUDE_KEY: (
+            (ROW_DIM, COLUMN_DIM),
+            longitude_matrix_deg_e
+        ),
+        FIELD_NAME_KEY: (
+            (FIELD_DIM,),
+            target_field_names
+        )
+    }
+
+    attribute_dict = {
+        MODEL_FILE_KEY: prediction_table_xarray.attrs[MODEL_FILE_KEY],
+        INIT_TIME_KEY: init_times_unix_sec[0]
+    }
+
+    return xarray.Dataset(data_vars=main_data_dict, attrs=attribute_dict)
 
 
 def write_file(
         netcdf_file_name, target_matrix, prediction_matrix,
         latitude_matrix_deg_n, longitude_matrix_deg_e, field_names,
-        init_times_unix_sec, model_file_name):
+        init_time_unix_sec, model_file_name):
     """Writes predictions to NetCDF file.
 
-    T = number of initialization times
     M = number of rows in grid
     N = number of columns in grid
     F = number of target fields
+    S = number of ensemble members
 
     :param netcdf_file_name: Path to output file.
-    :param target_matrix: T-by-M-by-N-by-F numpy array of actual values.
-    :param prediction_matrix: T-by-M-by-N-by-F numpy array of predicted values.
-    :param latitude_matrix_deg_n: T-by-M-by-N numpy array of latitudes (deg
-        north).
-    :param longitude_matrix_deg_e: T-by-M-by-N numpy array of longitudes (deg
-        east).
+    :param target_matrix: M-by-N-by-F numpy array of actual values.
+    :param prediction_matrix: M-by-N-by-F-by-S numpy array of predicted values.
+    :param latitude_matrix_deg_n: M-by-N numpy array of latitudes (deg north).
+    :param longitude_matrix_deg_e: M-by-N numpy array of longitudes (deg east).
     :param field_names: length-F list of field names.
-    :param init_times_unix_sec: length-T numpy array of initialization times.
+    :param init_time_unix_sec: Initialization time.
     :param model_file_name: Path to file with trained model.
     """
 
     # Check input args.
+    error_checking.assert_is_integer(init_time_unix_sec)
     error_checking.assert_is_string(model_file_name)
 
-    error_checking.assert_is_numpy_array(target_matrix, num_dimensions=4)
+    error_checking.assert_is_numpy_array(target_matrix, num_dimensions=3)
     # error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
-    num_init_times = target_matrix.shape[0]
-    num_rows = target_matrix.shape[1]
-    num_columns = target_matrix.shape[2]
-    num_fields = target_matrix.shape[3]
+    num_rows = target_matrix.shape[0]
+    num_columns = target_matrix.shape[1]
+    num_fields = target_matrix.shape[2]
 
-    error_checking.assert_is_numpy_array(
-        init_times_unix_sec,
-        exact_dimensions=numpy.array([num_init_times], dtype=int)
+    error_checking.assert_is_numpy_array(prediction_matrix, num_dimensions=4)
+    ensemble_size = prediction_matrix.shape[3]
+    expected_dim = numpy.array(
+        [num_rows, num_columns, num_fields, ensemble_size], dtype=int
     )
-    error_checking.assert_is_integer_numpy_array(init_times_unix_sec)
-
     error_checking.assert_is_numpy_array(
-        prediction_matrix,
-        exact_dimensions=numpy.array(target_matrix.shape, dtype=int)
+        prediction_matrix, exact_dimensions=expected_dim
     )
     # error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
 
-    these_dims = numpy.array([num_init_times, num_rows, num_columns], dtype=int)
+    expected_dim = numpy.array([num_rows, num_columns], dtype=int)
     error_checking.assert_is_numpy_array(
-        latitude_matrix_deg_n, exact_dimensions=these_dims
+        latitude_matrix_deg_n, exact_dimensions=expected_dim
     )
     error_checking.assert_is_valid_lat_numpy_array(
         latitude_matrix_deg_n, allow_nan=False
     )
 
     error_checking.assert_is_numpy_array(
-        longitude_matrix_deg_e, exact_dimensions=these_dims
+        longitude_matrix_deg_e, exact_dimensions=expected_dim
     )
     longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
         longitude_matrix_deg_e, allow_nan=False
@@ -308,32 +344,26 @@ def write_file(
     num_field_chars = max([len(f) for f in field_names])
 
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
-    dataset_object.createDimension(INIT_TIME_DIM, num_init_times)
+    dataset_object.setncattr(INIT_TIME_KEY, init_time_unix_sec)
     dataset_object.createDimension(ROW_DIM, num_rows)
     dataset_object.createDimension(COLUMN_DIM, num_columns)
     dataset_object.createDimension(FIELD_DIM, num_fields)
     dataset_object.createDimension(FIELD_CHAR_DIM, num_field_chars)
+    dataset_object.createDimension(ENSEMBLE_MEMBER_DIM, ensemble_size)
 
-    these_dim = (INIT_TIME_DIM,)
-    dataset_object.createVariable(
-        INIT_TIME_KEY, datatype=numpy.float64, dimensions=these_dim
-    )
-    dataset_object.variables[INIT_TIME_KEY][:] = (
-        init_times_unix_sec.astype(float)
-    )
-
-    these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM, FIELD_DIM)
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
         TARGET_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[TARGET_KEY][:] = target_matrix
 
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM)
     dataset_object.createVariable(
         PREDICTION_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[PREDICTION_KEY][:] = prediction_matrix
 
-    these_dim = (INIT_TIME_DIM, ROW_DIM, COLUMN_DIM)
+    these_dim = (ROW_DIM, COLUMN_DIM)
     dataset_object.createVariable(
         LATITUDE_KEY, datatype=numpy.float64, dimensions=these_dim
     )
@@ -357,3 +387,37 @@ def write_file(
     )
 
     dataset_object.close()
+
+
+def take_ensemble_mean(prediction_table_xarray):
+    """Takes ensemble mean for each atomic example.
+
+    One atomic example = one init time, one valid time, one field, one pixel
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    :return: prediction_table_xarray: Same but with only one prediction (the
+        ensemble mean) per atomic example.
+    """
+
+    ptx = prediction_table_xarray
+    ensemble_size = len(ptx.coords[ENSEMBLE_MEMBER_DIM].values)
+    if ensemble_size == 1:
+        return ptx
+
+    ptx = ptx.assign_coords({
+        DUMMY_ENSEMBLE_MEMBER_DIM: numpy.array([0], dtype=int)
+    })
+
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, DUMMY_ENSEMBLE_MEMBER_DIM)
+
+    ptx = ptx.assign({
+        PREDICTION_KEY: (
+            these_dim,
+            numpy.mean(ptx[PREDICTION_KEY].values, axis=-1, keepdims=True)
+        )
+    })
+
+    ptx = ptx.rename({DUMMY_ENSEMBLE_MEMBER_DIM: ENSEMBLE_MEMBER_DIM})
+    prediction_table_xarray = ptx
+    return prediction_table_xarray

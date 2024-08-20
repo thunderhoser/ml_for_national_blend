@@ -292,7 +292,7 @@ def _check_colour_limit_args(
 
 
 def _plot_everything_1sample(
-        prediction_table_xarray, example_index, field_names, lead_time_hours,
+        prediction_table_xarray, field_names, lead_time_hours,
         baseline_nwp_model_name, baseline_nwp_model_dir_name,
         min_colour_values, max_colour_values,
         min_colour_percentiles, max_colour_percentiles,
@@ -306,8 +306,6 @@ def _plot_everything_1sample(
 
     :param prediction_table_xarray: xarray table in format returned by
         `prediction_io.read_file`.
-    :param example_index: Will plot the [i]th data sample, where
-        i = `example_index`.
     :param field_names: See documentation at top of this script.
     :param lead_time_hours: Lead time.
     :param baseline_nwp_model_name: See documentation at top of this script.
@@ -328,10 +326,9 @@ def _plot_everything_1sample(
     :param output_dir_name: Same.
     """
 
-    i = example_index
     ptx = prediction_table_xarray
 
-    init_time_unix_sec = ptx[prediction_io.INIT_TIME_KEY].values[i]
+    init_time_unix_sec = ptx.attrs[prediction_io.INIT_TIME_KEY]
     valid_time_unix_sec = (
         init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
     )
@@ -363,10 +360,10 @@ def _plot_everything_1sample(
             )
 
             patch_start_latitude_deg_n = (
-                ptx[prediction_io.LATITUDE_KEY].values[i, 0, 0]
+                ptx[prediction_io.LATITUDE_KEY].values[0, 0]
             )
             patch_start_longitude_deg_e = (
-                ptx[prediction_io.LONGITUDE_KEY].values[i, 0, 0]
+                ptx[prediction_io.LONGITUDE_KEY].values[0, 0]
             )
             patch_start_longitude_deg_e = (
                 lng_conversion.convert_lng_positive_in_west(
@@ -416,10 +413,10 @@ def _plot_everything_1sample(
         )[0][0]
 
         prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[i, ..., j_new]
+            ptx[prediction_io.PREDICTION_KEY].values[..., j_new, 0]
         )
         target_matrix = (
-            ptx[prediction_io.TARGET_KEY].values[i, ..., j_new]
+            ptx[prediction_io.TARGET_KEY].values[..., j_new]
         )
 
         title_string = 'Predicted {0:s}\nInit {1:s}, valid {2:s}'.format(
@@ -429,13 +426,12 @@ def _plot_everything_1sample(
         )
 
         output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_predicted.jpg'
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_predicted.jpg'
         ).format(
             output_dir_name,
             init_time_string,
             valid_time_string,
-            field_names[j].replace('_', '-'),
-            example_index
+            field_names[j].replace('_', '-')
         )
 
         if min_colour_values is None:
@@ -470,10 +466,8 @@ def _plot_everything_1sample(
 
         _plot_one_field(
             data_matrix=prediction_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -487,21 +481,18 @@ def _plot_everything_1sample(
         )
 
         output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_actual.jpg'
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_actual.jpg'
         ).format(
             output_dir_name,
             init_time_string,
             valid_time_string,
-            field_names[j].replace('_', '-'),
-            example_index
+            field_names[j].replace('_', '-')
         )
 
         _plot_one_field(
             data_matrix=target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -516,21 +507,18 @@ def _plot_everything_1sample(
             )
 
             output_file_name = (
-                '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_baseline.jpg'
+                '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline.jpg'
             ).format(
                 output_dir_name,
                 init_time_string,
                 valid_time_string,
-                field_names[j].replace('_', '-'),
-                example_index
+                field_names[j].replace('_', '-')
             )
 
             _plot_one_field(
                 data_matrix=baseline_prediction_matrix[..., j],
-                latitude_matrix_deg_n=
-                ptx[prediction_io.LATITUDE_KEY].values[i, ...],
-                longitude_matrix_deg_e=
-                ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+                latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+                longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
                 colour_map_object=colour_map_object,
@@ -577,21 +565,18 @@ def _plot_everything_1sample(
         )
 
         output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_error.jpg'
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_error.jpg'
         ).format(
             output_dir_name,
             init_time_string,
             valid_time_string,
-            field_names[j].replace('_', '-'),
-            example_index
+            field_names[j].replace('_', '-')
         )
 
         _plot_one_field(
             data_matrix=prediction_matrix - target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -608,22 +593,18 @@ def _plot_everything_1sample(
         )
 
         output_file_name = (
-            '{0:s}/init={1:s}_valid={2:s}_{3:s}_example{4:04d}_'
-            'baseline-error.jpg'
+            '{0:s}/init={1:s}_valid={2:s}_{3:s}_baseline-error.jpg'
         ).format(
             output_dir_name,
             init_time_string,
             valid_time_string,
-            field_names[j].replace('_', '-'),
-            example_index
+            field_names[j].replace('_', '-')
         )
 
         _plot_one_field(
             data_matrix=baseline_prediction_matrix[..., j] - target_matrix,
-            latitude_matrix_deg_n=
-            ptx[prediction_io.LATITUDE_KEY].values[i, ...],
-            longitude_matrix_deg_e=
-            ptx[prediction_io.LONGITUDE_KEY].values[i, ...],
+            latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             colour_map_object=colour_map_object,
@@ -724,6 +705,9 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
     print('Reading data from: "{0:s}"...'.format(prediction_file_name))
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
+    prediction_table_xarray = prediction_io.take_ensemble_mean(
+        prediction_table_xarray
+    )
     ptx = prediction_table_xarray
 
     model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
@@ -736,29 +720,25 @@ def _run(prediction_dir_name, init_time_string, field_names,
     training_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
     lead_time_hours = training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
 
-    num_examples = len(ptx.coords[prediction_io.INIT_TIME_DIM].values)
-
-    for i in range(num_examples):
-        _plot_everything_1sample(
-            prediction_table_xarray=prediction_table_xarray,
-            example_index=i,
-            field_names=field_names,
-            lead_time_hours=lead_time_hours,
-            baseline_nwp_model_name=baseline_nwp_model_name,
-            baseline_nwp_model_dir_name=baseline_nwp_model_dir_name,
-            min_colour_values=min_colour_values,
-            max_colour_values=max_colour_values,
-            min_colour_percentiles=min_colour_percentiles,
-            max_colour_percentiles=max_colour_percentiles,
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            plot_diffs=plot_diffs,
-            min_colour_values_for_diff=min_colour_values_for_diff,
-            max_colour_values_for_diff=max_colour_values_for_diff,
-            min_colour_percentiles_for_diff=min_colour_percentiles_for_diff,
-            max_colour_percentiles_for_diff=max_colour_percentiles_for_diff,
-            output_dir_name=output_dir_name
-        )
+    _plot_everything_1sample(
+        prediction_table_xarray=prediction_table_xarray,
+        field_names=field_names,
+        lead_time_hours=lead_time_hours,
+        baseline_nwp_model_name=baseline_nwp_model_name,
+        baseline_nwp_model_dir_name=baseline_nwp_model_dir_name,
+        min_colour_values=min_colour_values,
+        max_colour_values=max_colour_values,
+        min_colour_percentiles=min_colour_percentiles,
+        max_colour_percentiles=max_colour_percentiles,
+        border_latitudes_deg_n=border_latitudes_deg_n,
+        border_longitudes_deg_e=border_longitudes_deg_e,
+        plot_diffs=plot_diffs,
+        min_colour_values_for_diff=min_colour_values_for_diff,
+        max_colour_values_for_diff=max_colour_values_for_diff,
+        min_colour_percentiles_for_diff=min_colour_percentiles_for_diff,
+        max_colour_percentiles_for_diff=max_colour_percentiles_for_diff,
+        output_dir_name=output_dir_name
+    )
 
 
 if __name__ == '__main__':

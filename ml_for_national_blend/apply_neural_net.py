@@ -269,12 +269,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     print('Writing results to: "{0:s}"...'.format(output_file_name))
     prediction_io.write_file(
         netcdf_file_name=output_file_name,
-        target_matrix=target_matrix,
-        prediction_matrix=prediction_matrix,
-        latitude_matrix_deg_n=latitude_matrix_deg_n,
-        longitude_matrix_deg_e=longitude_matrix_deg_e,
+        target_matrix=target_matrix[0, ...],
+        prediction_matrix=numpy.expand_dims(prediction_matrix[0, ...], axis=-1),
+        latitude_matrix_deg_n=latitude_matrix_deg_n[0, ...],
+        longitude_matrix_deg_e=longitude_matrix_deg_e[0, ...],
         field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
-        init_times_unix_sec=init_times_unix_sec,
+        init_time_unix_sec=init_times_unix_sec[0],
         model_file_name=model_file_name
     )
 
