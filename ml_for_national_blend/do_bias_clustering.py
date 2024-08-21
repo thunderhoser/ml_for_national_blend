@@ -201,13 +201,13 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
     unique_ids = numpy.unique(cluster_id_matrix)
     random_colors = numpy.random.rand(len(unique_ids), 3)
     cmap = matplotlib.colors.ListedColormap(random_colors)
-    color_indices = numpy.searchsorted(unique_ids, cluster_id_matrix)
+    norm = matplotlib.colors.Normalize(vmin=cluster_id_matrix.min(), vmax=cluster_id_matrix.max())
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
     axes_object.imshow(
-        color_indices, origin='lower', cmap=cmap
+        cluster_id_matrix, origin='lower', cmap=cmap, norm=norm
     )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
