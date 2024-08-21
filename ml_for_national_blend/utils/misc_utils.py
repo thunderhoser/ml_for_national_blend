@@ -3,6 +3,7 @@
 import os
 import numpy
 from scipy.ndimage import distance_transform_edt
+from scipy.ndimage.morphology import binary_dilation
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import number_rounding
 from ml_for_national_blend.outside_code import file_system_utils
@@ -33,6 +34,27 @@ ROW_LIMITS_20KM_KEY = 'row_limits_20km'
 COLUMN_LIMITS_20KM_KEY = 'column_limits_20km'
 ROW_LIMITS_40KM_KEY = 'row_limits_40km'
 COLUMN_LIMITS_40KM_KEY = 'column_limits_40km'
+
+
+def _check_2d_binary_matrix(binary_matrix):
+    """Error-checks 2-D binary matrix.
+
+    :param binary_matrix: 2-D numpy array, containing either Boolean flags or
+        integers in 0...1.
+    :return: is_boolean: Boolean flag, indicating whether or not matrix is
+        Boolean.
+    """
+
+    error_checking.assert_is_numpy_array(binary_matrix, num_dimensions=2)
+
+    try:
+        error_checking.assert_is_boolean_numpy_array(binary_matrix)
+        return True
+    except TypeError:
+        error_checking.assert_is_integer_numpy_array(binary_matrix)
+        error_checking.assert_is_geq_numpy_array(binary_matrix, 0)
+        error_checking.assert_is_leq_numpy_array(binary_matrix, 1)
+        return False
 
 
 def untar_file(tar_file_name, target_dir_name, relative_paths_to_untar=None):
@@ -369,3 +391,47 @@ def fill_nans_by_nn_interp(data_matrix):
         numpy.isnan(data_matrix), return_distances=False, return_indices=True
     )
     return data_matrix[tuple(indices)]
+
+
+def get_structure_matrix(buffer_distance_px):
+    """Creates structure matrix for dilation or erosion.
+
+    :param buffer_distance_px: Buffer distance (number of pixels).
+    :return: structure_matrix: 2-D numpy array of Boolean flags.
+    """
+
+    error_checking.assert_is_geq(buffer_distance_px, 0.)
+
+    half_grid_size_px = int(numpy.ceil(buffer_distance_px))
+    pixel_offsets = numpy.linspace(
+        -half_grid_size_px, half_grid_size_px,
+        num=2 * half_grid_size_px + 1,
+        dtype=float
+    )
+
+    column_offset_matrix, row_offset_matrix = numpy.meshgrid(
+        pixel_offsets, pixel_offsets
+    )
+    distance_matrix_px = numpy.sqrt(
+        row_offset_matrix ** 2 + column_offset_matrix ** 2
+    )
+    return distance_matrix_px <= buffer_distance_px
+
+
+def dilate_binary_matrix(binary_matrix, buffer_distance_px):
+    """Dilates binary matrix.
+
+    :param binary_matrix: See doc for `check_2d_binary_matrix`.
+    :param buffer_distance_px: Buffer distance (pixels).
+    :return: dilated_binary_matrix: Dilated version of input.
+    """
+
+    _check_2d_binary_matrix(binary_matrix)
+    error_checking.assert_is_geq(buffer_distance_px, 0.)
+
+    structure_matrix = get_structure_matrix(buffer_distance_px)
+    dilated_binary_matrix = binary_dilation(
+        binary_matrix.astype(int), structure=structure_matrix, iterations=1,
+        border_value=0
+    )
+    return dilated_binary_matrix.astype(binary_matrix.dtype)
