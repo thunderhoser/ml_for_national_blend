@@ -266,7 +266,7 @@ def read_file(netcdf_file_name):
 
     attribute_dict = {
         MODEL_FILE_KEY: prediction_table_xarray.attrs[MODEL_FILE_KEY],
-        INIT_TIME_KEY: init_times_unix_sec[0]
+        INIT_TIME_KEY: int(numpy.round(init_times_unix_sec[0]))
     }
 
     return xarray.Dataset(data_vars=main_data_dict, attrs=attribute_dict)
