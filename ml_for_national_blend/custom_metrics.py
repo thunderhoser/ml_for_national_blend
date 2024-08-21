@@ -101,7 +101,7 @@ def max_prediction(
 
         if expect_ensemble:
             mask_weight_tensor = tensorflow.broadcast_to(
-                mask_weight_tensor, relevant_prediction_tensor.shape
+                mask_weight_tensor, tensorflow.shape(relevant_prediction_tensor)
             )
         else:
             mask_weight_tensor = mask_weight_tensor[..., 0]
@@ -268,7 +268,7 @@ def min_prediction(
         )
         if expect_ensemble:
             mask_weight_tensor = tensorflow.broadcast_to(
-                mask_weight_tensor, relevant_prediction_tensor.shape
+                mask_weight_tensor, tensorflow.shape(relevant_prediction_tensor)
             )
         else:
             mask_weight_tensor = mask_weight_tensor[..., 0]
