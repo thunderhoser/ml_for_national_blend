@@ -101,6 +101,14 @@ INPUT_ARG_PARSER.add_argument(
     '--' + DO_BACKWARDS_ARG_NAME, type=int, required=True,
     help=DO_BACKWARDS_HELP_STRING
 )
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAIN_OUTPUT_FILE_ARG_NAME, type=str, required=True,
+    help=MAIN_OUTPUT_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + OUTPUT_FIGURE_FILE_ARG_NAME, type=str, required=True,
+    help=OUTPUT_FIGURE_FILE_HELP_STRING
+)
 
 
 def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
