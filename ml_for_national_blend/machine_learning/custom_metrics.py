@@ -90,7 +90,12 @@ def max_prediction(
         relevant_prediction_tensor = (
             prediction_tensor[:, :, :, channel_index, ...]
         )
-        if not expect_ensemble:
+
+        if expect_ensemble:
+            mask_weight_tensor = tensorflow.broadcast_to(
+                mask_weight_tensor, relevant_prediction_tensor.shape
+            )
+        else:
             mask_weight_tensor = mask_weight_tensor[..., 0]
 
         relevant_prediction_tensor = tensorflow.boolean_mask(
@@ -253,7 +258,11 @@ def min_prediction(
         relevant_prediction_tensor = (
             prediction_tensor[:, :, :, channel_index, ...]
         )
-        if not expect_ensemble:
+        if expect_ensemble:
+            mask_weight_tensor = tensorflow.broadcast_to(
+                mask_weight_tensor, relevant_prediction_tensor.shape
+            )
+        else:
             mask_weight_tensor = mask_weight_tensor[..., 0]
 
         relevant_prediction_tensor = tensorflow.boolean_mask(
