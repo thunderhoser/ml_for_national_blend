@@ -122,7 +122,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert numpy.all(bin_indices < num_bins)
 
     bin_counts = numpy.array([
-        numpy.sum(pixel_counts(bin_indices == k))
+        numpy.sum(pixel_counts[bin_indices == k])
         for k in numpy.linspace(0, num_bins - 1, num=num_bins, dtype=int)
     ], dtype=int)
 
