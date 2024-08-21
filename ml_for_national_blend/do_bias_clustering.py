@@ -7,6 +7,7 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
+import matplotlib.colors
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -185,20 +186,28 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
     # ])
     # axes_object.imshow(colour_matrix, origin='lower')
 
-    unique_cluster_ids = numpy.unique(cluster_id_matrix)
-    random_colour_map_object = pyplot.cm.get_cmap('hsv', len(unique_cluster_ids))
-    colour_map_dict = {
-        cluster_id: i
-        for i, cluster_id in enumerate(unique_cluster_ids)
-    }
-    colour_index_matrix = numpy.vectorize(colour_map_dict.get)(cluster_id_matrix)
-    print(colour_index_matrix.shape)
+    # unique_cluster_ids = numpy.unique(cluster_id_matrix)
+    # random_colour_map_object = pyplot.cm.get_cmap('hsv', len(unique_cluster_ids))
+    # colour_map_dict = {
+    #     cluster_id: i
+    #     for i, cluster_id in enumerate(unique_cluster_ids)
+    # }
+    # colour_index_matrix = numpy.vectorize(colour_map_dict.get)(cluster_id_matrix)
+    # print(colour_index_matrix.shape)
+    # axes_object.imshow(
+    #     colour_index_matrix, origin='lower', cmap=random_colour_map_object
+    # )
+
+    unique_ids = numpy.unique(cluster_id_matrix)
+    random_colors = numpy.random.rand(len(unique_ids), 3)
+    cmap = matplotlib.colors.ListedColormap(random_colors)
+    norm = matplotlib.colors.BoundaryNorm(boundaries=numpy.arange(len(unique_ids)+1)-0.5, ncolors=len(unique_ids))
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
     axes_object.imshow(
-        colour_index_matrix, origin='lower', cmap=random_colour_map_object
+        cluster_id_matrix, origin='lower', cmap=cmap, norm=norm
     )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
