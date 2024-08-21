@@ -122,7 +122,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert numpy.all(bin_indices < num_bins)
 
     bin_counts = numpy.array([
-        numpy.sum(bin_indices == k)
+        numpy.sum(pixel_counts(bin_indices == k))
         for k in numpy.linspace(0, num_bins - 1, num=num_bins, dtype=int)
     ], dtype=int)
 
@@ -144,10 +144,12 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     )
 
     x_tick_labels = ['{0:.0f}'.format(c) for c in HISTOGRAM_BIN_CENTERS]
+    axes_object.set_xticks(x_tick_values)
     axes_object.set_xticklabels(x_tick_labels)
+    # axes_object.set_xlim([0, num_bins])
+
     axes_object.set_xlabel('Pixels in cluster')
-    axes_object.set_ylabel('Frequency')
-    axes_object.set_xlim([0, num_bins])
+    axes_object.set_ylabel('Fraction of pixels')
     axes_object.set_title(title_string)
 
     print('Saving figure to: "{0:s}"...'.format(histogram_file_name))
@@ -212,6 +214,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
         numpy.min(latitude_matrix_deg_n),
         numpy.max(latitude_matrix_deg_n)
     )
+    axes_object.set_title(title_string)
 
     print('Saving figure to: "{0:s}"...'.format(map_file_name))
     figure_object.savefig(
