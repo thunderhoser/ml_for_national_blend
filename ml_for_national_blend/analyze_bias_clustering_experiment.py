@@ -258,7 +258,6 @@ def _run(experiment_dir_name, output_dir_name):
                         'min-cluster-size-px={1:03d}_buffer-distance-px={2:d}_'
                         'do-backwards-clustering={3:d}'
                     ).format(
-                        experiment_dir_name,
                         BIAS_DISCRETIZATION_INTERVAL_INTERVALS_AXIS1[i],
                         MIN_CLUSTER_SIZES_PX_AXIS2[j],
                         BUFFER_DISTANCES_PX_AXIS3[k],
