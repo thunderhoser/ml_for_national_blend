@@ -172,21 +172,34 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
         field_names=[target_field_name]
     )
 
+    # This works in matplotlib version 3.1.3 but not 3.8.3.
+    # unique_cluster_ids = numpy.unique(cluster_id_matrix)
+    # random_colour_map_object = numpy.random.rand(len(unique_cluster_ids), 3)
+    # colour_map_dict = {
+    #     cluster_id: random_colour_map_object[i]
+    #     for i, cluster_id in enumerate(unique_cluster_ids)
+    # }
+    # colour_matrix = numpy.array([
+    #     [colour_map_dict[id] for id in row]
+    #     for row in cluster_id_matrix
+    # ])
+    # axes_object.imshow(colour_matrix, origin='lower')
+
     unique_cluster_ids = numpy.unique(cluster_id_matrix)
-    random_colours = numpy.random.rand(len(unique_cluster_ids), 3)
+    random_colour_map_object = pyplot.cm.get_cmap('hsv', len(unique_cluster_ids))
     colour_map_dict = {
-        cluster_id: random_colours[i]
+        cluster_id: i
         for i, cluster_id in enumerate(unique_cluster_ids)
     }
-    colour_matrix = numpy.array([
-        [colour_map_dict[id] for id in row]
-        for row in cluster_id_matrix
-    ])
+    colour_index_matrix = numpy.vectorize(colour_map_dict.get)(cluster_id_matrix)
+    print(colour_index_matrix.shape)
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
-    axes_object.imshow(colour_matrix, origin='lower')
+    axes_object.imshow(
+        colour_index_matrix, origin='lower', cmap=random_colour_map_object
+    )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
     grid_latitude_matrix_deg_n = getx[evaluation.LATITUDE_KEY].values
