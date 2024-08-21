@@ -65,7 +65,7 @@ OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.Nadam(gradient_accumulation_steps=
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
-DEFAULT_OPTION_DICT = {
+DEFAULT_OPTION_DICT =
     chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([432, 432, 4], dtype=int),
     # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([432, 432, 2, 22], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
