@@ -206,8 +206,20 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
-    axes_object.imshow(
-        cluster_id_matrix, origin='lower', cmap=cmap, norm=norm
+    # axes_object.imshow(
+    #     cluster_id_matrix, origin='lower', cmap=cmap, norm=norm
+    # )
+
+    import target_plotting
+
+    target_plotting.plot_field(
+        data_matrix=cluster_id_matrix,
+        latitude_matrix_deg_n=getx[evaluation.LATITUDE_KEY].values,
+        longitude_matrix_deg_e=getx[evaluation.LONGITUDE_KEY].values,
+        colour_map_object=cmap,
+        colour_norm_object=norm,
+        axes_object=axes_object,
+        plot_colour_bar=False
     )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
