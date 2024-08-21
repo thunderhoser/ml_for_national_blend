@@ -102,7 +102,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert len(ctx.coords[bias_clustering.FIELD_DIM].values) == 1
 
     _, pixel_counts = numpy.unique(
-        ctx[bias_clustering.CLUSTER_ID_KEY].values, return_counts=True
+        ctx[bias_clustering.CLUSTER_ID_KEY].values[..., 0], return_counts=True
     )
 
     histogram_bin_edges = (
@@ -163,7 +163,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
         output_size_pixels=PANEL_SIZE_PX
     )
 
-    cluster_id_matrix = ctx[bias_clustering.CLUSTER_ID_KEY].values
+    cluster_id_matrix = ctx[bias_clustering.CLUSTER_ID_KEY].values[..., 0]
     latitude_matrix_deg_n = ctx[bias_clustering.LATITUDE_KEY].values
     longitude_matrix_deg_e = ctx[bias_clustering.LONGITUDE_KEY].values
 
