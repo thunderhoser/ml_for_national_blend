@@ -43,8 +43,8 @@ LOSS_FUNCTION_STRING = (
 )
 
 METRIC_FUNCTIONS = [
-    custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_max_prediction_celsius'),
-    custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_min_prediction_celsius'),
+    # custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_max_prediction_celsius'),
+    # custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_min_prediction_celsius'),
     custom_metrics.spatial_max_bias(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_spatial_max_bias'),
     custom_metrics.spatial_min_bias(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_spatial_min_bias'),
     custom_metrics.mean_squared_error(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name='temp_mse_celsius2'),
@@ -52,8 +52,8 @@ METRIC_FUNCTIONS = [
 ]
 
 METRIC_FUNCTION_STRINGS = [
-    'custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_max_prediction_celsius")',
-    'custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_min_prediction_celsius")',
+    # 'custom_metrics.max_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_max_prediction_celsius")',
+    # 'custom_metrics.min_prediction(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_min_prediction_celsius")',
     'custom_metrics.spatial_max_bias(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_spatial_max_bias")',
     'custom_metrics.spatial_min_bias(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_spatial_min_bias")',
     'custom_metrics.mean_squared_error(channel_index=0, temperature_index=0, u_wind_index=-1, v_wind_index=-1, dewpoint_index=-1, gust_index=-1, expect_ensemble=True, function_name="temp_mse_celsius2")',
@@ -112,7 +112,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-7,
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 50,
+    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
     chiu_net_pp_arch.NUM_OUTPUT_CHANNELS_KEY: 1,
     chiu_net_pp_arch.PREDICT_GUST_FACTOR_KEY: False,
     chiu_net_pp_arch.PREDICT_DEWPOINT_DEPRESSION_KEY: False,
