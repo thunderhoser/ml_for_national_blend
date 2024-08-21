@@ -94,7 +94,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert len(ctx.coords[bias_clustering.FIELD_DIM].values) == 1
 
     _, pixel_counts = numpy.unique(
-        ctx[bias_clustering.CLUSTER_ID_KEY].values, return_counts=True
+        ctx[bias_clustering.CLUSTER_ID_KEY].values[..., 0], return_counts=True
     )
 
     histogram_bin_edges = (
@@ -114,7 +114,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert numpy.all(bin_indices < num_bins)
 
     bin_counts = numpy.array([
-        numpy.sum(bin_indices == k)
+        numpy.sum(pixel_counts(bin_indices == k))
         for k in numpy.linspace(0, num_bins - 1, num=num_bins, dtype=int)
     ], dtype=int)
 
@@ -136,10 +136,12 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     )
 
     x_tick_labels = ['{0:.0f}'.format(c) for c in HISTOGRAM_BIN_CENTERS]
+    axes_object.set_xticks(x_tick_values)
     axes_object.set_xticklabels(x_tick_labels)
+    # axes_object.set_xlim([0, num_bins])
+
     axes_object.set_xlabel('Pixels in cluster')
-    axes_object.set_ylabel('Frequency')
-    axes_object.set_xlim([0, num_bins])
+    axes_object.set_ylabel('Fraction of pixels')
     axes_object.set_title(title_string)
 
     print('Saving figure to: "{0:s}"...'.format(histogram_file_name))
@@ -155,7 +157,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
         output_size_pixels=PANEL_SIZE_PX
     )
 
-    cluster_id_matrix = ctx[bias_clustering.CLUSTER_ID_KEY].values
+    cluster_id_matrix = ctx[bias_clustering.CLUSTER_ID_KEY].values[..., 0]
     latitude_matrix_deg_n = ctx[bias_clustering.LATITUDE_KEY].values
     longitude_matrix_deg_e = ctx[bias_clustering.LONGITUDE_KEY].values
 
@@ -204,6 +206,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
         numpy.min(latitude_matrix_deg_n),
         numpy.max(latitude_matrix_deg_n)
     )
+    axes_object.set_title(title_string)
 
     print('Saving figure to: "{0:s}"...'.format(map_file_name))
     figure_object.savefig(
@@ -250,7 +253,6 @@ def _run(experiment_dir_name, output_dir_name):
                         'min-cluster-size-px={1:03d}_buffer-distance-px={2:d}_'
                         'do-backwards-clustering={3:d}'
                     ).format(
-                        experiment_dir_name,
                         BIAS_DISCRETIZATION_INTERVAL_INTERVALS_AXIS1[i],
                         MIN_CLUSTER_SIZES_PX_AXIS2[j],
                         BUFFER_DISTANCES_PX_AXIS3[k],
