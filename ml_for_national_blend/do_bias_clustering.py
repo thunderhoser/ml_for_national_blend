@@ -136,10 +136,6 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
     gridded_eval_table_xarray = evaluation.read_file(gridded_eval_file_arg_name)
     getx = gridded_eval_table_xarray
 
-    # TODO(thunderhoser): This is a HACK!!!
-    getx = getx.isel({evaluation.ROW_DIM: numpy.linspace(0, 999, num=1000, dtype=int)})
-    getx = getx.isel({evaluation.COLUMN_DIM: numpy.linspace(0, 999, num=1000, dtype=int)})
-
     field_index = numpy.where(
         getx.coords[evaluation.FIELD_DIM].values == target_field_name
     )[0][0]
