@@ -5,11 +5,13 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
+import matplotlib.colors
 from gewittergefahr.gg_utils import file_system_utils
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.utils import evaluation
 from ml_for_national_blend.utils import bias_clustering
 from ml_for_national_blend.plotting import plotting_utils
+from ml_for_national_blend.plotting import target_plotting
 
 # TODO(thunderhoser): Allow multiple target fields.
 
@@ -93,6 +95,14 @@ INPUT_ARG_PARSER.add_argument(
     '--' + DO_BACKWARDS_ARG_NAME, type=int, required=True,
     help=DO_BACKWARDS_HELP_STRING
 )
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAIN_OUTPUT_FILE_ARG_NAME, type=str, required=True,
+    help=MAIN_OUTPUT_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + OUTPUT_FIGURE_FILE_ARG_NAME, type=str, required=True,
+    help=OUTPUT_FIGURE_FILE_HELP_STRING
+)
 
 
 def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
@@ -154,19 +164,24 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
 
     unique_cluster_ids = numpy.unique(cluster_id_matrix)
     random_colours = numpy.random.rand(len(unique_cluster_ids), 3)
-    colour_map_dict = {
-        cluster_id: random_colours[i]
-        for i, cluster_id in enumerate(unique_cluster_ids)
-    }
-    colour_matrix = numpy.array([
-        [colour_map_dict[id] for id in row]
-        for row in cluster_id_matrix
-    ])
+    colour_map_object = matplotlib.colors.ListedColormap(random_colours)
+    colour_norm_object = matplotlib.colors.Normalize(
+        vmin=numpy.min(cluster_id_matrix),
+        vmax=numpy.max(cluster_id_matrix)
+    )
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
-    axes_object.imshow(colour_matrix, origin='lower')
+    target_plotting.plot_field(
+        data_matrix=cluster_id_matrix,
+        latitude_matrix_deg_n=getx[evaluation.LATITUDE_KEY].values,
+        longitude_matrix_deg_e=getx[evaluation.LONGITUDE_KEY].values,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        axes_object=axes_object,
+        plot_colour_bar=False
+    )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
     grid_latitude_matrix_deg_n = getx[evaluation.LATITUDE_KEY].values

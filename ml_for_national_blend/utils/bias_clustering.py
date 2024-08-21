@@ -474,7 +474,7 @@ def write_file(
 
     these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
-        CLUSTER_ID_KEY, datatype=numpy.int64, dimensions=these_dim
+        CLUSTER_ID_KEY, datatype=numpy.int32, dimensions=these_dim
     )
     dataset_object.variables[CLUSTER_ID_KEY][:] = cluster_id_matrix
 

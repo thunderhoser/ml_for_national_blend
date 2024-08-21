@@ -416,7 +416,6 @@ def dual_weighted_msess(
                 gust_index=gust_index
             )
 
-
         num_target_fields = __get_num_target_fields(
             prediction_tensor=prediction_tensor,
             expect_ensemble=expect_ensemble
@@ -503,6 +502,231 @@ def dual_weighted_msess(
 
         # Return negative skill score.
         return (actual_dwmse - baseline_dwmse) / baseline_dwmse
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dual_weighted_crpss(
+        channel_weights, u_wind_index, v_wind_index, gust_index,
+        temperature_index, dewpoint_index, function_name,
+        dual_weight_exponent=1., test_mode=False):
+    """Creates dual-weighted-CRPSS loss function.
+
+    :param channel_weights: See documentation for `dual_weighted_mse`.
+    :param u_wind_index: Same.
+    :param v_wind_index: Same.
+    :param gust_index: Same.
+    :param temperature_index: Same.
+    :param dewpoint_index: Same.
+    :param function_name: Same.
+    :param dual_weight_exponent: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    check_index_args(
+        u_wind_index=u_wind_index,
+        v_wind_index=v_wind_index,
+        gust_index=gust_index,
+        temperature_index=temperature_index,
+        dewpoint_index=dewpoint_index
+    )
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_geq(dual_weight_exponent, 1.)
+    error_checking.assert_is_boolean(test_mode)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (dual-weighted CRPSS).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: scalar_dual_weighted_crpss: Dual-weighted CRPSS (a scalar
+            value).
+        """
+
+        if dewpoint_index >= 0 and temperature_index >= 0:
+            prediction_tensor = process_dewpoint_predictions(
+                prediction_tensor=prediction_tensor,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+
+        if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
+            prediction_tensor = process_gust_predictions(
+                prediction_tensor=prediction_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                gust_index=gust_index
+            )
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        relevant_target_tensor = target_tensor[..., :num_target_fields]
+        relevant_baseline_prediction_tensor = (
+            target_tensor[..., num_target_fields:-1]
+        )
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+
+        # Ensure compatible tensor shapes.
+        relevant_target_tensor = K.expand_dims(relevant_target_tensor, axis=-1)
+        relevant_baseline_prediction_tensor = K.expand_dims(
+            relevant_baseline_prediction_tensor, axis=-1
+        )
+        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
+
+        # Create dual-weight tensor.
+        dual_weight_tensor = K.pow(
+            K.maximum(K.abs(relevant_target_tensor), K.abs(prediction_tensor)),
+            dual_weight_exponent
+        )
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+
+        # Create channel-weight tensor.
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+
+        # Compute dual-weighted CRPS.
+        absolute_error_tensor = K.abs(
+            prediction_tensor - relevant_target_tensor
+        )
+        mean_prediction_error_tensor = K.mean(
+            dual_weight_tensor * absolute_error_tensor, axis=-1
+        )
+
+        prediction_tensor = tensorflow.transpose(
+            prediction_tensor, perm=[1, 0, 2, 3, 4]
+        )
+
+        def compute_mapd_1row(prediction_tensor_1row, dual_weight_exponent):
+            """Computes MAPD for one grid row.
+
+            MAPD = mean absolute pairwise difference
+
+            :param prediction_tensor_1row: E-by-N-by-T-by-S tensor of
+                predictions.
+            :param dual_weight_exponent: See documentation for
+                `dual_weighted_mse`.
+            :return: mapd_tensor_1row: E-by-N-by-T tensor of mean absolute
+                pairwise differences.
+            """
+
+            pt1row = prediction_tensor_1row
+
+            return K.mean(
+                K.pow(
+                    K.maximum(
+                        K.abs(K.expand_dims(pt1row, axis=-1)),
+                        K.abs(K.expand_dims(pt1row, axis=-2))
+                    ),
+                    dual_weight_exponent
+                ) *
+                K.abs(
+                    K.expand_dims(pt1row, axis=-1) -
+                    K.expand_dims(pt1row, axis=-2)
+                ),
+                axis=(-2, -1)
+            )
+
+        def loop_body(i, mapd_tensor):
+            """Body of while-loop for computing MAPD.
+
+            This method is run once for every iteration through the while-loop,
+            i.e., once for every grid row.
+
+            :param i: Index of current grid row.
+            :param mapd_tensor: M-by-E-by-N-by-T tensor of MAPD values, which
+                this method will update.
+            :return: i_new: Index of next grid row.
+            :return: mapd_tensor: Updated version of input.
+            """
+
+            this_mapd_tensor = compute_mapd_1row(
+                prediction_tensor_1row=prediction_tensor[i, ...],
+                dual_weight_exponent=dual_weight_exponent
+            )
+
+            mapd_tensor = mapd_tensor.write(i, this_mapd_tensor)
+            return i + 1, mapd_tensor
+
+        mapd_tensor = tensorflow.TensorArray(
+            size=prediction_tensor.shape[0],
+            dtype=tensorflow.float32
+        )
+
+        i = tensorflow.constant(0)
+        condition = lambda i, mapd_tensor: tensorflow.less(
+            i, prediction_tensor.shape[0]
+        )
+
+        _, mapd_tensor = tensorflow.while_loop(
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=prediction_tensor.shape[0],
+            # parallel_iterations=1,
+            # swap_memory=True
+        )
+        mapd_tensor = mapd_tensor.stack()
+
+        mapd_tensor = tensorflow.transpose(
+            mapd_tensor, perm=[1, 0, 2, 3]
+        )
+        error_tensor = channel_weight_tensor * (
+            mean_prediction_error_tensor -
+            0.5 * mapd_tensor
+        )
+        actual_dwcrps = (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        # Create dual-weight tensor for baseline.
+        dual_weight_tensor = K.pow(
+            K.maximum(
+                K.abs(relevant_target_tensor),
+                K.abs(relevant_baseline_prediction_tensor)
+            ),
+            dual_weight_exponent
+        )
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+
+        # Compute dual-weighted CRPSS for baseline.
+        absolute_error_tensor = K.abs(
+            relevant_baseline_prediction_tensor - relevant_target_tensor
+        )
+        mean_prediction_error_tensor = K.mean(
+            dual_weight_tensor * absolute_error_tensor, axis=-1
+        )
+        error_tensor = channel_weight_tensor * mean_prediction_error_tensor
+
+        nan_mask_tensor = tf_math.is_finite(error_tensor)
+        error_tensor = tensorflow.where(
+            nan_mask_tensor, error_tensor, tensorflow.zeros_like(error_tensor)
+        )
+        mask_weight_tensor = mask_weight_tensor * K.ones_like(error_tensor)
+        mask_weight_tensor = tensorflow.where(
+            nan_mask_tensor,
+            mask_weight_tensor, tensorflow.zeros_like(mask_weight_tensor)
+        )
+
+        baseline_dwcrps = (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        # Return negative skill score.
+        return (actual_dwcrps - baseline_dwcrps) / baseline_dwcrps
 
     loss.__name__ = function_name
     return loss
