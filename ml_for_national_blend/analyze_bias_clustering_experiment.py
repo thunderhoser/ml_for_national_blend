@@ -128,6 +128,14 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
 
     bin_frequencies = bin_counts.astype(float) / numpy.sum(bin_counts)
 
+    k = numpy.argmin(numpy.absolute(HISTOGRAM_BIN_CENTERS - 10))
+    fraction_of_px_in_small_cluster = numpy.sum(bin_frequencies[:(k + 1)])
+    print((
+        'Fraction of pixels in cluster with 10 pixels or less = {0:.4f}'
+    ).format(
+        fraction_of_px_in_small_cluster
+    ))
+
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
@@ -145,7 +153,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
 
     x_tick_labels = ['{0:.0f}'.format(c) for c in HISTOGRAM_BIN_CENTERS]
     axes_object.set_xticks(x_tick_values)
-    axes_object.set_xticklabels(x_tick_labels)
+    axes_object.set_xticklabels(x_tick_labels, fontsize=20, rotation=90)
     # axes_object.set_xlim([0, num_bins])
 
     axes_object.set_xlabel('Pixels in cluster')
