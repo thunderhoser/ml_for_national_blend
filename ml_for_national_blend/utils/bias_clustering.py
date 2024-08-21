@@ -508,7 +508,7 @@ def read_file(netcdf_file_name):
     """Reads predictions from NetCDF file.
 
     :param netcdf_file_name: Path to input file.
-    :return: prediction_table_xarray: xarray table.  Documentation in the xarray
+    :return: cluster_table_xarray: xarray table.  Documentation in the xarray
         table should make values self-explanatory.
     """
 
