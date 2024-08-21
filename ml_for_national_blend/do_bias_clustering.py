@@ -19,6 +19,7 @@ import border_io
 import evaluation
 import bias_clustering
 import plotting_utils
+import target_plotting
 
 # TODO(thunderhoser): Allow multiple target fields.
 
@@ -173,51 +174,23 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
         field_names=[target_field_name]
     )
 
-    # This works in matplotlib version 3.1.3 but not 3.8.3.
-    # unique_cluster_ids = numpy.unique(cluster_id_matrix)
-    # random_colour_map_object = numpy.random.rand(len(unique_cluster_ids), 3)
-    # colour_map_dict = {
-    #     cluster_id: random_colour_map_object[i]
-    #     for i, cluster_id in enumerate(unique_cluster_ids)
-    # }
-    # colour_matrix = numpy.array([
-    #     [colour_map_dict[id] for id in row]
-    #     for row in cluster_id_matrix
-    # ])
-    # axes_object.imshow(colour_matrix, origin='lower')
-
-    # unique_cluster_ids = numpy.unique(cluster_id_matrix)
-    # random_colour_map_object = pyplot.cm.get_cmap('hsv', len(unique_cluster_ids))
-    # colour_map_dict = {
-    #     cluster_id: i
-    #     for i, cluster_id in enumerate(unique_cluster_ids)
-    # }
-    # colour_index_matrix = numpy.vectorize(colour_map_dict.get)(cluster_id_matrix)
-    # print(colour_index_matrix.shape)
-    # axes_object.imshow(
-    #     colour_index_matrix, origin='lower', cmap=random_colour_map_object
-    # )
-
-    unique_ids = numpy.unique(cluster_id_matrix)
-    random_colors = numpy.random.rand(len(unique_ids), 3)
-    cmap = matplotlib.colors.ListedColormap(random_colors)
-    norm = matplotlib.colors.Normalize(vmin=cluster_id_matrix.min(), vmax=cluster_id_matrix.max())
+    unique_cluster_ids = numpy.unique(cluster_id_matrix)
+    random_colours = numpy.random.rand(len(unique_cluster_ids), 3)
+    colour_map_object = matplotlib.colors.ListedColormap(random_colours)
+    colour_norm_object = matplotlib.colors.Normalize(
+        vmin=numpy.min(cluster_id_matrix),
+        vmax=numpy.max(cluster_id_matrix)
+    )
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
-    # axes_object.imshow(
-    #     cluster_id_matrix, origin='lower', cmap=cmap, norm=norm
-    # )
-
-    import target_plotting
-
     target_plotting.plot_field(
         data_matrix=cluster_id_matrix,
         latitude_matrix_deg_n=getx[evaluation.LATITUDE_KEY].values,
         longitude_matrix_deg_e=getx[evaluation.LONGITUDE_KEY].values,
-        colour_map_object=cmap,
-        colour_norm_object=norm,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
         axes_object=axes_object,
         plot_colour_bar=False
     )
