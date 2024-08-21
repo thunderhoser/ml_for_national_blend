@@ -556,6 +556,7 @@ def dual_weighted_crpss(
             value).
         """
 
+        # E x M x N x T x S
         if dewpoint_index >= 0 and temperature_index >= 0:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
@@ -563,6 +564,7 @@ def dual_weighted_crpss(
                 dewpoint_index=dewpoint_index
             )
 
+        # E x M x N x T x S
         if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
             prediction_tensor = process_gust_predictions(
                 prediction_tensor=prediction_tensor,
@@ -577,41 +579,41 @@ def dual_weighted_crpss(
         )
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        relevant_target_tensor = target_tensor[..., :num_target_fields]
+        relevant_target_tensor = target_tensor[..., :num_target_fields]  # E x M x N x T
         relevant_baseline_prediction_tensor = (
-            target_tensor[..., num_target_fields:-1]
+            target_tensor[..., num_target_fields:-1]  # E x M x N x T
         )
-        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)  # E x M x N x 1
 
         # Ensure compatible tensor shapes.
-        relevant_target_tensor = K.expand_dims(relevant_target_tensor, axis=-1)
+        relevant_target_tensor = K.expand_dims(relevant_target_tensor, axis=-1)  # E x M x N x T x 1
         relevant_baseline_prediction_tensor = K.expand_dims(
-            relevant_baseline_prediction_tensor, axis=-1
+            relevant_baseline_prediction_tensor, axis=-1  # E x M x N x T x 1
         )
-        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
 
         # Create dual-weight tensor.
         dual_weight_tensor = K.pow(
             K.maximum(K.abs(relevant_target_tensor), K.abs(prediction_tensor)),
             dual_weight_exponent
         )
-        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)  # E x M x N x T x S
 
         # Create channel-weight tensor.
         channel_weight_tensor = K.cast(
             K.constant(channel_weights), dual_weight_tensor.dtype
         )
         for _ in range(3):
-            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)  # 1 x 1 x 1 x T
 
         # Compute dual-weighted CRPS.
         absolute_error_tensor = K.abs(
-            prediction_tensor - relevant_target_tensor
+            prediction_tensor - relevant_target_tensor  # E x M x N x T x S
         )
         mean_prediction_error_tensor = K.mean(
-            dual_weight_tensor * absolute_error_tensor, axis=-1
+            dual_weight_tensor * absolute_error_tensor, axis=-1  # E x M x N x T
         )
 
+        # M x E x N x T x S
         prediction_tensor = tensorflow.transpose(
             prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
@@ -685,12 +687,12 @@ def dual_weighted_crpss(
             # parallel_iterations=1,
             # swap_memory=True
         )
-        mapd_tensor = mapd_tensor.stack()
+        mapd_tensor = mapd_tensor.stack()  # M x E x N x T
 
         mapd_tensor = tensorflow.transpose(
-            mapd_tensor, perm=[1, 0, 2, 3]
+            mapd_tensor, perm=[1, 0, 2, 3]  # E x M x N x T
         )
-        error_tensor = channel_weight_tensor * (
+        error_tensor = channel_weight_tensor * (  # E x M x N x T
             mean_prediction_error_tensor -
             0.5 * mapd_tensor
         )
@@ -707,16 +709,16 @@ def dual_weighted_crpss(
             ),
             dual_weight_exponent
         )
-        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)
+        dual_weight_tensor = K.maximum(dual_weight_tensor, 1.)  # E x M x N x T x 1
 
         # Compute dual-weighted CRPSS for baseline.
         absolute_error_tensor = K.abs(
-            relevant_baseline_prediction_tensor - relevant_target_tensor
+            relevant_baseline_prediction_tensor - relevant_target_tensor  # E x M x N x T x 1
         )
         mean_prediction_error_tensor = K.mean(
-            dual_weight_tensor * absolute_error_tensor, axis=-1
+            dual_weight_tensor * absolute_error_tensor, axis=-1  # E x M x N x T
         )
-        error_tensor = channel_weight_tensor * mean_prediction_error_tensor
+        error_tensor = channel_weight_tensor * mean_prediction_error_tensor  # E x M x N x T
 
         nan_mask_tensor = tf_math.is_finite(error_tensor)
         error_tensor = tensorflow.where(
