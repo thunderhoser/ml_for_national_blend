@@ -299,7 +299,9 @@ def _convert_nwp_forecasts_1init(
         longitude_matrix_deg_e=nwp_longitude_matrix_deg_e,
         field_names=urma_field_names,
         init_time_unix_sec=init_time_unix_sec,
-        model_file_name=dummy_model_file_name
+        model_file_name=dummy_model_file_name,
+        isotonic_model_file_name=None,
+        uncertainty_calib_model_file_name=None
     )
 
 
