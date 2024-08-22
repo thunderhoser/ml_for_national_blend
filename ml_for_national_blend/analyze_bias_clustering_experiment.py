@@ -340,8 +340,8 @@ def _run(experiment_dir_name, output_dir_name):
             imagemagick_utils.concatenate_images(
                 input_file_names=panel_file_names,
                 output_file_name=concat_figure_file_name,
-                num_panel_rows=axis2_length,
-                num_panel_columns=axis1_length
+                num_panel_rows=axis1_length,
+                num_panel_columns=axis2_length
             )
 
             concat_figure_file_name = (
@@ -365,8 +365,8 @@ def _run(experiment_dir_name, output_dir_name):
             imagemagick_utils.concatenate_images(
                 input_file_names=panel_file_names,
                 output_file_name=concat_figure_file_name,
-                num_panel_rows=axis2_length,
-                num_panel_columns=axis1_length
+                num_panel_rows=axis1_length,
+                num_panel_columns=axis2_length
             )
 
     print(SEPARATOR_STRING)
