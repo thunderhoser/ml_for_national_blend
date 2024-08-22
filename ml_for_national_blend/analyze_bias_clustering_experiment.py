@@ -321,7 +321,7 @@ def _run(experiment_dir_name, output_dir_name):
 
             concat_figure_file_name = (
                 '{0:s}/histograms_buffer-distance-px={1:d}_'
-                'do-backwards-clustering={2:d}'
+                'do-backwards-clustering={2:d}.jpg'
             ).format(
                 output_dir_name,
                 BUFFER_DISTANCES_PX_AXIS3[k],
@@ -346,7 +346,7 @@ def _run(experiment_dir_name, output_dir_name):
 
             concat_figure_file_name = (
                 '{0:s}/spatial_maps_buffer-distance-px={1:d}_'
-                'do-backwards-clustering={2:d}'
+                'do-backwards-clustering={2:d}.jpg'
             ).format(
                 output_dir_name,
                 BUFFER_DISTANCES_PX_AXIS3[k],
