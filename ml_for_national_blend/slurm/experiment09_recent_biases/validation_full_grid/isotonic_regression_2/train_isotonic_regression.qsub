@@ -42,7 +42,7 @@ num_lag_times=${LAG_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
 --init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
 --input_cluster_file_name="${model_dir_name}/validation_full_grid/bias_clustering_test/bias-discretization-interval-interval=0.100_min-cluster-size-px=250_buffer-distance-px=6_do-backwards-clustering=1/bias_clustering.nc" \
