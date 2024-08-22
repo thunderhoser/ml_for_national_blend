@@ -31,6 +31,8 @@ ENSEMBLE_MEMBER_DIM = 'ensemble_member'
 DUMMY_ENSEMBLE_MEMBER_DIM = 'dummy_ensemble_member'
 
 MODEL_FILE_KEY = 'model_file_name'
+ISOTONIC_MODEL_FILE_KEY = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_KEY = 'uncertainty_calib_model_file_name'
 INIT_TIME_KEY = 'init_time_unix_sec'
 
 TARGET_KEY = 'target'
@@ -225,6 +227,16 @@ def read_file(netcdf_file_name):
         )
     })
 
+    if ISOTONIC_MODEL_FILE_KEY not in prediction_table_xarray.attrs:
+        prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = ''
+    if UNCERTAINTY_CALIB_MODEL_FILE_KEY not in prediction_table_xarray.attrs:
+        prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = ''
+
+    if prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] == '':
+        prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+    if prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] == '':
+        prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = None
+
     if INIT_TIME_KEY not in prediction_table_xarray.data_vars:
         return prediction_table_xarray
 
@@ -264,8 +276,17 @@ def read_file(netcdf_file_name):
         )
     }
 
+    if prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] is None:
+        prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = ''
+    if prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] is None:
+        prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = ''
+
     attribute_dict = {
         MODEL_FILE_KEY: prediction_table_xarray.attrs[MODEL_FILE_KEY],
+        ISOTONIC_MODEL_FILE_KEY:
+            prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY],
+        UNCERTAINTY_CALIB_MODEL_FILE_KEY:
+            prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY],
         INIT_TIME_KEY: int(numpy.round(init_times_unix_sec[0]))
     }
 
@@ -275,7 +296,8 @@ def read_file(netcdf_file_name):
 def write_file(
         netcdf_file_name, target_matrix, prediction_matrix,
         latitude_matrix_deg_n, longitude_matrix_deg_e, field_names,
-        init_time_unix_sec, model_file_name):
+        init_time_unix_sec, model_file_name, isotonic_model_file_name,
+        uncertainty_calib_model_file_name):
     """Writes predictions to NetCDF file.
 
     M = number of rows in grid
@@ -291,11 +313,20 @@ def write_file(
     :param field_names: length-F list of field names.
     :param init_time_unix_sec: Initialization time.
     :param model_file_name: Path to file with trained model.
+    :param isotonic_model_file_name: Path to file with isotonic-regression model
+        used to bias-correct ensemble means.  If N/A, make this None.
+    :param uncertainty_calib_model_file_name: Path to file with uncertainty-
+        calibration model used to bias-correct ensemble spreads.  If N/A, make
+        this None.
     """
 
     # Check input args.
     error_checking.assert_is_integer(init_time_unix_sec)
     error_checking.assert_is_string(model_file_name)
+    if isotonic_model_file_name is not None:
+        error_checking.assert_is_string(isotonic_model_file_name)
+    if uncertainty_calib_model_file_name is not None:
+        error_checking.assert_is_string(uncertainty_calib_model_file_name)
 
     error_checking.assert_is_numpy_array(target_matrix, num_dimensions=3)
     # error_checking.assert_is_numpy_array_without_nan(target_matrix)
@@ -344,6 +375,16 @@ def write_file(
     num_field_chars = max([len(f) for f in field_names])
 
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
+    dataset_object.setncattr(
+        ISOTONIC_MODEL_FILE_KEY,
+        '' if isotonic_model_file_name is None
+        else isotonic_model_file_name
+    )
+    dataset_object.setncattr(
+        UNCERTAINTY_CALIB_MODEL_FILE_KEY,
+        '' if uncertainty_calib_model_file_name is None
+        else uncertainty_calib_model_file_name
+    )
     dataset_object.setncattr(INIT_TIME_KEY, init_time_unix_sec)
     dataset_object.createDimension(ROW_DIM, num_rows)
     dataset_object.createDimension(COLUMN_DIM, num_columns)
