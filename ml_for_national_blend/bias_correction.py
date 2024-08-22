@@ -325,7 +325,7 @@ def train_model_suite(
 
     if cluster_table_xarray is not None:
         field_index = numpy.where(
-            cluster_table_xarray.coords[bias_clustering.FIELD_DIM].values
+            cluster_table_xarray[bias_clustering.FIELD_NAME_KEY].values
             == target_field_name
         )[0][0]
 
