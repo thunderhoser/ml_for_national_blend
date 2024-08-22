@@ -114,11 +114,19 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
     assert numpy.all(bin_indices < num_bins)
 
     bin_counts = numpy.array([
-        numpy.sum(pixel_counts(bin_indices == k))
+        numpy.sum(pixel_counts[bin_indices == k])
         for k in numpy.linspace(0, num_bins - 1, num=num_bins, dtype=int)
     ], dtype=int)
 
     bin_frequencies = bin_counts.astype(float) / numpy.sum(bin_counts)
+
+    k = numpy.argmin(numpy.absolute(HISTOGRAM_BIN_CENTERS - 10))
+    fraction_of_px_in_small_cluster = numpy.sum(bin_frequencies[:(k + 1)])
+    print((
+        'Fraction of pixels in cluster with 10 pixels or less = {0:.4f}'
+    ).format(
+        fraction_of_px_in_small_cluster
+    ))
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
@@ -137,7 +145,7 @@ def _make_plots_one_hyperparam_set(cluster_file_name, title_string,
 
     x_tick_labels = ['{0:.0f}'.format(c) for c in HISTOGRAM_BIN_CENTERS]
     axes_object.set_xticks(x_tick_values)
-    axes_object.set_xticklabels(x_tick_labels)
+    axes_object.set_xticklabels(x_tick_labels, fontsize=20, rotation=90)
     # axes_object.set_xlim([0, num_bins])
 
     axes_object.set_xlabel('Pixels in cluster')
@@ -302,7 +310,7 @@ def _run(experiment_dir_name, output_dir_name):
 
             concat_figure_file_name = (
                 '{0:s}/histograms_buffer-distance-px={1:d}_'
-                'do-backwards-clustering={2:d}'
+                'do-backwards-clustering={2:d}.jpg'
             ).format(
                 output_dir_name,
                 BUFFER_DISTANCES_PX_AXIS3[k],
@@ -316,13 +324,13 @@ def _run(experiment_dir_name, output_dir_name):
                 input_file_names=
                 numpy.ravel(histogram_file_name_matrix[..., k, m]).tolist(),
                 output_file_name=concat_figure_file_name,
-                num_panel_rows=axis2_length,
-                num_panel_columns=axis1_length
+                num_panel_rows=axis1_length,
+                num_panel_columns=axis2_length
             )
 
             concat_figure_file_name = (
                 '{0:s}/spatial_maps_buffer-distance-px={1:d}_'
-                'do-backwards-clustering={2:d}'
+                'do-backwards-clustering={2:d}.jpg'
             ).format(
                 output_dir_name,
                 BUFFER_DISTANCES_PX_AXIS3[k],
@@ -336,8 +344,8 @@ def _run(experiment_dir_name, output_dir_name):
                 input_file_names=
                 numpy.ravel(map_file_name_matrix[..., k, m]).tolist(),
                 output_file_name=concat_figure_file_name,
-                num_panel_rows=axis2_length,
-                num_panel_columns=axis1_length
+                num_panel_rows=axis1_length,
+                num_panel_columns=axis2_length
             )
 
     print(SEPARATOR_STRING)

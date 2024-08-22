@@ -10,11 +10,11 @@ import dill
 import numpy
 import xarray
 from sklearn.isotonic import IsotonicRegression
-from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import prediction_io
-# from ml_for_wildfire_wpo.utils import canadian_fwi_utils
+from ml_for_national_blend.utils import bias_clustering
+from ml_for_national_blend.utils import urma_utils
 
 TOLERANCE = 1e-6
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
@@ -23,73 +23,96 @@ MAX_STDEV_INFLATION_FACTOR = 1000.
 
 EVALUATION_WEIGHT_KEY = 'evaluation_weight'
 
-MODELS_KEY = 'model_object_matrix'
-LATITUDES_KEY = 'latitude_matrix_deg_e'
-LONGITUDES_KEY = 'longitude_matrix_deg_e'
+MODEL_KEY = 'model_object'
+CLUSTER_TO_MODEL_KEY = 'cluster_id_to_model_object'
+CLUSTER_IDS_KEY = 'cluster_id_matrix'
 FIELD_NAMES_KEY = 'field_names'
-PIXEL_RADIUS_KEY = 'pixel_radius_metres'
-WEIGHT_BY_INV_DIST_KEY = 'weight_pixels_by_inverse_dist'
-WEIGHT_BY_INV_SQ_DIST_KEY = 'weight_pixels_by_inverse_sq_dist'
 DO_UNCERTAINTY_CALIB_KEY = 'do_uncertainty_calibration'
 DO_IR_BEFORE_UC_KEY = 'do_iso_reg_before_uncertainty_calib'
 
 ALL_KEYS = [
-    MODELS_KEY, LATITUDES_KEY, LONGITUDES_KEY, FIELD_NAMES_KEY,
-    PIXEL_RADIUS_KEY, WEIGHT_BY_INV_DIST_KEY, WEIGHT_BY_INV_SQ_DIST_KEY,
+    MODEL_KEY, CLUSTER_TO_MODEL_KEY, CLUSTER_IDS_KEY, FIELD_NAMES_KEY,
     DO_UNCERTAINTY_CALIB_KEY, DO_IR_BEFORE_UC_KEY
 ]
 
-# TODO(thunderhoser): Add eval weights in preparation for BC-training.
 
-# TODO(thunderhoser): Calling lat/long from prediction_io.py will be fucky, because they are now 2-D and not 1-D.
+def __get_slices_for_multiprocessing(cluster_ids):
+    """Returns slices for multiprocessing.
 
-# TODO(thunderhoser): Need to deal with NaN predictions.
+    Each "slice" consists of several clusters.
+
+    K = number of slices
+
+    :param cluster_ids: 1-D numpy array of cluster IDs (positive integers).
+    :return: slice_to_cluster_ids: Dictionary, where each key is a slice index
+        (non-negative integer) and the corresponding value is a list of cluster
+        IDs.
+    """
+
+    shuffled_cluster_ids = cluster_ids + 0
+    numpy.random.shuffle(shuffled_cluster_ids)
+    num_clusters = len(shuffled_cluster_ids)
+
+    slice_indices_normalized = numpy.linspace(
+        0, 1, num=NUM_SLICES_FOR_MULTIPROCESSING + 1, dtype=float
+    )
+
+    start_indices = numpy.round(
+        num_clusters * slice_indices_normalized[:-1]
+    ).astype(int)
+
+    end_indices = numpy.round(
+        num_clusters * slice_indices_normalized[1:]
+    ).astype(int)
+
+    slice_to_cluster_ids = dict()
+
+    for i in range(len(start_indices)):
+        slice_to_cluster_ids[i] = (
+            shuffled_cluster_ids[start_indices[i]:end_indices[i]]
+        )
+
+    return slice_to_cluster_ids
 
 
-def _subset_predictions_by_location(
-        prediction_tables_xarray, desired_latitude_deg_n,
-        desired_longitude_deg_e, pixel_radius_metres,
-        weight_pixels_by_inverse_dist,
-        weight_pixels_by_inverse_sq_dist):
+def _subset_predictions_to_cluster(
+        prediction_tables_xarray, cluster_table_xarray, desired_cluster_id):
     """Subsets predictions by location.
 
     :param prediction_tables_xarray: See input documentation for
         `train_model_suite`.
-    :param desired_latitude_deg_n: Desired latitude (deg north).
-    :param desired_longitude_deg_e: Desired longitude (deg east).
-    :param pixel_radius_metres: See input documentation for
-        `train_model_suite`.
-    :param weight_pixels_by_inverse_dist: Same.
-    :param weight_pixels_by_inverse_sq_dist: Same.
-    :return: new_prediction_tables_xarray: Same as input, but maybe with a
-        smaller grid and maybe with different evaluation weights.
+    :param cluster_table_xarray: Same.
+    :param desired_cluster_id: Will subset predictions to cluster k, where
+        k = `desired_cluster_id`.
+    :return: new_prediction_tables_xarray: Same as input, except with a smaller
+        grid and different evaluation weights.
     """
+
+    # This method automatically handles NaN predictions, because only grid
+    # points without NaN predictions (i.e., where NaN is impossible) are
+    # assigned to a real cluster (with index > 0).
+    assert desired_cluster_id > 0
+
+    cluster_id_matrix = (
+        cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values[..., 0]
+    )
+    good_rows, good_columns = numpy.where(
+        cluster_id_matrix == desired_cluster_id
+    )
+    good_rows = numpy.unique(good_rows)
+    good_columns = numpy.unique(good_columns)
+
+    first_ptx = prediction_tables_xarray[0]
+    eval_weight_submatrix = (
+        first_ptx[EVALUATION_WEIGHT_KEY].values[good_rows, :][:, good_columns]
+    )
+    cluster_id_submatrix = cluster_id_matrix[good_rows, :][:, good_columns]
+    eval_weight_submatrix[cluster_id_submatrix != desired_cluster_id] = 0.
 
     num_tables = len(prediction_tables_xarray)
     new_prediction_tables_xarray = [xarray.Dataset()] * num_tables
 
-    good_rows = numpy.array([], dtype=int)
-    good_columns = numpy.array([], dtype=int)
-
     for k in range(num_tables):
-        if k == 0:
-            (
-                new_prediction_tables_xarray[k], keep_location_matrix
-            ) = prediction_io.subset_by_location(
-                prediction_table_xarray=prediction_tables_xarray[k],
-                desired_latitude_deg_n=desired_latitude_deg_n,
-                desired_longitude_deg_e=desired_longitude_deg_e,
-                radius_metres=pixel_radius_metres,
-                recompute_weights_by_inverse_dist=weight_pixels_by_inverse_dist,
-                recompute_weights_by_inverse_sq_dist=
-                weight_pixels_by_inverse_sq_dist
-            )
-
-            good_rows, good_columns = numpy.where(keep_location_matrix)
-            good_rows = numpy.unique(good_rows)
-            good_columns = numpy.unique(good_columns)
-            continue
-
         new_prediction_tables_xarray[k] = prediction_tables_xarray[k].isel(
             {prediction_io.ROW_DIM: good_rows}
         )
@@ -99,7 +122,7 @@ def _subset_predictions_by_location(
         new_prediction_tables_xarray[k] = new_prediction_tables_xarray[k].assign({
             EVALUATION_WEIGHT_KEY: (
                 new_prediction_tables_xarray[k][EVALUATION_WEIGHT_KEY].dims,
-                new_prediction_tables_xarray[0][EVALUATION_WEIGHT_KEY].values
+                eval_weight_submatrix
             )
         })
 
@@ -142,6 +165,14 @@ def _train_one_model(prediction_tables_xarray):
         for ptx in prediction_tables_xarray
     ])
 
+    real_mask = numpy.invert(numpy.logical_or(
+        numpy.isnan(predicted_values),
+        numpy.isnan(target_values)
+    ))
+    predicted_values = predicted_values[real_mask]
+    target_values = target_values[real_mask]
+    eval_weights = eval_weights[real_mask]
+
     percentile_levels = numpy.linspace(0, 100, num=11, dtype=float)
     print((
         'Num training pixels/samples = {0:d}/{1:d}; '
@@ -162,242 +193,58 @@ def _train_one_model(prediction_tables_xarray):
     return model_object
 
 
-def _train_one_model_per_pixel(
-        prediction_tables_xarray, train_for_grid_rows, pixel_radius_metres,
-        weight_pixels_by_inverse_dist, weight_pixels_by_inverse_sq_dist):
-    """Trains one model per pixel, using multiprocessing.
-
-    m = number of grid rows for which to train a model
-    N = number of columns in full grid
-    F = number of target fields
+def _train_one_model_per_cluster(prediction_tables_xarray, cluster_table_xarray,
+                                 train_for_cluster_ids):
+    """Trains one model per cluster, using multiprocessing.
 
     :param prediction_tables_xarray: See documentation for `train_model_suite`.
-    :param train_for_grid_rows: length-m numpy array of row indices.  Models
-        will be trained only for these rows.
-    :param pixel_radius_metres: See documentation for `train_model_suite`.
-    :param weight_pixels_by_inverse_dist: Same.
-    :param weight_pixels_by_inverse_sq_dist: Same.
-    :return: model_object_matrix: m-by-N-by-F numpy array of trained
-        bias-correction models (instances of
-        `sklearn.isotonic.IsotonicRegression`).
+    :param cluster_table_xarray: Same.
+    :param train_for_cluster_ids: 1-D numpy array of cluster IDs for which to
+        train a model.
+    :return: cluster_id_to_model_object: See output doc for `train_model_suite`.
+        This will be a subset of that final dictionary.
     """
 
-    ptx = prediction_tables_xarray[0]
-    grid_latitudes_deg_n = ptx[prediction_io.LATITUDE_KEY].values
-    grid_longitudes_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
-    field_names = ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
+    cluster_id_to_model_object = dict()
+    num_clusters = len(train_for_cluster_ids)
 
-    latitude_matrix_deg_n, longitude_matrix_deg_e = (
-        grids.latlng_vectors_to_matrices(
-            unique_latitudes_deg=grid_latitudes_deg_n,
-            unique_longitudes_deg=grid_longitudes_deg_e
-        )
-    )
+    for k in range(num_clusters):
+        print((
+            'Training bias-correction model for {0:d}th of {1:d} clusters...'
+        ).format(
+            k + 1, num_clusters
+        ))
 
-    num_target_rows = len(train_for_grid_rows)
-    num_columns = latitude_matrix_deg_n.shape[1]
-    num_fields = len(field_names)
-    model_object_matrix = numpy.full(
-        (num_target_rows, num_columns, num_fields),
-        '', dtype=object
-    )
-
-    for f in range(num_fields):
-        for i_model in range(num_target_rows):
-            i_pred = train_for_grid_rows[i_model]
-
-            for j in range(num_columns):
-                print((
-                    'Training bias-correction model for '
-                    '{0:d}th of {1:d} grid rows, '
-                    '{2:d}th of {3:d} columns, '
-                    '{4:d}th of {5:d} fields...'
-                ).format(
-                    i_model + 1, num_target_rows,
-                    j + 1, num_columns,
-                    f + 1, num_fields
-                ))
-
-                these_prediction_tables_xarray = [
-                    ptx.isel({
-                        prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
-                    })
-                    for ptx in prediction_tables_xarray
-                ]
-
-                # TODO(thunderhoser): _subset_predictions_by_location will need an input arg pertaining to clustering.
-                these_prediction_tables_xarray = (
-                    _subset_predictions_by_location(
-                        prediction_tables_xarray=these_prediction_tables_xarray,
-                        desired_latitude_deg_n=latitude_matrix_deg_n[i_pred, j],
-                        desired_longitude_deg_e=
-                        longitude_matrix_deg_e[i_pred, j],
-                        pixel_radius_metres=pixel_radius_metres,
-                        weight_pixels_by_inverse_dist=
-                        weight_pixels_by_inverse_dist,
-                        weight_pixels_by_inverse_sq_dist=
-                        weight_pixels_by_inverse_sq_dist
-                    )
-                )
-
-                model_object_matrix[i_model, j, f] = _train_one_model(
-                    these_prediction_tables_xarray
-                )
-
-    return model_object_matrix
-
-
-def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
-                               apply_to_grid_rows, verbose):
-    """Applies one model per pixel, using multiprocessing.
-
-    m = number of grid rows for which to train a model
-    N = number of columns in full grid
-    F = number of target fields
-    S = ensemble size
-
-    :param prediction_table_xarray: xarray table in format returned by
-        `prediction_io.read_file`, containing uncorrected predictions.
-    :param model_dict: Dictionary created by `train_model_suite`.
-    :param apply_to_grid_rows: length-m numpy array of row indices.  Models
-        will be applied only to these rows.
-    :param verbose: Boolean flag.
-    :return: prediction_matrix: m-by-N-by-F-by-S numpy array of bias-corrected
-        predictions.
-    """
-
-    # TODO(thunderhoser): This method assumes that `prediction_table_xarray`
-    # has already been subset to the relevant rows, whereas
-    # `_train_one_model_per_pixel` does not make the assumption, because
-    # surrounding information (spatial context) is always needed for training.
-
-    field_names = model_dict[FIELD_NAMES_KEY]
-    model_object_matrix = model_dict[MODELS_KEY]
-    do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
-
-    num_fields = len(field_names)
-    num_target_rows = len(apply_to_grid_rows)
-    num_columns = model_object_matrix.shape[1]
-
-    ptx = prediction_table_xarray
-    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
-
-    if do_uncertainty_calibration:
-        mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
-        prediction_stdev_matrix = numpy.std(
-            prediction_matrix, axis=-1, ddof=1
-        )
-    else:
-        mean_prediction_matrix = numpy.array([], dtype=float)
-        prediction_stdev_matrix = numpy.array([], dtype=float)
-
-    constrain_dsr = (
-        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-        and
-        canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-    )
-
-    for f_model in range(num_fields):
-        if constrain_dsr and field_names[f_model] == canadian_fwi_utils.DSR_NAME:
-            continue
-
-        f_pred = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
-        )[0][0]
-
-        for i_pred in range(num_target_rows):
-            i_model = apply_to_grid_rows[i_pred]
-
-            for j in range(num_columns):
-                if model_object_matrix[i_model, j, f_model] is None:
-                    continue
-
-                if verbose:
-                    print((
-                        'Applying bias-correction model for '
-                        '{0:d}th of {1:d} grid rows, '
-                        '{2:d}th of {3:d} columns, '
-                        '{4:d}th of {5:d} fields...'
-                    ).format(
-                        i_pred + 1, num_target_rows,
-                        j + 1, num_columns,
-                        f_model + 1, num_fields
-                    ))
-
-                if do_uncertainty_calibration:
-                    orig_stdev = prediction_stdev_matrix[i_pred, j, f_pred]
-                    new_stdev = numpy.sqrt(
-                        model_object_matrix[i_model, j, f_model].predict(
-                            orig_stdev ** 2
-                        )
-                    )
-                    stdev_inflation_factor = new_stdev / orig_stdev
-
-                    if numpy.isnan(stdev_inflation_factor):
-                        stdev_inflation_factor = 1.
-
-                    stdev_inflation_factor = numpy.minimum(
-                        stdev_inflation_factor, MAX_STDEV_INFLATION_FACTOR
-                    )
-
-                    prediction_matrix[i_pred, j, f_pred, :] = (
-                        mean_prediction_matrix[i_pred, j, f_pred] +
-                        stdev_inflation_factor * (
-                            prediction_matrix[i_pred, j, f_pred, :] -
-                            mean_prediction_matrix[i_pred, j, f_pred]
-                        )
-                    )
-                else:
-                    prediction_matrix[i_pred, j, f_pred, :] = (
-                        model_object_matrix[i_model, j, f_model].predict(
-                            prediction_matrix[i_pred, j, f_pred, :]
-                        )
-                    )
-
-    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
-
-    if constrain_dsr:
-        fwi_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.FWI_NAME
-        )[0][0]
-
-        dsr_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.DSR_NAME
-        )[0][0]
-
-        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
-            prediction_matrix[..., fwi_index, :]
+        these_prediction_tables_xarray = _subset_predictions_to_cluster(
+            prediction_tables_xarray=prediction_tables_xarray,
+            cluster_table_xarray=cluster_table_xarray,
+            desired_cluster_id=train_for_cluster_ids[k]
         )
 
-    return prediction_matrix
+        cluster_id_to_model_object[train_for_cluster_ids[k]] = (
+            _train_one_model(these_prediction_tables_xarray)
+        )
+
+    return cluster_id_to_model_object
 
 
 def train_model_suite(
-        prediction_tables_xarray, one_model_per_pixel,
-        do_uncertainty_calibration,
-        pixel_radius_metres=None,
-        weight_pixels_by_inverse_dist=None,
-        weight_pixels_by_inverse_sq_dist=None,
+        prediction_tables_xarray, target_field_name, do_uncertainty_calibration,
         do_iso_reg_before_uncertainty_calib=None,
-        do_multiprocessing=True):
+        do_multiprocessing=True,
+        cluster_table_xarray=None):
     """Trains one model suite.
 
     The model suite will contain either [1] one model per target field or
-    [2] one model per target field per pixel.
+    [2] one model per target field per cluster.
 
-    M = number of rows in model grid.  If `one_model_per_pixel == True`, this
-    will be the number of rows in the physical grid; else, this will be 1.
-
-    N = same but for columns
-    F = number of target fields
+    M = number of rows in spatial grid
+    N = number of columns in spatial grid
 
     :param prediction_tables_xarray: 1-D list of xarray tables in format
         returned by `prediction_io.read_file`.
-    :param one_model_per_pixel: Boolean flag.  If True, will train one model per
-        target field per pixel.  If False, will just train one model per target
-        field.
+    :param target_field_name: Will train models only for this target field
+        (name must be accepted by `urma_utils.check_field_name`).
     :param do_uncertainty_calibration: Boolean flag.  If True, this method will
         [1] assume that every "prediction" in `prediction_tables_xarray` is the
         ensemble variance; [2] assume that every "target" in
@@ -405,304 +252,211 @@ def train_model_suite(
         [3] train IR models to adjust the ensemble variance, i.e., to do
         uncertainty calibration.  If False, this method will do standard
         isotonic regression, correcting only the ensemble mean.
-    :param pixel_radius_metres: [used only if `one_model_per_pixel == True`]
-        When training the model for pixel P, will use all pixels within this
-        radius.
-    :param weight_pixels_by_inverse_dist:
-        [used only if `one_model_per_pixel == True`]
-        Boolean flag.  If True, when training the model for pixel P, will weight
-        every other pixel by the inverse of its distance to P.
-    :param weight_pixels_by_inverse_sq_dist:
-        [used only if `one_model_per_pixel == True`]
-        Boolean flag.  If True, when training the model for pixel P, will weight
-        every other pixel by the inverse of its *squared* distance to P.
     :param do_iso_reg_before_uncertainty_calib:
         [used only if `do_uncertainty_calibration == True`]
         Boolean flag, indicating whether isotonic regression has been done
         before uncertainty calibration.
-    :param do_multiprocessing: [used only if `one_model_per_pixel == True`]
+    :param do_multiprocessing: [used only if `cluster_table_xarray is not None`]
         Boolean flag.  If True, will do multi-threaded processing to make this
         go faster.
+    :param cluster_table_xarray: xarray table in format returned by
+        `bias_clustering.read_file`.  If you want to train one model for the
+        whole domain -- instead of one model per spatial cluster -- just make
+        this None.
 
     :return: model_dict: Dictionary with the following keys.
-    model_dict["model_object_matrix"]: M-by-N-by-F numpy array of trained
-        bias-correction models (instances of
-        `sklearn.isotonic.IsotonicRegression`).
-    model_dict["latitude_matrix_deg_e"]: M-by-N numpy array of latitudes (deg
-        north).
-    model_dict["longitude_matrix_deg_e"]: M-by-N numpy array of longitudes (deg
-        east).
-    model_dict["field_names"]: length-F list with names of target fields.
-    model_dict["pixel_radius_metres"]: Same as input arg.
-    model_dict["weight_pixels_by_inverse_dist"]: Same as input arg.
-    model_dict["weight_pixels_by_inverse_sq_dist"]: Same as input arg.
+    model_dict["model_object"]: Trained bias-correction model (instance of
+        `sklearn.isotonic.IsotonicRegression`).  If one model per cluster, this
+        is None.
+    model_dict["cluster_id_to_model_object"]: Dictionary, where each key is a
+        cluster ID (positive integer) and the corresponding value is a trained
+        bias-correction model (instance of
+        `sklearn.isotonic.IsotonicRegression`).  If *not* one model per cluster,
+        this is None.
+    model_dict["cluster_id_matrix"]: M-by-N numpy array of cluster IDs.  If
+        *not* one model per cluster, this is None.
+    model_dict["field_names"]: length-1 list with names of target fields.
     model_dict["do_uncertainty_calibration"]: Same as input arg.
     model_dict["do_iso_reg_before_uncertainty_calib"]: Same as input arg.
     """
 
-    # TODO(thunderhoser): Add option to subset by season -- probably.
-    #  I guess this depends on what my detailed evaluation finds.
-
     # Check input args.
-    error_checking.assert_is_boolean(one_model_per_pixel)
+    urma_utils.check_field_name(target_field_name)
     error_checking.assert_is_boolean(do_uncertainty_calibration)
-    if not one_model_per_pixel:
+    if cluster_table_xarray is None:
         do_multiprocessing = False
-
-    error_checking.assert_is_boolean(do_multiprocessing)
-
-    grid_latitudes_deg_n = None
-    grid_longitudes_deg_e = None
-    field_names = []
-
-    for k in range(len(prediction_tables_xarray)):
-        # prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
-        #     prediction_tables_xarray[k]
-        # )
-        ptx = prediction_tables_xarray[k]
-
-        if grid_latitudes_deg_n is None:
-            grid_latitudes_deg_n = ptx[prediction_io.LATITUDE_KEY].values
-            grid_longitudes_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
-            field_names = ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
-
-        assert numpy.allclose(
-            grid_latitudes_deg_n, ptx[prediction_io.LATITUDE_KEY].values,
-            atol=TOLERANCE
-        )
-        assert numpy.allclose(
-            grid_longitudes_deg_e, ptx[prediction_io.LONGITUDE_KEY].values,
-            atol=TOLERANCE
-        )
-        assert field_names == ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
-
-    latitude_matrix_deg_n, longitude_matrix_deg_e = (
-        grids.latlng_vectors_to_matrices(
-            unique_latitudes_deg=grid_latitudes_deg_n,
-            unique_longitudes_deg=grid_longitudes_deg_e
-        )
-    )
-
-    if not one_model_per_pixel:
-        pixel_radius_metres = None
-        weight_pixels_by_inverse_dist = None
-        weight_pixels_by_inverse_sq_dist = None
     if not do_uncertainty_calibration:
         do_iso_reg_before_uncertainty_calib = None
 
-    # Do actual stuff.
-    num_model_grid_rows = (
-        latitude_matrix_deg_n.shape[0] if one_model_per_pixel else 1
-    )
-    num_model_grid_columns = (
-        latitude_matrix_deg_n.shape[1] if one_model_per_pixel else 1
-    )
-    num_fields = len(field_names)
+    error_checking.assert_is_boolean(do_multiprocessing)
 
-    model_latitude_matrix_deg_n = (
-        latitude_matrix_deg_n if one_model_per_pixel
-        else numpy.full((1, 1), numpy.nan)
-    )
-    model_longitude_matrix_deg_e = (
-        longitude_matrix_deg_e if one_model_per_pixel
-        else numpy.full((1, 1), numpy.nan)
-    )
-    model_object_matrix = numpy.full(
-        (num_model_grid_rows, num_model_grid_columns, num_fields),
-        '', dtype=object
-    )
+    # Subset all data to the one field.
+    first_ptx = prediction_tables_xarray[0]
+    num_grid_rows = len(first_ptx.coords[prediction_io.ROW_DIM].values)
+    num_grid_columns = len(first_ptx.coords[prediction_io.COLUMN_DIM].values)
+    eval_weight_matrix = numpy.full((num_grid_rows, num_grid_columns), 1.)
+
+    num_tables = len(prediction_tables_xarray)
+
+    for i in range(num_tables):
+        field_index = numpy.where(
+            prediction_tables_xarray[i].coords[prediction_io.FIELD_DIM].values
+            == target_field_name
+        )[0][0]
+
+        prediction_tables_xarray[i] = prediction_tables_xarray[i].isel({
+            prediction_io.FIELD_DIM: numpy.array([field_index], dtype=int)
+        })
+
+        prediction_tables_xarray[i] = prediction_tables_xarray[i].assign({
+            EVALUATION_WEIGHT_KEY: (
+                (prediction_io.ROW_DIM, prediction_io.COLUMN_DIM),
+                eval_weight_matrix
+            )
+        })
+
+    if cluster_table_xarray is not None:
+        field_index = numpy.where(
+            cluster_table_xarray.coords[bias_clustering.FIELD_DIM].values
+            == target_field_name
+        )[0][0]
+
+        cluster_table_xarray = cluster_table_xarray.isel({
+            bias_clustering.FIELD_DIM: numpy.array([field_index], dtype=int)
+        })
+
+    # Do actual stuff.
+    if cluster_table_xarray is None:
+        cluster_id_matrix = None
+        unique_cluster_ids = numpy.array([-1], dtype=int)
+    else:
+        cluster_id_matrix = (
+            cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values
+        )
+        unique_cluster_ids = numpy.unique(
+            cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values
+        )
+        unique_cluster_ids = unique_cluster_ids[unique_cluster_ids > 0]
+
+    model_object = None
+    cluster_id_to_model_object = dict()
+    for this_id in unique_cluster_ids:
+        cluster_id_to_model_object[this_id] = None
+
+    num_clusters = len(unique_cluster_ids)
 
     if do_multiprocessing:
-        start_rows, end_rows = __get_slices_for_multiprocessing(
-            num_grid_rows=num_model_grid_rows
+        slice_to_cluster_ids = __get_slices_for_multiprocessing(
+            cluster_ids=unique_cluster_ids
         )
 
         argument_list = []
-        for s, e in zip(start_rows, end_rows):
+        for this_slice in slice_to_cluster_ids:
             argument_list.append((
                 prediction_tables_xarray,
-                numpy.linspace(s, e - 1, num=e - s, dtype=int),
-                pixel_radius_metres,
-                weight_pixels_by_inverse_dist,
-                weight_pixels_by_inverse_sq_dist
+                cluster_table_xarray,
+                slice_to_cluster_ids[this_slice]
             ))
 
         with Pool() as pool_object:
-            subarrays = pool_object.starmap(
-                _train_one_model_per_pixel, argument_list
+            subdicts = pool_object.starmap(
+                _train_one_model_per_cluster, argument_list
             )
 
-            for k in range(len(start_rows)):
-                s = start_rows[k]
-                e = end_rows[k]
-                model_object_matrix[s:e, ...] = subarrays[k]
+            for k in range(len(subdicts)):
+                cluster_id_to_model_object.update(subdicts[k])
+
+        for this_cluster_id in cluster_id_to_model_object:
+            assert cluster_id_to_model_object[this_cluster_id] is not None
 
         return {
-            MODELS_KEY: model_object_matrix,
-            LATITUDES_KEY: model_latitude_matrix_deg_n,
-            LONGITUDES_KEY: model_longitude_matrix_deg_e,
-            FIELD_NAMES_KEY: field_names,
-            PIXEL_RADIUS_KEY: pixel_radius_metres,
-            WEIGHT_BY_INV_DIST_KEY: weight_pixels_by_inverse_dist,
-            WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist,
+            MODEL_KEY: model_object,
+            CLUSTER_TO_MODEL_KEY: cluster_id_to_model_object,
+            CLUSTER_IDS_KEY: cluster_id_matrix,
+            FIELD_NAMES_KEY: [target_field_name],
             DO_UNCERTAINTY_CALIB_KEY: do_uncertainty_calibration,
             DO_IR_BEFORE_UC_KEY: do_iso_reg_before_uncertainty_calib
         }
 
-    for f in range(num_fields):
-        for i in range(num_model_grid_rows):
-            for j in range(num_model_grid_columns):
-                print((
-                    'Training bias-correction model for '
-                    '{0:d}th of {1:d} grid rows, '
-                    '{2:d}th of {3:d} columns, '
-                    '{4:d}th of {5:d} fields...'
-                ).format(
-                    i + 1,
-                    num_model_grid_rows,
-                    j + 1,
-                    num_model_grid_columns,
-                    f + 1,
-                    num_fields
-                ))
+    for k in range(num_clusters):
+        if cluster_table_xarray is None:
+            print('Training bias-correction model...')
+        else:
+            print((
+                'Training bias-correction model for {0:d}th of {1:d} '
+                'clusters...'
+            ).format(
+                k + 1, num_clusters
+            ))
 
-                these_prediction_tables_xarray = [
-                    ptx.isel({
-                        prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
-                    })
-                    for ptx in prediction_tables_xarray
-                ]
+        if cluster_table_xarray is None:
+            these_prediction_tables_xarray = prediction_tables_xarray
+            model_object = _train_one_model(these_prediction_tables_xarray)
+        else:
+            these_prediction_tables_xarray = _subset_predictions_to_cluster(
+                prediction_tables_xarray=prediction_tables_xarray,
+                cluster_table_xarray=cluster_table_xarray,
+                desired_cluster_id=unique_cluster_ids[k]
+            )
 
-                if one_model_per_pixel:
-                    these_prediction_tables_xarray = (
-                        _subset_predictions_by_location(
-                            prediction_tables_xarray=
-                            these_prediction_tables_xarray,
-                            desired_latitude_deg_n=latitude_matrix_deg_n[i, j],
-                            desired_longitude_deg_e=
-                            longitude_matrix_deg_e[i, j],
-                            pixel_radius_metres=pixel_radius_metres,
-                            weight_pixels_by_inverse_dist=
-                            weight_pixels_by_inverse_dist,
-                            weight_pixels_by_inverse_sq_dist=
-                            weight_pixels_by_inverse_sq_dist
-                        )
-                    )
+            cluster_id_to_model_object[unique_cluster_ids[k]] = (
+                _train_one_model(these_prediction_tables_xarray)
+            )
 
-                model_object_matrix[i, j, f] = _train_one_model(
-                    these_prediction_tables_xarray
-                )
+    if cluster_table_xarray is None:
+        cluster_id_to_model_object = None
 
     return {
-        MODELS_KEY: model_object_matrix,
-        LATITUDES_KEY: model_latitude_matrix_deg_n,
-        LONGITUDES_KEY: model_longitude_matrix_deg_e,
-        FIELD_NAMES_KEY: field_names,
-        PIXEL_RADIUS_KEY: pixel_radius_metres,
-        WEIGHT_BY_INV_DIST_KEY: weight_pixels_by_inverse_dist,
-        WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist,
+        MODEL_KEY: model_object,
+        CLUSTER_TO_MODEL_KEY: cluster_id_to_model_object,
+        CLUSTER_IDS_KEY: cluster_id_matrix,
+        FIELD_NAMES_KEY: [target_field_name],
         DO_UNCERTAINTY_CALIB_KEY: do_uncertainty_calibration,
         DO_IR_BEFORE_UC_KEY: do_iso_reg_before_uncertainty_calib
     }
 
 
-def apply_model_suite(prediction_table_xarray, model_dict, verbose,
-                      do_multiprocessing=False):
+def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     """Applies model suite to new data in inference mode.
 
     :param prediction_table_xarray: xarray table in format returned by
         `prediction_io.read_file`.
     :param model_dict: Dictionary in format created by `train_model_suite`.
     :param verbose: Boolean flag.
-    :param do_multiprocessing: [used only if there is one model per pixel]
-        Boolean flag.  If True, will do multi-threaded processing to make this
-        go faster.
     :return: prediction_table_xarray: Same as input but with new predictions.
     """
 
     exec_start_time_unix_sec = time.time()
     error_checking.assert_is_boolean(verbose)
 
+    model_object = model_dict[MODEL_KEY]
+    cluster_id_to_model_object = model_dict[CLUSTER_TO_MODEL_KEY]
+    cluster_id_matrix = model_dict[CLUSTER_IDS_KEY]
     field_names = model_dict[FIELD_NAMES_KEY]
-    model_latitude_matrix_deg_n = model_dict[LATITUDES_KEY]
-    model_longitude_matrix_deg_e = model_dict[LONGITUDES_KEY]
-    model_object_matrix = model_dict[MODELS_KEY]
     do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
+    one_model_per_cluster = model_object is None
 
-    one_model_per_pixel = model_latitude_matrix_deg_n.size > 1
+    if len(field_names) > 1:
+        error_string = 'Cannot run apply_model_suite with multi target fields.  Still have not implemented physical constraints.'
+        raise ValueError(error_string)
+
+    ptx = prediction_table_xarray
+    assert (
+        set(field_names) ==
+        set(ptx[prediction_io.FIELD_NAME_KEY].values.tolist())
+    )
+
+    sort_indices = numpy.array([
+        numpy.where(ptx[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+        for f in field_names
+    ], dtype=int)
+
+    prediction_table_xarray = prediction_table_xarray.isel({
+        prediction_io.FIELD_DIM: sort_indices
+    })
     ptx = prediction_table_xarray
 
-    if one_model_per_pixel:
-        pred_latitude_matrix_deg_n, pred_longitude_matrix_deg_e = (
-            grids.latlng_vectors_to_matrices(
-                unique_latitudes_deg=ptx[prediction_io.LATITUDE_KEY].values,
-                unique_longitudes_deg=ptx[prediction_io.LONGITUDE_KEY].values
-            )
-        )
-
-        assert numpy.allclose(
-            model_latitude_matrix_deg_n, pred_latitude_matrix_deg_n,
-            atol=TOLERANCE
-        )
-        assert numpy.allclose(
-            model_longitude_matrix_deg_e, pred_longitude_matrix_deg_e,
-            atol=TOLERANCE
-        )
-        assert (
-            set(field_names) ==
-            set(ptx[prediction_io.FIELD_NAME_KEY].values.tolist())
-        )
-    else:
-        do_multiprocessing = False
-
-    error_checking.assert_is_boolean(do_multiprocessing)
     prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
-
-    if do_multiprocessing:
-        start_rows, end_rows = __get_slices_for_multiprocessing(
-            num_grid_rows=model_latitude_matrix_deg_n.shape[0]
-        )
-
-        argument_list = []
-        for s, e in zip(start_rows, end_rows):
-            these_row_indices = numpy.linspace(
-                s, e - 1, num=e - s, dtype=int
-            )
-            this_ptx = ptx.isel({prediction_io.ROW_DIM: these_row_indices})
-
-            argument_list.append((
-                this_ptx,
-                model_dict,
-                these_row_indices,
-                verbose
-            ))
-
-        with Pool() as pool_object:
-            subarrays = pool_object.starmap(
-                _apply_one_model_per_pixel, argument_list
-            )
-
-            for k in range(len(start_rows)):
-                s = start_rows[k]
-                e = end_rows[k]
-                prediction_matrix[s:e, ...] = subarrays[k]
-
-        ptx = ptx.assign({
-            prediction_io.PREDICTION_KEY: (
-                ptx[prediction_io.PREDICTION_KEY].dims,
-                prediction_matrix
-            )
-        })
-
-        print('Applying bias-correction model took {0:.4f} seconds.'.format(
-            time.time() - exec_start_time_unix_sec
-        ))
-        return ptx
-
-    num_fields = len(field_names)
-    num_model_grid_rows = model_latitude_matrix_deg_n.shape[0]
-    num_model_grid_columns = model_latitude_matrix_deg_n.shape[1]
-
     if do_uncertainty_calibration:
         ensemble_size = prediction_matrix.shape[-1]
         assert ensemble_size > 1
@@ -715,139 +469,159 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
         mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
-    constrain_dsr = (
-        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-        and
-        canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-    )
+    num_fields = len(field_names)
+    if one_model_per_cluster:
+        unique_cluster_ids = numpy.array(
+            list(cluster_id_to_model_object.keys()),
+            dtype=int
+        )
+    else:
+        unique_cluster_ids = numpy.array([-1], dtype=int)
 
-    for f_model in range(num_fields):
-        if constrain_dsr and field_names[f_model] == canadian_fwi_utils.DSR_NAME:
-            continue
+    num_clusters = len(unique_cluster_ids)
 
-        f_pred = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
-        )[0][0]
+    for f in range(num_fields):
         prediction_matrix_this_field = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., f_pred, :]
+            ptx[prediction_io.PREDICTION_KEY].values[..., f, :]
         )
 
-        for i in range(num_model_grid_rows):
-            for j in range(num_model_grid_columns):
-                if (
-                        one_model_per_pixel and
-                        model_object_matrix[i, j, f_model] is None
-                ):
-                    continue
+        for k in range(num_clusters):
+            if verbose:
+                print((
+                    'Applying bias-correction model for '
+                    '{0:d}th of {1:d} fields,'
+                    '{2:d}th of {3:d} clusters...'
+                ).format(
+                    f + 1, num_fields,
+                    k + 1, num_clusters
+                ))
 
-                if verbose:
-                    print((
-                        'Applying bias-correction model for '
-                        '{0:d}th of {1:d} grid rows, '
-                        '{2:d}th of {3:d} columns, '
-                        '{4:d}th of {5:d} fields...'
-                    ).format(
-                        i + 1,
-                        num_model_grid_rows,
-                        j + 1,
-                        num_model_grid_columns,
-                        f_model + 1,
-                        num_fields
-                    ))
+            if do_uncertainty_calibration:
+                if one_model_per_cluster:
+                    this_model_object = cluster_id_to_model_object[
+                        unique_cluster_ids[k]
+                    ]
+                    this_cluster_mask = (
+                        cluster_id_matrix == unique_cluster_ids[k]
+                    )
 
-                if do_uncertainty_calibration:
-                    if one_model_per_pixel:
-                        orig_stdev = prediction_stdev_matrix[i, j, f_pred]
-                        new_stdev = numpy.sqrt(
-                            model_object_matrix[i, j, f_model].predict(
-                                orig_stdev ** 2
-                            )
+                    orig_stdev_vector = (
+                        prediction_stdev_matrix[..., f][this_cluster_mask]
+                    )
+                    real_mask = numpy.invert(numpy.isnan(orig_stdev_vector))
+
+                    new_stdev_vector = orig_stdev_vector + 0.
+                    new_stdev_vector[real_mask] = numpy.sqrt(
+                        this_model_object.predict(
+                            orig_stdev_vector[real_mask] ** 2
                         )
-                        stdev_inflation_factor = new_stdev / orig_stdev
+                    )
 
-                        if numpy.isnan(stdev_inflation_factor):
-                            stdev_inflation_factor = 1.
+                    stdev_inflation_vector = (
+                        new_stdev_vector / orig_stdev_vector
+                    )
+                    stdev_inflation_vector[
+                        numpy.isnan(stdev_inflation_vector)
+                    ] = 1.
+                    stdev_inflation_vector = numpy.minimum(
+                        stdev_inflation_vector, MAX_STDEV_INFLATION_FACTOR
+                    )
 
-                        stdev_inflation_factor = numpy.minimum(
-                            stdev_inflation_factor, MAX_STDEV_INFLATION_FACTOR
-                        )
-
-                        prediction_matrix[i, j, f_pred, :] = (
-                            mean_prediction_matrix[i, j, f_pred] +
-                            stdev_inflation_factor * (
-                                prediction_matrix[i, j, f_pred, :] -
-                                mean_prediction_matrix[i, j, f_pred]
-                            )
-                        )
-                    else:
-                        orig_stdev_matrix = prediction_stdev_matrix[..., f_pred]
-                        these_dims = orig_stdev_matrix.shape
-
-                        new_stdevs = numpy.sqrt(
-                            model_object_matrix[i, j, f_model].predict(
-                                numpy.ravel(orig_stdev_matrix ** 2)
-                            )
-                        )
-                        new_stdev_matrix = numpy.reshape(new_stdevs, these_dims)
-                        stdev_inflation_matrix = (
-                            new_stdev_matrix / orig_stdev_matrix
-                        )
-
-                        stdev_inflation_matrix[
-                            numpy.isnan(stdev_inflation_matrix)
-                        ] = 1.
-                        stdev_inflation_matrix = numpy.minimum(
-                            stdev_inflation_matrix, MAX_STDEV_INFLATION_FACTOR
-                        )
-
-                        stdev_inflation_matrix = numpy.expand_dims(
-                            stdev_inflation_matrix, axis=-1
-                        )
-                        this_mean_pred_matrix = numpy.expand_dims(
-                            mean_prediction_matrix[..., f_pred], axis=-1
-                        )
-
-                        prediction_matrix[..., f_pred, :] = (
-                            this_mean_pred_matrix +
-                            stdev_inflation_matrix * (
-                                prediction_matrix[..., f_pred, :] -
-                                this_mean_pred_matrix
-                            )
-                        )
-
-                    continue
-
-                if one_model_per_pixel:
-                    prediction_matrix[i, j, f_pred, :] = (
-                        model_object_matrix[i, j, f_model].predict(
-                            prediction_matrix_this_field[i, j, :]
+                    stdev_inflation_matrix = numpy.expand_dims(
+                        stdev_inflation_vector, axis=-1
+                    )
+                    this_mean_pred_matrix = numpy.expand_dims(
+                        mean_prediction_matrix[..., f][this_cluster_mask],
+                        axis=-1
+                    )
+                    prediction_matrix[this_cluster_mask, f, :] = (
+                        this_mean_pred_matrix +
+                        stdev_inflation_matrix * (
+                            prediction_matrix[this_cluster_mask, f, :] -
+                            this_mean_pred_matrix
                         )
                     )
                 else:
-                    these_dims = prediction_matrix_this_field.shape
-                    new_predictions = model_object_matrix[i, j, f_model].predict(
-                        numpy.ravel(prediction_matrix_this_field)
+                    orig_stdev_matrix = prediction_stdev_matrix[..., f]
+                    these_dims = orig_stdev_matrix.shape
+                    orig_stdev_vector = numpy.ravel(orig_stdev_matrix)
+                    real_mask = numpy.invert(numpy.isnan(orig_stdev_vector))
+
+                    new_stdev_vector = orig_stdev_vector + 0.
+                    new_stdev_vector[real_mask] = numpy.sqrt(
+                        model_object.predict(orig_stdev_vector[real_mask] ** 2)
                     )
-                    prediction_matrix[..., f_pred, :] = numpy.reshape(
-                        new_predictions, these_dims
+                    new_stdev_matrix = numpy.reshape(
+                        new_stdev_vector, these_dims
                     )
 
-    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
+                    stdev_inflation_matrix = (
+                        new_stdev_matrix / orig_stdev_matrix
+                    )
+                    stdev_inflation_matrix[
+                        numpy.isnan(stdev_inflation_matrix)
+                    ] = 1.
+                    stdev_inflation_matrix = numpy.minimum(
+                        stdev_inflation_matrix, MAX_STDEV_INFLATION_FACTOR
+                    )
 
-    if constrain_dsr:
-        fwi_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.FWI_NAME
-        )[0][0]
+                    stdev_inflation_matrix = numpy.expand_dims(
+                        stdev_inflation_matrix, axis=-1
+                    )
+                    this_mean_pred_matrix = numpy.expand_dims(
+                        mean_prediction_matrix[..., f], axis=-1
+                    )
+                    prediction_matrix[..., f, :] = (
+                        this_mean_pred_matrix +
+                        stdev_inflation_matrix *
+                        (prediction_matrix[..., f, :] - this_mean_pred_matrix)
+                    )
 
-        dsr_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.DSR_NAME
-        )[0][0]
+                continue
 
-        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
-            prediction_matrix[..., fwi_index, :]
-        )
+            if one_model_per_cluster:
+                this_model_object = cluster_id_to_model_object[
+                    unique_cluster_ids[k]
+                ]
+                this_cluster_mask = cluster_id_matrix == unique_cluster_ids[k]
+
+                relevant_prediction_matrix_this_field = (
+                    prediction_matrix_this_field[this_cluster_mask, :]
+                )
+                these_dims = relevant_prediction_matrix_this_field.shape
+
+                relevant_prediction_vector_this_field = numpy.ravel(
+                    relevant_prediction_matrix_this_field
+                )
+                real_mask = numpy.invert(
+                    numpy.isnan(relevant_prediction_vector_this_field)
+                )
+                relevant_prediction_vector_this_field[real_mask] = (
+                    this_model_object.predict(
+                        relevant_prediction_vector_this_field[real_mask]
+                    )
+                )
+                prediction_matrix_this_field[
+                    this_cluster_mask, :
+                ] = numpy.reshape(
+                    relevant_prediction_vector_this_field, these_dims
+                )
+
+                prediction_matrix[..., f, :] = prediction_matrix_this_field
+            else:
+                these_dims = prediction_matrix_this_field.shape
+                prediction_vector_this_field = numpy.ravel(
+                    prediction_matrix_this_field
+                )
+                real_mask = numpy.invert(
+                    numpy.isnan(prediction_vector_this_field)
+                )
+                prediction_vector_this_field[real_mask] = model_object.predict(
+                    prediction_vector_this_field[real_mask]
+                )
+                prediction_matrix[..., f, :] = numpy.reshape(
+                    prediction_vector_this_field, these_dims
+                )
 
     ptx = ptx.assign({
         prediction_io.PREDICTION_KEY: (
@@ -855,6 +629,8 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
             prediction_matrix
         )
     })
+
+    # TODO(thunderhoser): Apply physical constraints here!!!!
 
     print('Applying bias-correction model took {0:.4f} seconds.'.format(
         time.time() - exec_start_time_unix_sec
