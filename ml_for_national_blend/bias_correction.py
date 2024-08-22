@@ -307,6 +307,7 @@ def train_model_suite(
     num_tables = len(prediction_tables_xarray)
 
     for i in range(num_tables):
+        print(prediction_tables_xarray[i])
         field_index = numpy.where(
             prediction_tables_xarray[i].coords[prediction_io.FIELD_DIM].values
             == target_field_name
