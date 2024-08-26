@@ -232,6 +232,7 @@ def get_spread_vs_skill(
             )
 
             if numpy.sum(this_flag_matrix) == 0:
+                rtx[EXAMPLE_COUNT_KEY].values[k, m] = 0.
                 continue
 
             rtx[MEAN_PREDICTION_STDEV_KEY].values[k, m] = numpy.sqrt(numpy.mean(
