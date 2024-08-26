@@ -140,6 +140,8 @@ def _run(input_dir_name, init_time_limit_strings, isotonic_model_file_name,
         )
         tptx = this_prediction_table_xarray
 
+        print(tptx.attrs)
+
         if isotonic_model_file_name is not None:
             assert tptx.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is None
             assert (
