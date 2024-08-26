@@ -1,6 +1,7 @@
 """Creates spatially connected clusters with similar model bias."""
 
 import warnings
+from multiprocessing import Pool
 import numpy
 import xarray
 import netCDF4
@@ -12,6 +13,7 @@ from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.utils import misc_utils
 
 TOLERANCE = 1e-6
+NUM_SLICES_FOR_MULTIPROCESSING = 24
 
 ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
@@ -22,6 +24,167 @@ CLUSTER_ID_KEY = 'cluster_id'
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
 FIELD_NAME_KEY = 'field_name'
+
+
+def __get_slices_for_multiprocessing(bin_ids):
+    """Returns slices for multiprocessing.
+
+    Each "slice" consists of several bins.
+
+    K = number of slices
+
+    :param bin_ids: 1-D numpy array of bin IDs (positive integers).
+    :return: slice_to_bin_ids: Dictionary, where each key is a slice index
+        (non-negative integer) and the corresponding value is a list of bin IDs.
+    """
+
+    shuffled_bin_ids = bin_ids + 0
+    numpy.random.shuffle(shuffled_bin_ids)
+    num_bins = len(shuffled_bin_ids)
+
+    slice_indices_normalized = numpy.linspace(
+        0, 1, num=NUM_SLICES_FOR_MULTIPROCESSING + 1, dtype=float
+    )
+
+    start_indices = numpy.round(
+        num_bins * slice_indices_normalized[:-1]
+    ).astype(int)
+
+    end_indices = numpy.round(
+        num_bins * slice_indices_normalized[1:]
+    ).astype(int)
+
+    slice_to_bin_ids = dict()
+    for i in range(len(start_indices)):
+        slice_to_bin_ids[i] = shuffled_bin_ids[start_indices[i]:end_indices[i]]
+
+    return slice_to_bin_ids
+
+
+def __find_clusters_one_scale(
+        bin_id_matrix, unique_bin_ids_to_process,
+        cluster_id_matrix, last_cluster_id,
+        buffer_distance_px, min_cluster_size):
+    """Finds clusters at one spatial scale.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param bin_id_matrix: M-by-N numpy array of bin IDs (positive integers).
+        For pixels where the bias is NaN, a bin cannot be assigned and the value
+        in this array will be -1.
+    :param unique_bin_ids_to_process: 1-D numpy array with bin IDs to process
+        right now.
+    :param cluster_id_matrix: M-by-N numpy array of current cluster IDs, which
+        will be updated by this method.
+    :param last_cluster_id: Last cluster ID assigned.  This method will only
+        increase the cluster ID.
+    :param buffer_distance_px: See documentation for `find_clusters`.
+    :param min_cluster_size: Same.
+    :return: cluster_id_matrix: Updated version of input.
+    :return: last_cluster_id: Updated version of input.
+    """
+
+    for i in range(len(unique_bin_ids_to_process)):
+        print('Have processed {0:d} of {1:d} bins...'.format(
+            i, len(unique_bin_ids_to_process)
+        ))
+
+        ith_bin_flag_matrix = (
+            bin_id_matrix == unique_bin_ids_to_process[i]
+        ).astype(int)
+
+        if buffer_distance_px > TOLERANCE:
+            ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
+                binary_matrix=ith_bin_flag_matrix,
+                buffer_distance_px=buffer_distance_px
+            )
+
+        this_cluster_id_matrix = label(
+            input=ith_bin_flag_matrix,
+            structure=numpy.full((3, 3), 1, dtype=int)
+        )[0]
+
+        these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
+        these_unique_cluster_ids = these_unique_cluster_ids[
+            these_unique_cluster_ids > 0
+        ]
+
+        for this_cluster_id in these_unique_cluster_ids:
+            this_cluster_mask = numpy.logical_and(
+                this_cluster_id_matrix == this_cluster_id,
+                bin_id_matrix == unique_bin_ids_to_process[i]
+            )
+
+            this_cluster_size = numpy.sum(this_cluster_mask)
+            if this_cluster_size < min_cluster_size:
+                continue
+
+            last_cluster_id += 1
+            cluster_id_matrix[this_cluster_mask] = last_cluster_id
+
+    return cluster_id_matrix, last_cluster_id
+
+
+def __salvage_clusters(
+        bin_id_matrix, unique_bin_ids_to_process,
+        cluster_id_matrix, last_cluster_id, buffer_distance_px):
+    """Salvages clusters.
+
+    :param bin_id_matrix: See documentation for `__find_clusters_one_scale`.
+    :param unique_bin_ids_to_process: Same.
+    :param cluster_id_matrix: Same.
+    :param last_cluster_id: Same.
+    :param buffer_distance_px: Same.
+    :return: cluster_id_matrix: Updated version of input.
+    :return: last_cluster_id: Updated version of input.
+    :return: num_pixels_salvaged: Number of pixels salvaged into a cluster.
+    """
+
+    num_pixels_salvaged = 0
+
+    for i in range(len(unique_bin_ids_to_process)):
+        print('Have processed {0:d} of {1:d} bins...'.format(
+            i, len(unique_bin_ids_to_process)
+        ))
+
+        ith_bin_flag_matrix = (
+            bin_id_matrix == unique_bin_ids_to_process[i]
+        ).astype(int)
+
+        if buffer_distance_px > TOLERANCE:
+            ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
+                binary_matrix=ith_bin_flag_matrix,
+                buffer_distance_px=buffer_distance_px
+            )
+
+        this_cluster_id_matrix = label(
+            input=ith_bin_flag_matrix,
+            structure=numpy.full((3, 3), 1, dtype=int)
+        )[0]
+
+        these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
+        these_unique_cluster_ids = these_unique_cluster_ids[
+            these_unique_cluster_ids > 0
+        ]
+
+        for this_cluster_id in these_unique_cluster_ids:
+            this_cluster_mask = numpy.logical_and(
+                this_cluster_id_matrix == this_cluster_id,
+                bin_id_matrix == unique_bin_ids_to_process[i]
+            )
+            this_cluster_mask = numpy.logical_and(
+                this_cluster_mask,
+                cluster_id_matrix == 0
+            )
+            if numpy.sum(this_cluster_mask) == 0:
+                continue
+
+            last_cluster_id += 1
+            cluster_id_matrix[this_cluster_mask] = last_cluster_id
+            num_pixels_salvaged += numpy.sum(this_cluster_mask)
+
+    return cluster_id_matrix, last_cluster_id, num_pixels_salvaged
 
 
 def _report_cluster_membership(cluster_id_matrix):
@@ -78,7 +241,7 @@ def _discretize_biases(bias_matrix, discretization_interval):
 
 
 def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
-                  buffer_distance_px):
+                  buffer_distance_px, do_multiprocessing=True):
     """Finds clusters.
 
     M = number of rows in grid
@@ -91,6 +254,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
     :param buffer_distance_px: Buffer distance (number of pixels).  A non-zero
         buffer distance allows a cluster to be a non-simply-connected spatial
         region.
+    :param do_multiprocessing: Boolean flag.
     :return: cluster_id_matrix: M-by-N numpy array of cluster IDs (positive
         integers).  For pixels where the bias is NaN, a cluster cannot be
         assigned and the value in this array will be -1.
@@ -102,6 +266,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
     error_checking.assert_is_integer(min_cluster_size)
     error_checking.assert_is_geq(min_cluster_size, 1)
     error_checking.assert_is_geq(buffer_distance_px, 0.)
+    error_checking.assert_is_boolean(do_multiprocessing)
     error_checking.assert_is_numpy_array(
         bias_discretization_intervals, num_dimensions=1
     )
@@ -134,43 +299,43 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
         )
         unique_bin_ids = numpy.unique(bin_id_matrix[bin_id_matrix != -1])
 
-        for i in range(len(unique_bin_ids)):
-            print('Have processed {0:d} of {1:d} bins...'.format(
-                i, len(unique_bin_ids)
-            ))
+        if do_multiprocessing:
+            slice_to_bin_ids = __get_slices_for_multiprocessing(
+                bin_ids=unique_bin_ids
+            )
 
-            ith_bin_flag_matrix = (
-                bin_id_matrix == unique_bin_ids[i]
-            ).astype(int)
+            argument_list = []
+            for this_slice in slice_to_bin_ids:
+                last_cluster_id += int(1e5)
+                argument_list.append((
+                    bin_id_matrix,
+                    slice_to_bin_ids[this_slice],
+                    cluster_id_matrix,
+                    last_cluster_id,
+                    buffer_distance_px,
+                    min_cluster_size
+                ))
 
-            if buffer_distance_px > TOLERANCE:
-                ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
-                    binary_matrix=ith_bin_flag_matrix,
-                    buffer_distance_px=buffer_distance_px
+            with Pool() as pool_object:
+                cluster_id_matrices, last_cluster_ids = pool_object.starmap(
+                    __find_clusters_one_scale, argument_list
                 )
 
-            this_cluster_id_matrix = label(
-                input=ith_bin_flag_matrix,
-                structure=numpy.full((3, 3), 1, dtype=int)
-            )[0]
+                last_cluster_id = max([l for l in last_cluster_ids])
 
-            these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
-            these_unique_cluster_ids = these_unique_cluster_ids[
-                these_unique_cluster_ids > 0
-            ]
-
-            for this_cluster_id in these_unique_cluster_ids:
-                this_cluster_mask = numpy.logical_and(
-                    this_cluster_id_matrix == this_cluster_id,
-                    bin_id_matrix == unique_bin_ids[i]
-                )
-
-                this_cluster_size = numpy.sum(this_cluster_mask)
-                if this_cluster_size < min_cluster_size:
-                    continue
-
-                last_cluster_id += 1
-                cluster_id_matrix[this_cluster_mask] = last_cluster_id
+                for k in range(len(cluster_id_matrices)):
+                    cluster_id_matrix = numpy.maximum(
+                        cluster_id_matrix, cluster_id_matrices[k]
+                    )
+        else:
+            cluster_id_matrix, last_cluster_id = __find_clusters_one_scale(
+                bin_id_matrix=bin_id_matrix,
+                unique_bin_ids_to_process=unique_bin_ids,
+                cluster_id_matrix=cluster_id_matrix,
+                last_cluster_id=last_cluster_id,
+                buffer_distance_px=buffer_distance_px,
+                min_cluster_size=min_cluster_size
+            )
 
     if not numpy.any(cluster_id_matrix == 0):
         _report_cluster_membership(cluster_id_matrix)
@@ -185,48 +350,45 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
         discretization_interval=bias_discretization_intervals[0]
     )
     unique_bin_ids = numpy.unique(bin_id_matrix[bin_id_matrix != -1])
-    num_pixels_salvaged = 0
 
-    for i in range(len(unique_bin_ids)):
-        print('Have processed {0:d} of {1:d} bins...'.format(
-            i, len(unique_bin_ids)
-        ))
+    if do_multiprocessing:
+        slice_to_bin_ids = __get_slices_for_multiprocessing(
+            bin_ids=unique_bin_ids
+        )
 
-        ith_bin_flag_matrix = (
-            bin_id_matrix == unique_bin_ids[i]
-        ).astype(int)
+        argument_list = []
+        for this_slice in slice_to_bin_ids:
+            last_cluster_id += int(1e5)
+            argument_list.append((
+                bin_id_matrix,
+                slice_to_bin_ids[this_slice],
+                cluster_id_matrix,
+                last_cluster_id,
+                buffer_distance_px
+            ))
 
-        if buffer_distance_px > TOLERANCE:
-            ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
-                binary_matrix=ith_bin_flag_matrix,
+        with Pool() as pool_object:
+            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = (
+                pool_object.starmap(__salvage_clusters, argument_list)
+            )
+
+            last_cluster_id = max([l for l in last_cluster_ids])
+            num_pixels_salvaged = numpy.sum(salvaged_pixel_counts)
+
+            for k in range(len(cluster_id_matrices)):
+                cluster_id_matrix = numpy.maximum(
+                    cluster_id_matrix, cluster_id_matrices[k]
+                )
+    else:
+        cluster_id_matrix, last_cluster_id, num_pixels_salvaged = (
+            __salvage_clusters(
+                bin_id_matrix=bin_id_matrix,
+                unique_bin_ids_to_process=unique_bin_ids,
+                cluster_id_matrix=cluster_id_matrix,
+                last_cluster_id=last_cluster_id,
                 buffer_distance_px=buffer_distance_px
             )
-
-        this_cluster_id_matrix = label(
-            input=ith_bin_flag_matrix,
-            structure=numpy.full((3, 3), 1, dtype=int)
-        )[0]
-
-        these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
-        these_unique_cluster_ids = these_unique_cluster_ids[
-            these_unique_cluster_ids > 0
-        ]
-
-        for this_cluster_id in these_unique_cluster_ids:
-            this_cluster_mask = numpy.logical_and(
-                this_cluster_id_matrix == this_cluster_id,
-                bin_id_matrix == unique_bin_ids[i]
-            )
-            this_cluster_mask = numpy.logical_and(
-                this_cluster_mask,
-                cluster_id_matrix == 0
-            )
-            if numpy.sum(this_cluster_mask) == 0:
-                continue
-
-            last_cluster_id += 1
-            cluster_id_matrix[this_cluster_mask] = last_cluster_id
-            num_pixels_salvaged += numpy.sum(this_cluster_mask)
+        )
 
     print('Number of pixels salvaged from smallest scale = {0:d}'.format(
         num_pixels_salvaged
@@ -245,7 +407,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
 
 def find_clusters_backwards(
         bias_matrix, min_cluster_size, bias_discretization_intervals,
-        buffer_distance_px):
+        buffer_distance_px, do_multiprocessing=True):
     """Finds clusters.
 
     M = number of rows in grid
@@ -258,6 +420,7 @@ def find_clusters_backwards(
     :param buffer_distance_px: Buffer distance (number of pixels).  A non-zero
         buffer distance allows a cluster to be a non-simply-connected spatial
         region.
+    :param do_multiprocessing: Boolean flag.
     :return: cluster_id_matrix: M-by-N numpy array of cluster IDs (positive
         integers).  For pixels where the bias is NaN, a cluster cannot be
         assigned and the value in this array will be -1.
@@ -269,6 +432,7 @@ def find_clusters_backwards(
     error_checking.assert_is_integer(min_cluster_size)
     error_checking.assert_is_geq(min_cluster_size, 1)
     error_checking.assert_is_geq(buffer_distance_px, 0.)
+    error_checking.assert_is_boolean(do_multiprocessing)
     error_checking.assert_is_numpy_array(
         bias_discretization_intervals, num_dimensions=1
     )
@@ -300,43 +464,43 @@ def find_clusters_backwards(
         )
         unique_bin_ids = numpy.unique(bin_id_matrix[bin_id_matrix != -1])
 
-        for i in range(len(unique_bin_ids)):
-            print('Have processed {0:d} of {1:d} bins...'.format(
-                i, len(unique_bin_ids)
-            ))
+        if do_multiprocessing:
+            slice_to_bin_ids = __get_slices_for_multiprocessing(
+                bin_ids=unique_bin_ids
+            )
 
-            ith_bin_flag_matrix = (
-                bin_id_matrix == unique_bin_ids[i]
-            ).astype(int)
+            argument_list = []
+            for this_slice in slice_to_bin_ids:
+                last_cluster_id += int(1e5)
+                argument_list.append((
+                    bin_id_matrix,
+                    slice_to_bin_ids[this_slice],
+                    cluster_id_matrix,
+                    last_cluster_id,
+                    buffer_distance_px,
+                    min_cluster_size
+                ))
 
-            if buffer_distance_px > TOLERANCE:
-                ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
-                    binary_matrix=ith_bin_flag_matrix,
-                    buffer_distance_px=buffer_distance_px
+            with Pool() as pool_object:
+                cluster_id_matrices, last_cluster_ids = pool_object.starmap(
+                    __find_clusters_one_scale, argument_list
                 )
 
-            this_cluster_id_matrix = label(
-                input=ith_bin_flag_matrix,
-                structure=numpy.full((3, 3), 1, dtype=int)
-            )[0]
+                last_cluster_id = max([l for l in last_cluster_ids])
 
-            these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
-            these_unique_cluster_ids = these_unique_cluster_ids[
-                these_unique_cluster_ids > 0
-            ]
-
-            for this_cluster_id in these_unique_cluster_ids:
-                this_cluster_mask = numpy.logical_and(
-                    this_cluster_id_matrix == this_cluster_id,
-                    bin_id_matrix == unique_bin_ids[i]
-                )
-
-                this_cluster_size = numpy.sum(this_cluster_mask)
-                if this_cluster_size < min_cluster_size:
-                    continue
-
-                last_cluster_id += 1
-                cluster_id_matrix[this_cluster_mask] = last_cluster_id
+                for k in range(len(cluster_id_matrices)):
+                    cluster_id_matrix = numpy.maximum(
+                        cluster_id_matrix, cluster_id_matrices[k]
+                    )
+        else:
+            cluster_id_matrix, last_cluster_id = __find_clusters_one_scale(
+                bin_id_matrix=bin_id_matrix,
+                unique_bin_ids_to_process=unique_bin_ids,
+                cluster_id_matrix=cluster_id_matrix,
+                last_cluster_id=last_cluster_id,
+                buffer_distance_px=buffer_distance_px,
+                min_cluster_size=min_cluster_size
+            )
 
     if not numpy.any(cluster_id_matrix == 0):
         _report_cluster_membership(cluster_id_matrix)
@@ -351,48 +515,45 @@ def find_clusters_backwards(
         discretization_interval=bias_discretization_intervals[0]
     )
     unique_bin_ids = numpy.unique(bin_id_matrix[bin_id_matrix != -1])
-    num_pixels_salvaged = 0
 
-    for i in range(len(unique_bin_ids)):
-        print('Have processed {0:d} of {1:d} bins...'.format(
-            i, len(unique_bin_ids)
-        ))
+    if do_multiprocessing:
+        slice_to_bin_ids = __get_slices_for_multiprocessing(
+            bin_ids=unique_bin_ids
+        )
 
-        ith_bin_flag_matrix = (
-            bin_id_matrix == unique_bin_ids[i]
-        ).astype(int)
+        argument_list = []
+        for this_slice in slice_to_bin_ids:
+            last_cluster_id += int(1e5)
+            argument_list.append((
+                bin_id_matrix,
+                slice_to_bin_ids[this_slice],
+                cluster_id_matrix,
+                last_cluster_id,
+                buffer_distance_px
+            ))
 
-        if buffer_distance_px > TOLERANCE:
-            ith_bin_flag_matrix = misc_utils.dilate_binary_matrix(
-                binary_matrix=ith_bin_flag_matrix,
+        with Pool() as pool_object:
+            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = (
+                pool_object.starmap(__salvage_clusters, argument_list)
+            )
+
+            last_cluster_id = max([l for l in last_cluster_ids])
+            num_pixels_salvaged = numpy.sum(salvaged_pixel_counts)
+
+            for k in range(len(cluster_id_matrices)):
+                cluster_id_matrix = numpy.maximum(
+                    cluster_id_matrix, cluster_id_matrices[k]
+                )
+    else:
+        cluster_id_matrix, last_cluster_id, num_pixels_salvaged = (
+            __salvage_clusters(
+                bin_id_matrix=bin_id_matrix,
+                unique_bin_ids_to_process=unique_bin_ids,
+                cluster_id_matrix=cluster_id_matrix,
+                last_cluster_id=last_cluster_id,
                 buffer_distance_px=buffer_distance_px
             )
-
-        this_cluster_id_matrix = label(
-            input=ith_bin_flag_matrix,
-            structure=numpy.full((3, 3), 1, dtype=int)
-        )[0]
-
-        these_unique_cluster_ids = numpy.unique(this_cluster_id_matrix)
-        these_unique_cluster_ids = these_unique_cluster_ids[
-            these_unique_cluster_ids > 0
-        ]
-
-        for this_cluster_id in these_unique_cluster_ids:
-            this_cluster_mask = numpy.logical_and(
-                this_cluster_id_matrix == this_cluster_id,
-                bin_id_matrix == unique_bin_ids[i]
-            )
-            this_cluster_mask = numpy.logical_and(
-                this_cluster_mask,
-                cluster_id_matrix == 0
-            )
-            if numpy.sum(this_cluster_mask) == 0:
-                continue
-
-            last_cluster_id += 1
-            cluster_id_matrix[this_cluster_mask] = last_cluster_id
-            num_pixels_salvaged += numpy.sum(this_cluster_mask)
+        )
 
     print('Number of pixels salvaged from largest scale = {0:d}'.format(
         num_pixels_salvaged
