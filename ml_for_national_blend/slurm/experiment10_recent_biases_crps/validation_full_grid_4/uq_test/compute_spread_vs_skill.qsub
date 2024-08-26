@@ -46,6 +46,6 @@ python3 -u "${CODE_DIR_NAME}/compute_spread_vs_skill.py" \
 --init_time_limit_strings "2022-05-01-00" "2022-06-01-00" \
 --target_field_names "temperature_2m_agl_kelvins" \
 --num_bins_by_target 80 \
---min_bin_edge_by_target -40 \
---max_bin_edge_by_target 40 \
+--min_bin_edge_prctile_by_target 0 \
+--max_bin_edge_prctile_by_target 100 \
 --output_file_name="${model_dir_name}/validation_full_grid/spread_vs_skill.nc"
