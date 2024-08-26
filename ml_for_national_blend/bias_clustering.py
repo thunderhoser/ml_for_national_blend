@@ -325,8 +325,10 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
                 ))
 
             with Pool() as pool_object:
-                cluster_id_matrices, last_cluster_ids = pool_object.starmap(
-                    __find_clusters_one_scale, argument_list
+                cluster_id_matrices, last_cluster_ids = zip(
+                    *pool_object.starmap(
+                        __find_clusters_one_scale, argument_list
+                    )
                 )
 
                 last_cluster_id = max([l for l in last_cluster_ids])
@@ -376,8 +378,8 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
             ))
 
         with Pool() as pool_object:
-            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = (
-                pool_object.starmap(__salvage_clusters, argument_list)
+            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = zip(
+                *pool_object.starmap(__salvage_clusters, argument_list)
             )
 
             last_cluster_id = max([l for l in last_cluster_ids])
@@ -490,8 +492,10 @@ def find_clusters_backwards(
                 ))
 
             with Pool() as pool_object:
-                cluster_id_matrices, last_cluster_ids = pool_object.starmap(
-                    __find_clusters_one_scale, argument_list
+                cluster_id_matrices, last_cluster_ids = zip(
+                    *pool_object.starmap(
+                        __find_clusters_one_scale, argument_list
+                    )
                 )
 
                 last_cluster_id = max([l for l in last_cluster_ids])
@@ -541,8 +545,8 @@ def find_clusters_backwards(
             ))
 
         with Pool() as pool_object:
-            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = (
-                pool_object.starmap(__salvage_clusters, argument_list)
+            cluster_id_matrices, last_cluster_ids, salvaged_pixel_counts = zip(
+                *pool_object.starmap(__salvage_clusters, argument_list)
             )
 
             last_cluster_id = max([l for l in last_cluster_ids])
