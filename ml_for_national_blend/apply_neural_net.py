@@ -270,7 +270,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     prediction_io.write_file(
         netcdf_file_name=output_file_name,
         target_matrix=target_matrix[0, ...],
-        prediction_matrix=numpy.expand_dims(prediction_matrix[0, ...], axis=-1),
+        prediction_matrix=prediction_matrix[0, ...],
         latitude_matrix_deg_n=latitude_matrix_deg_n[0, ...],
         longitude_matrix_deg_e=longitude_matrix_deg_e[0, ...],
         field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
