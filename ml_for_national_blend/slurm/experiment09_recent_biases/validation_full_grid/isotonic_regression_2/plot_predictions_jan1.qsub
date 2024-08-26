@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_predictions_jan1"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=04:00:00
+#SBATCH --array=2
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_predictions_jan1_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment09_recent_biases"
+
+NWP_LEAD_TIME_COUNTS=("1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4")
+LAG_TIME_COUNTS=("1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4")
+
+num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
+num_lag_times=${LAG_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
+echo $model_dir_name
+
+INIT_TIME_STRINGS=("2022-01-01-18")
+i=0
+
+while [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
+    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
+    --input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression" \
+    --init_time_string="${INIT_TIME_STRINGS[$i]}" \
+    --field_names "temperature_2m_agl_kelvins"  \
+    --min_colour_percentiles 0.1 \
+    --max_colour_percentiles 99.9 \
+    --plot_diffs=1 \
+    --max_colour_percentiles_for_diff 99.9 \
+    --baseline_nwp_model_name="ensemble" \
+    --baseline_nwp_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid" \
+    --output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/${INIT_TIME_STRINGS[$i]}"
+    
+    i=$(( $i + 1 ))
+done
