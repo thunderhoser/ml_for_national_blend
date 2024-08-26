@@ -73,6 +73,11 @@ def __compute_pit_values_1field(prediction_matrix_2d, target_values_1d):
     pit_values_1d = numpy.full(num_scalar_examples, numpy.nan)
 
     for i in range(num_scalar_examples):
+        if numpy.any(numpy.isnan(prediction_matrix_2d[i, :])):
+            continue
+        if numpy.any(numpy.isnan(target_values_1d[i])):
+            continue
+
         if numpy.mod(i, 10000) == 0:
             print((
                 'Have computed PIT value for {0:d} of {1:d} scalar examples...'
@@ -195,7 +200,7 @@ def _compute_pit_histogram_1field(
                 e = end_indices[k]
                 pit_values_1d[s:e] = subarrays[k]
 
-            assert not numpy.any(numpy.isnan(pit_values_1d))
+            # assert not numpy.any(numpy.isnan(pit_values_1d))
     else:
         pit_values_1d = __compute_pit_values_1field(
             prediction_matrix_2d=prediction_matrix_2d,
@@ -211,8 +216,10 @@ def _compute_pit_histogram_1field(
     ) - 1
     example_to_bin = numpy.maximum(example_to_bin, 0)
     example_to_bin = numpy.minimum(example_to_bin, num_bins - 1)
+    example_to_bin[numpy.isnan(pit_values_1d)] = -1
 
     used_bin_indices = numpy.unique(example_to_bin)
+    used_bin_indices = used_bin_indices[used_bin_indices >= 0]
     used_bin_counts = numpy.full(len(used_bin_indices), numpy.nan)
 
     for k in range(len(used_bin_indices)):
