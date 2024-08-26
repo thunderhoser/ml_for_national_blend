@@ -632,7 +632,8 @@ def _run(evaluation_file_names, target_normalization_file_name,
 
             this_prediction_table_xarray = evaluation.read_inputs(
                 prediction_file_names=[prediction_file_names[j]],
-                target_field_names=target_field_names
+                target_field_names=target_field_names,
+                take_ensemble_mean=True
             )
             ptx = this_prediction_table_xarray
 

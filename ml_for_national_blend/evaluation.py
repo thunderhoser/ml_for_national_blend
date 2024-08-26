@@ -843,7 +843,7 @@ def confidence_interval_to_polygon(
     )))
 
 
-def read_inputs(prediction_file_names, target_field_names):
+def read_inputs(prediction_file_names, target_field_names, take_ensemble_mean):
     """Reads inputs (predictions and targets) from many files.
 
     P = number of files
@@ -851,6 +851,7 @@ def read_inputs(prediction_file_names, target_field_names):
     :param prediction_file_names: length-F list of paths to prediction files.
         Each file will be read by `prediction_io.read_file`.
     :param target_field_names: length-T list of field names desired.
+    :param take_ensemble_mean: Boolean flag.
     :return: prediction_tables_xarray: length-F list of xarray tables in format
         returned by `prediction_io.read_file`.
     """
@@ -859,6 +860,7 @@ def read_inputs(prediction_file_names, target_field_names):
 
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_string_list(target_field_names)
+    error_checking.assert_is_boolean(take_ensemble_mean)
 
     num_times = len(prediction_file_names)
     prediction_tables_xarray = [xarray.Dataset()] * num_times
@@ -869,11 +871,12 @@ def read_inputs(prediction_file_names, target_field_names):
         prediction_tables_xarray[i] = prediction_io.read_file(
             prediction_file_names[i]
         )
-        prediction_tables_xarray[i] = prediction_io.take_ensemble_mean(
-            prediction_tables_xarray[i]
-        )
-        pt_i = prediction_tables_xarray[i]
+        if take_ensemble_mean:
+            prediction_tables_xarray[i] = prediction_io.take_ensemble_mean(
+                prediction_tables_xarray[i]
+            )
 
+        pt_i = prediction_tables_xarray[i]
         if model_file_name is None:
             model_file_name = copy.deepcopy(
                 pt_i.attrs[prediction_io.MODEL_FILE_KEY]
@@ -988,7 +991,8 @@ def get_scores_with_bootstrapping(
 
     prediction_tables_xarray = read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names
+        target_field_names=target_field_names,
+        take_ensemble_mean=True
     )
 
     prediction_matrix = numpy.stack([
