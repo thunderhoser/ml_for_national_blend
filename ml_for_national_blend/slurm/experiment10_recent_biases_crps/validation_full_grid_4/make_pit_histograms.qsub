@@ -43,7 +43,7 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/make_pit_histograms.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
---init_time_limit_strings "2022-05-01-00" "2022-06-01-00" \
+--init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
 --target_field_names "temperature_2m_agl_kelvins" \
 --num_bins=50 \
 --output_file_name="${model_dir_name}/validation_full_grid/pit_histograms.nc"
