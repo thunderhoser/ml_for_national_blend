@@ -43,4 +43,4 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_spread_vs_skill.py" \
 --input_file_name="${model_dir_name}/validation_full_grid/spread_vs_skill.nc" \
---output_file_name="${model_dir_name}/validation_full_grid/spread_vs_skill"
+--output_dir_name="${model_dir_name}/validation_full_grid/spread_vs_skill"
