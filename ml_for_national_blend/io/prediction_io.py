@@ -269,11 +269,6 @@ def read_file(netcdf_file_name):
         )
     }
 
-    if prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] is None:
-        prediction_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = ''
-    if prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] is None:
-        prediction_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = ''
-
     attribute_dict = {
         MODEL_FILE_KEY: prediction_table_xarray.attrs[MODEL_FILE_KEY],
         ISOTONIC_MODEL_FILE_KEY:

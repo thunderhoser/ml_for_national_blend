@@ -184,8 +184,9 @@ def _train_one_model(prediction_tables_xarray):
         str(numpy.percentile(eval_weights, percentile_levels))
     ))
 
+    # TODO(thunderhoser): Deal with physical constraints here.
     model_object = IsotonicRegression(
-        increasing=True, out_of_bounds='clip', y_min=0.
+        increasing=True, out_of_bounds='clip'
     )
     model_object.fit(
         X=predicted_values, y=target_values, sample_weight=eval_weights
@@ -300,7 +301,7 @@ def train_model_suite(
 
     for i in range(num_tables):
         field_index = numpy.where(
-            prediction_tables_xarray[i].coords[prediction_io.FIELD_DIM].values
+            prediction_tables_xarray[i][prediction_io.FIELD_NAME_KEY].values
             == target_field_name
         )[0][0]
 
@@ -317,7 +318,7 @@ def train_model_suite(
 
     if cluster_table_xarray is not None:
         field_index = numpy.where(
-            cluster_table_xarray.coords[bias_clustering.FIELD_DIM].values
+            cluster_table_xarray[bias_clustering.FIELD_NAME_KEY].values
             == target_field_name
         )[0][0]
 
@@ -502,7 +503,7 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                         unique_cluster_ids[k]
                     ]
                     this_cluster_mask = (
-                        cluster_id_matrix == unique_cluster_ids[k]
+                        cluster_id_matrix[..., f] == unique_cluster_ids[k]
                     )
 
                     orig_stdev_vector = (
@@ -583,7 +584,9 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                 this_model_object = cluster_id_to_model_object[
                     unique_cluster_ids[k]
                 ]
-                this_cluster_mask = cluster_id_matrix == unique_cluster_ids[k]
+                this_cluster_mask = (
+                    cluster_id_matrix[..., f] == unique_cluster_ids[k]
+                )
 
                 relevant_prediction_matrix_this_field = (
                     prediction_matrix_this_field[this_cluster_mask, :]
