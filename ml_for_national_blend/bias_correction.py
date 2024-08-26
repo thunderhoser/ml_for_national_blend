@@ -192,8 +192,9 @@ def _train_one_model(prediction_tables_xarray):
         str(numpy.percentile(eval_weights, percentile_levels))
     ))
 
+    # TODO(thunderhoser): Deal with physical constraints here.
     model_object = IsotonicRegression(
-        increasing=True, out_of_bounds='clip', y_min=0.
+        increasing=True, out_of_bounds='clip'
     )
     model_object.fit(
         X=predicted_values, y=target_values, sample_weight=eval_weights
@@ -308,8 +309,8 @@ def train_model_suite(
 
     for i in range(num_tables):
         field_index = numpy.where(
-            prediction_tables_xarray[i][prediction_io.FIELD_NAME_KEY] ==
-            target_field_name
+            prediction_tables_xarray[i][prediction_io.FIELD_NAME_KEY].values
+            == target_field_name
         )[0][0]
 
         prediction_tables_xarray[i] = prediction_tables_xarray[i].isel({
