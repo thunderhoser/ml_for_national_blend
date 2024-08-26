@@ -260,7 +260,7 @@ def __predicted_2m_depression_to_dewpoint(prediction_matrix,
         have been replaced with dewpoint temperatures.
     """
 
-    num_target_fields = prediction_matrix.shape[-1]
+    num_target_fields = prediction_matrix.shape[-2]
     target_field_names = numpy.array(target_field_names)
 
     error_checking.assert_is_numpy_array(
@@ -274,9 +274,9 @@ def __predicted_2m_depression_to_dewpoint(prediction_matrix,
     temp_index = numpy.where(
         target_field_names == urma_utils.TEMPERATURE_2METRE_NAME
     )[0][0]
-    prediction_matrix[..., dewp_index] = (
-        prediction_matrix[..., temp_index] -
-        prediction_matrix[..., dewp_index]
+    prediction_matrix[..., dewp_index, :] = (
+        prediction_matrix[..., temp_index, :] -
+        prediction_matrix[..., dewp_index, :]
     )
 
     return prediction_matrix
@@ -291,7 +291,7 @@ def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
         been replaced with gust speeds.
     """
 
-    num_target_fields = prediction_matrix.shape[-1]
+    num_target_fields = prediction_matrix.shape[-2]
     target_field_names = numpy.array(target_field_names)
 
     error_checking.assert_is_numpy_array(
@@ -309,12 +309,12 @@ def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
         target_field_names == urma_utils.WIND_GUST_10METRE_NAME
     )[0][0]
 
-    gust_factor_matrix = prediction_matrix[..., gust_index] + 1.
+    gust_factor_matrix = prediction_matrix[..., gust_index, :] + 1.
     sustained_speed_matrix = numpy.sqrt(
-        prediction_matrix[..., u_index] ** 2 +
-        prediction_matrix[..., v_index] ** 2
+        prediction_matrix[..., u_index, :] ** 2 +
+        prediction_matrix[..., v_index, :] ** 2
     )
-    prediction_matrix[..., gust_index] = (
+    prediction_matrix[..., gust_index, :] = (
         gust_factor_matrix * sustained_speed_matrix
     )
 
@@ -3647,13 +3647,15 @@ def apply_patchwise_model_to_full_grid(
 
     weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
     weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
 
     num_examples = full_predictor_matrices[0].shape[0]
     these_dim = (
-        num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields
+        num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields, 1
     )
-    summed_prediction_matrix = numpy.full(these_dim, 0.)
     prediction_count_matrix = numpy.full(these_dim, 0, dtype=float)
+    summed_prediction_matrix = None
+    # summed_prediction_matrix = numpy.full(these_dim, 0.)
 
     while True:
         patch_metalocation_dict = __update_patch_metalocation_dict(
@@ -3735,10 +3737,18 @@ def apply_patchwise_model_to_full_grid(
             verbose=False
         )
 
-        summed_prediction_matrix[:, i_start:i_end, j_start:j_end, :] += (
+        if summed_prediction_matrix is None:
+            ensemble_size = patch_prediction_matrix.shape[-1]
+            these_dim = (
+                num_examples, num_rows_2pt5km, num_columns_2pt5km,
+                num_target_fields, ensemble_size
+            )
+            summed_prediction_matrix = numpy.full(these_dim, 0.)
+
+        summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
             weight_matrix * patch_prediction_matrix
         )
-        prediction_count_matrix[:, i_start:i_end, j_start:j_end, :] += (
+        prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
             weight_matrix
         )
 
@@ -3760,6 +3770,7 @@ def apply_model(
     M = number of rows in grid
     N = number of columns in grid
     F = number of target fields
+    S = ensemble size
 
     :param model_object: Trained neural net (instance of `keras.models.Model`).
     :param predictor_matrices: See output doc for `data_generator`.
@@ -3773,7 +3784,7 @@ def apply_model(
         [used only if predict_dewpoint_depression or predict_gust_factor]
         length-F list of target fields (each must be accepted by
         `urma_utils.check_field_name`).
-    :return: prediction_matrix: E-by-M-by-N-by-F numpy array of predicted
+    :return: prediction_matrix: E-by-M-by-N-by-F-by-S numpy array of predicted
         values.
     """
 
@@ -3820,7 +3831,7 @@ def apply_model(
     if verbose:
         print('Have applied model to all {0:d} examples!'.format(num_examples))
 
-    while len(prediction_matrix.shape) < 4:
+    while len(prediction_matrix.shape) < 5:
         prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
     if predict_dewpoint_depression:
