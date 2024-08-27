@@ -634,7 +634,7 @@ def _run(evaluation_file_names, target_normalization_file_name,
                 prediction_file_names=[prediction_file_names[j]],
                 target_field_names=target_field_names,
                 take_ensemble_mean=True
-            )
+            )[0]
             ptx = this_prediction_table_xarray
 
             this_prediction_matrix = (
