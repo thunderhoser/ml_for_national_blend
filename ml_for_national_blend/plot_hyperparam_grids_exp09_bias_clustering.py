@@ -1290,13 +1290,6 @@ def _run(experiment_dir_name, output_dir_name):
         reliability_panel_file_name_matrix
     ]
 
-    num_panel_rows = int(numpy.floor(
-        numpy.sqrt(axis3_length)
-    ))
-    num_panel_columns = int(numpy.ceil(
-        float(axis4_length) / num_panel_rows
-    ))
-
     for i in range(len(concat_figure_file_names)):
         print('Concatenating panels to: "{0:s}"...'.format(
             concat_figure_file_names[i]
@@ -1304,8 +1297,8 @@ def _run(experiment_dir_name, output_dir_name):
         imagemagick_utils.concatenate_images(
             input_file_names=numpy.ravel(panel_file_name_matrices[i]).tolist(),
             output_file_name=concat_figure_file_names[i],
-            num_panel_rows=num_panel_rows,
-            num_panel_columns=num_panel_columns
+            num_panel_rows=axis3_length,
+            num_panel_columns=axis4_length
         )
         imagemagick_utils.resize_image(
             input_file_name=concat_figure_file_names[i],
