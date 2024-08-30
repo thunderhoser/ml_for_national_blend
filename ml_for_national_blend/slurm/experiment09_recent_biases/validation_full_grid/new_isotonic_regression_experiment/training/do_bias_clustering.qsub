@@ -1,0 +1,77 @@
+#!/bin/bash
+
+#SBATCH --job-name="do_bias_clustering"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=0-149%70
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=do_bias_clustering_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment09_recent_biases"
+
+NWP_LEAD_TIME_COUNTS=("1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4")
+LAG_TIME_COUNTS=("1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4")
+
+BEST_MODEL_INDEX=2
+
+num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$BEST_MODEL_INDEX]}
+num_lag_times=${LAG_TIME_COUNTS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
+echo $model_dir_name
+
+BIAS_DISCRETIZATION_INTERVAL_INTERVALS=("0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30" "0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30" "0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30" "0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30" "0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30" "0.10" "0.10" "0.10" "0.10" "0.10" "0.15" "0.15" "0.15" "0.15" "0.15" "0.20" "0.20" "0.20" "0.20" "0.20" "0.25" "0.25" "0.25" "0.25" "0.25" "0.30" "0.30" "0.30" "0.30" "0.30")
+MIN_CLUSTER_SIZES_PX=("100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "350" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "750" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000" "1000")
+BUFFER_DISTANCES_PX=("6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20" "6" "9" "12" "15" "20")
+DO_BACKWARDS_FLAGS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+
+bias_discretization_interval_interval="${BIAS_DISCRETIZATION_INTERVAL_INTERVALS[$SLURM_ARRAY_TASK_ID]}"
+min_cluster_size_px="${MIN_CLUSTER_SIZES_PX[$SLURM_ARRAY_TASK_ID]}"
+buffer_distance_px="${BUFFER_DISTANCES_PX[$SLURM_ARRAY_TASK_ID]}"
+do_backwards_flag="${DO_BACKWARDS_FLAGS[$SLURM_ARRAY_TASK_ID]}"
+
+if [ "$bias_discretization_interval_interval" == "0.10" ]; then
+    bias_discretization_intervals="0.100 0.200 0.300 0.400 0.500 0.600 0.700 0.800 0.900 1.000"
+elif [ "$bias_discretization_interval_interval" == "0.15" ]; then
+    bias_discretization_intervals="0.150 0.300 0.450 0.600 0.750 0.900 1.050"
+elif [ "$bias_discretization_interval_interval" == "0.20" ]; then
+    bias_discretization_intervals="0.200 0.400 0.600 0.800 1.000"
+elif [ "$bias_discretization_interval_interval" == "0.25" ]; then
+    bias_discretization_intervals="0.250 0.500 0.750 1.000"
+elif [ "$bias_discretization_interval_interval" == "0.30" ]; then
+    bias_discretization_intervals="0.300 0.600 0.900 1.200"
+fi
+
+python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
+--input_gridded_eval_file_arg_name="${model_dir_name}/training_full_grid/gridded_evaluation.nc" \
+--min_cluster_size_px=${min_cluster_size_px} \
+--target_field_name="temperature_2m_agl_kelvins" \
+--bias_discretization_intervals ${bias_discretization_intervals} \
+--buffer_distance_px=${buffer_distance_px} \
+--do_backwards_clustering=${do_backwards_flag} \
+--main_output_file_name="${model_dir_name}/training_full_grid/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/bias_clustering.nc" \
+--output_figure_file_name="${model_dir_name}/training_full_grid/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/bias_clustering.jpg"
