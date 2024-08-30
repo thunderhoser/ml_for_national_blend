@@ -1302,7 +1302,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_names[i]
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=panel_file_name_matrices[i],
+            input_file_names=numpy.ravel(panel_file_name_matrices[i]).tolist(),
             output_file_name=concat_figure_file_names[i],
             num_panel_rows=num_panel_rows,
             num_panel_columns=num_panel_columns
