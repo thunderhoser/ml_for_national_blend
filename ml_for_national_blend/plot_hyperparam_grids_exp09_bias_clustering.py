@@ -149,7 +149,7 @@ def _plot_scores_2d(
         colour_map_object=colour_map_object,
         colour_norm_object=colour_norm_object,
         orientation_string='vertical', extend_min=False, extend_max=False,
-        font_size=FONT_SIZE
+        font_size=FONT_SIZE, fraction_of_axis_length=0.6
     )
 
     tick_values = colour_bar_object.get_ticks()
@@ -187,7 +187,7 @@ def _print_ranking_one_score(score_matrix, score_name):
 
         print((
             r'{0:d}th-lowest {1:s} = {2:.4g} ... '
-            r'discretization $\Delta$\Delta = {3:.3f} ... '
+            r'discretization $\Delta\Delta$ = {3:.3f} ... '
             r'min size = {4:d} ... '
             r'buffer dist = {5:d} px ... '
             r'backwards = {6:d}'
@@ -329,7 +329,7 @@ def _print_ranking_all_scores(
         b = b_sort_indices[k]
 
         print((
-            r'Discretization $\Delta$\Delta = {0:.3f} ... '
+            r'Discretization $\Delta\Delta$ = {0:.3f} ... '
             r'min size = {1:d} ... '
             r'buffer dist = {2:d} px ... '
             r'backwards = {3:d}:\n'
@@ -375,7 +375,7 @@ def _run(experiment_dir_name, output_dir_name):
     ]
     x_tick_labels = ['{0:d}'.format(m) for m in MIN_CLUSTER_SIZES_PX_AXIS2]
 
-    y_axis_label = r'Bias-discretization $\Delta$\Delta ($^{\circ}$C)'
+    y_axis_label = r'Bias-discretization $\Delta\Delta$ ($^{\circ}$C)'
     x_axis_label = 'Min cluster size (pixels)'
 
     dimensions = (axis1_length, axis2_length, axis3_length, axis4_length)
