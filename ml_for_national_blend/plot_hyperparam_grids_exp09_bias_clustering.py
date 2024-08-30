@@ -21,7 +21,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import imagemagick_utils
 import file_system_utils
 import gg_plotting_utils
-import make_templates_exp04_temp_only_more_models as make_templates_exp04
 import evaluation
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
