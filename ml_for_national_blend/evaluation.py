@@ -464,6 +464,7 @@ def _get_ssrat_one_replicate(
     """
 
     # TODO(thunderhoser): Fix output documentation.
+    # TODO(thunderhoser): This is not actually computing a issue.  Need to fix documentation and var names.
 
     squared_error_matrix = full_squared_error_matrix[
         example_indices_in_replicate, ...
@@ -498,7 +499,8 @@ def _get_ssrat_one_replicate(
                 numpy.nanmean(squared_error_matrix[..., k])
             )
 
-        ssrat_matrix[..., k] = numerator / denominator
+        # ssrat_matrix[..., k] = numerator / denominator
+        ssrat_matrix[..., k] = numerator - denominator
 
     return ssrat_matrix
 
