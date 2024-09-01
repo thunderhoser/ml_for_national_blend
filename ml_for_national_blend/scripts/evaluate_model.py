@@ -25,6 +25,7 @@ MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'min_relia_bin_edge_prctile_by_target'
 MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'max_relia_bin_edge_prctile_by_target'
 PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
 KEEP_IT_SIMPLE_ARG_NAME = 'keep_it_simple'
+COMPUTE_SSRAT_ARG_NAME = 'compute_ssrat'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -82,6 +83,9 @@ PER_GRID_CELL_HELP_STRING = (
 KEEP_IT_SIMPLE_HELP_STRING = (
     'Boolean flag.  If 1, will avoid Kolmogorov-Smirnov test and attributes '
     'diagram.'
+)
+COMPUTE_SSRAT_HELP_STRING = (
+    'Boolean flag.  If 1, will compute spread-skill ratio (SSRAT).'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -144,6 +148,10 @@ INPUT_ARG_PARSER.add_argument(
     help=KEEP_IT_SIMPLE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + COMPUTE_SSRAT_ARG_NAME, type=int, required=True,
+    help=COMPUTE_SSRAT_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -156,7 +164,7 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
          max_relia_bin_edge_by_target,
          min_relia_bin_edge_prctile_by_target,
          max_relia_bin_edge_prctile_by_target,
-         per_grid_cell, keep_it_simple, output_file_name):
+         per_grid_cell, keep_it_simple, compute_ssrat, output_file_name):
     """Evaluates model.
 
     This is effectively the main method.
@@ -174,6 +182,7 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
     :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
     :param keep_it_simple: Same.
+    :param compute_ssrat: Same.
     :param output_file_name: Same.
     """
 
@@ -260,7 +269,8 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
         max_relia_bin_edge_prctile_by_target=
         max_relia_bin_edge_prctile_by_target,
         per_grid_cell=per_grid_cell,
-        keep_it_simple=keep_it_simple
+        keep_it_simple=keep_it_simple,
+        compute_ssrat=compute_ssrat
     )
     print(SEPARATOR_STRING)
 
@@ -348,5 +358,6 @@ if __name__ == '__main__':
         ),
         per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
         keep_it_simple=bool(getattr(INPUT_ARG_OBJECT, KEEP_IT_SIMPLE_ARG_NAME)),
+        compute_ssrat=bool(getattr(INPUT_ARG_OBJECT, COMPUTE_SSRAT_ARG_NAME)),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
