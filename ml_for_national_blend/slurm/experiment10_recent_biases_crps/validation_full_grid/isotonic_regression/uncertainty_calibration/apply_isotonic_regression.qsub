@@ -42,6 +42,6 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/training_full_grid" \
---init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
+--init_time_limit_strings "2021-01-01-00" "2021-12-31-18" \
 --isotonic_model_file_name="${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression.dill" \
 --output_prediction_dir_name="${model_dir_name}/training_full_grid/isotonic_regression"
