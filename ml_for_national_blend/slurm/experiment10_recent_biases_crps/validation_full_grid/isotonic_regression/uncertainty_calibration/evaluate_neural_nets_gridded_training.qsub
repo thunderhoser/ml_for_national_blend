@@ -42,7 +42,7 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_n
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
---input_prediction_dir_name="${model_dir_name}/training_full_grid" \
+--input_prediction_dir_name="${model_dir_name}/training_full_grid/isotonic_regression" \
 --first_init_time_string_by_period "2021-01-01-00" \
 --last_init_time_string_by_period "2021-12-31-18" \
 --num_bootstrap_reps=1 \
@@ -53,4 +53,5 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --max_relia_bin_edge_by_target 35 \
 --per_grid_cell=1 \
 --keep_it_simple=1 \
---output_file_name="${model_dir_name}/training_full_grid/gridded_evaluation.nc"
+--compute_ssrat=1 \
+--output_file_name="${model_dir_name}/training_full_grid/isotonic_regression/gridded_evaluation.nc"
