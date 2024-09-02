@@ -148,7 +148,7 @@ INPUT_ARG_PARSER.add_argument(
     help=KEEP_IT_SIMPLE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + COMPUTE_SSRAT_ARG_NAME, type=int, required=True,
+    '--' + COMPUTE_SSRAT_ARG_NAME, type=int, required=False, default=0,
     help=COMPUTE_SSRAT_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
