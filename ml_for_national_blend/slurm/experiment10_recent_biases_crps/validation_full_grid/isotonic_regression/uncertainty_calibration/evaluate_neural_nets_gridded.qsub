@@ -53,4 +53,5 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --max_relia_bin_edge_by_target 35 \
 --per_grid_cell=1 \
 --keep_it_simple=0 \
+--compute_ssrat=1 \
 --output_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation.nc"

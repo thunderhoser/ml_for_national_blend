@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_evaluation_gridded"
+#SBATCH --job-name="plot_evaluation_gridded_ssrat"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_gridded_%A_%a.out
+#SBATCH --output=plot_evaluation_gridded_ssrat_%A_%a.out
 
 conda init
 conda activate base
@@ -42,8 +42,8 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_n
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
---input_evaluation_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation.nc" \
---metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" "spread_skill_ratio" \
---min_colour_percentiles 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 \
---max_colour_percentiles 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 \
---output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation"
+--input_evaluation_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation_ssrat.nc" \
+--metric_names "spread_skill_ratio" \
+--min_colour_percentiles 0.5 \
+--max_colour_percentiles 99.5 \
+--output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation_ssrat"
