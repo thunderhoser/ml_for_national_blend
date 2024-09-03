@@ -58,16 +58,16 @@ fi
 
 if [ "$num_lag_times" = "1" ]; then
     urma_lag_times_hours="0"
-    recent_bias_init_time_lags_hours="12"
-    recent_bias_lead_times_hours="12"
+    recent_bias_init_time_lags_hours="6"
+    recent_bias_lead_times_hours="6"
 elif [ "$num_lag_times" = "2" ]; then
     urma_lag_times_hours="0 24"
-    recent_bias_init_time_lags_hours="12 24"
-    recent_bias_lead_times_hours="12 24"
+    recent_bias_init_time_lags_hours="6 12"
+    recent_bias_lead_times_hours="6 12"
 elif [ "$num_lag_times" = "3" ]; then
     urma_lag_times_hours="0 12 24"
-    recent_bias_init_time_lags_hours="12 24 36"
-    recent_bias_lead_times_hours="12 24 36"
+    recent_bias_init_time_lags_hours="6 12 18"
+    recent_bias_lead_times_hours="6 12 18"
 else
     urma_lag_times_hours="0 12 24 36"
     recent_bias_init_time_lags_hours="12 24 36 48"
