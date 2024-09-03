@@ -490,7 +490,7 @@ def _plot_everything_1sample(
                     numpy.expand_dims(baseline_prediction_matrix[..., j], axis=-1)
                 ]
 
-            concat_matrix = numpy.stack(these_matrices, axis=-1)
+            concat_matrix = numpy.concatenate(these_matrices, axis=-1)
 
             (
                 ensemble_colour_map_object, ensemble_colour_norm_object
