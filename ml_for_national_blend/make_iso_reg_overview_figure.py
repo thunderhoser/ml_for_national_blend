@@ -322,6 +322,8 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         bc_x_values, bc_y_values, color=BC_PREDICTION_LINE_COLOUR, alpha=0.2
     )
 
+    y_max = axes_object.get_ylim()[1]
+
     legend_handles[2] = axes_object.plot(
         numpy.full(2, target_value), axes_object.get_ylim(),
         color=TARGET_LINE_COLOUR,
@@ -341,6 +343,11 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     axes_object.set_xlabel(
         target_plotting.FIELD_NAME_TO_FANCY[target_field_name]
     )
+
+    x_min = min([numpy.min(raw_x_values), numpy.min(bc_x_values)])
+    x_max = max([numpy.max(raw_x_values), numpy.max(bc_x_values)])
+    axes_object.set_xlim([x_min, x_max])
+    axes_object.set_ylim([0, y_max])
 
     output_file_name = '{0:s}/ir_effect_on_ensemble_distribution.jpg'.format(
         output_dir_name
