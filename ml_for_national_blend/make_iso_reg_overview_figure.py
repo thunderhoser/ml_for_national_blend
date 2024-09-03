@@ -4,6 +4,7 @@ import os
 import sys
 import argparse
 import numpy
+from scipy.stats import gaussian_kde
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
@@ -249,7 +250,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markeredgewidth=0
     )[0]
 
-    legend_strings = ['Raw pred''n', 'Bias-corrected pred''n', 'Actual']
+    legend_strings = ['Raw pred\'n', 'Bias-corrected pred\'n', 'Actual']
 
     axes_object.legend(
         legend_handles, legend_strings, loc='upper left',
@@ -264,6 +265,83 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     )
 
     output_file_name = '{0:s}/ir_effect_on_ensemble_mean.jpg'.format(
+        output_dir_name
+    )
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    figure_object.savefig(
+        output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+        pad_inches=0, bbox_inches='tight'
+    )
+    pyplot.close(figure_object)
+
+    # Create plot to show how IR affects full ensemble distribution.
+    i = numpy.random.choice(example_indices, size=1, replace=False)[0]
+    raw_predictions = raw_prediction_matrix[i, :]
+    bc_predictions = bc_prediction_matrix[i, :]
+    target_value = target_values[i]
+
+    raw_kde_object = gaussian_kde(raw_predictions, bw_method='scott')
+    raw_x_values = numpy.linspace(
+        numpy.min(raw_predictions) - 2.,
+        numpy.max(raw_predictions) + 2.,
+        num=1000
+    )
+    raw_y_values = raw_kde_object(raw_x_values)
+
+    bc_kde_object = gaussian_kde(bc_predictions, bw_method='scott')
+    bc_x_values = numpy.linspace(
+        numpy.min(bc_predictions) - 2.,
+        numpy.max(bc_predictions) + 2.,
+        num=1000
+    )
+    bc_y_values = bc_kde_object(bc_x_values)
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+    legend_handles = [None] * 3
+
+    legend_handles[0] = axes_object.plot(
+        raw_x_values, raw_y_values,
+        color=RAW_PREDICTION_LINE_COLOUR,
+        linestyle='solid',
+        linewidth=LINE_WIDTH
+    )[0]
+    axes_object.fill_between(
+        raw_x_values, raw_y_values, color=RAW_PREDICTION_LINE_COLOUR, alpha=0.2
+    )
+
+    legend_handles[1] = axes_object.plot(
+        bc_x_values, bc_y_values,
+        color=BC_PREDICTION_LINE_COLOUR,
+        linestyle='solid',
+        linewidth=LINE_WIDTH
+    )[0]
+    axes_object.fill_between(
+        bc_x_values, bc_y_values, color=BC_PREDICTION_LINE_COLOUR, alpha=0.2
+    )
+
+    legend_handles[2] = axes_object.plot(
+        numpy.full(2, target_value), axes_object.get_ylim(),
+        color=TARGET_LINE_COLOUR,
+        linestyle='dashed',
+        linewidth=0.5 * LINE_WIDTH
+    )[0]
+
+    legend_strings = ['Raw ensemble', 'Bias-corrected ensemble', 'Actual value']
+
+    axes_object.legend(
+        legend_handles, legend_strings, loc='upper left',
+        bbox_to_anchor=(0, 0.95), fancybox=True, shadow=False,
+        facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
+    )
+
+    axes_object.set_ylabel('Probability density')
+    axes_object.set_xlabel(
+        target_plotting.FIELD_NAME_TO_FANCY[target_field_name]
+    )
+
+    output_file_name = '{0:s}/ir_effect_on_ensemble_distribution.jpg'.format(
         output_dir_name
     )
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
