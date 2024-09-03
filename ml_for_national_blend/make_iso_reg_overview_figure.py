@@ -4,14 +4,42 @@ import os
 import sys
 import argparse
 import numpy
+import matplotlib
+matplotlib.use('agg')
+from matplotlib import pyplot
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import file_system_utils
 import error_checking
 import prediction_io
+import target_plotting
+
+FIGURE_WIDTH_INCHES = 15
+FIGURE_HEIGHT_INCHES = 15
+FIGURE_RESOLUTION_DPI = 300
+
+RAW_PREDICTION_LINE_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
+BC_PREDICTION_LINE_COLOUR = numpy.array([117, 112, 179], dtype=float) / 255
+TARGET_LINE_COLOUR = numpy.array([27, 158, 119], dtype=float) / 255
+LINE_WIDTH = 3
+
+PREDICTION_MARKER_TYPE = 'o'
+PREDICTION_MARKER_SIZE = 16
+TARGET_MARKER_TYPE = '*'
+TARGET_MARKER_SIZE = 16
+
+DEFAULT_FONT_SIZE = 30
+pyplot.rc('font', size=DEFAULT_FONT_SIZE)
+pyplot.rc('axes', titlesize=DEFAULT_FONT_SIZE)
+pyplot.rc('axes', labelsize=DEFAULT_FONT_SIZE)
+pyplot.rc('xtick', labelsize=DEFAULT_FONT_SIZE)
+pyplot.rc('ytick', labelsize=DEFAULT_FONT_SIZE)
+pyplot.rc('legend', fontsize=DEFAULT_FONT_SIZE)
+pyplot.rc('figure', titlesize=DEFAULT_FONT_SIZE)
 
 RAW_FILE_ARG_NAME = 'input_raw_prediction_file_name'
 BIAS_CORRECTED_FILE_ARG_NAME = 'input_bc_prediction_file_name'
@@ -72,9 +100,14 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     :param output_dir_name: Same.
     """
 
+    # Basic error-checking.
     error_checking.assert_is_geq(num_atomic_examples, 10)
     error_checking.assert_is_leq(num_atomic_examples, 1000)
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
 
+    # Read files and subset to desired field.
     print('Reading data from: "{0:s}"...'.format(raw_prediction_file_name))
     raw_prediction_table_xarray = prediction_io.read_file(
         raw_prediction_file_name
@@ -103,6 +136,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         prediction_io.FIELD_DIM: inds
     })
 
+    # Make sure files have matching metadata.
     raw_ptx = raw_prediction_table_xarray
     bc_ptx = bc_prediction_table_xarray
 
@@ -112,7 +146,6 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         raw_ptx.coords[prediction_io.ENSEMBLE_MEMBER_DIM].values
     )
 
-    # TODO: Verify same init time.
     assert num_grid_rows == len(bc_ptx.coords[prediction_io.ROW_DIM].values)
     assert (
         num_grid_columns ==
@@ -124,6 +157,12 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     )
     assert ensemble_size > 1
 
+    assert (
+        raw_ptx.attrs[prediction_io.INIT_TIME_KEY] ==
+        bc_ptx.attrs[prediction_io.INIT_TIME_KEY]
+    )
+
+    # Subset grid points.
     raw_prediction_matrix = (
         raw_ptx[prediction_io.PREDICTION_KEY].values[..., 0, :]
     )
@@ -156,11 +195,82 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     bc_prediction_matrix = (
         bc_prediction_matrix[good_row_indices, good_column_indices, :]
     )
-    target_matrix = target_matrix[good_row_indices, good_column_indices]
+    target_values = target_matrix[good_row_indices, good_column_indices]
 
-    print(raw_prediction_matrix.shape)
-    print(bc_prediction_matrix.shape)
-    print(target_matrix.shape)
+    # Create plot to show how IR affects ensemble means.
+    sort_indices = numpy.argsort(
+        numpy.mean(raw_prediction_matrix, axis=-1)
+    )
+    raw_prediction_matrix = raw_prediction_matrix[sort_indices, :]
+    bc_prediction_matrix = bc_prediction_matrix[sort_indices, :]
+    target_values = target_values[sort_indices]
+
+    example_indices = numpy.linspace(
+        1, num_atomic_examples, num=num_atomic_examples, dtype=float
+    )
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+    legend_handles = [None] * 3
+
+    legend_handles[0] = axes_object.plot(
+        example_indices, numpy.mean(raw_prediction_matrix, axis=-1),
+        color=RAW_PREDICTION_LINE_COLOUR,
+        linestyle='solid',
+        linewidth=LINE_WIDTH,
+        marker=PREDICTION_MARKER_TYPE,
+        markersize=PREDICTION_MARKER_SIZE,
+        markerfacecolor=RAW_PREDICTION_LINE_COLOUR,
+        markeredgecolor=RAW_PREDICTION_LINE_COLOUR,
+        markeredgewidth=0
+    )
+    legend_handles[1] = axes_object.plot(
+        example_indices, numpy.mean(bc_prediction_matrix, axis=-1),
+        color=BC_PREDICTION_LINE_COLOUR,
+        linestyle='solid',
+        linewidth=LINE_WIDTH,
+        marker=PREDICTION_MARKER_TYPE,
+        markersize=PREDICTION_MARKER_SIZE,
+        markerfacecolor=BC_PREDICTION_LINE_COLOUR,
+        markeredgecolor=BC_PREDICTION_LINE_COLOUR,
+        markeredgewidth=0
+    )
+    legend_handles[2] = axes_object.plot(
+        example_indices, target_values,
+        color=TARGET_LINE_COLOUR,
+        linestyle='solid',
+        linewidth=LINE_WIDTH,
+        marker=TARGET_MARKER_TYPE,
+        markersize=TARGET_MARKER_SIZE,
+        markerfacecolor=TARGET_LINE_COLOUR,
+        markeredgecolor=TARGET_LINE_COLOUR,
+        markeredgewidth=0
+    )
+
+    legend_strings = ['Raw pred''n', 'Bias-corrected pred''n', 'Actual']
+
+    axes_object.legend(
+        legend_handles, legend_strings, loc='top left',
+        bbox_to_anchor=(0, 0), fancybox=True, shadow=False,
+        facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
+    )
+
+    axes_object.set_xticks([], [])
+    axes_object.set_xlabel('Data sample')
+    axes_object.set_ylabel(
+        target_plotting.FIELD_NAME_TO_FANCY[target_field_name]
+    )
+
+    output_file_name = '{0:s}/ir_effect_on_ensemble_mean.jpg'.format(
+        output_dir_name
+    )
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    figure_object.savefig(
+        output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+        pad_inches=0, bbox_inches='tight'
+    )
+    pyplot.close(figure_object)
 
 
 if __name__ == '__main__':
