@@ -37,6 +37,7 @@ MAX_PERCENTILES_ARG_NAME = 'max_colour_percentiles'
 PLOT_DIFFS_ARG_NAME = 'plot_diffs'
 MAX_DIFF_VALUES_ARG_NAME = 'max_colour_values_for_diff'
 MAX_DIFF_PERCENTILES_ARG_NAME = 'max_colour_percentiles_for_diff'
+ENSEMBLE_PERCENTILES_ARG_NAME = 'ensemble_percentiles'
 BASELINE_MODEL_ARG_NAME = 'baseline_nwp_model_name'
 BASELINE_MODEL_DIR_ARG_NAME = 'baseline_nwp_model_dir_name'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
@@ -83,6 +84,12 @@ MAX_DIFF_PERCENTILES_HELP_STRING = (
 ).format(
     MAX_DIFF_PERCENTILES_ARG_NAME
 )
+ENSEMBLE_PERCENTILES_HELP_STRING = (
+    '1-D list of percentiles (ranging from 0...100).  If the model outputs an '
+    'ensemble, this script will plot the given percentiles of the ensemble '
+    'distribution.  If you just want to plot the ensemble mean, leave this '
+    'argument alone.'
+)
 BASELINE_MODEL_HELP_STRING = (
     'Name of baseline model (must be accepted by '
     '`nwp_model_utils.check_model_name`).  If you do not want a baseline '
@@ -92,7 +99,9 @@ BASELINE_MODEL_DIR_HELP_STRING = (
     '[used only if {0:s} is non-empty] Path to directory for baseline model.  '
     'Files therein will be found by `interp_nwp_model_io.find_file` and read '
     'by `interp_nwp_model_io.read_file`.'
-).format(BASELINE_MODEL_ARG_NAME)
+).format(
+    BASELINE_MODEL_ARG_NAME
+)
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Figures will be saved here.'
 )
@@ -137,6 +146,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + MAX_DIFF_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
     default=[-1.], help=MAX_DIFF_PERCENTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ENSEMBLE_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1], help=ENSEMBLE_PERCENTILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + BASELINE_MODEL_ARG_NAME, type=str, required=False, default='',
@@ -291,7 +304,7 @@ def _plot_everything_1sample(
         border_latitudes_deg_n, border_longitudes_deg_e,
         plot_diffs, min_colour_values_for_diff, max_colour_values_for_diff,
         min_colour_percentiles_for_diff, max_colour_percentiles_for_diff,
-        output_dir_name):
+        ensemble_percentiles, output_dir_name):
     """Plots everything for one data sample.
 
     P = number of points in border set
@@ -315,6 +328,7 @@ def _plot_everything_1sample(
     :param max_colour_values_for_diff: Same.
     :param min_colour_percentiles_for_diff: Same.
     :param max_colour_percentiles_for_diff: Same.
+    :param ensemble_percentiles: Same.
     :param output_dir_name: Same.
     """
 
@@ -404,12 +418,11 @@ def _plot_everything_1sample(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
         )[0][0]
 
-        prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., j_new, 0]
+        all_prediction_matrix = (
+            ptx[prediction_io.PREDICTION_KEY].values[..., j_new, :]
         )
-        target_matrix = (
-            ptx[prediction_io.TARGET_KEY].values[..., j_new]
-        )
+        prediction_matrix = numpy.mean(all_prediction_matrix, axis=-1)
+        target_matrix = ptx[prediction_io.TARGET_KEY].values[..., j_new]
 
         title_string = 'Predicted {0:s}\nInit {1:s}, valid {2:s}'.format(
             this_field_name_fancy,
@@ -456,6 +469,39 @@ def _plot_everything_1sample(
                 max_value=max_colour_values[j]
             )
 
+        if min_colour_values is None:
+            if baseline_prediction_matrix is None:
+                these_matrices = [
+                    all_prediction_matrix,
+                    numpy.expand_dims(target_matrix, axis=-1)
+                ]
+            else:
+                these_matrices = [
+                    all_prediction_matrix,
+                    numpy.expand_dims(target_matrix, axis=-1),
+                    numpy.expand_dims(baseline_prediction_matrix[..., j], axis=-1)
+                ]
+
+            concat_matrix = numpy.stack(these_matrices, axis=-1)
+
+            (
+                ensemble_colour_map_object, ensemble_colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=
+                numpy.nanpercentile(concat_matrix, min_colour_percentiles[j]),
+                max_value=
+                numpy.nanpercentile(concat_matrix, max_colour_percentiles[j]),
+            )
+        else:
+            (
+                ensemble_colour_map_object, ensemble_colour_norm_object
+            ) = target_plotting.field_to_colour_scheme(
+                field_name=field_names[j],
+                min_value=min_colour_values[j],
+                max_value=max_colour_values[j]
+            )
+
         _plot_one_field(
             data_matrix=prediction_matrix,
             latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
@@ -467,6 +513,40 @@ def _plot_everything_1sample(
             title_string=title_string,
             output_file_name=output_file_name
         )
+
+        for this_percentile in ensemble_percentiles:
+            title_string = (
+                '{0:.1f}th-percentile {1:s}\nInit {2:s}, valid {3:s}'
+            ).format(
+                this_percentile,
+                this_field_name_fancy,
+                init_time_string,
+                valid_time_string
+            )
+
+            output_file_name = (
+                '{0:s}/init={1:s}_valid={2:s}_{3:s}_percentile{4:05.1f}.jpg'
+            ).format(
+                output_dir_name,
+                init_time_string,
+                valid_time_string,
+                field_names[j].replace('_', '-'),
+                this_percentile
+            )
+
+            _plot_one_field(
+                data_matrix=numpy.percentile(
+                    all_prediction_matrix, this_percentile, axis=-1
+                ),
+                latitude_matrix_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+                longitude_matrix_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                colour_map_object=ensemble_colour_map_object,
+                colour_norm_object=ensemble_colour_norm_object,
+                title_string=title_string,
+                output_file_name=output_file_name
+            )
 
         title_string = 'Actual {0:s}\nValid {1:s}'.format(
             this_field_name_fancy, valid_time_string
@@ -610,8 +690,8 @@ def _run(prediction_dir_name, init_time_string, field_names,
          min_colour_values, max_colour_values,
          min_colour_percentiles, max_colour_percentiles, plot_diffs,
          max_colour_values_for_diff, max_colour_percentiles_for_diff,
-         baseline_nwp_model_name, baseline_nwp_model_dir_name,
-         output_dir_name):
+         ensemble_percentiles, baseline_nwp_model_name,
+         baseline_nwp_model_dir_name, output_dir_name):
     """Plots NN-based predictions and targets (actual values).
 
     This is effectively the main method.
@@ -626,6 +706,7 @@ def _run(prediction_dir_name, init_time_string, field_names,
     :param plot_diffs: Same.
     :param max_colour_values_for_diff: Same.
     :param max_colour_percentiles_for_diff: Same.
+    :param ensemble_percentiles: Same.
     :param baseline_nwp_model_name: Same.
     :param baseline_nwp_model_dir_name: Same.
     :param output_dir_name: Same.
@@ -686,6 +767,13 @@ def _run(prediction_dir_name, init_time_string, field_names,
         directory_name=output_dir_name
     )
 
+    if len(ensemble_percentiles) == 1 and ensemble_percentiles[0] < 0:
+        ensemble_percentiles = numpy.array([])
+
+    if len(ensemble_percentiles) > 0:
+        error_checking.assert_is_geq_numpy_array(ensemble_percentiles, 0.)
+        error_checking.assert_is_leq_numpy_array(ensemble_percentiles, 100.)
+
     # Do actual stuff.
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
@@ -697,12 +785,10 @@ def _run(prediction_dir_name, init_time_string, field_names,
 
     print('Reading data from: "{0:s}"...'.format(prediction_file_name))
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
-    prediction_table_xarray = prediction_io.take_ensemble_mean(
-        prediction_table_xarray
-    )
-    ptx = prediction_table_xarray
 
-    model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
+    model_file_name = (
+        prediction_table_xarray.attrs[prediction_io.MODEL_FILE_KEY]
+    )
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
@@ -729,6 +815,7 @@ def _run(prediction_dir_name, init_time_string, field_names,
         max_colour_values_for_diff=max_colour_values_for_diff,
         min_colour_percentiles_for_diff=min_colour_percentiles_for_diff,
         max_colour_percentiles_for_diff=max_colour_percentiles_for_diff,
+        ensemble_percentiles=ensemble_percentiles,
         output_dir_name=output_dir_name
     )
 
@@ -758,6 +845,10 @@ if __name__ == '__main__':
         ),
         max_colour_percentiles_for_diff=numpy.array(
             getattr(INPUT_ARG_OBJECT, MAX_DIFF_PERCENTILES_ARG_NAME),
+            dtype=float
+        ),
+        ensemble_percentiles=numpy.array(
+            getattr(INPUT_ARG_OBJECT, ENSEMBLE_PERCENTILES_ARG_NAME),
             dtype=float
         ),
         baseline_nwp_model_name=getattr(
