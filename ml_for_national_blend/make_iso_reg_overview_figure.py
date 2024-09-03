@@ -175,7 +175,10 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         numpy.all(numpy.isfinite(raw_prediction_matrix), axis=-1),
         numpy.all(numpy.isfinite(bc_prediction_matrix), axis=-1)
     )
-    real_target_flag_matrix = numpy.isfinite(target_matrix)
+
+    # TODO(thunderhoser): This is a HACK.
+    # real_target_flag_matrix = numpy.isfinite(target_matrix)
+    real_target_flag_matrix = target_matrix < -10.
 
     good_row_indices, good_column_indices = numpy.where(numpy.logical_and(
         real_prediction_flag_matrix, real_target_flag_matrix
@@ -252,7 +255,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
 
     axes_object.legend(
         legend_handles, legend_strings, loc='upper left',
-        bbox_to_anchor=(0, 0), fancybox=True, shadow=False,
+        bbox_to_anchor=(0.5, 0.5), fancybox=True, shadow=False,
         facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
     )
 
