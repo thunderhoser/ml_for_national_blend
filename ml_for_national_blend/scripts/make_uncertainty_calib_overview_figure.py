@@ -1,4 +1,4 @@
-"""Creates overview figure to explain isotonic regression."""
+"""Creates overview figure to explain uncertainty calibration."""
 
 import argparse
 import numpy
@@ -45,8 +45,8 @@ RAW_FILE_HELP_STRING = (
     'by `prediction_io.read_file`.'
 )
 BIAS_CORRECTED_FILE_HELP_STRING = (
-    'Path to file with bias-corrected predictions (i.e., from isotonic '
-    'regression).  Will be read by `prediction_io.read_file`.'
+    'Path to file with bias-corrected predictions (i.e., from uncertainty '
+    'calibration).  Will be read by `prediction_io.read_file`.'
 )
 NUM_ATOMIC_EXAMPLES_HELP_STRING = (
     'Number of atomic examples (where 1 atomic examples = 1 time step at 1 '
@@ -82,7 +82,7 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
          target_field_name, output_dir_name):
-    """Creates overview figure to explain isotonic regression.
+    """Creates overview figure to explain uncertainty calibration.
 
     This is effectively the main method.
 
@@ -168,10 +168,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         numpy.all(numpy.isfinite(raw_prediction_matrix), axis=-1),
         numpy.all(numpy.isfinite(bc_prediction_matrix), axis=-1)
     )
-
-    # TODO(thunderhoser): This is a HACK.
-    # real_target_flag_matrix = numpy.isfinite(target_matrix)
-    real_target_flag_matrix = target_matrix < -10.
+    real_target_flag_matrix = numpy.isfinite(target_matrix)
 
     good_row_indices, good_column_indices = numpy.where(numpy.logical_and(
         real_prediction_flag_matrix, real_target_flag_matrix
@@ -193,11 +190,16 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     )
     target_values = target_matrix[good_row_indices, good_column_indices]
 
-    # Create plot to show how IR affects ensemble means.
-    sort_indices = numpy.argsort(target_values)
+    # Create plot to show how UC affects ensemble means.
+    squared_errors = (
+        (target_values - numpy.mean(raw_prediction_matrix, axis=-1)) ** 2
+    )
+
+    sort_indices = numpy.argsort(squared_errors)
     raw_prediction_matrix = raw_prediction_matrix[sort_indices, :]
     bc_prediction_matrix = bc_prediction_matrix[sort_indices, :]
     target_values = target_values[sort_indices]
+    squared_errors = squared_errors[sort_indices]
 
     example_indices = numpy.linspace(
         1, num_atomic_examples, num=num_atomic_examples, dtype=float
@@ -209,7 +211,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     legend_handles = [None] * 3
 
     legend_handles[0] = axes_object.plot(
-        example_indices, numpy.mean(raw_prediction_matrix, axis=-1),
+        example_indices, numpy.var(raw_prediction_matrix, axis=-1, ddof=1),
         color=RAW_PREDICTION_LINE_COLOUR,
         linestyle='solid',
         linewidth=LINE_WIDTH,
@@ -220,7 +222,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markeredgewidth=0
     )[0]
     legend_handles[1] = axes_object.plot(
-        example_indices, numpy.mean(bc_prediction_matrix, axis=-1),
+        example_indices, numpy.var(bc_prediction_matrix, axis=-1, ddof=1),
         color=BC_PREDICTION_LINE_COLOUR,
         linestyle='solid',
         linewidth=LINE_WIDTH,
@@ -231,7 +233,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markeredgewidth=0
     )[0]
     legend_handles[2] = axes_object.plot(
-        example_indices, target_values,
+        example_indices, squared_errors,
         color=TARGET_LINE_COLOUR,
         linestyle='solid',
         linewidth=LINE_WIDTH,
@@ -242,7 +244,11 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markeredgewidth=0
     )[0]
 
-    legend_strings = ['Raw pred\'n', 'Bias-corrected pred\'n', 'Actual']
+    legend_strings = [
+        'Variance of\nraw ensemble',
+        'Variance of\nbias-corrected ensemble',
+        'Squared error'
+    ]
 
     axes_object.legend(
         legend_handles, legend_strings, loc='upper left',
@@ -256,7 +262,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         target_plotting.FIELD_NAME_TO_FANCY[target_field_name]
     )
 
-    output_file_name = '{0:s}/ir_effect_on_ensemble_mean.jpg'.format(
+    output_file_name = '{0:s}/uc_effect_on_ensemble_mean.jpg'.format(
         output_dir_name
     )
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
@@ -266,7 +272,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     )
     pyplot.close(figure_object)
 
-    # Create plot to show how IR affects full ensemble distribution.
+    # Create plot to show how UC affects full ensemble distribution.
     i = numpy.random.choice(example_indices, size=1, replace=False)[0]
     i = int(i)
     raw_predictions = raw_prediction_matrix[i, :]
@@ -341,7 +347,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     axes_object.set_xlim([x_min, x_max])
     axes_object.set_ylim([0, y_max])
 
-    output_file_name = '{0:s}/ir_effect_on_ensemble_distribution.jpg'.format(
+    output_file_name = '{0:s}/uc_effect_on_ensemble_distribution.jpg'.format(
         output_dir_name
     )
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
