@@ -52,6 +52,7 @@ MAE_KEY = 'mean_absolute_error'
 MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 BIAS_KEY = 'bias'
 SSRAT_KEY = 'spread_skill_ratio'
+SSDIFF_KEY = 'spread_skill_difference'
 SPATIAL_MIN_BIAS_KEY = 'spatial_min_bias'
 SPATIAL_MAX_BIAS_KEY = 'spatial_max_bias'
 CORRELATION_KEY = 'correlation'
@@ -455,16 +456,22 @@ def _get_ssrat_one_replicate(
         example_indices_in_replicate, per_grid_cell):
     """Computes SSRAT for one bootstrap replicate.
 
-    :param full_squared_error_matrix: See documentation for
-        `_get_ssrat_one_replicate`.
-    :param full_prediction_variance_matrix: Same.
-    :param example_indices_in_replicate: Same.
-    :param per_grid_cell: Same.
-    :return: ssrat_matrix: Foo.
-    """
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
 
-    # TODO(thunderhoser): Fix output documentation.
-    # TODO(thunderhoser): This is not actually computing a issue.  Need to fix documentation and var names.
+    :param full_squared_error_matrix: E-by-M-by-N-by-T numpy array of squared
+        errors.
+    :param full_prediction_variance_matrix: E-by-M-by-N-by-T numpy array of
+        ensemble variances.
+    :param example_indices_in_replicate: See documentation for
+        `_get_scores_one_replicate`.
+    :param per_grid_cell: Same.
+    :return: ssrat_matrix: If `per_grid_cell == True`, this is an M-by-N-by-T
+        numpy array of spread-skill ratios.  Otherwise, this is a length-T numpy
+        array of spread-skill ratios.
+    """
 
     squared_error_matrix = full_squared_error_matrix[
         example_indices_in_replicate, ...
@@ -499,10 +506,68 @@ def _get_ssrat_one_replicate(
                 numpy.nanmean(squared_error_matrix[..., k])
             )
 
-        # ssrat_matrix[..., k] = numerator / denominator
-        ssrat_matrix[..., k] = numerator - denominator
+        ssrat_matrix[..., k] = numerator / denominator
 
     return ssrat_matrix
+
+
+def _get_ssdiff_one_replicate(
+        full_squared_error_matrix, full_prediction_variance_matrix,
+        example_indices_in_replicate, per_grid_cell):
+    """Computes SSDIFF for one bootstrap replicate.
+
+    SSDIFF = spread-skill difference = spread minus skill
+
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+
+    :param full_squared_error_matrix: See documentation for
+        `_get_ssrat_one_replicate`.
+    :param full_prediction_variance_matrix: Same.
+    :param example_indices_in_replicate: Same.
+    :param per_grid_cell: Same.
+    :return: ssdiff_matrix: If `per_grid_cell == True`, this is an M-by-N-by-T
+        numpy array of spread-skill differences.  Otherwise, this is a length-T
+        numpy array of spread-skill differences.
+    """
+
+    squared_error_matrix = full_squared_error_matrix[
+        example_indices_in_replicate, ...
+    ]
+    prediction_variance_matrix = full_prediction_variance_matrix[
+        example_indices_in_replicate, ...
+    ]
+    num_target_fields = squared_error_matrix.shape[3]
+
+    if per_grid_cell:
+        num_grid_rows = squared_error_matrix.shape[1]
+        num_grid_columns = squared_error_matrix.shape[2]
+        these_dim = ((num_grid_rows, num_grid_columns, num_target_fields))
+    else:
+        these_dim = (num_target_fields,)
+
+    ssdiff_matrix = numpy.full(these_dim, numpy.nan)
+
+    for k in range(num_target_fields):
+        if per_grid_cell:
+            numerator = numpy.sqrt(
+                numpy.nanmean(prediction_variance_matrix[..., k], axis=0)
+            )
+            denominator = numpy.sqrt(
+                numpy.nanmean(squared_error_matrix[..., k], axis=0)
+            )
+        else:
+            numerator = numpy.sqrt(
+                numpy.nanmean(prediction_variance_matrix[..., k])
+            )
+            denominator = numpy.sqrt(
+                numpy.nanmean(squared_error_matrix[..., k])
+            )
+
+        ssdiff_matrix[..., k] = numerator - denominator
+
+    return ssdiff_matrix
 
 
 def _get_scores_one_replicate(
@@ -1036,7 +1101,7 @@ def get_scores_with_bootstrapping(
     :param keep_it_simple: Boolean flag.  If True, will avoid Kolmogorov-Smirnov
         test and attributes diagram.
     :param compute_ssrat: Boolean flag.  If True, will compute spread-skill
-        ratio (SSRAT).
+        ratio (SSRAT) and spread-skill difference (SSDIFF).
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -1122,6 +1187,7 @@ def get_scores_with_bootstrapping(
             these_dim = (num_target_fields, num_bootstrap_reps)
 
         ssrat_matrix = numpy.full(these_dim, numpy.nan)
+        ssdiff_matrix = numpy.full(these_dim, numpy.nan)
         num_examples = squared_error_matrix.shape[0]
         example_indices = numpy.linspace(
             0, num_examples - 1, num=num_examples, dtype=int
@@ -1136,7 +1202,8 @@ def get_scores_with_bootstrapping(
                 )
 
             print((
-                'Computing SSRAT for {0:d}th of {1:d} bootstrap replicates...'
+                'Computing SSRAT and SSDIFF for {0:d}th of {1:d} bootstrap '
+                'replicates...'
             ).format(
                 i + 1, num_bootstrap_reps
             ))
@@ -1147,8 +1214,16 @@ def get_scores_with_bootstrapping(
                 example_indices_in_replicate=these_indices,
                 per_grid_cell=per_grid_cell
             )
+
+            ssdiff_matrix[..., i] = _get_ssdiff_one_replicate(
+                full_squared_error_matrix=squared_error_matrix,
+                full_prediction_variance_matrix=prediction_variance_matrix,
+                example_indices_in_replicate=these_indices,
+                per_grid_cell=per_grid_cell
+            )
     else:
         ssrat_matrix = None
+        ssdiff_matrix = None
 
     prediction_tables_xarray = read_inputs(
         prediction_file_names=prediction_file_names,
@@ -1272,7 +1347,8 @@ def get_scores_with_bootstrapping(
 
     if compute_ssrat:
         new_dict = {
-            SSRAT_KEY: (these_dim_keys, ssrat_matrix)
+            SSRAT_KEY: (these_dim_keys, ssrat_matrix),
+            SSDIFF_KEY: (these_dim_keys, ssdiff_matrix)
         }
         main_data_dict.update(new_dict)
 

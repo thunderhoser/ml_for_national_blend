@@ -93,7 +93,8 @@ KEEP_IT_SIMPLE_HELP_STRING = (
     'diagram.'
 )
 COMPUTE_SSRAT_HELP_STRING = (
-    'Boolean flag.  If 1, will compute spread-skill ratio (SSRAT).'
+    'Boolean flag.  If 1, will compute spread-skill ratio (SSRAT) and spread-'
+    'skill difference (SSDIFF).'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '

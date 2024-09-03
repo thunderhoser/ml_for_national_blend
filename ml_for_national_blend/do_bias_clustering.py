@@ -44,7 +44,7 @@ TARGET_FIELD_ARG_NAME = 'target_field_name'
 BIAS_DISCRETIZATION_INTERVALS_ARG_NAME = 'bias_discretization_intervals'
 BUFFER_DISTANCE_ARG_NAME = 'buffer_distance_px'
 DO_BACKWARDS_ARG_NAME = 'do_backwards_clustering'
-CLUSTER_SSRAT_ARG_NAME = 'cluster_ssrat_instead_of_bias'
+CLUSTER_SSDIFF_ARG_NAME = 'cluster_ssdiff_instead_of_bias'
 MAIN_OUTPUT_FILE_ARG_NAME = 'main_output_file_name'
 OUTPUT_FIGURE_FILE_ARG_NAME = 'output_figure_file_name'
 
@@ -70,11 +70,8 @@ DO_BACKWARDS_HELP_STRING = (
     'starting with the largest spatial scale.  If 0, will run the forward '
     'algorithm, starting with the smallest scale.'
 )
-
-# TODO(thunderhoser): Fix bad terminology.
-CLUSTER_SSRAT_HELP_STRING = (
-    'Boolean flag.  If 1, will cluster spread-skill ratio (actually difference)'
-    ' instead of bias.'
+CLUSTER_SSDIFF_HELP_STRING = (
+    'Boolean flag.  If 1, will cluster spread-skill difference instead of bias.'
 )
 MAIN_OUTPUT_FILE_HELP_STRING = (
     'Path to main output file.  The clustering will be written here by '
@@ -111,8 +108,8 @@ INPUT_ARG_PARSER.add_argument(
     help=DO_BACKWARDS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + CLUSTER_SSRAT_ARG_NAME, type=int, required=True,
-    help=CLUSTER_SSRAT_HELP_STRING
+    '--' + CLUSTER_SSDIFF_ARG_NAME, type=int, required=True,
+    help=CLUSTER_SSDIFF_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + MAIN_OUTPUT_FILE_ARG_NAME, type=str, required=True,
@@ -126,7 +123,7 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
          bias_discretization_intervals, buffer_distance_px,
-         do_backwards_clustering, cluster_ssrat_instead_of_bias,
+         do_backwards_clustering, cluster_ssdiff_instead_of_bias,
          main_output_file_name, figure_file_name):
     """Clusters a spatial field of model biases.
 
@@ -138,7 +135,7 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
     :param bias_discretization_intervals: Same.
     :param buffer_distance_px: Same.
     :param do_backwards_clustering: Same.
-    :param cluster_ssrat_instead_of_bias: Same.
+    :param cluster_ssdiff_instead_of_bias: Same.
     :param main_output_file_name: Same.
     :param figure_file_name: Same.
     """
@@ -153,9 +150,9 @@ def _run(gridded_eval_file_arg_name, min_cluster_size_px, target_field_name,
         getx.coords[evaluation.FIELD_DIM].values == target_field_name
     )[0][0]
 
-    if cluster_ssrat_instead_of_bias:
+    if cluster_ssdiff_instead_of_bias:
         bias_matrix = numpy.nanmean(
-            getx[evaluation.SSRAT_KEY].values[..., field_index, :], axis=-1
+            getx[evaluation.SSDIFF_KEY].values[..., field_index, :], axis=-1
         )
     else:
         bias_matrix = numpy.nanmean(
@@ -263,8 +260,8 @@ if __name__ == '__main__':
         do_backwards_clustering=bool(
             getattr(INPUT_ARG_OBJECT, DO_BACKWARDS_ARG_NAME)
         ),
-        cluster_ssrat_instead_of_bias=bool(
-            getattr(INPUT_ARG_OBJECT, CLUSTER_SSRAT_ARG_NAME)
+        cluster_ssdiff_instead_of_bias=bool(
+            getattr(INPUT_ARG_OBJECT, CLUSTER_SSDIFF_ARG_NAME)
         ),
         main_output_file_name=getattr(
             INPUT_ARG_OBJECT, MAIN_OUTPUT_FILE_ARG_NAME

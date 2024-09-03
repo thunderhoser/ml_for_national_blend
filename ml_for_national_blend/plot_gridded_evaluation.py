@@ -79,13 +79,14 @@ METRIC_NAME_TO_VERBOSE = {
     evaluation.CORRELATION_KEY: 'correlation',
     evaluation.KGE_KEY: 'Kling-Gupta efficiency',
     evaluation.RELIABILITY_KEY: 'reliability',
-    evaluation.SSRAT_KEY: 'spread-skill ratio'
+    evaluation.SSRAT_KEY: 'spread-skill ratio',
+    evaluation.SSDIFF_KEY: 'spread-skill difference'
 }
 
 UNITLESS_METRIC_NAMES = [
     evaluation.MSE_SKILL_SCORE_KEY, evaluation.DWMSE_SKILL_SCORE_KEY,
     evaluation.MAE_SKILL_SCORE_KEY, evaluation.CORRELATION_KEY,
-    evaluation.KGE_KEY, evaluation.SSRAT_KEY
+    evaluation.KGE_KEY, evaluation.SSRAT_KEY, evaluation.SSDIFF_KEY
 ]
 SQUARED_METRIC_NAMES = [
     evaluation.MSE_BIAS_KEY, evaluation.MSE_VARIANCE_KEY,
@@ -112,7 +113,8 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
     evaluation.CORRELATION_KEY: pyplot.get_cmap('seismic'),
     evaluation.KGE_KEY: pyplot.get_cmap('seismic'),
     evaluation.RELIABILITY_KEY: pyplot.get_cmap('viridis'),
-    evaluation.SSRAT_KEY: pyplot.get_cmap('seismic')
+    evaluation.SSRAT_KEY: pyplot.get_cmap('seismic'),
+    evaluation.SSDIFF_KEY: pyplot.get_cmap('seismic')
 }
 
 METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
@@ -134,7 +136,8 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     evaluation.CORRELATION_KEY: 'diverging',
     evaluation.KGE_KEY: 'diverging_weird',
     evaluation.RELIABILITY_KEY: 'sequential',
-    evaluation.SSRAT_KEY: 'ssrat'
+    evaluation.SSRAT_KEY: 'ssrat',
+    evaluation.SSDIFF_KEY: 'diverging'
 }
 
 NAN_COLOUR = numpy.full(3, 152. / 255)
