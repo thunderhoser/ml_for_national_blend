@@ -227,7 +227,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markerfacecolor=RAW_PREDICTION_LINE_COLOUR,
         markeredgecolor=RAW_PREDICTION_LINE_COLOUR,
         markeredgewidth=0
-    )
+    )[0]
     legend_handles[1] = axes_object.plot(
         example_indices, numpy.mean(bc_prediction_matrix, axis=-1),
         color=BC_PREDICTION_LINE_COLOUR,
@@ -238,7 +238,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markerfacecolor=BC_PREDICTION_LINE_COLOUR,
         markeredgecolor=BC_PREDICTION_LINE_COLOUR,
         markeredgewidth=0
-    )
+    )[0]
     legend_handles[2] = axes_object.plot(
         example_indices, target_values,
         color=TARGET_LINE_COLOUR,
@@ -249,13 +249,13 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
         markerfacecolor=TARGET_LINE_COLOUR,
         markeredgecolor=TARGET_LINE_COLOUR,
         markeredgewidth=0
-    )
+    )[0]
 
     legend_strings = ['Raw pred''n', 'Bias-corrected pred''n', 'Actual']
 
     axes_object.legend(
         legend_handles, legend_strings, loc='upper left',
-        bbox_to_anchor=(0.5, 0.5), fancybox=True, shadow=False,
+        bbox_to_anchor=(0, 0), fancybox=True, shadow=False,
         facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
     )
 
