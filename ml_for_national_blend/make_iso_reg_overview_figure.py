@@ -334,8 +334,8 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     legend_strings = ['Raw ensemble', 'Bias-corrected ensemble', 'Actual value']
 
     axes_object.legend(
-        legend_handles, legend_strings, loc='upper left',
-        bbox_to_anchor=(0, 0.95), fancybox=True, shadow=False,
+        legend_handles, legend_strings, loc='lower left',
+        bbox_to_anchor=(0, 0.1), fancybox=True, shadow=False,
         facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
     )
 
