@@ -114,11 +114,11 @@ def __read_targets_one_example(
         urma_table_xarray=urma_table_xarray,
         desired_field_names=target_field_names
     )
-    urma_table_xarray = normalization.normalize_targets(
-        urma_table_xarray=urma_table_xarray,
-        norm_param_table_xarray=target_norm_param_table_xarray,
-        use_quantile_norm=use_quantile_norm
-    )
+    # urma_table_xarray = normalization.normalize_targets(
+    #     urma_table_xarray=urma_table_xarray,
+    #     norm_param_table_xarray=target_norm_param_table_xarray,
+    #     use_quantile_norm=use_quantile_norm
+    # )
 
     target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
@@ -829,14 +829,15 @@ def _read_predictors_1example_1model(
             )
 
         if nwp_norm_param_table_xarray is not None:
-            print('Normalizing predictor variables to z-scores...')
-            nwp_forecast_table_xarray = (
-                normalization.normalize_nwp_data(
-                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-                    norm_param_table_xarray=nwp_norm_param_table_xarray,
-                    use_quantile_norm=use_quantile_norm
-                )
-            )
+            pass
+            # print('Normalizing predictor variables to z-scores...')
+            # nwp_forecast_table_xarray = (
+            #     normalization.normalize_nwp_data(
+            #         nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            #         norm_param_table_xarray=nwp_norm_param_table_xarray,
+            #         use_quantile_norm=use_quantile_norm
+            #     )
+            # )
 
         if downsampling_factor != desired_downsampling_factor:
             nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(
@@ -1324,11 +1325,11 @@ def read_recent_biases_one_example(
                 nwp_forecast_matrix=this_forecast_matrix[..., 0, :],
                 target_field_names=target_field_names
             )
-            this_urma_table_xarray = normalization.normalize_targets(
-                urma_table_xarray=this_urma_table_xarray,
-                norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=use_quantile_norm
-            )
+            # this_urma_table_xarray = normalization.normalize_targets(
+            #     urma_table_xarray=this_urma_table_xarray,
+            #     norm_param_table_xarray=target_norm_param_table_xarray,
+            #     use_quantile_norm=use_quantile_norm
+            # )
             this_forecast_matrix = (
                 this_urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
             )
