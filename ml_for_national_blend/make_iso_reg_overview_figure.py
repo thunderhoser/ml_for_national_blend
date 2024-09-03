@@ -251,7 +251,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     legend_strings = ['Raw pred''n', 'Bias-corrected pred''n', 'Actual']
 
     axes_object.legend(
-        legend_handles, legend_strings, loc='top left',
+        legend_handles, legend_strings, loc='upper left',
         bbox_to_anchor=(0, 0), fancybox=True, shadow=False,
         facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
     )
