@@ -30,7 +30,7 @@ LINE_WIDTH = 3
 PREDICTION_MARKER_TYPE = 'o'
 PREDICTION_MARKER_SIZE = 16
 TARGET_MARKER_TYPE = '*'
-TARGET_MARKER_SIZE = 16
+TARGET_MARKER_SIZE = 24
 
 DEFAULT_FONT_SIZE = 30
 pyplot.rc('font', size=DEFAULT_FONT_SIZE)
@@ -201,9 +201,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     target_values = target_matrix[good_row_indices, good_column_indices]
 
     # Create plot to show how IR affects ensemble means.
-    sort_indices = numpy.argsort(
-        numpy.mean(raw_prediction_matrix, axis=-1)
-    )
+    sort_indices = numpy.argsort(target_values)
     raw_prediction_matrix = raw_prediction_matrix[sort_indices, :]
     bc_prediction_matrix = bc_prediction_matrix[sort_indices, :]
     target_values = target_values[sort_indices]
@@ -255,7 +253,7 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
 
     axes_object.legend(
         legend_handles, legend_strings, loc='upper left',
-        bbox_to_anchor=(0, 0), fancybox=True, shadow=False,
+        bbox_to_anchor=(0, 0.95), fancybox=True, shadow=False,
         facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
     )
 
