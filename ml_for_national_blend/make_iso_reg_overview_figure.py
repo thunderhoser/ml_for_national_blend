@@ -275,7 +275,8 @@ def _run(raw_prediction_file_name, bc_prediction_file_name, num_atomic_examples,
     pyplot.close(figure_object)
 
     # Create plot to show how IR affects full ensemble distribution.
-    i = numpy.random.choice(example_indices, size=1, replace=False)[0]
+    i = numpy.random.choice(example_indices, size=1, replace=False)
+    print(i)
     raw_predictions = raw_prediction_matrix[i, :]
     bc_predictions = bc_prediction_matrix[i, :]
     target_value = target_values[i]
