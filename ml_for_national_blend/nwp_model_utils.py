@@ -19,10 +19,6 @@ import time_conversion
 import error_checking
 import nbm_utils
 
-THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
-    os.path.join(os.getcwd(), os.path.expanduser(__file__))
-))
-
 TOLERANCE = 1e-6
 
 HOURS_TO_SECONDS = 3600
@@ -249,9 +245,9 @@ def model_to_init_time_interval(model_name):
 
     check_model_name(model_name=model_name, allow_ensemble=True)
 
-    # TODO(thunderhoser): HACK to prevent creation of huge amounts of data.
-    if model_name == HRRR_MODEL_NAME:
-        return 6 * HOURS_TO_SECONDS
+    # # TODO(thunderhoser): HACK to prevent creation of huge amounts of data.
+    # if model_name == HRRR_MODEL_NAME:
+    #     return 6 * HOURS_TO_SECONDS
 
     if model_name in [RAP_MODEL_NAME, HRRR_MODEL_NAME, GRIDDED_LAMP_MODEL_NAME]:
         return HOURS_TO_SECONDS
@@ -753,10 +749,6 @@ def interp_data_to_nbm_grid(
         nbm_longitude_matrix_deg_e = (
             nbm_longitude_matrix_deg_e[::dsf, ::dsf][:-1, :-1]
         )
-
-    print('Downsampling factor = {0:d}'.format(downsampling_factor))
-    print('Size of nbm_latitude_matrix_deg_n = {0:s}'.format(str(nbm_latitude_matrix_deg_n.shape)))
-    print('Size of nbm_longitude_matrix_deg_e = {0:s}'.format(str(nbm_longitude_matrix_deg_e.shape)))
 
     if proj_object is None:
         nbm_x_matrix_metres = nbm_longitude_matrix_deg_e
