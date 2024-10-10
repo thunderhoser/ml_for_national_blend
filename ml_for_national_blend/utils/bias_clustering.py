@@ -6,10 +6,11 @@ import numpy
 import xarray
 import netCDF4
 from scipy.ndimage import label
-from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
-from gewittergefahr.gg_utils import number_rounding
-from gewittergefahr.gg_utils import file_system_utils
-from gewittergefahr.gg_utils import error_checking
+from ml_for_national_blend.outside_code import \
+    longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import number_rounding
+from ml_for_national_blend.outside_code import file_system_utils
+from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import misc_utils
 
 TOLERANCE = 1e-6
