@@ -174,7 +174,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
     chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
     chiu_net_pp_arch.NUM_OUTPUT_CHANNELS_KEY: 5,
-    chiu_net_pp_arch.PREDICT_GUST_FACTOR_KEY: True,
+    chiu_net_pp_arch.PREDICT_GUST_EXCESS_KEY: True,
     chiu_net_pp_arch.PREDICT_DEWPOINT_DEPRESSION_KEY: True,
     # chiu_net_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
     # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
