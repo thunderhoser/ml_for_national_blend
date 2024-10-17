@@ -2,6 +2,7 @@
 
 import os
 import sys
+import numpy
 import xarray
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -130,7 +131,10 @@ def file_name_to_init_time(interp_nwp_file_name):
     """Parses initialization time from name of file with NWP forecasts.
 
     :param interp_nwp_file_name: File path.
-    :return: init_time_unix_sec: Initialization time.
+    :return: init_time_unix_sec: Initializationtarget_matrix = numpy.transpose(
+        urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
+        axes=(1, 0, 2)
+    ) time.
     """
 
     pathless_file_name = os.path.split(interp_nwp_file_name)[1]
@@ -187,7 +191,48 @@ def read_file(netcdf_file_name):
     """
 
     error_checking.assert_file_exists(netcdf_file_name)
-    return xarray.open_dataset(netcdf_file_name)
+    nwp_forecast_table_xarray = xarray.open_dataset(netcdf_file_name)
+    nwpft = nwp_forecast_table_xarray
+
+    if (
+            nwp_model_utils.WIND_GUST_10METRE_NAME not in
+            nwpft.coords[nwp_model_utils.FIELD_DIM].values
+    ):
+        return nwpft
+
+    gust_index = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.WIND_GUST_10METRE_NAME
+    )[0][0]
+    u_indices = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.U_WIND_10METRE_NAME
+    )[0]
+    v_indices = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.V_WIND_10METRE_NAME
+    )[0]
+
+    if len(u_indices) == 0 or len(v_indices) == 0:
+        return nwpft
+
+    u_index = u_indices[0]
+    v_index = v_indices[0]
+
+    data_matrix = nwpft[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., gust_index] = numpy.maximum(
+        data_matrix[..., gust_index],
+        numpy.sqrt(
+            data_matrix[..., u_index] ** 2 +
+            data_matrix[..., v_index] ** 2
+        )
+    )
+
+    return nwpft.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwpft[nwp_model_utils.DATA_KEY].dims, data_matrix
+        )
+    })
 
 
 def write_file(nwp_forecast_table_xarray, netcdf_file_name):
