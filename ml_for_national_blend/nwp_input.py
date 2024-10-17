@@ -829,15 +829,14 @@ def _read_predictors_1example_1model(
             )
 
         if nwp_norm_param_table_xarray is not None:
-            pass
-            # print('Normalizing predictor variables to z-scores...')
-            # nwp_forecast_table_xarray = (
-            #     normalization.normalize_nwp_data(
-            #         nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-            #         norm_param_table_xarray=nwp_norm_param_table_xarray,
-            #         use_quantile_norm=use_quantile_norm
-            #     )
-            # )
+            print('Normalizing predictor variables to z-scores...')
+            nwp_forecast_table_xarray = (
+                normalization.normalize_nwp_data(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    norm_param_table_xarray=nwp_norm_param_table_xarray,
+                    use_quantile_norm=use_quantile_norm
+                )
+            )
 
         if downsampling_factor != desired_downsampling_factor:
             nwp_forecast_table_xarray = nwp_model_utils.interp_data_to_nbm_grid(

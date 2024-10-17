@@ -1060,13 +1060,12 @@ def _read_targets_one_example(
             )
         })
     else:
-        pass
-        # print('Normalizing target variables to z-scores...')
-        # urma_table_xarray = normalization.normalize_targets(
-        #     urma_table_xarray=urma_table_xarray,
-        #     norm_param_table_xarray=target_norm_param_table_xarray,
-        #     use_quantile_norm=use_quantile_norm
-        # )
+        print('Normalizing target variables to z-scores...')
+        urma_table_xarray = normalization.normalize_targets(
+            urma_table_xarray=urma_table_xarray,
+            norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=use_quantile_norm
+        )
 
     target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
