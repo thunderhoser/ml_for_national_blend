@@ -200,6 +200,33 @@ def _convert_2m_temp_to_celsius(nwp_forecast_table_xarray):
     })
 
 
+def _convert_2m_dewp_to_celsius(nwp_forecast_table_xarray):
+    """Converts 2-metre NWP dewpoints from Kelvins to Celsius.
+
+    :param nwp_forecast_table_xarray: xarray table in format returned by
+        `interp_nwp_model_io.read_file`.
+    :return: nwp_forecast_table_xarray: Same, except that dewpoints have been
+        converted to Celsius.
+    """
+
+    k = numpy.where(
+        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.DEWPOINT_2METRE_NAME
+    )[0][0]
+
+    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
+        data_matrix[..., k]
+    )
+
+    return nwp_forecast_table_xarray.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
 def _convert_10m_gust_speed_to_factor(nwp_forecast_table_xarray):
     """Converts 10-metre NWP gust speeds to gust factors.
 
@@ -1063,6 +1090,10 @@ def read_residual_baseline_one_example(
 
     if predict_dewpoint_depression:
         nwp_forecast_table_xarray = _convert_2m_dewp_to_depression(
+            nwp_forecast_table_xarray
+        )
+    else:
+        nwp_forecast_table_xarray = _convert_2m_dewp_to_celsius(
             nwp_forecast_table_xarray
         )
 

@@ -162,13 +162,24 @@ def __report_data_properties(
     error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
     print((
-        'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f} ... '
-        'min/max = {2:.4f}/{3:.4f}'
+        'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f}'
     ).format(
         str(target_matrix.shape),
-        numpy.mean(numpy.isnan(target_matrix)),
-        numpy.min(target_matrix),
-        numpy.max(target_matrix)
+        numpy.mean(numpy.isnan(target_matrix))
+    ))
+
+    these_min = numpy.nanmin(
+        target_matrix, axis=(0, 1, 2)
+    )
+    these_max = numpy.nanmax(
+        target_matrix, axis=(0, 1, 2)
+    )
+
+    print('Min values in target matrix: {0:s}'.format(
+        str(these_min)
+    ))
+    print('Max values in target matrix: {0:s}'.format(
+        str(these_max)
     ))
 
     predictor_matrices = (
