@@ -197,7 +197,7 @@ def _run():
                 [432, 432, NWP_LEAD_TIME_COUNTS[i], 22], dtype=int
             )
             input_dims_lagged_targets = numpy.array(
-                [432, 432, LAG_TIME_COUNTS[j], 1], dtype=int
+                [432, 432, LAG_TIME_COUNTS[j], 5], dtype=int
             )
 
             option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
