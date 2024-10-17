@@ -414,7 +414,7 @@ def _plot_everything_1sample(
                 target_field_names=field_names,
                 patch_location_dict=patch_location_dict,
                 predict_dewpoint_depression=False,
-                predict_gust_factor=False
+                predict_gust_excess=False
             )
         )
 

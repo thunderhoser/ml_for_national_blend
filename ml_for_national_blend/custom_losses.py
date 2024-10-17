@@ -94,17 +94,17 @@ def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
     """Processes wind-gust predictions.
 
     Specifically, this method assumes that raw gust predictions are actually
-    (gust factor - 1) -- and then converts them to actual gust speeds.
+    gust minus sustained -- and then converts them to actual gust speeds.
 
     :param prediction_tensor: See doc for `process_dewpoint_predictions`.
     :param u_wind_index: Array index for u-wind.  This tells the method that
         u-wind predictions can be found in
         prediction_tensor[:, :, :, u_wind_index, ...].
     :param v_wind_index: Same but for v-wind.
-    :param gust_index: Same but for gust (factor).
+    :param gust_index: Same but for gust (excess).
     :return: prediction_tensor: Same as input, except that
         prediction_tensor[:, :, :, gust_index, ...] now contains gust speeds
-        and not gust factors.
+        and not gust excesses.
     """
 
     error_checking.assert_is_integer(u_wind_index)
@@ -118,10 +118,10 @@ def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
     assert u_wind_index != gust_index
     assert v_wind_index != gust_index
 
-    gust_factor_prediction_tensor = (
-        prediction_tensor[:, :, :, gust_index, ...] + 1.
+    gust_excess_prediction_tensor = (
+        prediction_tensor[:, :, :, gust_index, ...]
     )
-    gust_speed_prediction_tensor = gust_factor_prediction_tensor * K.sqrt(
+    gust_speed_prediction_tensor = gust_excess_prediction_tensor + K.sqrt(
         prediction_tensor[:, :, :, u_wind_index, ...] ** 2 +
         prediction_tensor[:, :, :, v_wind_index, ...] ** 2
     )
