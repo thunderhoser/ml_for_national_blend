@@ -45,6 +45,6 @@ python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation.nc" \
 --target_field_name="temperature_2m_agl_kelvins" \
 --metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" \
---min_colour_values 1 1 -5 -5 0.4 0.0 0 0 0 0 0.025 0 0.3 0 -1.2 0 -1 0 \
---max_colour_values 1 17 30 30 3.0 1.4 8 1 150 1 0.250 1 2.2 1 1.2 1 1 5 \
+--min_colour_values 1  1  -5 -5 0.4 0.0 0 0 0   0 0.025 0 0.3 0 -1.2 0 -1 0 \
+--max_colour_values 17 17 30 30 3.0 1.4 8 1 150 1 0.250 1 2.2 1  1.2 1  1 5 \
 --output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation_no_prctile"
