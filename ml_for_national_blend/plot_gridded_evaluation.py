@@ -80,13 +80,14 @@ METRIC_NAME_TO_VERBOSE = {
     evaluation.KGE_KEY: 'Kling-Gupta efficiency',
     evaluation.RELIABILITY_KEY: 'reliability',
     evaluation.SSRAT_KEY: 'spread-skill ratio',
-    evaluation.SSDIFF_KEY: 'spread-skill difference'
+    evaluation.SSDIFF_KEY: 'spread-skill difference',
+    evaluation.SSREL_KEY: 'spread-skill reliability'
 }
 
 UNITLESS_METRIC_NAMES = [
     evaluation.MSE_SKILL_SCORE_KEY, evaluation.DWMSE_SKILL_SCORE_KEY,
     evaluation.MAE_SKILL_SCORE_KEY, evaluation.CORRELATION_KEY,
-    evaluation.KGE_KEY, evaluation.SSRAT_KEY, evaluation.SSDIFF_KEY
+    evaluation.KGE_KEY, evaluation.SSRAT_KEY
 ]
 SQUARED_METRIC_NAMES = [
     evaluation.MSE_BIAS_KEY, evaluation.MSE_VARIANCE_KEY,
@@ -114,7 +115,8 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
     evaluation.KGE_KEY: pyplot.get_cmap('seismic'),
     evaluation.RELIABILITY_KEY: pyplot.get_cmap('viridis'),
     evaluation.SSRAT_KEY: pyplot.get_cmap('seismic'),
-    evaluation.SSDIFF_KEY: pyplot.get_cmap('seismic')
+    evaluation.SSDIFF_KEY: pyplot.get_cmap('seismic'),
+    evaluation.SSREL_KEY: pyplot.get_cmap('viridis')
 }
 
 METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
@@ -137,7 +139,8 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     evaluation.KGE_KEY: 'diverging_weird',
     evaluation.RELIABILITY_KEY: 'sequential',
     evaluation.SSRAT_KEY: 'ssrat',
-    evaluation.SSDIFF_KEY: 'diverging'
+    evaluation.SSDIFF_KEY: 'diverging',
+    evaluation.SSREL_KEY: 'sequential'
 }
 
 NAN_COLOUR = numpy.full(3, 152. / 255)
@@ -147,13 +150,20 @@ FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
 
 INPUT_FILE_ARG_NAME = 'input_evaluation_file_name'
+TARGET_FIELD_ARG_NAME = 'target_field_name'
 METRICS_ARG_NAME = 'metric_names'
+MIN_VALUES_ARG_NAME = 'min_colour_values'
+MAX_VALUES_ARG_NAME = 'max_colour_values'
 MIN_PERCENTILES_ARG_NAME = 'min_colour_percentiles'
 MAX_PERCENTILES_ARG_NAME = 'max_colour_percentiles'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_FILE_HELP_STRING = (
     'Path to input file (will be read by `evaluation.read_file`).'
+)
+TARGET_FIELD_HELP_STRING = (
+    'Name of target field for which to plot metrics.  This field name must be '
+    'accepted by `urma_utils.check_field_name`.'
 )
 METRICS_HELP_STRING = (
     'List of metrics to plot.  Each metric must be in the following list:'
@@ -162,24 +172,33 @@ METRICS_HELP_STRING = (
     str(list(METRIC_NAME_TO_VERBOSE.keys()))
 )
 
+MIN_VALUES_HELP_STRING = (
+    'List of minimum values for each colour bar (one per metric in the list '
+    '`{0:s}`).  If you would rather specify min/max values by percentile, '
+    'leave this argument alone; use `{1:s}` and `{2:s}`, instead.'
+).format(
+    METRICS_ARG_NAME,
+    MIN_PERCENTILES_ARG_NAME,
+    MAX_PERCENTILES_ARG_NAME
+)
+MAX_VALUES_HELP_STRING = 'See documentation for `{0:s}`.'.format(
+    MIN_VALUES_ARG_NAME
+)
 MIN_PERCENTILES_HELP_STRING = (
-    'List of minimum percentiles for each colour scheme (one per metric in the '
-    'list `{0:s}`).  For example, suppose that the second value in the list '
-    '`{0:s}` is "dual_weighted_mean_squared_error" and the second value in '
-    'this list is 1 -- then, for each target variable, the minimum value in '
-    'the colour scheme for DWMSE will be the 1st percentile over values in the '
-    'spatial grid.'
-).format(METRICS_ARG_NAME)
-
-MAX_PERCENTILES_HELP_STRING = (
-    'List of max percentiles for each colour scheme (one per metric in the '
-    'list `{0:s}`).  For example, suppose that the second value in the list '
-    '`{0:s}` is "dual_weighted_mean_squared_error" and the second value in '
-    'this list is 99 -- then, for each target variable, the max value in '
-    'the colour scheme for DWMSE will be the 99th percentile over values in the '
-    'spatial grid.'
-).format(METRICS_ARG_NAME)
-
+    'List of minimum percentiles for each colour bar (one per metric in the '
+    'list `{0:s}`).  For example, suppose that the second value in `{0:s}` is '
+    '"mean_squared_error" and the second value in this list is 0.5.  Then the '
+    'minimum value in the colour bar for MSE will be the 0.5th-percentile MSE '
+    'over all grid points.  If you would rather specify min/max values '
+    'directly, leave this argument alone; use `{1:s}` and `{2:s}`, instead.'
+).format(
+    METRICS_ARG_NAME,
+    MIN_PERCENTILES_ARG_NAME,
+    MAX_PERCENTILES_ARG_NAME
+)
+MAX_PERCENTILES_HELP_STRING = 'See documentation for `{0:s}`.'.format(
+    MIN_PERCENTILES_ARG_NAME
+)
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory (figures will be saved here).'
 )
@@ -194,12 +213,20 @@ INPUT_ARG_PARSER.add_argument(
     help=METRICS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MIN_PERCENTILES_ARG_NAME, type=float, nargs='+', required=True,
-    help=MIN_PERCENTILES_HELP_STRING
+    '--' + MIN_VALUES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[101.], help=MIN_VALUES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MAX_PERCENTILES_ARG_NAME, type=float, nargs='+', required=True,
-    help=MAX_PERCENTILES_HELP_STRING
+    '--' + MAX_VALUES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1.], help=MAX_VALUES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MIN_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[101.], help=MIN_PERCENTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1.], help=MAX_PERCENTILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -339,14 +366,16 @@ def _plot_one_score(
     pyplot.close(figure_object)
 
 
-def _run(input_file_name, metric_names, min_colour_percentiles,
-         max_colour_percentiles, output_dir_name):
+def _run(input_file_name, metric_names, min_colour_values, max_colour_values,
+         min_colour_percentiles, max_colour_percentiles, output_dir_name):
     """Plots gridded model evaluation.
 
     This is effectively the main method.
 
     :param input_file_name: See documentation at top of file.
     :param metric_names: Same.
+    :param min_colour_values: Same.
+    :param max_colour_values: Same.
     :param min_colour_percentiles: Same.
     :param max_colour_percentiles: Same.
     :param output_dir_name: Same.
@@ -361,18 +390,44 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
 
     valid_metric_names = list(METRIC_NAME_TO_VERBOSE.keys())
     assert all([m in valid_metric_names for m in metric_names])
-
     num_metrics = len(metric_names)
-    error_checking.assert_is_numpy_array(
-        max_colour_percentiles,
-        exact_dimensions=numpy.array([num_metrics], dtype=int)
-    )
 
-    error_checking.assert_is_leq_numpy_array(max_colour_percentiles, 100.)
-    error_checking.assert_is_geq_numpy_array(min_colour_percentiles, 0.)
-    error_checking.assert_is_greater_numpy_array(
-        max_colour_percentiles - min_colour_percentiles, 0.
-    )
+    if (
+            len(min_colour_values) == 1 and
+            len(max_colour_values) == 1 and
+            max_colour_values[0] < min_colour_values[0]
+    ):
+        min_colour_values = None
+        max_colour_values = None
+
+    if (
+            len(min_colour_percentiles) == 1 and
+            len(max_colour_percentiles) == 1 and
+            max_colour_percentiles[0] < min_colour_percentiles[0]
+    ):
+        min_colour_percentiles = None
+        max_colour_percentiles = None
+
+    if min_colour_values is not None:
+        error_checking.assert_is_numpy_array(
+            min_colour_values,
+            exact_dimensions=numpy.array([num_metrics], dtype=int)
+        )
+        error_checking.assert_is_greater_numpy_array(
+            max_colour_values - min_colour_values, 0.
+        )
+
+    if min_colour_percentiles is not None:
+        error_checking.assert_is_numpy_array(
+            max_colour_percentiles,
+            exact_dimensions=numpy.array([num_metrics], dtype=int)
+        )
+
+        error_checking.assert_is_leq_numpy_array(max_colour_percentiles, 100.)
+        error_checking.assert_is_geq_numpy_array(min_colour_percentiles, 0.)
+        error_checking.assert_is_greater_numpy_array(
+            max_colour_percentiles - min_colour_percentiles, 0.
+        )
 
     # Do actual stuff.
     print('Reading data from: "{0:s}"...'.format(input_file_name))
@@ -453,53 +508,57 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
                 metric_names[i]
             ]
 
-            if colour_norm_type_string == 'sequential':
-                min_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, min_colour_percentiles[i]
-                )
-                max_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, max_colour_percentiles[i]
-                )
-            elif colour_norm_type_string == 'diverging_weird':
-                max_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, max_colour_percentiles[i]
-                )
-                min_colour_value = -1 * max_colour_value
-            elif colour_norm_type_string == 'diverging':
-                max_colour_value = numpy.nanpercentile(
-                    numpy.absolute(score_matrix_for_cnorm),
-                    max_colour_percentiles[i]
-                )
-                min_colour_value = -1 * max_colour_value
-            elif colour_norm_type_string == 'ssrat':
-                this_offset = numpy.nanpercentile(
-                    numpy.absolute(score_matrix_for_cnorm - 1.),
-                    max_colour_percentiles[i]
-                )
-                max_colour_value = 1. + this_offset
-                min_colour_value = 0.
+            if min_colour_values is None:
+                if colour_norm_type_string == 'sequential':
+                    this_min_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, min_colour_percentiles[i]
+                    )
+                    this_max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                elif colour_norm_type_string == 'diverging_weird':
+                    this_max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                    this_min_colour_value = -1 * this_max_colour_value
+                elif colour_norm_type_string == 'diverging':
+                    this_max_colour_value = numpy.nanpercentile(
+                        numpy.absolute(score_matrix_for_cnorm),
+                        max_colour_percentiles[i]
+                    )
+                    this_min_colour_value = -1 * this_max_colour_value
+                elif colour_norm_type_string == 'ssrat':
+                    this_offset = numpy.nanpercentile(
+                        numpy.absolute(score_matrix_for_cnorm - 1.),
+                        max_colour_percentiles[i]
+                    )
+                    this_max_colour_value = 1. + this_offset
+                    this_min_colour_value = 0.
+                else:
+                    this_max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                    this_min_colour_value = -1 * this_max_colour_value
+
+                if numpy.isnan(this_max_colour_value):
+                    this_min_colour_value = 0.
+                    this_max_colour_value = 1.
+
+                this_max_colour_value = max([
+                    this_max_colour_value,
+                    this_min_colour_value + TOLERANCE
+                ])
             else:
-                max_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, max_colour_percentiles[i]
-                )
-                min_colour_value = -1 * max_colour_value
-
-            if numpy.isnan(max_colour_value):
-                min_colour_value = 0.
-                max_colour_value = 1.
-
-            max_colour_value = max([
-                max_colour_value,
-                min_colour_value + TOLERANCE
-            ])
+                this_min_colour_value = min_colour_values[i]
+                this_max_colour_value = max_colour_values[i]
 
             if colour_norm_type_string == 'ssrat':
                 colour_map_object, colour_norm_object = (
-                    _get_ssrat_colour_scheme(max_colour_value)
+                    _get_ssrat_colour_scheme(this_max_colour_value)
                 )
             else:
                 colour_norm_object = pyplot.Normalize(
-                    vmin=min_colour_value, vmax=max_colour_value
+                    vmin=this_min_colour_value, vmax=this_max_colour_value
                 )
 
             if metric_names[i] in UNITLESS_METRIC_NAMES:
@@ -558,6 +617,14 @@ if __name__ == '__main__':
     _run(
         input_file_name=getattr(INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME),
         metric_names=getattr(INPUT_ARG_OBJECT, METRICS_ARG_NAME),
+        min_colour_values=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MIN_VALUES_ARG_NAME),
+            dtype=float
+        ),
+        max_colour_values=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_VALUES_ARG_NAME),
+            dtype=float
+        ),
         min_colour_percentiles=numpy.array(
             getattr(INPUT_ARG_OBJECT, MIN_PERCENTILES_ARG_NAME),
             dtype=float

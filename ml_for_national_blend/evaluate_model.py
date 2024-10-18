@@ -16,8 +16,6 @@ import prediction_io
 import evaluation
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
-
-SENTINEL_VALUE = -1e6
 TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
@@ -29,11 +27,10 @@ TARGET_NORM_FILE_ARG_NAME = 'input_target_norm_file_name'
 NUM_RELIA_BINS_ARG_NAME = 'num_relia_bins_by_target'
 MIN_RELIA_BIN_EDGES_ARG_NAME = 'min_relia_bin_edge_by_target'
 MAX_RELIA_BIN_EDGES_ARG_NAME = 'max_relia_bin_edge_by_target'
-MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'min_relia_bin_edge_prctile_by_target'
-MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'max_relia_bin_edge_prctile_by_target'
 PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
 KEEP_IT_SIMPLE_ARG_NAME = 'keep_it_simple'
 COMPUTE_SSRAT_ARG_NAME = 'compute_ssrat'
+COMPUTE_SSREL_ARG_NAME = 'compute_ssrel'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -65,25 +62,12 @@ NUM_RELIA_BINS_HELP_STRING = (
     'target, where T = number of target fields.'
 )
 MIN_RELIA_BIN_EDGES_HELP_STRING = (
-    'length-T numpy array with minimum target/predicted value in reliability '
-    'curve for each target.  If you instead want minimum values to be '
-    'percentiles over the data, leave this argument alone and use {0:s}.'
-).format(MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME)
-
+    'length-T numpy array with minimum predicted value in reliability curve '
+    'for each target.'
+)
 MAX_RELIA_BIN_EDGES_HELP_STRING = 'Same as {0:s} but for maximum'.format(
     MIN_RELIA_BIN_EDGES_ARG_NAME
 )
-MIN_RELIA_BIN_EDGES_PRCTILE_HELP_STRING = (
-    'length-T numpy array with percentile level used to determine minimum '
-    'target/predicted value in reliability curve for each target.  If you '
-    'instead want to specify raw values, leave this argument alone and use '
-    '{0:s}.'
-).format(MIN_RELIA_BIN_EDGES_ARG_NAME)
-
-MAX_RELIA_BIN_EDGES_PRCTILE_HELP_STRING = (
-    'Same as {0:s} but for maximum'
-).format(MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME)
-
 PER_GRID_CELL_HELP_STRING = (
     'Boolean flag.  If 1, will compute a separate set of scores at each grid '
     'cell.  If 0, will compute one set of scores for the whole domain.'
@@ -95,6 +79,9 @@ KEEP_IT_SIMPLE_HELP_STRING = (
 COMPUTE_SSRAT_HELP_STRING = (
     'Boolean flag.  If 1, will compute spread-skill ratio (SSRAT) and spread-'
     'skill difference (SSDIFF).'
+)
+COMPUTE_SSREL_HELP_STRING = (
+    'Boolean flag.  If 1, will compute spread-skill reliability (SSREL).'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -131,22 +118,12 @@ INPUT_ARG_PARSER.add_argument(
     help=NUM_RELIA_BINS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MIN_RELIA_BIN_EDGES_ARG_NAME, type=float, nargs='+', required=False,
-    default=[SENTINEL_VALUE - 1], help=MIN_RELIA_BIN_EDGES_HELP_STRING
+    '--' + MIN_RELIA_BIN_EDGES_ARG_NAME, type=float, nargs='+', required=True,
+    help=MIN_RELIA_BIN_EDGES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MAX_RELIA_BIN_EDGES_ARG_NAME, type=float, nargs='+', required=False,
-    default=[SENTINEL_VALUE - 1], help=MAX_RELIA_BIN_EDGES_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME, type=float, nargs='+',
-    required=False, default=[SENTINEL_VALUE - 1],
-    help=MIN_RELIA_BIN_EDGES_PRCTILE_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME, type=float, nargs='+',
-    required=False, default=[SENTINEL_VALUE - 1],
-    help=MAX_RELIA_BIN_EDGES_PRCTILE_HELP_STRING
+    '--' + MAX_RELIA_BIN_EDGES_ARG_NAME, type=float, nargs='+', required=True,
+    help=MAX_RELIA_BIN_EDGES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PER_GRID_CELL_ARG_NAME, type=int, required=True,
@@ -161,6 +138,10 @@ INPUT_ARG_PARSER.add_argument(
     help=COMPUTE_SSRAT_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + COMPUTE_SSREL_ARG_NAME, type=int, required=False, default=0,
+    help=COMPUTE_SSREL_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -171,9 +152,8 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
          target_field_names, target_normalization_file_name,
          num_relia_bins_by_target, min_relia_bin_edge_by_target,
          max_relia_bin_edge_by_target,
-         min_relia_bin_edge_prctile_by_target,
-         max_relia_bin_edge_prctile_by_target,
-         per_grid_cell, keep_it_simple, compute_ssrat, output_file_name):
+         per_grid_cell, keep_it_simple, compute_ssrat, compute_ssrel,
+         output_file_name):
     """Evaluates model.
 
     This is effectively the main method.
@@ -187,31 +167,12 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
     :param num_relia_bins_by_target: Same.
     :param min_relia_bin_edge_by_target: Same.
     :param max_relia_bin_edge_by_target: Same.
-    :param min_relia_bin_edge_prctile_by_target: Same.
-    :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
     :param keep_it_simple: Same.
     :param compute_ssrat: Same.
+    :param compute_ssrel: Same.
     :param output_file_name: Same.
     """
-
-    if (
-            (len(min_relia_bin_edge_by_target) == 1 and
-             min_relia_bin_edge_by_target[0] <= SENTINEL_VALUE) or
-            (len(max_relia_bin_edge_by_target) == 1 and
-             max_relia_bin_edge_by_target[0] <= SENTINEL_VALUE)
-    ):
-        min_relia_bin_edge_by_target = None
-        max_relia_bin_edge_by_target = None
-
-    if (
-            (len(min_relia_bin_edge_prctile_by_target) == 1 and
-             min_relia_bin_edge_prctile_by_target[0] <= SENTINEL_VALUE) or
-            (len(max_relia_bin_edge_prctile_by_target) == 1 and
-             max_relia_bin_edge_prctile_by_target[0] <= SENTINEL_VALUE)
-    ):
-        min_relia_bin_edge_prctile_by_target = None
-        max_relia_bin_edge_prctile_by_target = None
 
     first_init_time_by_period_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
@@ -273,13 +234,12 @@ def _run(prediction_dir_name, first_init_time_string_by_period,
         num_relia_bins_by_target=num_relia_bins_by_target,
         min_relia_bin_edge_by_target=min_relia_bin_edge_by_target,
         max_relia_bin_edge_by_target=max_relia_bin_edge_by_target,
-        min_relia_bin_edge_prctile_by_target=
-        min_relia_bin_edge_prctile_by_target,
-        max_relia_bin_edge_prctile_by_target=
-        max_relia_bin_edge_prctile_by_target,
+        min_relia_bin_edge_prctile_by_target=None,
+        max_relia_bin_edge_prctile_by_target=None,
         per_grid_cell=per_grid_cell,
         keep_it_simple=keep_it_simple,
-        compute_ssrat=compute_ssrat
+        compute_ssrat=compute_ssrat,
+        compute_ssrel=compute_ssrel
     )
     print(SEPARATOR_STRING)
 
@@ -357,16 +317,9 @@ if __name__ == '__main__':
         max_relia_bin_edge_by_target=numpy.array(
             getattr(INPUT_ARG_OBJECT, MAX_RELIA_BIN_EDGES_ARG_NAME), dtype=float
         ),
-        min_relia_bin_edge_prctile_by_target=numpy.array(
-            getattr(INPUT_ARG_OBJECT, MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME),
-            dtype=float
-        ),
-        max_relia_bin_edge_prctile_by_target=numpy.array(
-            getattr(INPUT_ARG_OBJECT, MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME),
-            dtype=float
-        ),
         per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
         keep_it_simple=bool(getattr(INPUT_ARG_OBJECT, KEEP_IT_SIMPLE_ARG_NAME)),
         compute_ssrat=bool(getattr(INPUT_ARG_OBJECT, COMPUTE_SSRAT_ARG_NAME)),
+        compute_ssrel=bool(getattr(INPUT_ARG_OBJECT, COMPUTE_SSREL_ARG_NAME)),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

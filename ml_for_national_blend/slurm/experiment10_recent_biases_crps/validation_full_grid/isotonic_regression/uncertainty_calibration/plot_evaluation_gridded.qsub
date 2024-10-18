@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="plot_evaluation_gridded"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
@@ -43,6 +43,7 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/gridded_evaluation.nc" \
+--target_field_name="temperature_2m_agl_kelvins" \
 --metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" "spread_skill_ratio" \
 --min_colour_percentiles 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 \
 --max_colour_percentiles 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 99.5 \

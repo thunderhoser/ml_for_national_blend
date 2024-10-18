@@ -23,6 +23,7 @@ import urma_utils
 # TODO(thunderhoser): Allow multiple lead times.
 
 TOLERANCE = 1e-6
+NUM_BINS_FOR_SSREL = 100
 
 RELIABILITY_BIN_DIM = 'reliability_bin'
 BOOTSTRAP_REP_DIM = 'bootstrap_replicate'
@@ -53,6 +54,7 @@ MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 BIAS_KEY = 'bias'
 SSRAT_KEY = 'spread_skill_ratio'
 SSDIFF_KEY = 'spread_skill_difference'
+SSREL_KEY = 'spread_skill_reliability'
 SPATIAL_MIN_BIAS_KEY = 'spatial_min_bias'
 SPATIAL_MAX_BIAS_KEY = 'spatial_max_bias'
 CORRELATION_KEY = 'correlation'
@@ -451,6 +453,70 @@ def _get_rel_curve_one_scalar(
     return mean_predictions, mean_observations, example_counts
 
 
+def _get_ss_plot_one_scalar(
+        squared_errors, ensemble_variances,
+        num_bins, min_bin_edge_stdev, max_bin_edge_stdev):
+    """Computes spread-skill plot for one scalar target variable.
+
+    B = number of bins
+    E = number of examples
+
+    :param squared_errors: length-E numpy array with squared error of ensemble
+        mean for every example.
+    :param ensemble_variances: length-E numpy array with ensemble variance for
+        every example.
+    :param num_bins: Number of bins (points in curve).
+    :param min_bin_edge_stdev: Value at lower edge of first bin.  This is an
+        ensemble standard deviation, not a variance.
+    :param max_bin_edge_stdev: Value at upper edge of last bin.  This is an
+        ensemble standard deviation, not a variance.
+    :return: mean_ensemble_variances: length-B numpy array of x-coordinates.
+    :return: mean_squared_errors: length-B numpy array of y-coordinates.
+    :return: example_counts: length-B numpy array with num examples in each bin.
+    """
+
+    real_indices = numpy.where(numpy.invert(numpy.logical_or(
+        numpy.isnan(squared_errors),
+        numpy.isnan(ensemble_variances)
+    )))[0]
+    real_squared_errors = squared_errors[real_indices]
+    real_ensemble_variances = ensemble_variances[real_indices]
+
+    mean_ensemble_variances = numpy.full(num_bins, numpy.nan)
+    mean_squared_errors = numpy.full(num_bins, numpy.nan)
+    example_counts = numpy.full(num_bins, numpy.nan)
+
+    if len(real_indices) == 0:
+        return mean_ensemble_variances, mean_squared_errors, example_counts
+
+    bin_cutoffs = numpy.linspace(
+        min_bin_edge_stdev, max_bin_edge_stdev, num=num_bins + 1
+    )
+    example_to_bin_indices = numpy.digitize(
+        numpy.sqrt(real_ensemble_variances), bin_cutoffs, right=False
+    ) - 1
+    example_to_bin_indices = numpy.clip(example_to_bin_indices, 0, num_bins - 1)
+
+    example_indices_by_bin = __find_examples_in_each_bin(
+        example_to_bin_indices=example_to_bin_indices,
+        num_bins=num_bins
+    )
+
+    for j in range(num_bins):
+        if len(example_indices_by_bin[j]) == 0:
+            continue
+
+        example_counts[j] = len(example_indices_by_bin[j])
+        mean_ensemble_variances[j] = numpy.mean(
+            real_ensemble_variances[example_indices_by_bin[j]]
+        )
+        mean_squared_errors[j] = numpy.mean(
+            real_squared_errors[example_indices_by_bin[j]]
+        )
+
+    return mean_ensemble_variances, mean_squared_errors, example_counts
+
+
 def _get_ssrat_one_replicate(
         full_squared_error_matrix, full_prediction_variance_matrix,
         example_indices_in_replicate, per_grid_cell):
@@ -484,7 +550,7 @@ def _get_ssrat_one_replicate(
     if per_grid_cell:
         num_grid_rows = squared_error_matrix.shape[1]
         num_grid_columns = squared_error_matrix.shape[2]
-        these_dim = ((num_grid_rows, num_grid_columns, num_target_fields))
+        these_dim = (num_grid_rows, num_grid_columns, num_target_fields)
     else:
         these_dim = (num_target_fields,)
 
@@ -543,7 +609,7 @@ def _get_ssdiff_one_replicate(
     if per_grid_cell:
         num_grid_rows = squared_error_matrix.shape[1]
         num_grid_columns = squared_error_matrix.shape[2]
-        these_dim = ((num_grid_rows, num_grid_columns, num_target_fields))
+        these_dim = (num_grid_rows, num_grid_columns, num_target_fields)
     else:
         these_dim = (num_target_fields,)
 
@@ -568,6 +634,121 @@ def _get_ssdiff_one_replicate(
         ssdiff_matrix[..., k] = numerator - denominator
 
     return ssdiff_matrix
+
+
+def _get_ssrel_one_replicate(
+        full_squared_error_matrix, full_prediction_variance_matrix,
+        example_indices_in_replicate, per_grid_cell):
+    """Computes SSREL for one bootstrap replicate.
+
+    SSREL = spread-skill reliability
+
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+
+    :param full_squared_error_matrix: See documentation for
+        `_get_ssrat_one_replicate`.
+    :param full_prediction_variance_matrix: Same.
+    :param example_indices_in_replicate: Same.
+    :param per_grid_cell: Same.
+    :return: ssrel_matrix: If `per_grid_cell == True`, this is an M-by-N-by-T
+        numpy array of spread-skill reliabilities.  Otherwise, this is a
+        length-T numpy array of spread-skill reliabilities.
+    """
+
+    squared_error_matrix = full_squared_error_matrix[
+        example_indices_in_replicate, ...
+    ]
+    prediction_variance_matrix = full_prediction_variance_matrix[
+        example_indices_in_replicate, ...
+    ]
+    num_target_fields = squared_error_matrix.shape[3]
+
+    if per_grid_cell:
+        num_grid_rows = squared_error_matrix.shape[1]
+        num_grid_columns = squared_error_matrix.shape[2]
+        these_dim = (num_grid_rows, num_grid_columns, num_target_fields)
+    else:
+        num_grid_rows = 0
+        num_grid_columns = 0
+        these_dim = (num_target_fields,)
+
+    ssrel_matrix = numpy.full(these_dim, numpy.nan)
+
+    for k in range(num_target_fields):
+        if per_grid_cell:
+            for i in range(num_grid_rows):
+                print((
+                    'Have computed SSREL for {0:d} of {1:d} grid rows...'
+                ).format(
+                    i, num_grid_rows
+                ))
+
+                for j in range(num_grid_columns):
+                    min_bin_edge_stdev = numpy.min(
+                        numpy.sqrt(prediction_variance_matrix[:, i, j, k])
+                    )
+                    max_bin_edge_stdev = numpy.max(
+                        numpy.sqrt(prediction_variance_matrix[:, i, j, k])
+                    )
+                    max_bin_edge_stdev = max([
+                        max_bin_edge_stdev,
+                        min_bin_edge_stdev + TOLERANCE
+                    ])
+
+                    (
+                        mean_ensemble_variances,
+                        mean_squared_errors,
+                        example_counts
+                    ) = _get_ss_plot_one_scalar(
+                        squared_errors=squared_error_matrix[:, i, j, k],
+                        ensemble_variances=
+                        prediction_variance_matrix[:, i, j, k],
+                        num_bins=NUM_BINS_FOR_SSREL,
+                        min_bin_edge_stdev=min_bin_edge_stdev,
+                        max_bin_edge_stdev=max_bin_edge_stdev
+                    )
+
+                    these_diffs = numpy.absolute(
+                        mean_ensemble_variances - mean_squared_errors
+                    )
+                    ssrel_matrix[i, j, k] = (
+                        numpy.nansum(example_counts * these_diffs) /
+                        numpy.nansum(example_counts)
+                    )
+        else:
+            min_bin_edge_stdev = numpy.min(
+                numpy.sqrt(prediction_variance_matrix[..., k])
+            )
+            max_bin_edge_stdev = numpy.max(
+                numpy.sqrt(prediction_variance_matrix[..., k])
+            )
+            max_bin_edge_stdev = max([
+                max_bin_edge_stdev,
+                min_bin_edge_stdev + TOLERANCE
+            ])
+
+            (
+                mean_ensemble_variances, mean_squared_errors, example_counts
+            ) = _get_ss_plot_one_scalar(
+                squared_errors=numpy.ravel(squared_error_matrix[..., k]),
+                ensemble_variances=
+                numpy.ravel(prediction_variance_matrix[..., k]),
+                num_bins=NUM_BINS_FOR_SSREL,
+                min_bin_edge_stdev=min_bin_edge_stdev,
+                max_bin_edge_stdev=max_bin_edge_stdev
+            )
+
+            these_diffs = numpy.absolute(
+                mean_ensemble_variances - mean_squared_errors
+            )
+            ssrel_matrix[k] = (
+                numpy.nansum(example_counts * these_diffs) /
+                numpy.nansum(example_counts)
+            )
+
+    return ssrel_matrix
 
 
 def _get_scores_one_replicate(
@@ -1016,8 +1197,8 @@ def read_inputs(prediction_file_names, target_field_names, take_ensemble_mean):
     return prediction_tables_xarray
 
 
-def _read_inputs_for_ssrat(prediction_file_names, target_field_names):
-    """Reads inputs for calculation of spread-skill ratio (SSRAT).
+def _read_spread_skill_inputs(prediction_file_names, target_field_names):
+    """Reads inputs for calculation of spread-skill stuff.
 
     :param prediction_file_names: See doc for `read_inputs`.
     :param target_field_names: Same.
@@ -1071,7 +1252,8 @@ def get_scores_with_bootstrapping(
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell, keep_it_simple=False, compute_ssrat=False):
+        per_grid_cell, keep_it_simple=False,
+        compute_ssrat=False, compute_ssrel=False):
     """Computes all scores with bootstrapping.
 
     T = number of target fields
@@ -1102,6 +1284,8 @@ def get_scores_with_bootstrapping(
         test and attributes diagram.
     :param compute_ssrat: Boolean flag.  If True, will compute spread-skill
         ratio (SSRAT) and spread-skill difference (SSDIFF).
+    :param compute_ssrel: Boolean flag.  If True, will compute spread-skill
+        reliability (SSREL).
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -1112,6 +1296,8 @@ def get_scores_with_bootstrapping(
     error_checking.assert_is_string_list(target_field_names)
     error_checking.assert_is_boolean(per_grid_cell)
     error_checking.assert_is_boolean(keep_it_simple)
+    error_checking.assert_is_boolean(compute_ssrat)
+    error_checking.assert_is_boolean(compute_ssrel)
 
     num_target_fields = len(target_field_names)
     expected_dim = numpy.array([num_target_fields], dtype=int)
@@ -1160,8 +1346,8 @@ def get_scores_with_bootstrapping(
                 min_relia_bin_edge_by_target[j]
             )
 
-    if compute_ssrat:
-        prediction_tables_xarray = _read_inputs_for_ssrat(
+    if compute_ssrat or compute_ssrel:
+        prediction_tables_xarray = _read_spread_skill_inputs(
             prediction_file_names=prediction_file_names,
             target_field_names=target_field_names
         )
@@ -1186,8 +1372,18 @@ def get_scores_with_bootstrapping(
         else:
             these_dim = (num_target_fields, num_bootstrap_reps)
 
-        ssrat_matrix = numpy.full(these_dim, numpy.nan)
-        ssdiff_matrix = numpy.full(these_dim, numpy.nan)
+        if compute_ssrat:
+            ssrat_matrix = numpy.full(these_dim, numpy.nan)
+            ssdiff_matrix = numpy.full(these_dim, numpy.nan)
+        else:
+            ssrat_matrix = None
+            ssdiff_matrix = None
+
+        if compute_ssrel:
+            ssrel_matrix = numpy.full(these_dim, numpy.nan)
+        else:
+            ssrel_matrix = None
+
         num_examples = squared_error_matrix.shape[0]
         example_indices = numpy.linspace(
             0, num_examples - 1, num=num_examples, dtype=int
@@ -1201,29 +1397,46 @@ def get_scores_with_bootstrapping(
                     example_indices, size=num_examples, replace=True
                 )
 
-            print((
-                'Computing SSRAT and SSDIFF for {0:d}th of {1:d} bootstrap '
-                'replicates...'
-            ).format(
-                i + 1, num_bootstrap_reps
-            ))
+            if compute_ssrat:
+                print((
+                    'Computing SSRAT and SSDIFF for {0:d}th of {1:d} bootstrap '
+                    'replicates...'
+                ).format(
+                    i + 1, num_bootstrap_reps
+                ))
 
-            ssrat_matrix[..., i] = _get_ssrat_one_replicate(
-                full_squared_error_matrix=squared_error_matrix,
-                full_prediction_variance_matrix=prediction_variance_matrix,
-                example_indices_in_replicate=these_indices,
-                per_grid_cell=per_grid_cell
-            )
+                ssrat_matrix[..., i] = _get_ssrat_one_replicate(
+                    full_squared_error_matrix=squared_error_matrix,
+                    full_prediction_variance_matrix=prediction_variance_matrix,
+                    example_indices_in_replicate=these_indices,
+                    per_grid_cell=per_grid_cell
+                )
 
-            ssdiff_matrix[..., i] = _get_ssdiff_one_replicate(
-                full_squared_error_matrix=squared_error_matrix,
-                full_prediction_variance_matrix=prediction_variance_matrix,
-                example_indices_in_replicate=these_indices,
-                per_grid_cell=per_grid_cell
-            )
+                ssdiff_matrix[..., i] = _get_ssdiff_one_replicate(
+                    full_squared_error_matrix=squared_error_matrix,
+                    full_prediction_variance_matrix=prediction_variance_matrix,
+                    example_indices_in_replicate=these_indices,
+                    per_grid_cell=per_grid_cell
+                )
+
+            if compute_ssrel:
+                print((
+                    'Computing SSREL for {0:d}th of {1:d} bootstrap '
+                    'replicates...'
+                ).format(
+                    i + 1, num_bootstrap_reps
+                ))
+
+                ssrel_matrix[..., i] = _get_ssrel_one_replicate(
+                    full_squared_error_matrix=squared_error_matrix,
+                    full_prediction_variance_matrix=prediction_variance_matrix,
+                    example_indices_in_replicate=these_indices,
+                    per_grid_cell=per_grid_cell
+                )
     else:
         ssrat_matrix = None
         ssdiff_matrix = None
+        ssrel_matrix = None
 
     prediction_tables_xarray = read_inputs(
         prediction_file_names=prediction_file_names,
@@ -1349,6 +1562,12 @@ def get_scores_with_bootstrapping(
         new_dict = {
             SSRAT_KEY: (these_dim_keys, ssrat_matrix),
             SSDIFF_KEY: (these_dim_keys, ssdiff_matrix)
+        }
+        main_data_dict.update(new_dict)
+
+    if compute_ssrel:
+        new_dict = {
+            SSREL_KEY: (these_dim_keys, ssrel_matrix)
         }
         main_data_dict.update(new_dict)
 

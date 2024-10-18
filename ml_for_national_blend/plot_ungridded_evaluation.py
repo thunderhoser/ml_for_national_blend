@@ -16,6 +16,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
 import urma_io
@@ -32,6 +33,10 @@ TARGET_FIELD_NAME_TO_VERBOSE = {
     urma_utils.V_WIND_10METRE_NAME: r'10-m meridional wind (m s$^{-1}$)',
     urma_utils.WIND_GUST_10METRE_NAME: r'10-m wind gust (m s$^{-1}$)'
 }
+
+CELSIUS_FIELD_NAMES = [
+    urma_utils.TEMPERATURE_2METRE_NAME, urma_utils.DEWPOINT_2METRE_NAME
+]
 
 POLYGON_OPACITY = 0.5
 FIGURE_WIDTH_INCHES = 15
@@ -541,6 +546,15 @@ def _run(evaluation_file_names, target_normalization_file_name,
     climo_mean_target_values = (
         tnpt[urma_utils.MEAN_VALUE_KEY].values[these_indices]
     )
+
+    celsius_indices = numpy.array(
+        [f in CELSIUS_FIELD_NAMES for f in target_field_names], dtype=bool
+    )
+    for i in celsius_indices:
+        climo_mean_target_values[i] = temperature_conv.kelvins_to_celsius(
+            climo_mean_target_values[i]
+        )
+
     num_target_fields = len(target_field_names)
 
     for k in range(num_target_fields):

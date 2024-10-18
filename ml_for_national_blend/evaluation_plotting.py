@@ -423,7 +423,7 @@ def plot_attributes_diagram(
 
 
 def plot_taylor_diagram(target_stdev, prediction_stdev, correlation,
-                        marker_colour, figure_object):
+                        marker_colour, axes_object, figure_object):
     """Plots Taylor diagram.
 
     :param target_stdev: Standard deviation of target (actual) values.
@@ -431,6 +431,8 @@ def plot_taylor_diagram(target_stdev, prediction_stdev, correlation,
     :param correlation: Correlation between actual and predicted values.
     :param marker_colour: Colour for markers (in any format accepted by
         matplotlib).
+    :param axes_object: Will plot on these axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
     :param figure_object: Will plot on this figure (instance of
         `matplotlib.figure.Figure`).
     :return: taylor_diagram_object: Handle for Taylor diagram (instance of
@@ -442,6 +444,8 @@ def plot_taylor_diagram(target_stdev, prediction_stdev, correlation,
     error_checking.assert_is_geq(correlation, -1., allow_nan=True)
     error_checking.assert_is_leq(correlation, 1., allow_nan=True)
 
+    axes_object.set_xticks([], [])
+    axes_object.set_yticks([], [])
     taylor_diagram_object = taylor_diagram.TaylorDiagram(
         refstd=target_stdev, fig=figure_object, srange=(0, 2), extend=False
     )
