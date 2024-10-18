@@ -103,15 +103,15 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
     RMSE_KEY: pyplot.get_cmap('viridis'),
     evaluation.MSE_BIAS_KEY: pyplot.get_cmap('viridis'),
     evaluation.MSE_VARIANCE_KEY: pyplot.get_cmap('viridis'),
-    evaluation.MSE_SKILL_SCORE_KEY: pyplot.get_cmap('seismic'),
+    evaluation.MSE_SKILL_SCORE_KEY: pyplot.get_cmap('viridis'),
     evaluation.DWMSE_KEY: pyplot.get_cmap('viridis'),
-    evaluation.DWMSE_SKILL_SCORE_KEY: pyplot.get_cmap('seismic'),
+    evaluation.DWMSE_SKILL_SCORE_KEY: pyplot.get_cmap('viridis'),
     evaluation.KS_STATISTIC_KEY: pyplot.get_cmap('viridis'),
     evaluation.KS_P_VALUE_KEY: pyplot.get_cmap('viridis'),
     evaluation.MAE_KEY: pyplot.get_cmap('viridis'),
-    evaluation.MAE_SKILL_SCORE_KEY: pyplot.get_cmap('seismic'),
+    evaluation.MAE_SKILL_SCORE_KEY: pyplot.get_cmap('viridis'),
     evaluation.BIAS_KEY: pyplot.get_cmap('seismic'),
-    evaluation.CORRELATION_KEY: pyplot.get_cmap('seismic'),
+    evaluation.CORRELATION_KEY: pyplot.get_cmap('viridis'),
     evaluation.KGE_KEY: pyplot.get_cmap('seismic'),
     evaluation.RELIABILITY_KEY: pyplot.get_cmap('viridis'),
     evaluation.SSRAT_KEY: pyplot.get_cmap('seismic'),
@@ -127,15 +127,15 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     RMSE_KEY: 'sequential',
     evaluation.MSE_BIAS_KEY: 'sequential',
     evaluation.MSE_VARIANCE_KEY: 'sequential',
-    evaluation.MSE_SKILL_SCORE_KEY: 'diverging_weird',
+    evaluation.MSE_SKILL_SCORE_KEY: 'sequential',
     evaluation.DWMSE_KEY: 'sequential',
-    evaluation.DWMSE_SKILL_SCORE_KEY: 'diverging_weird',
+    evaluation.DWMSE_SKILL_SCORE_KEY: 'sequential',
     evaluation.KS_STATISTIC_KEY: 'sequential',
     evaluation.KS_P_VALUE_KEY: 'sequential',
     evaluation.MAE_KEY: 'sequential',
-    evaluation.MAE_SKILL_SCORE_KEY: 'diverging_weird',
+    evaluation.MAE_SKILL_SCORE_KEY: 'sequential',
     evaluation.BIAS_KEY: 'diverging',
-    evaluation.CORRELATION_KEY: 'diverging',
+    evaluation.CORRELATION_KEY: 'sequential',
     evaluation.KGE_KEY: 'diverging_weird',
     evaluation.RELIABILITY_KEY: 'sequential',
     evaluation.SSRAT_KEY: 'ssrat',
@@ -549,8 +549,15 @@ def _run(input_file_name, metric_names, min_colour_values, max_colour_values,
                     this_min_colour_value + TOLERANCE
                 ])
             else:
-                this_min_colour_value = min_colour_values[i]
-                this_max_colour_value = max_colour_values[i]
+                if colour_norm_type_string in ['diverging', 'diverging_weird']:
+                    this_max_colour_value = max([
+                        numpy.absolute(min_colour_values[i]),
+                        numpy.absolute(max_colour_values[i])
+                    ])
+                    this_min_colour_value = -1 * this_max_colour_value
+                else:
+                    this_min_colour_value = min_colour_values[i]
+                    this_max_colour_value = max_colour_values[i]
 
             if colour_norm_type_string == 'ssrat':
                 colour_map_object, colour_norm_object = (
