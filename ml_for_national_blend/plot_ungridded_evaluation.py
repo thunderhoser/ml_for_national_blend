@@ -588,6 +588,7 @@ def _run(evaluation_file_names, target_normalization_file_name,
                     etx[evaluation.CORRELATION_KEY].values[k, :]
                 ),
                 marker_colour=line_colours[i],
+                axes_object=axes_object,
                 figure_object=figure_object
             )
 
