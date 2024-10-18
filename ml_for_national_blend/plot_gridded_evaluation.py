@@ -171,7 +171,6 @@ METRICS_HELP_STRING = (
 ).format(
     str(list(METRIC_NAME_TO_VERBOSE.keys()))
 )
-
 MIN_VALUES_HELP_STRING = (
     'List of minimum values for each colour bar (one per metric in the list '
     '`{0:s}`).  If you would rather specify min/max values by percentile, '
@@ -207,6 +206,10 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
     '--' + INPUT_FILE_ARG_NAME, type=str, required=True,
     help=INPUT_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + TARGET_FIELD_ARG_NAME, type=str, required=True,
+    help=TARGET_FIELD_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + METRICS_ARG_NAME, type=str, nargs='+', required=True,
@@ -366,13 +369,15 @@ def _plot_one_score(
     pyplot.close(figure_object)
 
 
-def _run(input_file_name, metric_names, min_colour_values, max_colour_values,
+def _run(input_file_name, target_field_name, metric_names,
+         min_colour_values, max_colour_values,
          min_colour_percentiles, max_colour_percentiles, output_dir_name):
     """Plots gridded model evaluation.
 
     This is effectively the main method.
 
     :param input_file_name: See documentation at top of file.
+    :param target_field_name: Same.
     :param metric_names: Same.
     :param min_colour_values: Same.
     :param max_colour_values: Same.
@@ -452,6 +457,9 @@ def _run(input_file_name, metric_names, min_colour_values, max_colour_values,
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     for k in range(num_target_fields):
+        if target_field_names[k] != target_field_name:
+            continue
+
         for i in range(len(metric_names)):
             if metric_names[i] == RMSE_KEY:
                 this_score_matrix = numpy.sqrt(numpy.nanmean(
@@ -623,6 +631,7 @@ if __name__ == '__main__':
 
     _run(
         input_file_name=getattr(INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME),
+        target_field_name=getattr(INPUT_ARG_OBJECT, TARGET_FIELD_ARG_NAME),
         metric_names=getattr(INPUT_ARG_OBJECT, METRICS_ARG_NAME),
         min_colour_values=numpy.array(
             getattr(INPUT_ARG_OBJECT, MIN_VALUES_ARG_NAME),
