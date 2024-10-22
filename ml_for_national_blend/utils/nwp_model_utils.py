@@ -1,5 +1,6 @@
 """Helper methods for output from any NWP model."""
 
+import os
 import time
 import warnings
 import numpy
@@ -10,6 +11,10 @@ from ml_for_national_blend.outside_code import longitude_conversion as lng_conve
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nbm_utils
+
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
 
 TOLERANCE = 1e-6
 
