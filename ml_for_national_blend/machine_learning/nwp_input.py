@@ -6,7 +6,8 @@ import numpy
 import xarray
 from scipy.interpolate import interp1d
 from ml_for_national_blend.outside_code import time_conversion
-from ml_for_national_blend.outside_code import temperature_conversions as temperature_conv
+from ml_for_national_blend.outside_code import \
+    temperature_conversions as temperature_conv
 from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.utils import nbm_utils
@@ -107,11 +108,11 @@ def __read_targets_one_example(
         urma_table_xarray=urma_table_xarray,
         desired_field_names=target_field_names
     )
-    urma_table_xarray = normalization.normalize_targets(
-        urma_table_xarray=urma_table_xarray,
-        norm_param_table_xarray=target_norm_param_table_xarray,
-        use_quantile_norm=use_quantile_norm
-    )
+    # urma_table_xarray = normalization.normalize_targets(
+    #     urma_table_xarray=urma_table_xarray,
+    #     norm_param_table_xarray=target_norm_param_table_xarray,
+    #     use_quantile_norm=use_quantile_norm
+    # )
 
     target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
@@ -193,15 +194,40 @@ def _convert_2m_temp_to_celsius(nwp_forecast_table_xarray):
     })
 
 
-def _convert_10m_gust_speed_to_factor(nwp_forecast_table_xarray):
-    """Converts 10-metre NWP gust speeds to gust factors.
+def _convert_2m_dewp_to_celsius(nwp_forecast_table_xarray):
+    """Converts 2-metre NWP dewpoints from Kelvins to Celsius.
 
-    *** Actually, gust factors minus one. ***
+    :param nwp_forecast_table_xarray: xarray table in format returned by
+        `interp_nwp_model_io.read_file`.
+    :return: nwp_forecast_table_xarray: Same, except that dewpoints have been
+        converted to Celsius.
+    """
+
+    k = numpy.where(
+        nwp_forecast_table_xarray.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.DEWPOINT_2METRE_NAME
+    )[0][0]
+
+    data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., k] = temperature_conv.kelvins_to_celsius(
+        data_matrix[..., k]
+    )
+
+    return nwp_forecast_table_xarray.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
+def _convert_10m_gust_speed_to_excess(nwp_forecast_table_xarray):
+    """Converts 10-metre NWP gust speeds to gust excesses.
 
     :param nwp_forecast_table_xarray: xarray table in format returned by
         `interp_nwp_model_io.read_file`.
     :return: nwp_forecast_table_xarray: Same, except that gust speeds have been
-        replaced with gust factors.
+        replaced with gust excesses.
     """
 
     k_inds = numpy.where(
@@ -231,7 +257,7 @@ def _convert_10m_gust_speed_to_factor(nwp_forecast_table_xarray):
     data_matrix = nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values
     k = k_inds[0]
     data_matrix[..., k] = (
-        gust_speed_matrix_m_s01 / sustained_speed_matrix_m_s01 - 1.
+        gust_speed_matrix_m_s01 - sustained_speed_matrix_m_s01
     )
 
     return nwp_forecast_table_xarray.assign({
@@ -942,7 +968,7 @@ def get_grid_dimensions(grid_spacing_km, patch_location_dict):
 def read_residual_baseline_one_example(
         init_time_unix_sec, nwp_model_name, nwp_lead_time_hours,
         nwp_directory_name, target_field_names, patch_location_dict,
-        predict_dewpoint_depression, predict_gust_factor):
+        predict_dewpoint_depression, predict_gust_excess):
     """Reads residual baseline for one example.
 
     M = number of rows in NBM grid (2.5-km target grid)
@@ -964,8 +990,8 @@ def read_residual_baseline_one_example(
         full grid (not the patchwise approach), make this None.
     :param predict_dewpoint_depression: Boolean flag.  If True, the NN is
         predicting dewpoint depression instead of dewpoint.
-    :param predict_gust_factor: Boolean flag.  If True, the NN is predicting
-        gust factor instead of gust speed.
+    :param predict_gust_excess: Boolean flag.  If True, the NN is predicting
+        gust excess instead of gust speed.
     :return: residual_baseline_matrix: M-by-N-by-F numpy array of baseline
         predictions.  These are all unnormalized.
     """
@@ -1058,9 +1084,13 @@ def read_residual_baseline_one_example(
         nwp_forecast_table_xarray = _convert_2m_dewp_to_depression(
             nwp_forecast_table_xarray
         )
+    else:
+        nwp_forecast_table_xarray = _convert_2m_dewp_to_celsius(
+            nwp_forecast_table_xarray
+        )
 
-    if predict_gust_factor:
-        nwp_forecast_table_xarray = _convert_10m_gust_speed_to_factor(
+    if predict_gust_excess:
+        nwp_forecast_table_xarray = _convert_10m_gust_speed_to_excess(
             nwp_forecast_table_xarray
         )
 
@@ -1317,11 +1347,11 @@ def read_recent_biases_one_example(
                 nwp_forecast_matrix=this_forecast_matrix[..., 0, :],
                 target_field_names=target_field_names
             )
-            this_urma_table_xarray = normalization.normalize_targets(
-                urma_table_xarray=this_urma_table_xarray,
-                norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=use_quantile_norm
-            )
+            # this_urma_table_xarray = normalization.normalize_targets(
+            #     urma_table_xarray=this_urma_table_xarray,
+            #     norm_param_table_xarray=target_norm_param_table_xarray,
+            #     use_quantile_norm=use_quantile_norm
+            # )
             this_forecast_matrix = (
                 this_urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
             )

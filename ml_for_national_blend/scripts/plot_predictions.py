@@ -6,7 +6,8 @@ import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
 from ml_for_national_blend.outside_code import time_conversion
-from ml_for_national_blend.outside_code import longitude_conversion as lng_conversion
+from ml_for_national_blend.outside_code import \
+    longitude_conversion as lng_conversion
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import border_io
@@ -406,7 +407,7 @@ def _plot_everything_1sample(
                 target_field_names=field_names,
                 patch_location_dict=patch_location_dict,
                 predict_dewpoint_depression=False,
-                predict_gust_factor=False
+                predict_gust_excess=False
             )
         )
 

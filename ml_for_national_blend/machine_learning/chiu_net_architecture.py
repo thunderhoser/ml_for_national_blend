@@ -65,7 +65,7 @@ USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
-PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
+PREDICT_GUST_EXCESS_KEY = 'predict_gust_excess'
 PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
@@ -200,8 +200,8 @@ def check_input_args(option_dict):
         batch normalization after each non-output layer.
     option_dict["ensemble_size"]: Number of ensemble members.
     option_dict["num_output_channels"]: Number of output channels.
-    option_dict["predict_gust_factor"]: Boolean flag.  If True, the model needs
-        to predict gust factor.
+    option_dict["predict_gust_excess"]: Boolean flag.  If True, the model needs
+        to predict gust excess.
     option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the
         model needs to predict dewpoint depression.
     option_dict["loss_function"]: Loss function.
@@ -588,7 +588,7 @@ def check_input_args(option_dict):
     error_checking.assert_is_geq(option_dict[ENSEMBLE_SIZE_KEY], 1)
     error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
     error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
-    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
+    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_EXCESS_KEY])
     error_checking.assert_is_boolean(
         option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
     )
@@ -681,7 +681,7 @@ def create_model(option_dict):
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
     num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
 
     num_lead_times = input_dimensions_2pt5km_res[2]
@@ -1431,7 +1431,7 @@ def create_model(option_dict):
             [conv_layer_by_level[i - 1], upconv_layer_by_level[i - 1]]
         )
 
-    this_offset = int(predict_gust_factor) + int(predict_dewpoint_depression)
+    this_offset = int(predict_gust_excess) + int(predict_dewpoint_depression)
 
     simple_output_layer_object = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
@@ -1469,21 +1469,21 @@ def create_model(option_dict):
     else:
         dd_output_layer_object = None
 
-    if predict_gust_factor:
+    if predict_gust_excess:
         gf_output_layer_object = architecture_utils.get_2d_conv_layer(
             num_kernel_rows=1, num_kernel_columns=1,
             num_rows_per_stride=1, num_columns_per_stride=1,
             num_filters=ensemble_size,
             padding_type_string=architecture_utils.YES_PADDING_STRING,
             weight_regularizer=l2_function,
-            layer_name='last_conv_gf'
+            layer_name='last_conv_gex'
         )(skip_layer_by_level[0])
 
         gf_output_layer_object = architecture_utils.get_activation_layer(
             activation_function_string=architecture_utils.RELU_FUNCTION_STRING,
             alpha_for_relu=0.,
             alpha_for_elu=0.,
-            layer_name='last_conv_gf_activation'
+            layer_name='last_conv_gex_activation'
         )(gf_output_layer_object)
     else:
         gf_output_layer_object = None

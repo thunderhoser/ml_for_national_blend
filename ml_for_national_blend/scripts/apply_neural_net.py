@@ -243,7 +243,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             verbose=True,
             predict_dewpoint_depression=
             vod[neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY],
-            predict_gust_factor=vod[neural_net.PREDICT_GUST_FACTOR_KEY],
+            predict_gust_excess=vod[neural_net.PREDICT_GUST_EXCESS_KEY],
             target_field_names=vod[neural_net.TARGET_FIELDS_KEY]
         )
 

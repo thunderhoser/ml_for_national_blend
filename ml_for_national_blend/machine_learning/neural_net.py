@@ -32,7 +32,6 @@ TOLERANCE = 1e-6
 TIME_FORMAT = '%Y-%m-%d-%H'
 HOURS_TO_SECONDS = 3600
 
-DEFAULT_GUST_FACTOR = 1.5
 POSSIBLE_DOWNSAMPLING_FACTORS = numpy.array([1, 4, 8, 16], dtype=int)
 
 FIRST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
@@ -62,7 +61,7 @@ PATCH_BUFFER_SIZE_KEY = 'patch_buffer_size_2pt5km_pixels'
 REQUIRE_ALL_PREDICTORS_KEY = 'require_all_predictors'
 
 PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
-PREDICT_GUST_FACTOR_KEY = 'predict_gust_factor'
+PREDICT_GUST_EXCESS_KEY = 'predict_gust_excess'
 DO_RESIDUAL_PREDICTION_KEY = 'do_residual_prediction'
 RESID_BASELINE_MODEL_KEY = 'resid_baseline_model_name'
 RESID_BASELINE_LEAD_TIME_KEY = 'resid_baseline_lead_time_hours'
@@ -156,13 +155,24 @@ def __report_data_properties(
     error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
     print((
-        'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f} ... '
-        'min/max = {2:.4f}/{3:.4f}'
+        'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f}'
     ).format(
         str(target_matrix.shape),
-        numpy.mean(numpy.isnan(target_matrix)),
-        numpy.min(target_matrix),
-        numpy.max(target_matrix)
+        numpy.mean(numpy.isnan(target_matrix))
+    ))
+
+    these_min = numpy.nanmin(
+        target_matrix, axis=(0, 1, 2)
+    )
+    these_max = numpy.nanmax(
+        target_matrix, axis=(0, 1, 2)
+    )
+
+    print('Min values in target matrix: {0:s}'.format(
+        str(these_min)
+    ))
+    print('Max values in target matrix: {0:s}'.format(
+        str(these_max)
     ))
 
     predictor_matrices = (
@@ -282,12 +292,12 @@ def __predicted_2m_depression_to_dewpoint(prediction_matrix,
     return prediction_matrix
 
 
-def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
-    """Converts 10-metre gust factor in predictions to gust speed.
+def __predicted_10m_gust_excess_to_speed(prediction_matrix, target_field_names):
+    """Converts 10-metre gust excess in predictions to gust speed.
 
     :param prediction_matrix: See documentation for `apply_model`.
     :param target_field_names: Same.
-    :return: prediction_matrix: Same as input, except that gust factors have
+    :return: prediction_matrix: Same as input, except that gust excesses have
         been replaced with gust speeds.
     """
 
@@ -309,13 +319,13 @@ def __predicted_10m_gust_factor_to_speed(prediction_matrix, target_field_names):
         target_field_names == urma_utils.WIND_GUST_10METRE_NAME
     )[0][0]
 
-    gust_factor_matrix = prediction_matrix[..., gust_index, :] + 1.
+    gust_excess_matrix = prediction_matrix[..., gust_index, :]
     sustained_speed_matrix = numpy.sqrt(
         prediction_matrix[..., u_index, :] ** 2 +
         prediction_matrix[..., v_index, :] ** 2
     )
     prediction_matrix[..., gust_index, :] = (
-        gust_factor_matrix * sustained_speed_matrix
+        gust_excess_matrix + sustained_speed_matrix
     )
 
     return prediction_matrix
@@ -678,7 +688,7 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_boolean(
         option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
     )
-    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_FACTOR_KEY])
+    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_EXCESS_KEY])
 
     if option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]:
         assert (
@@ -687,7 +697,7 @@ def _check_generator_args(option_dict):
         option_dict[TARGET_FIELDS_KEY].remove(urma_utils.DEWPOINT_2METRE_NAME)
         option_dict[TARGET_FIELDS_KEY].append(urma_utils.DEWPOINT_2METRE_NAME)
 
-    if option_dict[PREDICT_GUST_FACTOR_KEY]:
+    if option_dict[PREDICT_GUST_EXCESS_KEY]:
         assert (
             urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
@@ -1195,7 +1205,7 @@ def create_data(option_dict, init_time_unix_sec,
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
@@ -1361,7 +1371,7 @@ def create_data(option_dict, init_time_unix_sec,
                     target_field_names=target_field_names,
                     patch_location_dict=patch_location_dict,
                     predict_dewpoint_depression=predict_dewpoint_depression,
-                    predict_gust_factor=predict_gust_factor
+                    predict_gust_excess=predict_gust_excess
                 )
             )
         except:
@@ -1628,7 +1638,7 @@ def create_data_fast_patches(
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
@@ -1782,7 +1792,7 @@ def create_data_fast_patches(
                 target_field_names=target_field_names,
                 patch_location_dict=None,
                 predict_dewpoint_depression=predict_dewpoint_depression,
-                predict_gust_factor=predict_gust_factor
+                predict_gust_excess=predict_gust_excess
             )
         except:
             warning_string = (
@@ -2132,7 +2142,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
@@ -2420,12 +2430,12 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                             patch_location_dict=None,
                             predict_dewpoint_depression=
                             predict_dewpoint_depression,
-                            predict_gust_factor=predict_gust_factor
+                            predict_gust_excess=predict_gust_excess
                         )
                     )
 
                     if compare_to_baseline_in_loss:
-                        if predict_dewpoint_depression or predict_gust_factor:
+                        if predict_dewpoint_depression or predict_gust_excess:
                             raw_baseline_matrix = (
                                 nwp_input.read_residual_baseline_one_example(
                                     init_time_unix_sec=
@@ -2438,7 +2448,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                                     target_field_names=target_field_names,
                                     patch_location_dict=None,
                                     predict_dewpoint_depression=False,
-                                    predict_gust_factor=False
+                                    predict_gust_excess=False
                                 )
                             )
 
@@ -2842,8 +2852,8 @@ def data_generator(option_dict, return_predictors_as_dict=False):
     option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the NN
         is trained to predict dewpoint depression, rather than predicting
         dewpoint temperature directly.
-    option_dict["predict_gust_factor"]: Boolean flag.  If True, the NN is
-        trained to predict gust factor, rather than predicting gust speed
+    option_dict["predict_gust_excess"]: Boolean flag.  If True, the NN is
+        trained to predict gust excess, rather than predicting gust speed
         directly.
     option_dict["do_residual_prediction"]: Boolean flag.  If True, the NN is
         trained to predict a residual -- i.e., the departure between URMA truth
@@ -2929,7 +2939,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
 
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
-    predict_gust_factor = option_dict[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
     resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
     resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
     resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
@@ -3179,12 +3189,12 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                             patch_location_dict=patch_location_dict,
                             predict_dewpoint_depression=
                             predict_dewpoint_depression,
-                            predict_gust_factor=predict_gust_factor
+                            predict_gust_excess=predict_gust_excess
                         )
                     )
 
                     if compare_to_baseline_in_loss:
-                        if predict_dewpoint_depression or predict_gust_factor:
+                        if predict_dewpoint_depression or predict_gust_excess:
                             this_raw_baseline_matrix = (
                                 nwp_input.read_residual_baseline_one_example(
                                     init_time_unix_sec=
@@ -3197,7 +3207,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                                     target_field_names=target_field_names,
                                     patch_location_dict=patch_location_dict,
                                     predict_dewpoint_depression=False,
-                                    predict_gust_factor=False
+                                    predict_gust_excess=False
                                 )
                             )
                 except:
@@ -3732,7 +3742,7 @@ def apply_patchwise_model_to_full_grid(
             num_examples_per_batch=num_examples_per_batch,
             predict_dewpoint_depression=
             validation_option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY],
-            predict_gust_factor=validation_option_dict[PREDICT_GUST_FACTOR_KEY],
+            predict_gust_excess=validation_option_dict[PREDICT_GUST_EXCESS_KEY],
             target_field_names=validation_option_dict[TARGET_FIELDS_KEY],
             verbose=False
         )
@@ -3762,7 +3772,7 @@ def apply_patchwise_model_to_full_grid(
 
 def apply_model(
         model_object, predictor_matrices, num_examples_per_batch,
-        predict_dewpoint_depression, predict_gust_factor,
+        predict_dewpoint_depression, predict_gust_excess,
         verbose=True, target_field_names=None):
     """Applies trained neural net -- inference time!
 
@@ -3777,11 +3787,11 @@ def apply_model(
     :param num_examples_per_batch: Batch size.
     :param predict_dewpoint_depression: Boolean flag.  If True, the NN predicts
         dewpoint depression, which will be converted to dewpoint temperature.
-    :param predict_gust_factor: Boolean flag.  If True, the NN predicts gust
-        factor, which will be converted to gust speed.
+    :param predict_gust_excess: Boolean flag.  If True, the NN predicts gust
+        excess, which will be converted to gust speed.
     :param verbose: Boolean flag.  If True, will print progress messages.
     :param target_field_names:
-        [used only if predict_dewpoint_depression or predict_gust_factor]
+        [used only if predict_dewpoint_depression or predict_gust_excess]
         length-F list of target fields (each must be accepted by
         `urma_utils.check_field_name`).
     :return: prediction_matrix: E-by-M-by-N-by-F-by-S numpy array of predicted
@@ -3798,10 +3808,10 @@ def apply_model(
     num_examples_per_batch = min([num_examples_per_batch, num_examples])
 
     error_checking.assert_is_boolean(predict_dewpoint_depression)
-    error_checking.assert_is_boolean(predict_gust_factor)
+    error_checking.assert_is_boolean(predict_gust_excess)
     error_checking.assert_is_boolean(verbose)
 
-    if predict_dewpoint_depression or predict_gust_factor:
+    if predict_dewpoint_depression or predict_gust_excess:
         error_checking.assert_is_string_list(target_field_names)
         for this_name in target_field_names:
             urma_utils.check_field_name(this_name)
@@ -3840,8 +3850,8 @@ def apply_model(
             target_field_names=target_field_names
         )
 
-    if predict_gust_factor:
-        prediction_matrix = __predicted_10m_gust_factor_to_speed(
+    if predict_gust_excess:
+        prediction_matrix = __predicted_10m_gust_excess_to_speed(
             prediction_matrix=prediction_matrix,
             target_field_names=target_field_names
         )

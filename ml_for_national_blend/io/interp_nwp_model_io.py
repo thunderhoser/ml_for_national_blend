@@ -1,6 +1,7 @@
 """Input/output methods for NWP forecasts interpolated to NBM grid."""
 
 import os
+import numpy
 import xarray
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
@@ -183,7 +184,48 @@ def read_file(netcdf_file_name):
     """
 
     error_checking.assert_file_exists(netcdf_file_name)
-    return xarray.open_dataset(netcdf_file_name)
+    nwp_forecast_table_xarray = xarray.open_dataset(netcdf_file_name)
+    nwpft = nwp_forecast_table_xarray
+
+    if (
+            nwp_model_utils.WIND_GUST_10METRE_NAME not in
+            nwpft.coords[nwp_model_utils.FIELD_DIM].values
+    ):
+        return nwpft
+
+    gust_index = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.WIND_GUST_10METRE_NAME
+    )[0][0]
+    u_indices = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.U_WIND_10METRE_NAME
+    )[0]
+    v_indices = numpy.where(
+        nwpft.coords[nwp_model_utils.FIELD_DIM].values ==
+        nwp_model_utils.V_WIND_10METRE_NAME
+    )[0]
+
+    if len(u_indices) == 0 or len(v_indices) == 0:
+        return nwpft
+
+    u_index = u_indices[0]
+    v_index = v_indices[0]
+
+    data_matrix = nwpft[nwp_model_utils.DATA_KEY].values
+    data_matrix[..., gust_index] = numpy.maximum(
+        data_matrix[..., gust_index],
+        numpy.sqrt(
+            data_matrix[..., u_index] ** 2 +
+            data_matrix[..., v_index] ** 2
+        )
+    )
+
+    return nwpft.assign({
+        nwp_model_utils.DATA_KEY: (
+            nwpft[nwp_model_utils.DATA_KEY].dims, data_matrix
+        )
+    })
 
 
 def write_file(nwp_forecast_table_xarray, netcdf_file_name):

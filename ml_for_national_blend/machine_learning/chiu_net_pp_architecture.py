@@ -94,7 +94,7 @@ USE_BATCH_NORM_KEY = chiu_net_arch.USE_BATCH_NORM_KEY
 ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 
 NUM_OUTPUT_CHANNELS_KEY = chiu_net_arch.NUM_OUTPUT_CHANNELS_KEY
-PREDICT_GUST_FACTOR_KEY = chiu_net_arch.PREDICT_GUST_FACTOR_KEY
+PREDICT_GUST_EXCESS_KEY = chiu_net_arch.PREDICT_GUST_EXCESS_KEY
 PREDICT_DEWPOINT_DEPRESSION_KEY = chiu_net_arch.PREDICT_DEWPOINT_DEPRESSION_KEY
 LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
@@ -637,7 +637,7 @@ def create_model(option_dict):
     use_batch_normalization = optd[USE_BATCH_NORM_KEY]
     ensemble_size = optd[ENSEMBLE_SIZE_KEY]
     num_output_channels = optd[NUM_OUTPUT_CHANNELS_KEY]
-    predict_gust_factor = optd[PREDICT_GUST_FACTOR_KEY]
+    predict_gust_excess = optd[PREDICT_GUST_EXCESS_KEY]
     predict_dewpoint_depression = optd[PREDICT_DEWPOINT_DEPRESSION_KEY]
 
     loss_function = optd[LOSS_FUNCTION_KEY]
@@ -1554,7 +1554,7 @@ def create_model(option_dict):
         )
 
     num_constrained_output_channels = (
-        int(predict_gust_factor) + int(predict_dewpoint_depression)
+        int(predict_gust_excess) + int(predict_dewpoint_depression)
     )
     do_residual_prediction = input_dimensions_predn_baseline is not None
 
@@ -1600,7 +1600,7 @@ def create_model(option_dict):
     else:
         dd_output_layer_object = None
 
-    if predict_gust_factor:
+    if predict_gust_excess:
         gf_output_layer_object = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_residual=use_residual_blocks,
@@ -1616,7 +1616,7 @@ def create_model(option_dict):
             activation_function_alpha=0.,
             dropout_rates=-1.,
             use_batch_norm=False,
-            basic_layer_name='last_conv_gf'
+            basic_layer_name='last_conv_gex'
         )
     else:
         gf_output_layer_object = None
