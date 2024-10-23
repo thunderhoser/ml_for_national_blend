@@ -45,7 +45,7 @@ i=0
 
 while [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
     python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name="${model_dir_name}/isotonic_regression/validation_full_grid" \
+    --input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration" \
     --init_time_string="${INIT_TIME_STRINGS[$i]}" \
     --field_names "temperature_2m_agl_kelvins"  \
     --min_colour_percentiles 0.1 \
@@ -54,7 +54,7 @@ while [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
     --max_colour_percentiles_for_diff 99.9 \
     --baseline_nwp_model_name="ensemble" \
     --baseline_nwp_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid" \
-    --output_dir_name="${model_dir_name}/isotonic_regression/validation_full_grid/${INIT_TIME_STRINGS[$i]}"
+    --output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/${INIT_TIME_STRINGS[$i]}"
     
     i=$(( $i + 1 ))
 done
