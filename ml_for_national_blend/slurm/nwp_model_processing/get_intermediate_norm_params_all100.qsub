@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="get_intermediate_norm_params_all100"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

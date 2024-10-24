@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="create_ensemble_files_all_vars_12h36h60h72h"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="process_glamp_data_weird_year_patch"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

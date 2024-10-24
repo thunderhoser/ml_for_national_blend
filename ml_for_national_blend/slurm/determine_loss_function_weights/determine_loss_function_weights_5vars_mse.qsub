@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="determine_loss_function_weights_5vars_mse"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

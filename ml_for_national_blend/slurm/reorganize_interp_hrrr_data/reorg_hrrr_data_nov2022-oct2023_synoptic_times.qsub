@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="reorg_hrrr_data_nov2022-oct2023"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

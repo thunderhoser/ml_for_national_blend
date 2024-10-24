@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="convert_intermediate_to_final_norm_params_long300"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

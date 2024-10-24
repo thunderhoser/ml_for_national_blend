@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="plot_evaluation_ungridded_subset"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node

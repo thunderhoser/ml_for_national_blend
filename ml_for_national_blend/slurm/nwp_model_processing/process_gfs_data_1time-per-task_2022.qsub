@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="process_gfs_data_1time-per-task_2022"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
