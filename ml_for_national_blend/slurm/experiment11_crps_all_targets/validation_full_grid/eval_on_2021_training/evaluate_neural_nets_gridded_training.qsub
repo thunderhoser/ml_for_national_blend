@@ -43,6 +43,28 @@ target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
 echo $model_dir_name
 
+if [ "$target_field_name" = "temperature_2m_agl_kelvins" ]; then
+    num_relia_bins=115
+    min_relia_bin_edge=-60
+    max_relia_bin_edge=55
+elif [ "$target_field_name" = "u_wind_10m_agl_m_s01" ]; then
+    num_relia_bins=80
+    min_relia_bin_edge=-40
+    max_relia_bin_edge=40
+elif [ "$target_field_name" = "v_wind_10m_agl_m_s01" ]; then
+    num_relia_bins=80
+    min_relia_bin_edge=-40
+    max_relia_bin_edge=40
+elif [ "$target_field_name" = "dewpoint_2m_agl_kelvins" ]; then
+    num_relia_bins=115
+    min_relia_bin_edge=-80
+    max_relia_bin_edge=35
+else
+    num_relia_bins=80
+    min_relia_bin_edge=0
+    max_relia_bin_edge=80
+fi
+
 python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
 --first_init_time_string_by_period "2021-01-01-00" \
@@ -50,9 +72,9 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --num_bootstrap_reps=1 \
 --target_field_names "${target_field_name}" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
---num_relia_bins_by_target 115 80 80 115 80 \
---min_relia_bin_edge_by_target -60 -40 -40 -80 0 \
---max_relia_bin_edge_by_target 55 40 40 35 80 \
+--num_relia_bins_by_target ${num_relia_bins} \
+--min_relia_bin_edge_by_target ${min_relia_bin_edge} \
+--max_relia_bin_edge_by_target ${max_relia_bin_edge} \
 --per_grid_cell=1 \
 --keep_it_simple=1 \
 --compute_ssrat=0 \
