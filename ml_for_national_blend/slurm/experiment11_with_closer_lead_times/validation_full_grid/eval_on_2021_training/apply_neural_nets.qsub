@@ -53,5 +53,5 @@ for this_init_time_string in "${INIT_TIME_STRINGS[@]}"; do
     --input_target_dir_name="${TARGET_DIR_NAME}" \
     --patches_to_full_grid=1 \
     --patch_overlap_size_2pt5km_pixels=144 \
-    --output_dir_name="${model_dir_name}/training_full_grid"
+    --output_dir_name="${model_dir_name}/validation_full_grid"
 done

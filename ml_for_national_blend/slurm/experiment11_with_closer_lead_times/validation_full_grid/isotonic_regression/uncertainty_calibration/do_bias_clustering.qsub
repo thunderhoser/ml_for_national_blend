@@ -46,7 +46,7 @@ python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
 --input_gridded_eval_file_arg_name="${model_dir_name}/training_full_grid/isotonic_regression/gridded_evaluation.nc" \
 --min_cluster_size_px=250 \
 --target_field_name="${target_field_name}" \
---bias_discretization_intervals 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 \
+# --bias_discretization_intervals 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 \
 --buffer_distance_px=6 \
 --do_backwards_clustering=1 \
 --cluster_ssrat_instead_of_bias=1 \
