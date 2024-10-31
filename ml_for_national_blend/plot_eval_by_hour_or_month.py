@@ -392,10 +392,11 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             )
             have_plotted_metric[metric_indices_to_plot] = True
 
-            output_file_name = '{0:s}/{1:s}_{2:s}.jpg'.format(
+            output_file_name = '{0:s}/{1:s}_{2:s}_{3:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[f].replace('_', '-'),
                 metric_names[m].replace('_', '-'),
+                'hourly' if by_hour else 'monthly'
             )
 
             _plot_one_metric_group(
