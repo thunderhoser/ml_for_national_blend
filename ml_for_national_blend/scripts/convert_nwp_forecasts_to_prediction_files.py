@@ -300,8 +300,8 @@ def _convert_nwp_forecasts_1init(
         field_names=urma_field_names,
         init_time_unix_sec=init_time_unix_sec,
         model_file_name=dummy_model_file_name,
-        isotonic_model_file_name=None,
-        uncertainty_calib_model_file_name=None
+        isotonic_model_file_names=None,
+        uncertainty_calib_model_file_names=None
     )
 
 

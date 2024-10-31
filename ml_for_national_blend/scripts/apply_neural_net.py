@@ -268,8 +268,8 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
         init_time_unix_sec=init_times_unix_sec[0],
         model_file_name=model_file_name,
-        isotonic_model_file_name=None,
-        uncertainty_calib_model_file_name=None
+        isotonic_model_file_names=None,
+        uncertainty_calib_model_file_names=None
     )
 
 

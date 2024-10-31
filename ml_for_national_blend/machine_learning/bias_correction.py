@@ -417,12 +417,15 @@ def train_model_suite(
     }
 
 
-def apply_model_suite(prediction_table_xarray, model_dict, verbose):
+def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
     """Applies model suite to new data in inference mode.
+
+    F = number of target fields
 
     :param prediction_table_xarray: xarray table in format returned by
         `prediction_io.read_file`.
-    :param model_dict: Dictionary in format created by `train_model_suite`.
+    :param model_dict_by_field: length-F list of dictionaries, each in format
+        created by `train_model_suite`.
     :param verbose: Boolean flag.
     :return: prediction_table_xarray: Same as input but with new predictions.
     """
@@ -430,16 +433,37 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     exec_start_time_unix_sec = time.time()
     error_checking.assert_is_boolean(verbose)
 
-    model_object = model_dict[MODEL_KEY]
-    cluster_id_to_model_object = model_dict[CLUSTER_TO_MODEL_KEY]
-    cluster_id_matrix = model_dict[CLUSTER_IDS_KEY]
-    field_names = model_dict[FIELD_NAMES_KEY]
-    do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
-    one_model_per_cluster = model_object is None
+    num_fields = len(model_dict_by_field)
+    one_model_per_cluster = None
+    field_names = [None] * num_fields
+    do_uncertainty_calibration = None
+    do_ir_before_uc = None
 
-    if len(field_names) > 1:
-        error_string = 'Cannot run apply_model_suite with multi target fields.  Still have not implemented physical constraints.'
-        raise ValueError(error_string)
+    for f in range(num_fields):
+        # model_object = model_dict[MODEL_KEY]
+        # cluster_id_to_model_object = model_dict[CLUSTER_TO_MODEL_KEY]
+        # cluster_id_matrix = model_dict[CLUSTER_IDS_KEY]
+
+        these_field_names = model_dict_by_field[f][FIELD_NAMES_KEY]
+        assert len(these_field_names) == 1
+        field_names[f] = these_field_names[0]
+
+        if f == 0:
+            do_uncertainty_calibration = (
+                model_dict_by_field[f][DO_UNCERTAINTY_CALIB_KEY]
+            )
+            do_ir_before_uc = model_dict_by_field[f][DO_IR_BEFORE_UC_KEY]
+            one_model_per_cluster = model_dict_by_field[f][MODEL_KEY] is None
+
+        assert (
+            do_uncertainty_calibration ==
+            model_dict_by_field[f][DO_UNCERTAINTY_CALIB_KEY]
+        )
+        assert do_ir_before_uc == model_dict_by_field[f][DO_IR_BEFORE_UC_KEY]
+        assert (
+            one_model_per_cluster ==
+            model_dict_by_field[f][MODEL_KEY] is None
+        )
 
     ptx = prediction_table_xarray
     assert (
@@ -458,11 +482,12 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     ptx = prediction_table_xarray
 
     prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+    mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
+
     if do_uncertainty_calibration:
         ensemble_size = prediction_matrix.shape[-1]
         assert ensemble_size > 1
 
-        mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
         prediction_stdev_matrix = numpy.std(
             prediction_matrix, axis=-1, ddof=1
         )
@@ -470,21 +495,22 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
-    num_fields = len(field_names)
-    if one_model_per_cluster:
-        unique_cluster_ids = numpy.array(
-            list(cluster_id_to_model_object.keys()),
-            dtype=int
-        )
-    else:
-        unique_cluster_ids = numpy.array([-1], dtype=int)
-
-    num_clusters = len(unique_cluster_ids)
-
     for f in range(num_fields):
-        prediction_matrix_this_field = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., f, :]
+        model_object = model_dict_by_field[f][MODEL_KEY]
+        cluster_id_to_model_object = (
+            model_dict_by_field[f][CLUSTER_TO_MODEL_KEY]
         )
+        cluster_id_matrix = model_dict_by_field[f][CLUSTER_IDS_KEY]
+
+        if one_model_per_cluster:
+            unique_cluster_ids = numpy.array(
+                list(cluster_id_to_model_object.keys()),
+                dtype=int
+            )
+        else:
+            unique_cluster_ids = numpy.array([-1], dtype=int)
+
+        num_clusters = len(unique_cluster_ids)
 
         for k in range(num_clusters):
             if verbose:
@@ -588,43 +614,73 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                     cluster_id_matrix[..., f] == unique_cluster_ids[k]
                 )
 
-                relevant_prediction_matrix_this_field = (
-                    prediction_matrix_this_field[this_cluster_mask, :]
+                orig_mean_vector = (
+                    mean_prediction_matrix[..., f][this_cluster_mask]
                 )
-                these_dims = relevant_prediction_matrix_this_field.shape
+                real_mask = numpy.invert(numpy.isnan(orig_mean_vector))
 
-                relevant_prediction_vector_this_field = numpy.ravel(
-                    relevant_prediction_matrix_this_field
-                )
-                real_mask = numpy.invert(
-                    numpy.isnan(relevant_prediction_vector_this_field)
-                )
-                relevant_prediction_vector_this_field[real_mask] = (
-                    this_model_object.predict(
-                        relevant_prediction_vector_this_field[real_mask]
-                    )
-                )
-                prediction_matrix_this_field[
-                    this_cluster_mask, :
-                ] = numpy.reshape(
-                    relevant_prediction_vector_this_field, these_dims
+                new_mean_vector = orig_mean_vector + 0.
+                new_mean_vector[real_mask] = this_model_object.predict(
+                    orig_mean_vector[real_mask]
                 )
 
-                prediction_matrix[..., f, :] = prediction_matrix_this_field
+                mean_diff_vector = new_mean_vector - orig_mean_vector
+                mean_diff_vector[numpy.isnan(mean_diff_vector)] = 0.
+
+                mean_diff_matrix = numpy.expand_dims(mean_diff_vector, axis=-1)
+                prediction_matrix[this_cluster_mask, f, :] = (
+                    prediction_matrix[this_cluster_mask, f, :] +
+                    mean_diff_matrix
+                )
             else:
-                these_dims = prediction_matrix_this_field.shape
-                prediction_vector_this_field = numpy.ravel(
-                    prediction_matrix_this_field
+                orig_mean_matrix = mean_prediction_matrix[..., f]
+                these_dims = orig_mean_matrix.shape
+                orig_mean_vector = numpy.ravel(orig_mean_matrix)
+                real_mask = numpy.invert(numpy.isnan(orig_mean_vector))
+
+                new_mean_vector = orig_mean_vector + 0.
+                new_mean_vector[real_mask] = model_object.predict(
+                    orig_mean_vector[real_mask]
                 )
-                real_mask = numpy.invert(
-                    numpy.isnan(prediction_vector_this_field)
+                new_mean_matrix = numpy.reshape(new_mean_vector, these_dims)
+
+                mean_diff_matrix = new_mean_matrix - orig_mean_matrix
+                mean_diff_matrix[numpy.isnan(mean_diff_matrix)] = 0.
+                mean_diff_matrix = numpy.expand_dims(
+                    mean_diff_matrix, axis=-1
                 )
-                prediction_vector_this_field[real_mask] = model_object.predict(
-                    prediction_vector_this_field[real_mask]
+                prediction_matrix[..., f, :] = (
+                    prediction_matrix[..., f, :] + mean_diff_matrix
                 )
-                prediction_matrix[..., f, :] = numpy.reshape(
-                    prediction_vector_this_field, these_dims
-                )
+
+    if (
+            urma_utils.DEWPOINT_2METRE_NAME in field_names and
+            urma_utils.TEMPERATURE_2METRE_NAME in field_names
+    ):
+        dewp_idx = field_names.index(urma_utils.DEWPOINT_2METRE_NAME)
+        temp_idx = field_names.index(urma_utils.TEMPERATURE_2METRE_NAME)
+        prediction_matrix[..., dewp_idx, :] = numpy.minimum(
+            prediction_matrix[..., dewp_idx, :],
+            prediction_matrix[..., temp_idx, :]
+        )
+
+    if (
+            urma_utils.U_WIND_10METRE_NAME in field_names and
+            urma_utils.V_WIND_10METRE_NAME in field_names and
+            urma_utils.WIND_GUST_10METRE_NAME in field_names
+    ):
+        u_idx = field_names.index(urma_utils.U_WIND_10METRE_NAME)
+        v_idx = field_names.index(urma_utils.V_WIND_10METRE_NAME)
+        gust_idx = field_names.index(urma_utils.WIND_GUST_10METRE_NAME)
+
+        sustained_speed_matrix = numpy.sqrt(
+            prediction_matrix[..., u_idx, :] ** 2 +
+            prediction_matrix[..., v_idx, :] ** 2
+        )
+        prediction_matrix[..., gust_idx, :] = numpy.maximum(
+            prediction_matrix[..., gust_idx, :],
+            sustained_speed_matrix
+        )
 
     ptx = ptx.assign({
         prediction_io.PREDICTION_KEY: (
@@ -632,8 +688,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
             prediction_matrix
         )
     })
-
-    # TODO(thunderhoser): Apply physical constraints here!!!!
 
     print('Applying bias-correction model took {0:.4f} seconds.'.format(
         time.time() - exec_start_time_unix_sec

@@ -12,8 +12,8 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
 INIT_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings'
-ISOTONIC_FILE_ARG_NAME = 'isotonic_model_file_name'
-UNCERTAINTY_CALIB_FILE_ARG_NAME = 'uncertainty_calib_model_file_name'
+ISOTONIC_FILES_ARG_NAME = 'isotonic_model_file_names'
+UNCERTAINTY_CALIB_FILES_ARG_NAME = 'uncertainty_calib_model_file_names'
 OUTPUT_DIR_ARG_NAME = 'output_prediction_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -26,14 +26,15 @@ INIT_TIME_LIMITS_HELP_STRING = (
     'period for which to apply bias correction.  Time format is '
     '"yyyy-mm-dd-HH".'
 )
-ISOTONIC_FILE_HELP_STRING = (
-    'Path to file with isotonic-regression model, which will be used to bias-'
-    'correct ensemble means.  If you do not want IR, leave this argument alone.'
+ISOTONIC_FILES_HELP_STRING = (
+    'Paths to files with isotonic-regression models (one per target field), '
+    'which will be used to bias-correct ensemble means.  If you do not want '
+    'IR, leave this argument alone.'
 )
-UNCERTAINTY_CALIB_FILE_HELP_STRING = (
-    'Path to file with uncertainty-calibration model, which will be used to '
-    'bias-correct ensemble spreads.  If you do not want UC, leave this '
-    'argument alone.'
+UNCERTAINTY_CALIB_FILES_HELP_STRING = (
+    'Paths to files with uncertainty-calibration modelsmodels (one per target '
+    'field), which will be used to bias-correct ensemble spreads.  If you do '
+    'not want UC, leave this argument alone.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Bias-corrected predictions will be written '
@@ -51,12 +52,12 @@ INPUT_ARG_PARSER.add_argument(
     help=INIT_TIME_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + ISOTONIC_FILE_ARG_NAME, type=str, required=False, default='',
-    help=ISOTONIC_FILE_HELP_STRING
+    '--' + ISOTONIC_FILES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=ISOTONIC_FILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + UNCERTAINTY_CALIB_FILE_ARG_NAME, type=str, required=False,
-    default='', help=UNCERTAINTY_CALIB_FILE_HELP_STRING
+    '--' + UNCERTAINTY_CALIB_FILES_ARG_NAME, type=str, nargs='+',
+    required=False, default=[''], help=UNCERTAINTY_CALIB_FILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -64,52 +65,79 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(input_dir_name, init_time_limit_strings, isotonic_model_file_name,
-         uncertainty_calib_model_file_name, output_dir_name):
+def _run(input_dir_name, init_time_limit_strings, isotonic_model_file_names,
+         uncertainty_calib_model_file_names, output_dir_name):
     """Applies bias correction -- inference time!
 
     This is effectively the main method.
 
     :param input_dir_name: See documentation at top of this script.
     :param init_time_limit_strings: Same.
-    :param isotonic_model_file_name: Same.
-    :param uncertainty_calib_model_file_name: Same.
+    :param isotonic_model_file_names: Same.
+    :param uncertainty_calib_model_file_names: Same.
     :param output_dir_name: Same.
     """
 
-    if isotonic_model_file_name == '':
-        isotonic_model_file_name = None
-    if uncertainty_calib_model_file_name == '':
-        uncertainty_calib_model_file_name = None
+    if (
+            len(isotonic_model_file_names) == 1 and
+            isotonic_model_file_names[0] == ''
+    ):
+        isotonic_model_file_names = None
+
+    if (
+            len(uncertainty_calib_model_file_names) == 1 and
+            uncertainty_calib_model_file_names[0] == ''
+    ):
+        uncertainty_calib_model_file_names = None
 
     assert not (
-        isotonic_model_file_name is None and
-        uncertainty_calib_model_file_name is None
+        isotonic_model_file_names is None and
+        uncertainty_calib_model_file_names is None
     )
 
-    if isotonic_model_file_name is None:
-        isotonic_model_dict = None
-    else:
-        print('Reading IR model from: "{0:s}"...'.format(
-            isotonic_model_file_name
-        ))
-        isotonic_model_dict = bias_correction.read_file(
-            isotonic_model_file_name
-        )
-        assert not isotonic_model_dict[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+    field_counts = []
+    if isotonic_model_file_names is not None:
+        field_counts.append(len(isotonic_model_file_names))
+    if uncertainty_calib_model_file_names is not None:
+        field_counts.append(len(uncertainty_calib_model_file_names))
 
-    if uncertainty_calib_model_file_name is None:
-        uncertainty_calib_model_dict = None
-    else:
-        print('Reading UC model from: "{0:s}"...'.format(
-            uncertainty_calib_model_file_name
-        ))
-        uncertainty_calib_model_dict = bias_correction.read_file(
-            uncertainty_calib_model_file_name
-        )
+    field_counts = numpy.array(field_counts, dtype=int)
+    assert len(numpy.unique(field_counts)) == 1
+    num_fields = field_counts[0]
 
-        ucmd = uncertainty_calib_model_dict
-        assert ucmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+    if isotonic_model_file_names is None:
+        isotonic_model_dict_by_field = None
+    else:
+        isotonic_model_dict_by_field = [dict()] * num_fields
+
+        for f in range(num_fields):
+            print('Reading IR model from: "{0:s}"...'.format(
+                isotonic_model_file_names[f]
+            ))
+            isotonic_model_dict_by_field[f] = bias_correction.read_file(
+                isotonic_model_file_names[f]
+            )
+
+            imd = isotonic_model_dict_by_field[f]
+            assert not imd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+
+    if uncertainty_calib_model_file_names is None:
+        uncertainty_calib_model_dict_by_field = None
+    else:
+        uncertainty_calib_model_dict_by_field = [dict()] * num_fields
+
+        for f in range(num_fields):
+            print('Reading UC model from: "{0:s}"...'.format(
+                uncertainty_calib_model_file_names[f]
+            ))
+            uncertainty_calib_model_dict_by_field[f] = (
+                bias_correction.read_file(
+                    uncertainty_calib_model_file_names[f]
+                )
+            )
+
+            ucmd = uncertainty_calib_model_dict_by_field[f]
+            assert ucmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
 
     init_time_limits_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
@@ -132,37 +160,38 @@ def _run(input_dir_name, init_time_limit_strings, isotonic_model_file_name,
         )
         tptx = this_prediction_table_xarray
 
-        if isotonic_model_file_name is not None:
-            assert tptx.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is None
+        if isotonic_model_file_names is not None:
+            assert tptx.attrs[prediction_io.ISOTONIC_MODEL_FILES_KEY] is None
             assert (
-                tptx.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILE_KEY]
+                tptx.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILES_KEY]
                 is None
             )
 
-        if uncertainty_calib_model_file_name is not None:
+        if uncertainty_calib_model_file_names is not None:
             assert (
-                tptx.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILE_KEY]
+                tptx.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILES_KEY]
                 is None
             )
 
-            ucmd = uncertainty_calib_model_dict
+            ucmd = uncertainty_calib_model_dict_by_field[0]
             if ucmd[bias_correction.DO_IR_BEFORE_UC_KEY]:
                 assert (
-                    isotonic_model_file_name is not None or
-                    tptx.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is not None
+                    isotonic_model_file_names is not None or
+                    tptx.attrs[prediction_io.ISOTONIC_MODEL_FILES_KEY]
+                    is not None
                 )
 
-        if isotonic_model_dict is not None:
+        if isotonic_model_file_names is not None:
             this_prediction_table_xarray = bias_correction.apply_model_suite(
                 prediction_table_xarray=this_prediction_table_xarray,
-                model_dict=isotonic_model_dict,
+                model_dict_by_field=isotonic_model_dict_by_field,
                 verbose=True
             )
 
-        if uncertainty_calib_model_dict is not None:
+        if uncertainty_calib_model_file_names is not None:
             this_prediction_table_xarray = bias_correction.apply_model_suite(
                 prediction_table_xarray=this_prediction_table_xarray,
-                model_dict=uncertainty_calib_model_dict,
+                model_dict_by_field=uncertainty_calib_model_dict_by_field,
                 verbose=True
             )
 
@@ -186,8 +215,9 @@ def _run(input_dir_name, init_time_limit_strings, isotonic_model_file_name,
             field_names=tptx[prediction_io.FIELD_NAME_KEY].values.tolist(),
             init_time_unix_sec=this_init_time_unix_sec,
             model_file_name=tptx.attrs[prediction_io.MODEL_FILE_KEY],
-            isotonic_model_file_name=isotonic_model_file_name,
-            uncertainty_calib_model_file_name=uncertainty_calib_model_file_name
+            isotonic_model_file_names=isotonic_model_file_names,
+            uncertainty_calib_model_file_names=
+            uncertainty_calib_model_file_names
         )
         print(SEPARATOR_STRING)
 
@@ -200,11 +230,11 @@ if __name__ == '__main__':
         init_time_limit_strings=getattr(
             INPUT_ARG_OBJECT, INIT_TIME_LIMITS_ARG_NAME
         ),
-        isotonic_model_file_name=getattr(
-            INPUT_ARG_OBJECT, ISOTONIC_FILE_ARG_NAME
+        isotonic_model_file_names=getattr(
+            INPUT_ARG_OBJECT, ISOTONIC_FILES_ARG_NAME
         ),
-        uncertainty_calib_model_file_name=getattr(
-            INPUT_ARG_OBJECT, UNCERTAINTY_CALIB_FILE_ARG_NAME
+        uncertainty_calib_model_file_names=getattr(
+            INPUT_ARG_OBJECT, UNCERTAINTY_CALIB_FILES_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

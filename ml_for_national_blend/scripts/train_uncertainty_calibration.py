@@ -121,15 +121,15 @@ def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
 
         if do_iso_reg_before_uncertainty_calib is None:
             do_iso_reg_before_uncertainty_calib = (
-                ptx_k.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is not None
+                ptx_k.attrs[prediction_io.ISOTONIC_MODEL_FILES_KEY] is not None
             )
 
         assert (
             do_iso_reg_before_uncertainty_calib ==
-            (ptx_k.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is not None)
+            (ptx_k.attrs[prediction_io.ISOTONIC_MODEL_FILES_KEY] is not None)
         )
         assert (
-            ptx_k.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILE_KEY] is None
+            ptx_k.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILES_KEY] is None
         )
 
         prediction_tables_xarray[k] = (
