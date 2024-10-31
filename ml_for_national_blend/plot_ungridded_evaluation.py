@@ -502,9 +502,14 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
         etx_i = evaluation_tables_xarray[i]
 
         if target_field_names is None:
-            target_field_names = etx_i.coords[evaluation.FIELD_DIM].values
+            target_field_names = (
+                etx_i.coords[evaluation.FIELD_DIM].values.tolist()
+            )
 
-        assert target_field_names == etx_i.coords[evaluation.FIELD_DIM].values
+        assert (
+            target_field_names ==
+            etx_i.coords[evaluation.FIELD_DIM].values.tolist()
+        )
 
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
