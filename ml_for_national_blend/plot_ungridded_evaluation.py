@@ -24,7 +24,6 @@ import urma_io
 import prediction_io
 import urma_utils
 import evaluation
-import neural_net
 import evaluation_plotting as eval_plotting
 
 TARGET_FIELD_NAME_TO_VERBOSE = {
@@ -500,26 +499,12 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
 
             raise ValueError(error_string)
 
-        model_file_name = (
-            evaluation_tables_xarray[i].attrs[evaluation.MODEL_FILE_KEY]
-        )
-        model_file_name = __change_file_name_for_nwp_forecasts(model_file_name)
-
-        model_metafile_name = neural_net.find_metafile(
-            model_file_name=model_file_name, raise_error_if_missing=True
-        )
-
-        print('Reading metadata from: "{0:s}"...'.format(model_metafile_name))
-        model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-        generator_option_dict = model_metadata_dict[
-            neural_net.TRAINING_OPTIONS_KEY
-        ]
-        goptd = generator_option_dict
+        etx_i = evaluation_tables_xarray[i]
 
         if target_field_names is None:
-            target_field_names = goptd[neural_net.TARGET_FIELDS_KEY]
+            target_field_names = etx_i.coords[evaluation.FIELD_DIM].values
 
-        assert target_field_names == goptd[neural_net.TARGET_FIELDS_KEY]
+        assert target_field_names == etx_i.coords[evaluation.FIELD_DIM].values
 
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
