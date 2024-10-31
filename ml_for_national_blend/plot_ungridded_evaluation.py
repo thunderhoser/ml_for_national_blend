@@ -16,6 +16,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import time_conversion
 import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
@@ -38,46 +39,51 @@ CELSIUS_FIELD_NAMES = [
     urma_utils.TEMPERATURE_2METRE_NAME, urma_utils.DEWPOINT_2METRE_NAME
 ]
 
+LINE_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
 POLYGON_OPACITY = 0.5
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
 
-INPUT_FILES_ARG_NAME = 'input_eval_file_names'
+INPUT_FILE_ARG_NAME = 'input_eval_file_name_or_pattern'
+BY_MONTH_ARG_NAME = 'by_month'
+BY_HOUR_ARG_NAME = 'by_hour'
 TARGET_NORM_FILE_ARG_NAME = 'input_target_norm_file_name'
-LINE_STYLES_ARG_NAME = 'line_styles'
-LINE_COLOURS_ARG_NAME = 'line_colours'
-SET_DESCRIPTIONS_ARG_NAME = 'set_descriptions'
 PLOT_FULL_DISTS_ARG_NAME = 'plot_full_error_distributions'
 CONFIDENCE_LEVEL_ARG_NAME = 'confidence_level'
 METRICS_IN_TITLES_ARG_NAME = 'report_metrics_in_titles'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
-INPUT_FILES_HELP_STRING = (
-    'Space-separated list of paths to input files (each will be read by '
-    '`evaluation.read_file`).'
+INPUT_FILE_HELP_STRING = (
+    'Path to input file.  Evaluation scores will be read from here by '
+    '`evaluation.read_file`.  If `{0:s} == 1`, there will be 12 input files, '
+    'each produced by replacing the ".nc" at the end of `{1:s}` with '
+    '"_month01.nc" or "_month02.nc" or... "_month12.nc".  If `{2:s} == 1`, '
+    'there will be 24 input files, each produced by replacing the ".nc" at the '
+    'end of `{1:s}` with "_hour00.nc" or "_hour01.nc" or... "_hour23.nc".'
+).format(
+    BY_MONTH_ARG_NAME,
+    INPUT_FILE_ARG_NAME,
+    BY_HOUR_ARG_NAME
+)
+BY_MONTH_HELP_STRING = (
+    'Boolean flag.  If 1, will produce a set of plots for forecasts valid in '
+    'every month.  If both this argument and `{0:s}` are 0, will produce a '
+    'single set of plots for all forecasts.'
+).format(
+    BY_HOUR_ARG_NAME
+)
+BY_HOUR_HELP_STRING = (
+    'Boolean flag.  If 1, will produce a set of plots for forecasts valid at '
+    'every UTC hour.  If both this argument and `{0:s}` are 0, will produce a '
+    'single set of plots for all forecasts.'
+).format(
+    BY_MONTH_ARG_NAME
 )
 TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization parameters for target fields.  Will be '
     'read by `urma_io.read_normalization_file`.'
 )
-LINE_STYLES_HELP_STRING = (
-    'Space-separated list of line styles (in any format accepted by '
-    'matplotlib).  Must have same length as `{0:s}`.'
-).format(INPUT_FILES_ARG_NAME)
-
-LINE_COLOURS_HELP_STRING = (
-    'Space-separated list of line colours.  Each colour must be a length-3 '
-    'array of (R, G, B) intensities ranging from 0...255.  Colours in each '
-    'array should be underscore-separated, so the list should look like '
-    '"0_0_0 217_95_2", for examples.  List must have same length as `{0:s}`.'
-).format(INPUT_FILES_ARG_NAME)
-
-SET_DESCRIPTIONS_HELP_STRING = (
-    'Space-separated list of set descriptions, to be used in legends.  Must '
-    'have same length as `{0:s}`.'
-).format(INPUT_FILES_ARG_NAME)
-
 PLOT_FULL_DISTS_HELP_STRING = (
     'Boolean flag.  If 1, for each evaluation set, will plot full error '
     'distribution with boxplot.'
@@ -96,24 +102,20 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + INPUT_FILES_ARG_NAME, type=str, nargs='+', required=True,
-    help=INPUT_FILES_HELP_STRING
+    '--' + INPUT_FILE_ARG_NAME, type=str, required=True,
+    help=INPUT_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BY_HOUR_ARG_NAME, type=int, required=False, default=0,
+    help=BY_HOUR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BY_MONTH_ARG_NAME, type=int, required=False, default=0,
+    help=BY_MONTH_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + TARGET_NORM_FILE_ARG_NAME, type=str, required=True,
     help=TARGET_NORM_FILE_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + LINE_STYLES_ARG_NAME, type=str, nargs='+', required=True,
-    help=LINE_STYLES_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + LINE_COLOURS_ARG_NAME, type=str, nargs='+', required=True,
-    help=LINE_COLOURS_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + SET_DESCRIPTIONS_ARG_NAME, type=str, nargs='+', required=True,
-    help=SET_DESCRIPTIONS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PLOT_FULL_DISTS_ARG_NAME, type=int, required=False, default=0,
@@ -192,7 +194,7 @@ def _plot_attributes_diagram(
         evaluation_tables_xarray, line_styles, line_colours,
         set_descriptions_abbrev, set_descriptions_verbose, confidence_level,
         climo_mean_target_value, target_field_name, report_reliability_in_title,
-        output_dir_name, force_plot_legend=False):
+        title_suffix, output_dir_name, force_plot_legend=False):
     """Plots attributes diagram for each set and each target variable.
 
     S = number of evaluation sets
@@ -214,6 +216,7 @@ def _plot_attributes_diagram(
     :param target_field_name: Name of target variable.
     :param report_reliability_in_title: Boolean flag.  If True, will report
         overall reliability in title.
+    :param title_suffix: End of figure title (string).
     :param output_dir_name: Name of output directory.  Figures will be saved
         here.
     :param force_plot_legend: Boolean flag.
@@ -343,8 +346,10 @@ def _plot_attributes_diagram(
 
         axes_object.set_xlabel('Prediction')
         axes_object.set_ylabel('Conditional mean observation')
-        title_string = 'Attributes diagram for {0:s}'.format(
-            TARGET_FIELD_NAME_TO_VERBOSE[target_field_name]
+
+        title_string = 'Attributes diagram for {0:s}{1:s}'.format(
+            TARGET_FIELD_NAME_TO_VERBOSE[target_field_name],
+            title_suffix
         )
         if report_reliability_in_title:
             title_string += '\nREL = {0:.2f}; MSESS = {1:.2f}'.format(
@@ -403,7 +408,7 @@ def _plot_attributes_diagram(
                 facecolor='white', edgecolor='k', framealpha=0.5, ncol=1
             )
 
-        figure_file_name = '{0:s}/{1:s}_attributes_{2:s}.jpg'.format(
+        figure_file_name = '{0:s}/{1:s}_attributes{2:s}.jpg'.format(
             output_dir_name,
             target_field_name.replace('_', '-'),
             set_descriptions_abbrev[main_index]
@@ -417,19 +422,17 @@ def _plot_attributes_diagram(
         pyplot.close(figure_object)
 
 
-def _run(evaluation_file_names, target_normalization_file_name,
-         line_styles, line_colour_strings,
-         set_descriptions_verbose, plot_full_error_distributions,
+def _run(eval_file_name_or_pattern, by_month, by_hour,
+         target_normalization_file_name, plot_full_error_distributions,
          confidence_level, report_metrics_in_titles, output_dir_name):
     """Plots ungridded (averaged over the whole domain) model evaluation.
 
     This is effectively the main method.
 
-    :param evaluation_file_names: See documentation at top of file.
+    :param eval_file_name_or_pattern: See documentation at top of file.
+    :param by_month: Same.
+    :param by_hour: Same.
     :param target_normalization_file_name: Same.
-    :param line_styles: Same.
-    :param line_colour_strings: Same.
-    :param set_descriptions_verbose: Same.
     :param plot_full_error_distributions: Same.
     :param confidence_level: Same.
     :param report_metrics_in_titles: Same.
@@ -439,58 +442,49 @@ def _run(evaluation_file_names, target_normalization_file_name,
     """
 
     # Check input args.
-    file_system_utils.mkdir_recursive_if_necessary(
-        directory_name=output_dir_name
-    )
+    assert not (by_month and by_hour)
 
     if confidence_level < 0:
         confidence_level = None
-
     if confidence_level is not None:
         error_checking.assert_is_geq(confidence_level, 0.9)
         error_checking.assert_is_less_than(confidence_level, 1.)
 
-    num_evaluation_sets = len(evaluation_file_names)
-    expected_dim = numpy.array([num_evaluation_sets], dtype=int)
-
-    error_checking.assert_is_string_list(line_styles)
-    error_checking.assert_is_numpy_array(
-        numpy.array(line_styles), exact_dimensions=expected_dim
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
     )
-
-    error_checking.assert_is_string_list(set_descriptions_verbose)
-    error_checking.assert_is_numpy_array(
-        numpy.array(set_descriptions_verbose), exact_dimensions=expected_dim
-    )
-
-    set_descriptions_verbose = [
-        s.replace('_', ' ') for s in set_descriptions_verbose
-    ]
-    set_descriptions_abbrev = [
-        s.lower().replace(' ', '-') for s in set_descriptions_verbose
-    ]
-
-    error_checking.assert_is_string_list(line_colour_strings)
-    error_checking.assert_is_numpy_array(
-        numpy.array(line_colour_strings), exact_dimensions=expected_dim
-    )
-    line_colours = [
-        numpy.fromstring(s, dtype=float, sep='_') / 255
-        for s in line_colour_strings
-    ]
-
-    for i in range(num_evaluation_sets):
-        error_checking.assert_is_numpy_array(
-            line_colours[i], exact_dimensions=numpy.array([3], dtype=int)
-        )
-        error_checking.assert_is_geq_numpy_array(line_colours[i], 0.)
-        error_checking.assert_is_leq_numpy_array(line_colours[i], 1.)
 
     # Do actual stuff.
-    evaluation_tables_xarray = [xarray.Dataset()] * num_evaluation_sets
+    if by_month:
+        eval_file_pattern = eval_file_name_or_pattern
+        assert eval_file_pattern.endswith('.nc')
+
+        months = numpy.linspace(1, 12, num=12, dtype=int)
+        evaluation_file_names = [
+            '{0:s}_month{1:02d}.nc'.format(eval_file_pattern, m)
+            for m in months
+        ]
+    elif by_hour:
+        eval_file_pattern = eval_file_name_or_pattern
+        assert eval_file_pattern.endswith('.nc')
+
+        hours = numpy.linspace(0, 23, num=24, dtype=int)
+        evaluation_file_names = [
+            '{0:s}_hour{1:02d}.nc'.format(eval_file_pattern, h)
+            for h in hours
+        ]
+    else:
+        evaluation_file_names = [eval_file_name_or_pattern]
+        assert os.path.isfile(evaluation_file_names[0])
+
+    num_files = len(evaluation_file_names)
+    evaluation_tables_xarray = [xarray.Dataset()] * num_files
     target_field_names = None
 
-    for i in range(num_evaluation_sets):
+    for i in range(num_files):
+        if not os.path.isfile(evaluation_file_names[i]):
+            continue
+
         print('Reading data from: "{0:s}"...'.format(evaluation_file_names[i]))
         evaluation_tables_xarray[i] = evaluation.read_file(
             evaluation_file_names[i]
@@ -522,13 +516,10 @@ def _run(evaluation_file_names, target_normalization_file_name,
         ]
         goptd = generator_option_dict
 
-        if i == 0:
+        if target_field_names is None:
             target_field_names = goptd[neural_net.TARGET_FIELDS_KEY]
 
         assert target_field_names == goptd[neural_net.TARGET_FIELDS_KEY]
-
-    # TODO(thunderhoser): HACK!
-    target_field_names = [urma_utils.TEMPERATURE_2METRE_NAME]
 
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
@@ -550,28 +541,50 @@ def _run(evaluation_file_names, target_normalization_file_name,
     celsius_indices = numpy.array(
         [f in CELSIUS_FIELD_NAMES for f in target_field_names], dtype=bool
     )
-    for i in celsius_indices:
-        climo_mean_target_values[i] = temperature_conv.kelvins_to_celsius(
-            climo_mean_target_values[i]
+    for j in celsius_indices:
+        climo_mean_target_values[j] = temperature_conv.kelvins_to_celsius(
+            climo_mean_target_values[j]
         )
 
     num_target_fields = len(target_field_names)
 
-    for k in range(num_target_fields):
-        _plot_attributes_diagram(
-            evaluation_tables_xarray=evaluation_tables_xarray,
-            line_styles=line_styles,
-            line_colours=line_colours,
-            set_descriptions_abbrev=set_descriptions_abbrev,
-            set_descriptions_verbose=set_descriptions_verbose,
-            confidence_level=confidence_level,
-            climo_mean_target_value=climo_mean_target_values[k],
-            target_field_name=target_field_names[k],
-            report_reliability_in_title=report_metrics_in_titles,
-            output_dir_name=output_dir_name
-        )
+    for i in range(num_files):
+        if not evaluation_tables_xarray[i].data_vars:
+            continue
 
-        for i in range(num_evaluation_sets):
+        if by_hour:
+            file_name_suffix = '_hour{0:02d}'.format(i)
+        elif by_month:
+            file_name_suffix = '_month{0:02d}'.format(i + 1)
+        else:
+            file_name_suffix = ''
+
+        if by_month:
+            title_suffix = ' in {0:s}'.format(
+                time_conversion.string_to_unix_sec(
+                    '2000-{0:02d}-01'.format(i + 1), '%b'
+                )
+            )
+        elif by_hour:
+            title_suffix = ' at {0:02d}Z'.format(i)
+        else:
+            title_suffix = ''
+
+        for k in range(num_target_fields):
+            _plot_attributes_diagram(
+                evaluation_tables_xarray=[evaluation_tables_xarray[i]],
+                line_styles=['solid'],
+                line_colours=[LINE_COLOUR],
+                set_descriptions_abbrev=[file_name_suffix],
+                set_descriptions_verbose=[file_name_suffix],
+                confidence_level=confidence_level,
+                climo_mean_target_value=climo_mean_target_values[k],
+                target_field_name=target_field_names[k],
+                report_reliability_in_title=report_metrics_in_titles,
+                title_suffix=title_suffix,
+                output_dir_name=output_dir_name
+            )
+
             figure_object, axes_object = pyplot.subplots(
                 1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
             )
@@ -587,13 +600,14 @@ def _run(evaluation_file_names, target_normalization_file_name,
                 correlation=numpy.nanmean(
                     etx[evaluation.CORRELATION_KEY].values[k, :]
                 ),
-                marker_colour=line_colours[i],
+                marker_colour=LINE_COLOUR,
                 axes_object=axes_object,
                 figure_object=figure_object
             )
 
-            title_string = 'Taylor diagram for {0:s}'.format(
-                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]]
+            title_string = 'Taylor diagram for {0:s}{1:s}'.format(
+                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]],
+                title_suffix
             )
             if report_metrics_in_titles:
                 title_string += (
@@ -612,10 +626,10 @@ def _run(evaluation_file_names, target_normalization_file_name,
 
             axes_object.set_title(title_string)
 
-            figure_file_name = '{0:s}/{1:s}_taylor_{2:s}.jpg'.format(
+            figure_file_name = '{0:s}/{1:s}_taylor{2:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-'),
-                set_descriptions_abbrev[i]
+                file_name_suffix
             )
 
             print('Saving figure to: "{0:s}"...'.format(figure_file_name))
@@ -628,7 +642,28 @@ def _run(evaluation_file_names, target_normalization_file_name,
     if not plot_full_error_distributions:
         return
 
-    for i in range(num_evaluation_sets):
+    for i in range(num_files):
+        if not evaluation_tables_xarray[i].data_vars:
+            continue
+
+        if by_hour:
+            file_name_suffix = '_hour{0:02d}'.format(i)
+        elif by_month:
+            file_name_suffix = '_month{0:02d}'.format(i + 1)
+        else:
+            file_name_suffix = ''
+
+        if by_month:
+            title_suffix = ' in {0:s}'.format(
+                time_conversion.string_to_unix_sec(
+                    '2000-{0:02d}-01'.format(i + 1), '%b'
+                )
+            )
+        elif by_hour:
+            title_suffix = ' at {0:02d}Z'.format(i)
+        else:
+            title_suffix = ''
+
         prediction_file_names = evaluation_tables_xarray[i].attrs[
             evaluation.PREDICTION_FILES_KEY
         ]
@@ -678,17 +713,18 @@ def _run(evaluation_file_names, target_normalization_file_name,
                 axes_object=axes_object
             )
 
-            title_string = 'Error distribution for {0:s}'.format(
-                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]]
+            title_string = 'Error distribution for {0:s}{1:s}'.format(
+                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]],
+                title_suffix
             )
             axes_object.set_title(title_string)
 
             figure_file_name = (
-                '{0:s}/{1:s}_error-distribution_{2:s}.jpg'
+                '{0:s}/{1:s}_error-distribution{2:s}.jpg'
             ).format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-'),
-                set_descriptions_abbrev[i]
+                file_name_suffix
             )
 
             print('Saving figure to: "{0:s}"...'.format(figure_file_name))
@@ -703,14 +739,13 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        evaluation_file_names=getattr(INPUT_ARG_OBJECT, INPUT_FILES_ARG_NAME),
+        eval_file_name_or_pattern=getattr(
+            INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME
+        ),
+        by_month=bool(getattr(INPUT_ARG_OBJECT, BY_MONTH_ARG_NAME)),
+        by_hour=bool(getattr(INPUT_ARG_OBJECT, BY_HOUR_ARG_NAME)),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, TARGET_NORM_FILE_ARG_NAME
-        ),
-        line_styles=getattr(INPUT_ARG_OBJECT, LINE_STYLES_ARG_NAME),
-        line_colour_strings=getattr(INPUT_ARG_OBJECT, LINE_COLOURS_ARG_NAME),
-        set_descriptions_verbose=getattr(
-            INPUT_ARG_OBJECT, SET_DESCRIPTIONS_ARG_NAME
         ),
         plot_full_error_distributions=bool(
             getattr(INPUT_ARG_OBJECT, PLOT_FULL_DISTS_ARG_NAME)
