@@ -249,7 +249,7 @@ def _run(prediction_dir_name, init_time_limit_strings,
         prediction_file_names[0]
     )
     first_ptx = first_prediction_table_xarray
-    model_file_name = first_ptx[prediction_io.MODEL_FILE_KEY]
+    model_file_name = first_ptx.attrs[prediction_io.MODEL_FILE_KEY]
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
