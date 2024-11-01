@@ -4,6 +4,7 @@ Keep in mind that this script works only with ungridded evaluation files as
 input.
 """
 
+import os
 import re
 import copy
 import argparse
@@ -281,7 +282,9 @@ def _run(evaluation_file_pattern, by_month, by_hour,
 
         months = numpy.linspace(1, 12, num=12, dtype=int)
         evaluation_file_names = [
-            '{0:s}_month{1:02d}.nc'.format(evaluation_file_pattern, m)
+            '{0:s}_month{1:02d}.nc'.format(
+                os.path.splitext(evaluation_file_pattern)[0], m
+            )
             for m in months
         ]
     else:
@@ -289,7 +292,9 @@ def _run(evaluation_file_pattern, by_month, by_hour,
 
         hours = numpy.linspace(0, 23, num=24, dtype=int)
         evaluation_file_names = [
-            '{0:s}_hour{1:02d}.nc'.format(evaluation_file_pattern, h)
+            '{0:s}_hour{1:02d}.nc'.format(
+                os.path.splitext(evaluation_file_pattern)[0], h
+            )
             for h in hours
         ]
 
