@@ -33,6 +33,21 @@ CELSIUS_FIELD_NAMES = [
     urma_utils.TEMPERATURE_2METRE_NAME, urma_utils.DEWPOINT_2METRE_NAME
 ]
 
+MONTH_INDEX_TO_STRING = {
+    1: 'Jan',
+    2: 'Feb',
+    3: 'Mar',
+    4: 'Apr',
+    5: 'May',
+    6: 'Jun',
+    7: 'Jul',
+    8: 'Aug',
+    9: 'Sep',
+    10: 'Oct',
+    11: 'Nov',
+    12: 'Dec'
+}
+
 LINE_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
 POLYGON_OPACITY = 0.5
 FIGURE_WIDTH_INCHES = 15
@@ -549,11 +564,7 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
             file_name_suffix = ''
 
         if by_month:
-            title_suffix = ' in {0:s}'.format(
-                time_conversion.string_to_unix_sec(
-                    '2000-{0:02d}-01'.format(i + 1), '%b'
-                )
-            )
+            title_suffix = ' in {0:s}'.format(MONTH_INDEX_TO_STRING[i + 1])
         elif by_hour:
             title_suffix = ' at {0:02d}Z'.format(i)
         else:
@@ -643,11 +654,7 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
             file_name_suffix = ''
 
         if by_month:
-            title_suffix = ' in {0:s}'.format(
-                time_conversion.string_to_unix_sec(
-                    '2000-{0:02d}-01'.format(i + 1), '%b'
-                )
-            )
+            title_suffix = ' in {0:s}'.format(MONTH_INDEX_TO_STRING[i + 1])
         elif by_hour:
             title_suffix = ' at {0:02d}Z'.format(i)
         else:
