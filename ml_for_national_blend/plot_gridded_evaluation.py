@@ -152,6 +152,21 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     evaluation.SPATIAL_MAX_BIAS_KEY: 'diverging'
 }
 
+MONTH_INDEX_TO_STRING = {
+    1: 'Jan',
+    2: 'Feb',
+    3: 'Mar',
+    4: 'Apr',
+    5: 'May',
+    6: 'Jun',
+    7: 'Jul',
+    8: 'Aug',
+    9: 'Sep',
+    10: 'Oct',
+    11: 'Nov',
+    12: 'Dec'
+}
+
 NAN_COLOUR = numpy.full(3, 152. / 255)
 
 FIGURE_WIDTH_INCHES = 15
@@ -567,11 +582,7 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
             file_name_suffix = ''
 
         if by_month:
-            this_time_string = time_conversion.string_to_unix_sec(
-                '2000-{0:02d}-01'.format(i + 1), '%Y-%b-%d'
-            )
-            month_string = this_time_string.split('-')[1]
-            title_suffix = ' in {0:s}'.format(month_string)
+            title_suffix = ' in {0:s}'.format(MONTH_INDEX_TO_STRING[i + 1])
         elif by_hour:
             title_suffix = ' at {0:02d}Z'.format(i)
         else:
