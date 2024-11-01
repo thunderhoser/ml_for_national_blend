@@ -363,6 +363,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             else:
                 print(metric_names[m])
 
+                print(evaluation_tables_xarray[0][metric_names[m]].values.shape)
+
                 these_values = numpy.array([
                     numpy.mean(etx[metric_names[m]].values[f_new, :], axis=1)
                     for etx, f_new in zip(
