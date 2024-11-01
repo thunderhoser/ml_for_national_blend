@@ -70,6 +70,8 @@ OUTPUT_ACTIV_FUNCTION_ALPHA_KEY = 'output_activ_function_alpha'
 L1_WEIGHT_KEY = 'l1_weight'
 L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
+BATCH_NORM_MOMENTUM_KEY = 'batch_norm_momentum'
+BATCH_NORM_SYNCH_FLAG_KEY = 'batch_norm_synch_flag'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
@@ -97,7 +99,9 @@ DEFAULT_OPTION_DICT = {
     OUTPUT_ACTIV_FUNCTION_KEY: None,
     OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
     L1_WEIGHT_KEY: 0.,
-    USE_BATCH_NORM_KEY: True
+    USE_BATCH_NORM_KEY: True,
+    BATCH_NORM_MOMENTUM_KEY: 0.99,
+    BATCH_NORM_SYNCH_FLAG_KEY: False
 }
 
 
@@ -206,6 +210,12 @@ def check_input_args(option_dict):
         only).
     option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
         batch normalization after each non-output layer.
+    option_dict["batch_norm_momentum"]: Momentum for batch-normalization layers.
+        For more details, see documentation for
+        `keras.layers.BatchNormalization`.
+    option_dict["batch_norm_synch_flag"]: Boolean flag for batch-normalization
+        layers.  For more details, see documentation for
+        `keras.layers.BatchNormalization`.
     option_dict["ensemble_size"]: Number of ensemble members.
     option_dict["num_output_channels"]: Number of output channels.
     option_dict["predict_gust_excess"]: Boolean flag.  If True, the model needs
@@ -601,6 +611,14 @@ def check_input_args(option_dict):
         option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
     )
 
+    if not option_dict[USE_BATCH_NORM_KEY]:
+        option_dict[BATCH_NORM_MOMENTUM_KEY] = 0.99
+        option_dict[BATCH_NORM_SYNCH_FLAG_KEY] = False
+
+    error_checking.assert_is_greater(option_dict[BATCH_NORM_MOMENTUM_KEY], 0.)
+    error_checking.assert_is_less_than(option_dict[BATCH_NORM_MOMENTUM_KEY], 1.)
+    error_checking.assert_is_boolean(option_dict[BATCH_NORM_SYNCH_FLAG_KEY])
+
     error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
 
     return option_dict
@@ -684,6 +702,8 @@ def create_model(option_dict):
     l1_weight = option_dict[L1_WEIGHT_KEY]
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
+    batch_norm_momentum = option_dict[BATCH_NORM_MOMENTUM_KEY]
+    batch_norm_synch_flag = option_dict[BATCH_NORM_SYNCH_FLAG_KEY]
     loss_function = option_dict[LOSS_FUNCTION_KEY]
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
@@ -826,6 +846,8 @@ def create_model(option_dict):
             if use_batch_normalization:
                 this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
                 conv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+                    momentum=batch_norm_momentum,
+                    synchronized=batch_norm_synch_flag,
                     layer_name=this_name
                 )(conv_layer_by_level[i])
 
@@ -906,6 +928,8 @@ def create_model(option_dict):
                 if use_batch_normalization:
                     this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
                     conv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+                        momentum=batch_norm_momentum,
+                        synchronized=batch_norm_synch_flag,
                         layer_name=this_name
                     )(conv_layer_by_level[i])
 
@@ -977,6 +1001,8 @@ def create_model(option_dict):
             if use_batch_normalization:
                 this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
                 conv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+                    momentum=batch_norm_momentum,
+                    synchronized=batch_norm_synch_flag,
                     layer_name=this_name
                 )(conv_layer_by_level[i])
 
@@ -1048,6 +1074,8 @@ def create_model(option_dict):
             if use_batch_normalization:
                 this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
                 conv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+                    momentum=batch_norm_momentum,
+                    synchronized=batch_norm_synch_flag,
                     layer_name=this_name
                 )(conv_layer_by_level[i])
 
@@ -1105,6 +1133,8 @@ def create_model(option_dict):
             if use_batch_normalization:
                 this_name = 'encoder_level{0:d}_bn{1:d}'.format(i, j)
                 conv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+                    momentum=batch_norm_momentum,
+                    synchronized=batch_norm_synch_flag,
                     layer_name=this_name
                 )(conv_layer_by_level[i])
 
@@ -1201,7 +1231,11 @@ def create_model(option_dict):
         if use_batch_normalization:
             this_name = 'fc_module_bn{0:d}'.format(j)
             forecast_module_layer_object = (
-                architecture_utils.get_batch_norm_layer(layer_name=this_name)(
+                architecture_utils.get_batch_norm_layer(
+                    momentum=batch_norm_momentum,
+                    synchronized=batch_norm_synch_flag,
+                    layer_name=this_name
+                )(
                     forecast_module_layer_object
                 )
             )
@@ -1256,6 +1290,8 @@ def create_model(option_dict):
     if use_batch_normalization:
         this_name = 'upsampling_level{0:d}_bn'.format(i)
         upconv_layer_by_level[i] = architecture_utils.get_batch_norm_layer(
+            momentum=batch_norm_momentum,
+            synchronized=batch_norm_synch_flag,
             layer_name=this_name
         )(upconv_layer_by_level[i])
 
@@ -1328,6 +1364,8 @@ def create_model(option_dict):
                 this_name = 'skip_level{0:d}_conv{1:d}_bn'.format(i, j)
                 skip_layer_by_level[i] = (
                     architecture_utils.get_batch_norm_layer(
+                        momentum=batch_norm_momentum,
+                        synchronized=batch_norm_synch_flag,
                         layer_name=this_name
                     )(skip_layer_by_level[i])
                 )
@@ -1358,6 +1396,8 @@ def create_model(option_dict):
             if use_batch_normalization:
                 skip_layer_by_level[i] = (
                     architecture_utils.get_batch_norm_layer(
+                        momentum=batch_norm_momentum,
+                        synchronized=batch_norm_synch_flag,
                         layer_name='penultimate_conv_bn'
                     )(skip_layer_by_level[i])
                 )
@@ -1407,6 +1447,8 @@ def create_model(option_dict):
         if use_batch_normalization:
             this_name = 'upsampling_level{0:d}_bn'.format(i - 1)
             upconv_layer_by_level[i - 1] = architecture_utils.get_batch_norm_layer(
+                momentum=batch_norm_momentum,
+                synchronized=batch_norm_synch_flag,
                 layer_name=this_name
             )(upconv_layer_by_level[i - 1])
 

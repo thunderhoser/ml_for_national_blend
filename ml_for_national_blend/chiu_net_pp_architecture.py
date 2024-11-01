@@ -98,6 +98,8 @@ OUTPUT_ACTIV_FUNCTION_ALPHA_KEY = chiu_net_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY
 L1_WEIGHT_KEY = chiu_net_arch.L1_WEIGHT_KEY
 L2_WEIGHT_KEY = chiu_net_arch.L2_WEIGHT_KEY
 USE_BATCH_NORM_KEY = chiu_net_arch.USE_BATCH_NORM_KEY
+BATCH_NORM_MOMENTUM_KEY = chiu_net_arch.BATCH_NORM_MOMENTUM_KEY
+BATCH_NORM_SYNCH_FLAG_KEY = chiu_net_arch.BATCH_NORM_SYNCH_FLAG_KEY
 ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 
 NUM_OUTPUT_CHANNELS_KEY = chiu_net_arch.NUM_OUTPUT_CHANNELS_KEY
@@ -200,7 +202,8 @@ def _get_2d_conv_block(
         num_conv_layers, filter_size_px, num_filters, do_time_distributed_conv,
         regularizer_object,
         activation_function_name, activation_function_alpha,
-        dropout_rates, use_batch_norm, basic_layer_name):
+        dropout_rates, use_batch_norm, batch_norm_momentum,
+        batch_norm_synch_flag, basic_layer_name):
     """Creates convolutional block for data with 2 spatial dimensions.
 
     L = number of conv layers
@@ -225,6 +228,11 @@ def _get_2d_conv_block(
     :param dropout_rates: Dropout rates for conv layers.  This can be a scalar
         (applied to every conv layer) or length-L numpy array.
     :param use_batch_norm: Boolean flag.  If True, will use batch normalization.
+    :param batch_norm_momentum: Momentum for batch-normalization layers.  For
+        more details, see documentation for `keras.layers.BatchNormalization`.
+    :param batch_norm_synch_flag: Boolean flag for batch-normalization layers.
+        For more details, see documentation for
+        `keras.layers.BatchNormalization`.
     :param basic_layer_name: Basic layer name.  Each layer name will be made
         unique by adding a suffix.
     :return: output_layer_object: Output layer from block.
@@ -320,6 +328,8 @@ def _get_2d_conv_block(
         if use_batch_norm:
             this_name = '{0:s}_bn{1:d}'.format(basic_layer_name, i)
             current_layer_object = architecture_utils.get_batch_norm_layer(
+                momentum=batch_norm_momentum,
+                synchronized=batch_norm_synch_flag,
                 layer_name=this_name
             )(current_layer_object)
 
@@ -329,7 +339,8 @@ def _get_2d_conv_block(
 def _get_3d_conv_block(
         input_layer_object, do_residual, num_conv_layers, filter_size_px,
         regularizer_object, activation_function_name, activation_function_alpha,
-        dropout_rates, use_batch_norm, basic_layer_name):
+        dropout_rates, use_batch_norm, batch_norm_momentum,
+        batch_norm_synch_flag, basic_layer_name):
     """Creates convolutional block for data with 3 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
@@ -341,6 +352,8 @@ def _get_3d_conv_block(
     :param activation_function_alpha: Same.
     :param dropout_rates: Same.
     :param use_batch_norm: Same.
+    :param batch_norm_momentum: Same.
+    :param batch_norm_synch_flag: Same.
     :param basic_layer_name: Same.
     :return: output_layer_object: Output layer from block (with 2 spatial dims).
     """
@@ -448,6 +461,8 @@ def _get_3d_conv_block(
         if use_batch_norm:
             this_name = '{0:s}_bn{1:d}'.format(basic_layer_name, i)
             current_layer_object = architecture_utils.get_batch_norm_layer(
+                momentum=batch_norm_momentum,
+                synchronized=batch_norm_synch_flag,
                 layer_name=this_name
             )(current_layer_object)
 
@@ -642,6 +657,8 @@ def create_model(option_dict):
     l1_weight = optd[L1_WEIGHT_KEY]
     l2_weight = optd[L2_WEIGHT_KEY]
     use_batch_normalization = optd[USE_BATCH_NORM_KEY]
+    batch_norm_momentum = optd[BATCH_NORM_MOMENTUM_KEY]
+    batch_norm_synch_flag = optd[BATCH_NORM_SYNCH_FLAG_KEY]
     ensemble_size = optd[ENSEMBLE_SIZE_KEY]
     num_output_channels = optd[NUM_OUTPUT_CHANNELS_KEY]
     predict_gust_excess = optd[PREDICT_GUST_EXCESS_KEY]
@@ -849,6 +866,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
@@ -887,6 +906,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
         )
 
@@ -967,6 +988,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=nwp_encoder_dropout_rate_by_level[i],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='nwp_encoder_level{0:d}'.format(i)
             )
 
@@ -1005,6 +1028,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
             )
 
@@ -1072,6 +1097,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
@@ -1108,6 +1135,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
             )
 
@@ -1175,6 +1204,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
@@ -1209,6 +1240,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
             )
 
@@ -1240,6 +1273,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=nwp_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='nwp_encoder_level{0:d}'.format(i)
         )
 
@@ -1272,6 +1307,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=rctbias_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='rctbias_encoder_level{0:d}'.format(i)
         )
 
@@ -1306,6 +1343,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=nwp_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='nwp_fcst_level{0:d}'.format(i)
             )
         else:
@@ -1329,6 +1368,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=nwp_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='nwp_fcst_level{0:d}'.format(i)
             )
 
@@ -1351,6 +1392,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=rctbias_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='rctbias_fcst_level{0:d}'.format(i)
             )
         else:
@@ -1374,6 +1417,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=rctbias_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='rctbias_fcst_level{0:d}'.format(i)
             )
 
@@ -1402,6 +1447,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=lagtgt_encoder_dropout_rate_by_level[i],
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='lagtgt_encoder_level{0:d}'.format(i)
         )
 
@@ -1421,6 +1468,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=lagtgt_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
         else:
@@ -1444,6 +1493,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=lagtgt_forecast_module_dropout_rates,
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
 
@@ -1518,6 +1569,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=upsampling_dropout_rate_by_level[i_new],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='block{0:d}-{1:d}_up'.format(i_new, j)
             )
 
@@ -1541,6 +1594,8 @@ def create_model(option_dict):
                 activation_function_alpha=inner_activ_function_alpha,
                 dropout_rates=skip_dropout_rate_by_level[i_new],
                 use_batch_norm=use_batch_normalization,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_synch_flag=batch_norm_synch_flag,
                 basic_layer_name='block{0:d}-{1:d}_skip'.format(i_new, j)
             )
 
@@ -1557,6 +1612,8 @@ def create_model(option_dict):
             activation_function_alpha=inner_activ_function_alpha,
             dropout_rates=penultimate_conv_dropout_rate,
             use_batch_norm=use_batch_normalization,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='penultimate'
         )
 
@@ -1583,6 +1640,8 @@ def create_model(option_dict):
         activation_function_alpha=output_activ_function_alpha,
         dropout_rates=-1.,
         use_batch_norm=False,
+        batch_norm_momentum=batch_norm_momentum,
+        batch_norm_synch_flag=batch_norm_synch_flag,
         basic_layer_name='last_conv_simple'
     )
 
@@ -1602,6 +1661,8 @@ def create_model(option_dict):
             activation_function_alpha=0.,
             dropout_rates=-1.,
             use_batch_norm=False,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='last_conv_dd'
         )
     else:
@@ -1623,6 +1684,8 @@ def create_model(option_dict):
             activation_function_alpha=0.,
             dropout_rates=-1.,
             use_batch_norm=False,
+            batch_norm_momentum=batch_norm_momentum,
+            batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='last_conv_gex'
         )
     else:

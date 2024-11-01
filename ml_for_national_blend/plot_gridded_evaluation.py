@@ -508,6 +508,7 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
     target_field_names = None
 
     for i in range(num_files):
+        print(evaluation_file_names[i])
         if not os.path.isfile(evaluation_file_names[i]):
             continue
 
