@@ -487,7 +487,9 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
 
         months = numpy.linspace(1, 12, num=12, dtype=int)
         evaluation_file_names = [
-            '{0:s}_month{1:02d}.nc'.format(eval_file_pattern, m)
+            '{0:s}_month{1:02d}.nc'.format(
+                os.path.splitext(eval_file_pattern)[0], m
+            )
             for m in months
         ]
     elif by_hour:
@@ -496,7 +498,9 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
 
         hours = numpy.linspace(0, 23, num=24, dtype=int)
         evaluation_file_names = [
-            '{0:s}_hour{1:02d}.nc'.format(eval_file_pattern, h)
+            '{0:s}_hour{1:02d}.nc'.format(
+                os.path.splitext(eval_file_pattern)[0], h
+            )
             for h in hours
         ]
     else:
@@ -508,7 +512,6 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
     target_field_names = None
 
     for i in range(num_files):
-        print(evaluation_file_names[i])
         if not os.path.isfile(evaluation_file_names[i]):
             continue
 
