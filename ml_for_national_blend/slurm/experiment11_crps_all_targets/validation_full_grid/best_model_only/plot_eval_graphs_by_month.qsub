@@ -45,6 +45,7 @@ echo $model_dir_name
 python3 -u "${CODE_DIR_NAME}/plot_eval_by_hour_or_month.py" \
 --input_eval_file_pattern="${model_dir_name}/validation_full_grid/ungridded_evaluation.nc" \
 --by_month=1 \
+--by_hour=0 \
 --target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
 --metric_names           "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" "spatial_min_bias" "spatial_max_bias" \
 --output_dir_name="${model_dir_name}/validation_full_grid/ungridded_evaluation"
