@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="evaluate_model_gridded_by_month"
+#SBATCH --job-name="plot_eval_graphs_by_hour"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -9,14 +9,13 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=04:00:00
-#SBATCH --array=0-11
+#SBATCH --time=24:00:00
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=evaluate_model_gridded_by_month_%A_%a.out
+#SBATCH --output=plot_eval_graphs_by_hour_%A.out
 
 conda init
 conda activate base
@@ -43,18 +42,9 @@ num_lag_times=${LAG_TIME_COUNTS[$BEST_MODEL_INDEX]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
 echo $model_dir_name
 
-MONTHS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12")
-
-python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
---input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
---init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
---num_bootstrap_reps=1 \
---evaluate_month=${MONTHS[$SLURM_ARRAY_TASK_ID]} \
+python3 -u "${CODE_DIR_NAME}/plot_eval_by_hour_or_month.py" \
+--input_eval_file_pattern="${model_dir_name}/validation_full_grid/ungridded_evaluation.nc" \
+--by_hour=1 \
 --target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
---input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
---num_relia_bins_by_target 115 80 80 115 80 \
---min_relia_bin_edge_by_target -60 -40 -40 -80 0 \
---max_relia_bin_edge_by_target 55 40 40 35 80 \
---per_grid_cell=1 \
---keep_it_simple=1 \
---output_file_name_or_pattern="${model_dir_name}/validation_full_grid/gridded_evaluation.nc"
+--metric_names           "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" "spatial_min_bias" "spatial_max_bias" \
+--output_dir_name="${model_dir_name}/validation_full_grid/ungridded_evaluation"

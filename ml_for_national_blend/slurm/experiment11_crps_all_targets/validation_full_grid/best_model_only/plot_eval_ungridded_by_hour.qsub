@@ -34,7 +34,7 @@ TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_bl
 NWP_LEAD_TIME_COUNTS=("1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4")
 LAG_TIME_COUNTS=("1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4")
 
-BEST_MODEL_INDEX=2
+BEST_MODEL_INDEX=15
 
 num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$BEST_MODEL_INDEX]}
 num_lag_times=${LAG_TIME_COUNTS[$BEST_MODEL_INDEX]}

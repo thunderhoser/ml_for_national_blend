@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_eval_ungraphs_by_hour"
+#SBATCH --job-name="plot_eval_graphs_by_month"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -15,7 +15,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_eval_ungraphs_by_hour_%A.out
+#SBATCH --output=plot_eval_graphs_by_month_%A.out
 
 conda init
 conda activate base
@@ -34,7 +34,7 @@ TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_bl
 NWP_LEAD_TIME_COUNTS=("1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4")
 LAG_TIME_COUNTS=("1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4")
 
-BEST_MODEL_INDEX=2
+BEST_MODEL_INDEX=15
 
 num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$BEST_MODEL_INDEX]}
 num_lag_times=${LAG_TIME_COUNTS[$BEST_MODEL_INDEX]}
@@ -44,7 +44,7 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_eval_by_hour_or_month.py" \
 --input_eval_file_pattern="${model_dir_name}/validation_full_grid/ungridded_evaluation.nc" \
---by_hour=1 \
+--by_month=1 \
 --target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
 --metric_names           "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" "spatial_min_bias" "spatial_max_bias" \
 --output_dir_name="${model_dir_name}/validation_full_grid/ungridded_evaluation"
