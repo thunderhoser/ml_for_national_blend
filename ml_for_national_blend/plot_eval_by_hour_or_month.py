@@ -203,8 +203,8 @@ def _plot_one_metric_group(metric_matrix, target_field_name, metric_names,
         )[0]
 
         this_label = '{0:s}{1:s}'.format(
-            metric_names[m][0].upper(),
-            metric_names[m][1:]
+            METRIC_NAME_TO_VERBOSE[metric_names[m]][0].upper(),
+            METRIC_NAME_TO_VERBOSE[metric_names[m]][1:]
         )
 
         if metric_names[m] in SQUARED_METRIC_NAMES:
