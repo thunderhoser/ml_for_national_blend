@@ -345,7 +345,7 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             if metric_names[m] == RMSE_KEY:
                 these_values = numpy.array([
                     numpy.sqrt(numpy.mean(
-                        etx[evaluation.MSE_KEY].values[f_new, :], axis=1
+                        etx[evaluation.MSE_KEY].values[f_new, :]
                     ))
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
@@ -361,12 +361,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
                     )
                 ])
             else:
-                print(metric_names[m])
-
-                print(evaluation_tables_xarray[0][metric_names[m]].values.shape)
-
                 these_values = numpy.array([
-                    numpy.mean(etx[metric_names[m]].values[f_new, :], axis=1)
+                    numpy.mean(etx[metric_names[m]].values[f_new, :])
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
                     )
