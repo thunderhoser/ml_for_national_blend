@@ -555,11 +555,11 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
             file_name_suffix = ''
 
         if by_month:
-            title_suffix = ' in {0:s}'.format(
-                time_conversion.string_to_unix_sec(
-                    '2000-{0:02d}-01'.format(i + 1), '%b'
-                )
+            this_time_string = time_conversion.string_to_unix_sec(
+                '2000-{0:02d}-01'.format(i + 1), '%Y-%b-%d'
             )
+            month_string = this_time_string.split('-')[1]
+            title_suffix = ' in {0:s}'.format(month_string)
         elif by_hour:
             title_suffix = ' at {0:02d}Z'.format(i)
         else:
@@ -649,11 +649,11 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
             file_name_suffix = ''
 
         if by_month:
-            title_suffix = ' in {0:s}'.format(
-                time_conversion.string_to_unix_sec(
-                    '2000-{0:02d}-01'.format(i + 1), '%b'
-                )
+            this_time_string = time_conversion.string_to_unix_sec(
+                '2000-{0:02d}-01'.format(i + 1), '%Y-%b-%d'
             )
+            month_string = this_time_string.split('-')[1]
+            title_suffix = ' in {0:s}'.format(month_string)
         elif by_hour:
             title_suffix = ' at {0:02d}Z'.format(i)
         else:
