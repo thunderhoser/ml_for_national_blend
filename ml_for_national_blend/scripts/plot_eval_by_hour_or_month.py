@@ -303,6 +303,9 @@ def _run(evaluation_file_pattern, by_month, by_hour,
     model_file_name = None
 
     for i in range(num_files):
+        if not os.path.isfile(evaluation_file_names[i]):
+            continue
+
         print('Reading data from: "{0:s}"...'.format(evaluation_file_names[i]))
         evaluation_tables_xarray[i] = evaluation.read_file(
             evaluation_file_names[i]
@@ -330,6 +333,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
                 etx.coords[evaluation.FIELD_DIM].values ==
                 target_field_names[f]
             )[0][0]
+            if etx.data_vars
+            else -1
             for etx in evaluation_tables_xarray
         ], dtype=int)
 
@@ -341,6 +346,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
                     numpy.sqrt(numpy.mean(
                         etx[evaluation.MSE_KEY].values[f_new, :]
                     ))
+                    if etx.data_vars
+                    else numpy.nan
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
                     )
@@ -350,6 +357,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             ]:
                 these_values = numpy.array([
                     etx[metric_names[m]].values[f_new]
+                    if etx.data_vars
+                    else numpy.nan
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
                     )
@@ -357,6 +366,8 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             else:
                 these_values = numpy.array([
                     numpy.mean(etx[metric_names[m]].values[f_new, :])
+                    if etx.data_vars
+                    else numpy.nan
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
                     )
