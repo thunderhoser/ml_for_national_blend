@@ -197,8 +197,8 @@ def _plot_one_metric_group(metric_matrix, target_field_name, metric_names,
         )[0]
 
         this_label = '{0:s}{1:s}'.format(
-            metric_names[m][0].upper(),
-            metric_names[m][1:]
+            METRIC_NAME_TO_VERBOSE[metric_names[m]][0].upper(),
+            METRIC_NAME_TO_VERBOSE[metric_names[m]][1:]
         )
 
         if metric_names[m] in SQUARED_METRIC_NAMES:
@@ -339,7 +339,7 @@ def _run(evaluation_file_pattern, by_month, by_hour,
             if metric_names[m] == RMSE_KEY:
                 these_values = numpy.array([
                     numpy.sqrt(numpy.mean(
-                        etx[evaluation.MSE_KEY].values[f_new, :], axis=1
+                        etx[evaluation.MSE_KEY].values[f_new, :]
                     ))
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
@@ -356,7 +356,7 @@ def _run(evaluation_file_pattern, by_month, by_hour,
                 ])
             else:
                 these_values = numpy.array([
-                    numpy.mean(etx[metric_names[m]].values[f_new, :], axis=1)
+                    numpy.mean(etx[metric_names[m]].values[f_new, :])
                     for etx, f_new in zip(
                         evaluation_tables_xarray, field_index_by_file
                     )

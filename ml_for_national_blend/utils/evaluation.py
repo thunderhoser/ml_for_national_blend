@@ -805,14 +805,16 @@ def _get_scores_one_replicate(
         )
     else:
         t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
-            target_matrix, ddof=1
+            target_matrix, ddof=1, axis=(0, 1, 2)
         )
         t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
-            prediction_matrix, ddof=1
+            prediction_matrix, ddof=1, axis=(0, 1, 2)
         )
-        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(target_matrix)
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
+            target_matrix, axis=(0, 1, 2)
+        )
         t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
-            prediction_matrix
+            prediction_matrix, axis=(0, 1, 2)
         )
 
     for k in range(num_target_fields):
