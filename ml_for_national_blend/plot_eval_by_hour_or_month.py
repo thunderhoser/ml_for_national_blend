@@ -245,7 +245,7 @@ def _plot_one_metric_group(metric_matrix, target_field_name, metric_names,
     )
 
     axes_object.set_xticks(x_tick_values)
-    axes_object.set_xticklabels(x_tick_labels)
+    axes_object.set_xticklabels(x_tick_labels, rotation=90.)
     axes_object.set_title(title_string)
 
     if num_time_divisions == 24:
