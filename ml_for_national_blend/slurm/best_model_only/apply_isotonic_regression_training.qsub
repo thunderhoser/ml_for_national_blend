@@ -1,0 +1,52 @@
+#!/bin/bash
+
+#SBATCH --job-name="apply_isotonic_regression_training"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=08:00:00
+#SBATCH --array=15,31,47,63
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_isotonic_regression_training_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment11_crps_all_targets"
+
+NWP_LEAD_TIME_COUNTS=("1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4" "1" "2" "3" "4")
+LAG_TIME_COUNTS=("1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4" "1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4" "1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4" "1" "1" "1" "1" "2" "2" "2" "2" "3" "3" "3" "3" "4" "4" "4" "4")
+FIRST_INIT_TIME_STRINGS=("2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-01-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-04-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-07-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00" "2021-10-01-00")
+LAST_INIT_TIME_STRINGS=("2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-03-31-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-06-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-09-30-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18" "2021-12-31-18")
+
+num_nwp_lead_times=${NWP_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
+num_lag_times=${LAG_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
+first_init_time_string=${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
+last_init_time_string=${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=${num_nwp_lead_times}_num-lag-times=${num_lag_times}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
+--input_prediction_dir_name="${model_dir_name}/training_full_grid" \
+--init_time_limit_strings "${first_init_time_string}" "${last_init_time_string}" \
+--target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
+--isotonic_model_file_names "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_temperature_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_u_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_v_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_dewpoint_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_wind_gust_10m_agl_m_s01.dill" \
+--output_prediction_dir_name="${model_dir_name}/training_full_grid/isotonic_regression"
