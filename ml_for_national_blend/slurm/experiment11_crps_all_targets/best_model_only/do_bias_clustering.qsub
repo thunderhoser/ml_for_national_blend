@@ -51,7 +51,7 @@ else
 fi
 
 python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
---input_gridded_eval_file_arg_name="${model_dir_name}/training_full_grid/gridded_evaluation.nc" \
+--input_gridded_eval_file_arg_name="${model_dir_name}/training_full_grid/gridded_evaluation_${target_field_name}.nc" \
 --min_cluster_size_px=250 \
 --target_field_name="${target_field_name}" \
 --bias_discretization_intervals ${bias_discretization_intervals} \
