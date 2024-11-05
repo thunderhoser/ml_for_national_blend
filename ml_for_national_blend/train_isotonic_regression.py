@@ -152,6 +152,8 @@ def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
             len(unique_cluster_ids) * cluster_indices_normalized[1:]
         )[this_cluster_part]
 
+        start_index = int(start_index)
+        end_index = int(end_index)
         these_cluster_ids = unique_cluster_ids[start_index:end_index]
         cluster_id_matrix[
             numpy.isin(cluster_id_matrix, these_cluster_ids) == False
