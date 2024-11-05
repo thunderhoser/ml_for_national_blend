@@ -12,6 +12,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import error_checking
 import prediction_io
 import bias_clustering
 import bias_correction
@@ -24,6 +25,8 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
 INIT_TIME_LIMITS_ARG_NAME = 'init_time_limit_strings'
 CLUSTER_FILE_ARG_NAME = 'input_cluster_file_name'
+NUM_CLUSTER_PARTS_ARG_NAME = 'num_cluster_parts'
+THIS_CLUSTER_PART_ARG_NAME = 'this_cluster_part'
 TARGET_FIELD_ARG_NAME = 'target_field_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
@@ -41,6 +44,23 @@ CLUSTER_FILE_HELP_STRING = (
     '`bias_clustering.read_file`.  If you want to train one model for the '
     'whole spatial domain, rather than one per spatial cluster, leave this '
     'argument alone.'
+)
+NUM_CLUSTER_PARTS_HELP_STRING = (
+    '[used only if {0:s} is not empty] Number of parts, i.e., number of calls '
+    'to this script required to train models for the whole domain for the '
+    'given target field.  For example, if {1:s} = 100, then this script will '
+    'be called 100 times for the given target field, and in each call IR '
+    'models will be trained for ~1/100th of all clusters.  If you want to '
+    'train IR models for all clusters in a single call, leave this argument '
+    'alone.'
+).format(
+    CLUSTER_FILE_ARG_NAME, NUM_CLUSTER_PARTS_ARG_NAME
+)
+THIS_CLUSTER_PART_HELP_STRING = (
+    '[used only if {0:s} > 1] This script will train IR models for the [j]th '
+    'set of clusters, where j = {1:s}.'
+).format(
+    NUM_CLUSTER_PARTS_ARG_NAME, THIS_CLUSTER_PART_ARG_NAME
 )
 TARGET_FIELD_HELP_STRING = (
     'Target field for which to train IR model.  Field name must be accepted by '
@@ -61,8 +81,16 @@ INPUT_ARG_PARSER.add_argument(
     help=INIT_TIME_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + CLUSTER_FILE_ARG_NAME, type=str, required=True, default='',
+    '--' + CLUSTER_FILE_ARG_NAME, type=str, required=False, default='',
     help=CLUSTER_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + NUM_CLUSTER_PARTS_ARG_NAME, type=int, required=False, default=-1,
+    help=NUM_CLUSTER_PARTS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + THIS_CLUSTER_PART_ARG_NAME, type=int, required=False, default=-1,
+    help=THIS_CLUSTER_PART_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + TARGET_FIELD_ARG_NAME, type=str, required=True,
@@ -75,7 +103,8 @@ INPUT_ARG_PARSER.add_argument(
 
 
 def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
-         target_field_name, output_file_name):
+         num_cluster_parts, this_cluster_part, target_field_name,
+         output_file_name):
     """Trains isotonic-regression model to bias-correct ensemble mean.
 
     This is effectively the main method.
@@ -83,6 +112,8 @@ def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
     :param prediction_dir_name: See documentation at top of this script.
     :param init_time_limit_strings: Same.
     :param cluster_file_name: Same.
+    :param num_cluster_parts: Same.
+    :param this_cluster_part: Same.
     :param target_field_name: Same.
     :param output_file_name: Same.
     """
@@ -92,6 +123,46 @@ def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
     else:
         print('Reading data from: "{0:s}"...'.format(cluster_file_name))
         cluster_table_xarray = bias_clustering.read_file(cluster_file_name)
+
+    if cluster_table_xarray is None:
+        num_cluster_parts = None
+        this_cluster_part = None
+
+    if num_cluster_parts < 2:
+        num_cluster_parts = None
+        this_cluster_part = None
+
+    if num_cluster_parts is not None:
+        error_checking.assert_is_geq(this_cluster_part, 0)
+        error_checking.assert_is_less_than(this_cluster_part, num_cluster_parts)
+
+        cluster_id_matrix = (
+            cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values
+        )
+        unique_cluster_ids = numpy.unique(cluster_id_matrix)
+        unique_cluster_ids = unique_cluster_ids[unique_cluster_ids > 0]
+
+        cluster_indices_normalized = numpy.linspace(
+            0, 1, num=num_cluster_parts + 1, dtype=float
+        )
+        start_index = numpy.round(
+            len(unique_cluster_ids) * cluster_indices_normalized[:-1]
+        )[this_cluster_part]
+        end_index = numpy.round(
+            len(unique_cluster_ids) * cluster_indices_normalized[1:]
+        )[this_cluster_part]
+
+        these_cluster_ids = unique_cluster_ids[start_index:end_index]
+        cluster_id_matrix[
+            numpy.isin(cluster_id_matrix, these_cluster_ids) == False
+        ] = -1
+
+        cluster_table_xarray = cluster_table_xarray.assign({
+            bias_clustering.CLUSTER_ID_KEY: (
+                cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].dims,
+                cluster_id_matrix
+            )
+        })
 
     init_time_limits_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
@@ -152,6 +223,8 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, INIT_TIME_LIMITS_ARG_NAME
         ),
         cluster_file_name=getattr(INPUT_ARG_OBJECT, CLUSTER_FILE_ARG_NAME),
+        num_cluster_parts=getattr(INPUT_ARG_OBJECT, NUM_CLUSTER_PARTS_ARG_NAME),
+        this_cluster_part=getattr(INPUT_ARG_OBJECT, THIS_CLUSTER_PART_ARG_NAME),
         target_field_name=getattr(INPUT_ARG_OBJECT, TARGET_FIELD_ARG_NAME),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
