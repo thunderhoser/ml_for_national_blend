@@ -51,6 +51,8 @@ for j in $(seq $cluster_start_index $cluster_end_index); do
     result+="$j "
 done
 
+echo $cluster_start_index
+echo $cluster_end_index
 echo $cluster_indices
 
 python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
