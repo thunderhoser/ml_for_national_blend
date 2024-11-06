@@ -48,7 +48,7 @@ cluster_start_index=$(echo "$cluster_start_index" | sed 's/^0*//')
 cluster_end_index=$(echo "$cluster_end_index" | sed 's/^0*//')
 cluster_indices=""
 for j in $(seq $((cluster_start_index)) $((cluster_end_index))); do
-    result+="$j "
+    cluster_indices+="$j "
 done
 
 echo $cluster_start_index
