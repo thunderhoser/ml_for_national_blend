@@ -310,6 +310,7 @@ def subset_clusters_before_training(
         these_cluster_indices = numpy.linspace(
             start_index, end_index, num=end_index - start_index + 1, dtype=int
         )
+        these_cluster_indices = these_cluster_indices[:-1]
 
     if these_cluster_indices is not None:
         cluster_id_matrix = (
