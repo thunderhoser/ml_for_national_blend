@@ -237,6 +237,110 @@ def _train_one_model_per_cluster(prediction_tables_xarray, cluster_table_xarray,
     return cluster_id_to_model_object
 
 
+def subset_clusters_before_training(
+        cluster_file_name,
+        these_cluster_indices=numpy.array([-1], dtype=int),
+        num_cluster_parts=-1,
+        this_cluster_part=-1):
+    """Subsets spatial clusters before training bias-correction models.
+
+    This allows parallelization for large spatial domains, e.g., the NBM domain.
+
+    There are two ways to subset clusters:
+
+    [1] Pass these_cluster_indices directly.  In this case, leave
+        num_cluster_parts and this_cluster_part alone.
+    [2] Pass num_cluster_parts and this_cluster_part.  In this case, leave
+        these_cluster_indices alone.
+
+    :param cluster_file_name: Path to file specifying spatial clusters (will be
+        read by `bias_clustering.read_file`).
+    :param these_cluster_indices: 1-D numpy array with indices of clusters for
+        which to train bias correction.  Remember that these are indices into
+        the sorted array of unique cluster IDs -- these are not cluster IDs.
+        For example, if these_cluster_indices = [0 1 3] and the first four
+        unique cluster IDs are [10 20 22 25], this method will subset the
+        cluster tableto clusters [10 20 25].
+    :param num_cluster_parts: Number of cluster parts, i.e., number of subsets
+        into which training of bias-correction models will be parallelized.
+    :param this_cluster_part: Current cluster part.  This method will subset the
+        cluster table to [j]th part of J, where j = this_cluster_part and
+        J = num_cluster_parts.
+    :return: cluster_table_xarray: xarray table in format returned by
+        `bias_clustering.read_file`, except subset to the relevant clusters.
+    """
+
+    print('Reading data from: "{0:s}"...'.format(cluster_file_name))
+    cluster_table_xarray = bias_clustering.read_file(cluster_file_name)
+
+    if len(these_cluster_indices) == 1 and these_cluster_indices[0] < 0:
+        these_cluster_indices = None
+
+    if these_cluster_indices is not None:
+        error_checking.assert_is_geq_numpy_array(these_cluster_indices, 0)
+        num_cluster_parts = None
+        this_cluster_part = None
+
+    if num_cluster_parts is not None and num_cluster_parts < 2:
+        num_cluster_parts = None
+        this_cluster_part = None
+
+    if num_cluster_parts is not None:
+        error_checking.assert_is_geq(this_cluster_part, 0)
+        error_checking.assert_is_less_than(this_cluster_part, num_cluster_parts)
+
+        cluster_id_matrix = (
+            cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values
+        )
+        unique_cluster_ids = numpy.unique(cluster_id_matrix)
+        unique_cluster_ids = unique_cluster_ids[unique_cluster_ids > 0]
+
+        cluster_indices_normalized = numpy.linspace(
+            0, 1, num=num_cluster_parts + 1, dtype=float
+        )
+        start_index = numpy.round(
+            len(unique_cluster_ids) * cluster_indices_normalized[:-1]
+        )[this_cluster_part]
+        end_index = numpy.round(
+            len(unique_cluster_ids) * cluster_indices_normalized[1:]
+        )[this_cluster_part]
+
+        start_index = int(start_index)
+        end_index = int(end_index)
+        these_cluster_indices = numpy.linspace(
+            start_index, end_index, num=end_index - start_index + 1, dtype=int
+        )
+
+    if these_cluster_indices is not None:
+        cluster_id_matrix = (
+            cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values
+        )
+        unique_cluster_ids = numpy.unique(cluster_id_matrix)
+        unique_cluster_ids = unique_cluster_ids[unique_cluster_ids > 0]
+
+        cluster_id_matrix[
+            numpy.isin(
+                cluster_id_matrix, unique_cluster_ids[these_cluster_indices]
+            ) == False
+        ] = -1
+
+        cluster_table_xarray = cluster_table_xarray.assign({
+            bias_clustering.CLUSTER_ID_KEY: (
+                cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].dims,
+                cluster_id_matrix
+            )
+        })
+
+    import sys
+    numpy.set_printoptions(threshold=sys.maxsize)
+    print('these_cluster_indices = {0:s}'.format(
+        str(these_cluster_indices)
+    ))
+    print(these_cluster_indices)
+
+    return cluster_table_xarray
+
+
 def train_model_suite(
         prediction_tables_xarray, target_field_name, do_uncertainty_calibration,
         do_iso_reg_before_uncertainty_calib=None,
