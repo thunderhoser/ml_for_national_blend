@@ -155,7 +155,8 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
 
         error_string = (
             'Could not find bias-correction models for {0:d} cluster IDs:'
-        )
+        ).format(len(missing_cluster_ids))
+
         for this_id in missing_cluster_ids:
             error_string += '\n{0:d}'.format(this_id)
 
