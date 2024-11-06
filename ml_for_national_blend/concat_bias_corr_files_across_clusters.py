@@ -69,7 +69,7 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
     ))
     full_cluster_id_matrix = bias_clustering.read_file(cluster_file_name)[
         bias_clustering.CLUSTER_ID_KEY
-    ]
+    ].values
 
     cluster_id_matrix = numpy.array([], dtype=int)
     cluster_id_to_model_object = dict()
