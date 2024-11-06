@@ -7,14 +7,20 @@ import copy
 import glob
 import argparse
 import numpy
+from ml_for_national_blend.utils import bias_clustering
 from ml_for_national_blend.machine_learning import bias_correction
 
-INPUT_FILE_PATTERN_ARG_NAME = 'input_file_pattern'
-OUTPUT_FILE_ARG_NAME = 'output_file_name'
+INPUT_FILE_PATTERN_ARG_NAME = 'input_model_file_pattern'
+CLUSTER_FILE_ARG_NAME = 'input_cluster_file_name'
+OUTPUT_FILE_ARG_NAME = 'output_model_file_name'
 
 INPUT_FILE_PATTERN_HELP_STRING = (
     'Glob pattern for input files.  Each input file will be read by '
     '`bias_correction.read_file`.'
+)
+CLUSTER_FILE_HELP_STRING = (
+    'Path to file with full cluster table.  Will be read by '
+    '`bias_clustering.read_file`.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Will be written in Dill format by '
@@ -27,23 +33,35 @@ INPUT_ARG_PARSER.add_argument(
     help=INPUT_FILE_PATTERN_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + CLUSTER_FILE_ARG_NAME, type=str, required=True,
+    help=CLUSTER_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
 
 
-def _run(input_file_pattern, output_file_name):
+def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
     """Concatenates bias-correction files across clusters.
 
     This is effectively the main method.
 
-    :param input_file_pattern: See documentation at top of this script.
-    :param output_file_name: Same.
+    :param input_model_file_pattern: See documentation at top of this script.
+    :param cluster_file_name: Same.
+    :param output_model_file_name: Same.
     """
 
-    input_file_names = glob.glob(input_file_pattern)
-    assert len(input_file_names) > 0
-    input_file_names.sort()
+    input_model_file_names = glob.glob(input_model_file_pattern)
+    assert len(input_model_file_names) > 0
+    input_model_file_names.sort()
+
+    print('Reading full cluster table from: "{0:s}"...'.format(
+        cluster_file_name
+    ))
+    full_cluster_id_matrix = bias_clustering.read_file(cluster_file_name)[
+        bias_clustering.CLUSTER_ID_KEY
+    ]
 
     cluster_id_matrix = numpy.array([], dtype=int)
     cluster_id_to_model_object = dict()
@@ -51,9 +69,9 @@ def _run(input_file_pattern, output_file_name):
     do_uncertainty_calibration = None
     do_iso_reg_before_uncertainty_calib = None
 
-    for i in range(len(input_file_names)):
-        print('Reading data from: "{0:s}"...'.format(input_file_names[i]))
-        this_model_dict = bias_correction.read_file(input_file_names[i])
+    for i in range(len(input_model_file_names)):
+        print('Reading data from: "{0:s}"...'.format(input_model_file_names[i]))
+        this_model_dict = bias_correction.read_file(input_model_file_names[i])
 
         assert this_model_dict[bias_correction.MODEL_KEY] is None
 
@@ -108,6 +126,33 @@ def _run(input_file_pattern, output_file_name):
 
         cluster_id_to_model_object.update(this_cluster_id_to_model_object)
 
+    found_all_clusters = numpy.array_equal(
+        cluster_id_matrix[cluster_id_matrix > 0],
+        full_cluster_id_matrix[full_cluster_id_matrix > 0]
+    )
+
+    if not found_all_clusters:
+        unique_cluster_ids_all = numpy.unique(
+            full_cluster_id_matrix[full_cluster_id_matrix > 0]
+        )
+        unique_cluster_ids_found = numpy.unique(
+            cluster_id_matrix[cluster_id_matrix > 0]
+        )
+
+        missing_cluster_ids = (
+            set(unique_cluster_ids_all.tolist()) -
+            set(unique_cluster_ids_found.tolist())
+        )
+        missing_cluster_ids = numpy.array(list(missing_cluster_ids), dtype=int)
+
+        error_string = (
+            'Could not find bias-correction models for {0:d} cluster IDs:'
+        )
+        for this_id in missing_cluster_ids:
+            error_string += '\n{0:d}'.format(this_id)
+
+        raise ValueError(error_string)
+
     model_dict = {
         bias_correction.MODEL_KEY: None,
         bias_correction.CLUSTER_TO_MODEL_KEY: cluster_id_to_model_object,
@@ -117,9 +162,9 @@ def _run(input_file_pattern, output_file_name):
         bias_correction.DO_IR_BEFORE_UC_KEY: do_iso_reg_before_uncertainty_calib
     }
 
-    print('Writing all models to: "{0:s}"...'.format(output_file_name))
+    print('Writing all models to: "{0:s}"...'.format(output_model_file_name))
     bias_correction.write_file(
-        model_dict=model_dict, dill_file_name=output_file_name
+        model_dict=model_dict, dill_file_name=output_model_file_name
     )
 
 
@@ -127,8 +172,9 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        input_file_pattern=getattr(
+        input_model_file_pattern=getattr(
             INPUT_ARG_OBJECT, INPUT_FILE_PATTERN_ARG_NAME
         ),
-        output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
+        cluster_file_name=getattr(INPUT_ARG_OBJECT, CLUSTER_FILE_ARG_NAME),
+        output_model_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
