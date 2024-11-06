@@ -44,8 +44,10 @@ target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=4_num-lag-times=4"
 echo $model_dir_name
 
+cluster_start_index=$(echo "$cluster_start_index" | sed 's/^0*//')
+cluster_end_index=$(echo "$cluster_end_index" | sed 's/^0*//')
 cluster_indices=""
-for j in $(seq $((cluster_start_index)) $((cluster_end_index))); do
+for j in $(seq $cluster_start_index $cluster_end_index); do
     result+="$j "
 done
 
