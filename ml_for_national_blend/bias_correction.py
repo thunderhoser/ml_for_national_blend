@@ -726,6 +726,8 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                     cluster_id_matrix == unique_cluster_ids[k]
                 )
 
+                print(this_cluster_mask.shape)
+
                 orig_mean_vector = (
                     mean_prediction_matrix[..., f][this_cluster_mask]
                 )
