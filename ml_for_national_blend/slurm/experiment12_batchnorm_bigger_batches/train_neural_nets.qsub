@@ -68,7 +68,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --nbm_constant_field_names "orographic_height_m_asl" "land_sea_mask_land1" "latitude_matrix_deg_n" "longitude_matrix_deg_e" \
 --nbm_constant_file_name="${NBM_CONSTANT_FILE_NAME}" \
 --compare_to_baseline_in_loss=1 \
---num_examples_per_batch=7 \
+--num_examples_per_batch=5 \
 --sentinel_value=-10 \
 --patch_size_2pt5km_pixels=432 \
 --patch_buffer_size_2pt5km_pixels=75 \
