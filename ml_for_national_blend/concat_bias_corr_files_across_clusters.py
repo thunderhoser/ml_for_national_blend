@@ -8,6 +8,7 @@ import sys
 import copy
 import glob
 import argparse
+import warnings
 import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -114,7 +115,29 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
             )
             continue
 
-        this_cluster_id_matrix = this_model_dict[bias_correction.CLUSTER_IDS_KEY]
+        this_cluster_id_matrix = this_model_dict[
+            bias_correction.CLUSTER_IDS_KEY
+        ]
+        overlap_cluster_ids = numpy.unique(
+            this_cluster_id_matrix[cluster_id_matrix > 0]
+        )
+        overlap_cluster_ids = overlap_cluster_ids[overlap_cluster_ids > 0]
+
+        if len(overlap_cluster_ids) > 0:
+            warning_string = (
+                'POTENTIAL ERROR: Found {0:d} cluster IDs in more than one '
+                'file:\n{1:s}'
+            ).format(
+                len(overlap_cluster_ids),
+                str(overlap_cluster_ids)
+            )
+
+            warnings.warn(warning_string)
+
+            this_cluster_id_matrix[
+                numpy.isin(this_cluster_id_matrix, overlap_cluster_ids)
+            ] = -1
+
         assert not numpy.any(numpy.logical_and(
             cluster_id_matrix > 0, this_cluster_id_matrix > 0
         ))
