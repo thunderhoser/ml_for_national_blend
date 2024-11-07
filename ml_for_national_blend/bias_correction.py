@@ -561,8 +561,6 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         assert len(these_field_names) == 1
         field_names[f] = these_field_names[0]
 
-        print(model_dict_by_field[f][MODEL_KEY])
-
         if f == 0:
             do_uncertainty_calibration = (
                 model_dict_by_field[f][DO_UNCERTAINTY_CALIB_KEY]
@@ -577,7 +575,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         assert do_ir_before_uc == model_dict_by_field[f][DO_IR_BEFORE_UC_KEY]
         assert (
             one_model_per_cluster ==
-            model_dict_by_field[f][MODEL_KEY] is None
+            (model_dict_by_field[f][MODEL_KEY] is None)
         )
 
     ptx = prediction_table_xarray
