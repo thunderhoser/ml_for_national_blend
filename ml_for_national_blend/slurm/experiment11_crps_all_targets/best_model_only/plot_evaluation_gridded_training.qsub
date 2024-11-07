@@ -46,7 +46,7 @@ echo $model_dir_name
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
---input_evaluation_file_name="${model_dir_name}/training_full_grid/isotonic_regression/gridded_evaluation_${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}.nc" \
+--input_eval_file_name_or_pattern="${model_dir_name}/training_full_grid/isotonic_regression/gridded_evaluation_${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}.nc" \
 --target_field_name="${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" \
 --metric_names "spread_skill_ratio" "spread_skill_difference" \
 --min_colour_percentiles 0.5 0.5 \
