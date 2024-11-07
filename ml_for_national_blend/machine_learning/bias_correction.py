@@ -35,6 +35,8 @@ ALL_KEYS = [
     DO_UNCERTAINTY_CALIB_KEY, DO_IR_BEFORE_UC_KEY
 ]
 
+GRID_POINT_DIM = 'grid_point'
+
 
 def __get_slices_for_multiprocessing(cluster_ids):
     """Returns slices for multiprocessing.
@@ -96,35 +98,34 @@ def _subset_predictions_to_cluster(
     cluster_id_matrix = (
         cluster_table_xarray[bias_clustering.CLUSTER_ID_KEY].values[..., 0]
     )
-    good_rows, good_columns = numpy.where(
-        cluster_id_matrix == desired_cluster_id
-    )
-    good_rows = numpy.unique(good_rows)
-    good_columns = numpy.unique(good_columns)
-
-    first_ptx = prediction_tables_xarray[0]
-    eval_weight_submatrix = (
-        first_ptx[EVALUATION_WEIGHT_KEY].values[good_rows, :][:, good_columns]
-    )
-    cluster_id_submatrix = cluster_id_matrix[good_rows, :][:, good_columns]
-    eval_weight_submatrix[cluster_id_submatrix != desired_cluster_id] = 0.
+    mask_matrix = cluster_id_matrix == desired_cluster_id
+    good_rows, good_columns = numpy.where(mask_matrix)
 
     num_tables = len(prediction_tables_xarray)
     new_prediction_tables_xarray = [xarray.Dataset()] * num_tables
 
     for k in range(num_tables):
-        new_prediction_tables_xarray[k] = prediction_tables_xarray[k].isel(
-            {prediction_io.ROW_DIM: good_rows}
-        )
-        new_prediction_tables_xarray[k] = new_prediction_tables_xarray[k].isel(
-            {prediction_io.COLUMN_DIM: good_columns}
-        )
-        new_prediction_tables_xarray[k] = new_prediction_tables_xarray[k].assign({
+        ptx_k = prediction_tables_xarray[k]
+
+        main_data_dict = {
+            prediction_io.TARGET_KEY: (
+                (GRID_POINT_DIM, prediction_io.FIELD_DIM),
+                ptx_k[prediction_io.TARGET_KEY].values[good_rows, good_columns, :]
+            ),
+            prediction_io.PREDICTION_KEY: (
+                (GRID_POINT_DIM, prediction_io.FIELD_DIM,
+                 prediction_io.ENSEMBLE_MEMBER_DIM),
+                ptx_k[prediction_io.PREDICTION_KEY].values[good_rows, good_columns, :, :]
+            ),
             EVALUATION_WEIGHT_KEY: (
-                new_prediction_tables_xarray[k][EVALUATION_WEIGHT_KEY].dims,
-                eval_weight_submatrix
+                (GRID_POINT_DIM,),
+                ptx_k[EVALUATION_WEIGHT_KEY].values[good_rows, good_columns]
             )
-        })
+        }
+
+        new_prediction_tables_xarray[k] = xarray.Dataset(
+            data_vars=main_data_dict
+        )
 
     return new_prediction_tables_xarray
 
