@@ -110,6 +110,10 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
         this_cluster_id_matrix = this_model_dict[
             bias_correction.CLUSTER_IDS_KEY
         ]
+        this_cluster_id_to_model_object = this_model_dict[
+            bias_correction.CLUSTER_TO_MODEL_KEY
+        ]
+
         overlap_cluster_ids = numpy.unique(
             this_cluster_id_matrix[cluster_id_matrix > 0]
         )
@@ -130,6 +134,9 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
                 numpy.isin(this_cluster_id_matrix, overlap_cluster_ids)
             ] = -1
 
+            for this_id in overlap_cluster_ids:
+                del this_cluster_id_to_model_object[this_id]
+
         assert not numpy.any(numpy.logical_and(
             cluster_id_matrix > 0, this_cluster_id_matrix > 0
         ))
@@ -138,9 +145,6 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
             this_cluster_id_matrix > 0
         ]
 
-        this_cluster_id_to_model_object = this_model_dict[
-            bias_correction.CLUSTER_TO_MODEL_KEY
-        ]
         common_keys = (
             set(cluster_id_to_model_object.keys()) &
             set(this_cluster_id_to_model_object.keys())
