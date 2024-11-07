@@ -6,6 +6,7 @@ Each input file should contain bias-correction models for a subset of clusters.
 import copy
 import glob
 import argparse
+import warnings
 import numpy
 from ml_for_national_blend.utils import bias_clustering
 from ml_for_national_blend.machine_learning import bias_correction
@@ -61,7 +62,7 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
     ))
     full_cluster_id_matrix = bias_clustering.read_file(cluster_file_name)[
         bias_clustering.CLUSTER_ID_KEY
-    ]
+    ].values
 
     cluster_id_matrix = numpy.array([], dtype=int)
     cluster_id_to_model_object = dict()
@@ -106,7 +107,29 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
             )
             continue
 
-        this_cluster_id_matrix = this_model_dict[bias_correction.CLUSTER_IDS_KEY]
+        this_cluster_id_matrix = this_model_dict[
+            bias_correction.CLUSTER_IDS_KEY
+        ]
+        overlap_cluster_ids = numpy.unique(
+            this_cluster_id_matrix[cluster_id_matrix > 0]
+        )
+        overlap_cluster_ids = overlap_cluster_ids[overlap_cluster_ids > 0]
+
+        if len(overlap_cluster_ids) > 0:
+            warning_string = (
+                'POTENTIAL ERROR: Found {0:d} cluster IDs in more than one '
+                'file:\n{1:s}'
+            ).format(
+                len(overlap_cluster_ids),
+                str(overlap_cluster_ids)
+            )
+
+            warnings.warn(warning_string)
+
+            this_cluster_id_matrix[
+                numpy.isin(this_cluster_id_matrix, overlap_cluster_ids)
+            ] = -1
+
         assert not numpy.any(numpy.logical_and(
             cluster_id_matrix > 0, this_cluster_id_matrix > 0
         ))
@@ -147,7 +170,8 @@ def _run(input_model_file_pattern, cluster_file_name, output_model_file_name):
 
         error_string = (
             'Could not find bias-correction models for {0:d} cluster IDs:'
-        )
+        ).format(len(missing_cluster_ids))
+
         for this_id in missing_cluster_ids:
             error_string += '\n{0:d}'.format(this_id)
 
