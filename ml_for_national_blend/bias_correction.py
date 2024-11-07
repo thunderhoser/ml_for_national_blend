@@ -628,7 +628,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
             if verbose:
                 print((
                     'Applying bias-correction model for '
-                    '{0:d}th of {1:d} fields,'
+                    '{0:d}th of {1:d} fields, '
                     '{2:d}th of {3:d} clusters...'
                 ).format(
                     f + 1, num_fields,
