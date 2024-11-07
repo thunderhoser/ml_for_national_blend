@@ -67,8 +67,7 @@ fi
 
 python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression" \
---first_init_time_string_by_period "2022-01-01-00" \
---last_init_time_string_by_period "2022-12-31-18" \
+--init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
 --num_bootstrap_reps=1 \
 --target_field_names "${target_field_name}" \
 --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
