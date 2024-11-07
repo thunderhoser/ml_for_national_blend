@@ -47,6 +47,5 @@ echo $model_dir_name
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
 --init_time_limit_strings "${first_init_time_string}" "${last_init_time_string}" \
---target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
 --isotonic_model_file_names "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_temperature_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_u_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_v_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_dewpoint_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_wind_gust_10m_agl_m_s01.dill" \
 --output_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression"
