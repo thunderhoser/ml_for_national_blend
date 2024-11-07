@@ -567,7 +567,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         assert do_ir_before_uc == model_dict_by_field[f][DO_IR_BEFORE_UC_KEY]
         assert (
             one_model_per_cluster ==
-            model_dict_by_field[f][MODEL_KEY] is None
+            (model_dict_by_field[f][MODEL_KEY] is None)
         )
 
     ptx = prediction_table_xarray
@@ -597,7 +597,6 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
             prediction_matrix, axis=-1, ddof=1
         )
     else:
-        mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
     for f in range(num_fields):
@@ -605,7 +604,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         cluster_id_to_model_object = (
             model_dict_by_field[f][CLUSTER_TO_MODEL_KEY]
         )
-        cluster_id_matrix = model_dict_by_field[f][CLUSTER_IDS_KEY]
+        cluster_id_matrix = model_dict_by_field[f][CLUSTER_IDS_KEY][..., 0]
 
         if one_model_per_cluster:
             unique_cluster_ids = numpy.array(
@@ -621,7 +620,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
             if verbose:
                 print((
                     'Applying bias-correction model for '
-                    '{0:d}th of {1:d} fields,'
+                    '{0:d}th of {1:d} fields, '
                     '{2:d}th of {3:d} clusters...'
                 ).format(
                     f + 1, num_fields,
@@ -634,7 +633,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                         unique_cluster_ids[k]
                     ]
                     this_cluster_mask = (
-                        cluster_id_matrix[..., f] == unique_cluster_ids[k]
+                        cluster_id_matrix == unique_cluster_ids[k]
                     )
 
                     orig_stdev_vector = (
@@ -716,7 +715,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                     unique_cluster_ids[k]
                 ]
                 this_cluster_mask = (
-                    cluster_id_matrix[..., f] == unique_cluster_ids[k]
+                    cluster_id_matrix == unique_cluster_ids[k]
                 )
 
                 orig_mean_vector = (
