@@ -561,6 +561,8 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         assert len(these_field_names) == 1
         field_names[f] = these_field_names[0]
 
+        print(model_dict_by_field[f][MODEL_KEY])
+
         if f == 0:
             do_uncertainty_calibration = (
                 model_dict_by_field[f][DO_UNCERTAINTY_CALIB_KEY]
