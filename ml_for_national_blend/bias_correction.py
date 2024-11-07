@@ -641,7 +641,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                         unique_cluster_ids[k]
                     ]
                     this_cluster_mask = (
-                        cluster_id_matrix[..., f] == unique_cluster_ids[k]
+                        cluster_id_matrix == unique_cluster_ids[k]
                     )
 
                     orig_stdev_vector = (
@@ -723,7 +723,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                     unique_cluster_ids[k]
                 ]
                 this_cluster_mask = (
-                    cluster_id_matrix[..., f] == unique_cluster_ids[k]
+                    cluster_id_matrix == unique_cluster_ids[k]
                 )
 
                 orig_mean_vector = (
