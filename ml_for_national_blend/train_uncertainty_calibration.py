@@ -186,6 +186,7 @@ def _run(prediction_dir_name, init_time_limit_strings, cluster_file_name,
                 prediction_tables_xarray[k]
             )
         )
+        print(prediction_tables_xarray[k])
 
     print(SEPARATOR_STRING)
 
