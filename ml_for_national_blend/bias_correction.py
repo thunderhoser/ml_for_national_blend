@@ -605,7 +605,6 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
             prediction_matrix, axis=-1, ddof=1
         )
     else:
-        mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
     for f in range(num_fields):
