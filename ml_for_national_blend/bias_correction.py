@@ -612,7 +612,7 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
         cluster_id_to_model_object = (
             model_dict_by_field[f][CLUSTER_TO_MODEL_KEY]
         )
-        cluster_id_matrix = model_dict_by_field[f][CLUSTER_IDS_KEY]
+        cluster_id_matrix = model_dict_by_field[f][CLUSTER_IDS_KEY][..., 0]
 
         if one_model_per_cluster:
             unique_cluster_ids = numpy.array(
@@ -725,8 +725,6 @@ def apply_model_suite(prediction_table_xarray, model_dict_by_field, verbose):
                 this_cluster_mask = (
                     cluster_id_matrix == unique_cluster_ids[k]
                 )
-
-                print(this_cluster_mask.shape)
 
                 orig_mean_vector = (
                     mean_prediction_matrix[..., f][this_cluster_mask]
