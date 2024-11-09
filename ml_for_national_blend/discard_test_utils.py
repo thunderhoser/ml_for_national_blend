@@ -12,8 +12,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import file_system_utils
 import error_checking
-import prediction_io
-import evaluation
+import spread_skill_utils as ss_utils
 
 TOLERANCE = 1e-6
 
@@ -70,7 +69,7 @@ def _run_discard_test_1field(
         this_percentile_level = 100 * (1 - discard_fractions[k])
         mask_out_matrix = (
             uncertainty_matrix >
-            numpy.nanpercentile(uncertainty_matrix, this_percentile_level)
+            numpy.percentile(uncertainty_matrix, this_percentile_level)
         )
 
         if numpy.sum(mask_out_matrix) == 0:
@@ -228,21 +227,10 @@ def run_discard_test(
     assert num_fractions >= 2
 
     # Read the data.
-    prediction_tables_xarray = evaluation.read_inputs(
+    prediction_matrix, target_matrix = ss_utils.read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names,
-        take_ensemble_mean=False
+        target_field_names=target_field_names
     )
-
-    prediction_matrix = numpy.stack(
-        [ptx[prediction_io.PREDICTION_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    target_matrix = numpy.stack(
-        [ptx[prediction_io.TARGET_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    del prediction_tables_xarray
 
     # Set up the output table.
     num_target_fields = len(target_field_names)
