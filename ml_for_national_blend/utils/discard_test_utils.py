@@ -4,8 +4,7 @@ import numpy
 import xarray
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
-from ml_for_national_blend.io import prediction_io
-from ml_for_national_blend.utils import evaluation
+from ml_for_national_blend.utils import spread_skill_utils as ss_utils
 
 TOLERANCE = 1e-6
 
@@ -220,21 +219,10 @@ def run_discard_test(
     assert num_fractions >= 2
 
     # Read the data.
-    prediction_tables_xarray = evaluation.read_inputs(
+    prediction_matrix, target_matrix = ss_utils.read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names,
-        take_ensemble_mean=False
+        target_field_names=target_field_names
     )
-
-    prediction_matrix = numpy.stack(
-        [ptx[prediction_io.PREDICTION_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    target_matrix = numpy.stack(
-        [ptx[prediction_io.TARGET_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    del prediction_tables_xarray
 
     # Set up the output table.
     num_target_fields = len(target_field_names)

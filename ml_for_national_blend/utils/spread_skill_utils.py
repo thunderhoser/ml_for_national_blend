@@ -1,5 +1,6 @@
 """Methods for computing spread-skill relationship."""
 
+import copy
 import numpy
 import xarray
 from gewittergefahr.gg_utils import file_system_utils
@@ -25,6 +26,67 @@ MEAN_TARGET_KEY = 'mean_target_value'
 BIN_EDGE_PREDICTION_STDEV_KEY = 'bin_edge_prediction_stdev'
 
 PREDICTION_FILES_KEY = 'prediction_file_names'
+
+
+def read_inputs(prediction_file_names, target_field_names):
+    """Reads inputs (predictions and targets) from many files.
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    S = ensemble size
+
+    :param prediction_file_names: 1-D list of paths to prediction files.
+        Each file will be read by `prediction_io.read_file`.
+    :param target_field_names: 1-D list of field names desired.
+    :return: prediction_matrix: E-by-M-by-N-by-1-by-S numpy array of
+        predictions.
+    :return: target_matrix: E-by-M-by-N-by-1 numpy array of actual values.
+    """
+
+    # TODO(thunderhoser): Put this in prediction_io.py.
+
+    error_checking.assert_is_string_list(prediction_file_names)
+    error_checking.assert_is_string_list(target_field_names)
+
+    num_times = len(prediction_file_names)
+    prediction_matrix = numpy.array([], dtype=float)
+    target_matrix = numpy.array([], dtype=float)
+    model_file_name = None
+
+    for i in range(num_times):
+        print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
+        this_prediction_table_xarray = prediction_io.read_file(
+            prediction_file_names[i]
+        )
+        tpt = this_prediction_table_xarray
+
+        if model_file_name is None:
+            model_file_name = copy.deepcopy(
+                tpt.attrs[prediction_io.MODEL_FILE_KEY]
+            )
+            num_grid_rows = tpt[prediction_io.PREDICTION_KEY].values.shape[0]
+            num_grid_columns = tpt[prediction_io.PREDICTION_KEY].values.shape[1]
+            ensemble_size = tpt[prediction_io.PREDICTION_KEY].values.shape[-1]
+
+            these_dim = (
+                num_times, num_grid_rows, num_grid_columns, 1, ensemble_size
+            )
+            prediction_matrix = numpy.full(these_dim, numpy.nan)
+            target_matrix = numpy.full(these_dim[:-1], numpy.nan)
+
+        assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+
+        these_indices = numpy.array([
+            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        tpt = tpt.isel({prediction_io.FIELD_DIM: these_indices})
+        prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values
+        target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values
+
+    return prediction_matrix, target_matrix
 
 
 def get_spread_vs_skill(
@@ -106,21 +168,10 @@ def get_spread_vs_skill(
             )
 
     # Read the data.
-    prediction_tables_xarray = evaluation.read_inputs(
+    prediction_matrix, target_matrix = read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names,
-        take_ensemble_mean=False
+        target_field_names=target_field_names
     )
-
-    prediction_matrix = numpy.stack(
-        [ptx[prediction_io.PREDICTION_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    target_matrix = numpy.stack(
-        [ptx[prediction_io.TARGET_KEY] for ptx in prediction_tables_xarray],
-        axis=0
-    )
-    del prediction_tables_xarray
 
     # Set up the output table.
     orig_dimensions = (num_target_fields,)
