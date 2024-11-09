@@ -6,7 +6,6 @@ import xarray
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_national_blend.io import prediction_io
-from ml_for_national_blend.utils import evaluation
 
 TOLERANCE = 1e-6
 
@@ -26,6 +25,29 @@ MEAN_TARGET_KEY = 'mean_target_value'
 BIN_EDGE_PREDICTION_STDEV_KEY = 'bin_edge_prediction_stdev'
 
 PREDICTION_FILES_KEY = 'prediction_file_names'
+
+
+def memory_efficient_stdev(input_matrix):
+    """Memory-efficient calculation of standard deviation (along final axis).
+
+    S = ensemble size
+
+    :param input_matrix: numpy array, where the last axis has length S.
+    :return: stdev_matrix: numpy array of standard deviations, with the same
+        size as `input_array`, except the last axis is gone.
+    """
+
+    ensemble_size = input_matrix.shape[-1]
+    error_checking.assert_is_greater(ensemble_size, 1)
+
+    mean_matrix = numpy.mean(input_matrix, axis=-1)
+
+    variance_matrix = (input_matrix[..., 0] - mean_matrix) ** 2
+    for k in range(1, ensemble_size):
+        variance_matrix += (input_matrix[..., k] - mean_matrix) ** 2
+
+    variance_matrix /= (ensemble_size - 1)
+    return numpy.sqrt(variance_matrix)
 
 
 def read_inputs(prediction_file_names, target_field_names):
@@ -72,8 +94,12 @@ def read_inputs(prediction_file_names, target_field_names):
             these_dim = (
                 num_times, num_grid_rows, num_grid_columns, 1, ensemble_size
             )
-            prediction_matrix = numpy.full(these_dim, numpy.nan)
-            target_matrix = numpy.full(these_dim[:-1], numpy.nan)
+            prediction_matrix = numpy.full(
+                these_dim, numpy.nan, dtype=numpy.float32
+            )
+            target_matrix = numpy.full(
+                these_dim[:-1], numpy.nan, dtype=numpy.float32
+            )
 
         assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
 
@@ -237,7 +263,7 @@ def get_spread_vs_skill(
 
     # Do actual stuff.
     deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
-    prediction_stdev_matrix = numpy.std(prediction_matrix, axis=-1, ddof=1)
+    prediction_stdev_matrix = memory_efficient_stdev(prediction_matrix)
     squared_error_matrix = (deterministic_pred_matrix - target_matrix) ** 2
 
     rtx = result_table_xarray
