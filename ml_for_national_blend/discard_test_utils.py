@@ -130,7 +130,7 @@ def get_stdev_uncertainty_func_1field():
         :return: stdev_matrix: E-by-M-by-N numpy array of standard deviations.
         """
 
-        return numpy.std(prediction_matrix, axis=-1, ddof=1)
+        return ss_utils.memory_efficient_stdev(prediction_matrix)
 
     return uncertainty_function
 
