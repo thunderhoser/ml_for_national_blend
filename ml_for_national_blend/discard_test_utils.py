@@ -63,6 +63,16 @@ def _run_discard_test_1field(
     rtx = result_table_xarray
 
     uncertainty_matrix = uncertainty_function(prediction_matrix)
+
+    bad_indices_tuple = numpy.where(numpy.isnan(uncertainty_matrix))
+
+    import sys
+    numpy.set_printoptions(threshold=sys.maxsize)
+
+    print(numpy.unique(bad_indices_tuple[1]))
+    print(numpy.unique(bad_indices_tuple[2]))
+
+
     print(numpy.mean(numpy.isnan(uncertainty_matrix)))
     print(numpy.nanmin(uncertainty_matrix))
     print(numpy.nanmax(uncertainty_matrix))
@@ -75,6 +85,8 @@ def _run_discard_test_1field(
             uncertainty_matrix >
             numpy.percentile(uncertainty_matrix, this_percentile_level)
         )
+
+        numpy.sum(mask_out_matrix)
 
         if numpy.sum(mask_out_matrix) == 0:
             continue
