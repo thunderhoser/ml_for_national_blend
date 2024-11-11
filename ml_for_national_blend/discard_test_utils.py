@@ -63,6 +63,10 @@ def _run_discard_test_1field(
     rtx = result_table_xarray
 
     uncertainty_matrix = uncertainty_function(prediction_matrix)
+    print(numpy.mean(numpy.isnan(uncertainty_matrix)))
+    print(numpy.nanmin(uncertainty_matrix))
+    print(numpy.nanmax(uncertainty_matrix))
+
     deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
 
     for k in range(num_fractions):
