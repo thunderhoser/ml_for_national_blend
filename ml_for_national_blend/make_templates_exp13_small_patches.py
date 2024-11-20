@@ -123,44 +123,44 @@ OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.AdamW(gradient_accumulation_steps=
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
 DEFAULT_OPTION_DICT = {
-    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([216, 216, 4], dtype=int),
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([216, 216, 2, 22], dtype=int),
+    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([208, 208, 4], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([208, 208, 2, 22], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: numpy.array([216, 216, 2, 3], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: numpy.array([208, 208, 2, 3], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RCTBIAS_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RCTBIAS_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY: None,
-    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([216, 216, 5], dtype=int),
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: numpy.array([216, 216, 2, 1], dtype=int),
+    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([208, 208, 5], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: numpy.array([208, 208, 2, 1], dtype=int),
     # chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     # chiu_net_pp_arch.USE_CONVNEXT_BLOCKS_KEY: True,
-    chiu_net_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192, 256], dtype=int),
-    chiu_net_pp_arch.NWP_POOLING_SIZE_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_pp_arch.NWP_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    chiu_net_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192], dtype=int),
+    chiu_net_pp_arch.NWP_POOLING_SIZE_KEY: numpy.full(5, 2, dtype=int),
+    chiu_net_pp_arch.NWP_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(6, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_pp_arch.NWP_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
-    chiu_net_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
+    chiu_net_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(5, 2, dtype=int),
+    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(6, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
-    chiu_net_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
+    chiu_net_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(5, 2, dtype=int),
+    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(6, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([40, 60, 80, 120, 160, 240], dtype=int),
-    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([40, 60, 80, 120, 160], dtype=int),
+    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(5, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(5, 0.),
+    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(5, 0.),
     chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
     chiu_net_pp_arch.PENULTIMATE_DROPOUT_RATE_KEY: 0.,
     chiu_net_pp_arch.INNER_ACTIV_FUNCTION_KEY: architecture_utils.RELU_FUNCTION_STRING,
@@ -192,10 +192,10 @@ def _run():
 
     for i in range(len(USE_CONVNEXT_FLAGS)):
         input_dims_2pt5km = numpy.array(
-            [216, 216, NUM_NWP_LEAD_TIMES, 22], dtype=int
+            [208, 208, NUM_NWP_LEAD_TIMES, 22], dtype=int
         )
         input_dims_lagged_targets = numpy.array(
-            [216, 216, NUM_LAG_TIMES, 5], dtype=int
+            [208, 208, NUM_LAG_TIMES, 5], dtype=int
         )
 
         option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
