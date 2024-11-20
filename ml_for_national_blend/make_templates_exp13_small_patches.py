@@ -1,4 +1,4 @@
-"""Makes templates for Experiment 13 (residual and ConvNext blocks)."""
+"""Makes templates for Experiment 13 with small patches."""
 
 import os
 import sys
@@ -20,7 +20,7 @@ import file_system_utils
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/'
-    'experiment13_fancy_blocks/templates'
+    'experiment13_small_patches/templates'
 )
 
 CHANNEL_WEIGHTS = numpy.array([
@@ -123,17 +123,17 @@ OPTIMIZER_FUNCTION_STRING = 'keras.optimizers.AdamW(gradient_accumulation_steps=
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
 DEFAULT_OPTION_DICT = {
-    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([432, 432, 4], dtype=int),
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([432, 432, 2, 22], dtype=int),
+    chiu_net_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([216, 216, 4], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: numpy.array([216, 216, 2, 22], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: numpy.array([432, 432, 2, 3], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: numpy.array([216, 216, 2, 3], dtype=int),
     chiu_net_pp_arch.INPUT_DIMENSIONS_10KM_RCTBIAS_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_20KM_RCTBIAS_KEY: None,
     chiu_net_pp_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY: None,
-    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([432, 432, 5], dtype=int),
-    # chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: numpy.array([432, 432, 2, 1], dtype=int),
+    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([216, 216, 5], dtype=int),
+    # chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: numpy.array([216, 216, 2, 1], dtype=int),
     # chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     # chiu_net_pp_arch.USE_CONVNEXT_BLOCKS_KEY: True,
     chiu_net_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192, 256], dtype=int),
@@ -185,17 +185,17 @@ USE_CONVNEXT_FLAGS = numpy.array([0, 1], dtype=bool)
 
 
 def _run():
-    """Makes templates for Experiment 13 (residual and ConvNext blocks).
+    """Makes templates for Experiment 13 with small patches.
 
     This is effectively the main method.
     """
 
     for i in range(len(USE_CONVNEXT_FLAGS)):
         input_dims_2pt5km = numpy.array(
-            [432, 432, NUM_NWP_LEAD_TIMES, 22], dtype=int
+            [216, 216, NUM_NWP_LEAD_TIMES, 22], dtype=int
         )
         input_dims_lagged_targets = numpy.array(
-            [432, 432, NUM_LAG_TIMES, 5], dtype=int
+            [216, 216, NUM_LAG_TIMES, 5], dtype=int
         )
 
         option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
