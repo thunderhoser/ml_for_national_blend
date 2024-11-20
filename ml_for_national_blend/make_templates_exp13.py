@@ -205,7 +205,9 @@ def _run():
             chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
             chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: input_dims_2pt5km,
             chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: input_dims_lagged_targets,
-            chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: None
+            chiu_net_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: None,
+            chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: not USE_CONVNEXT_FLAGS[i],
+            chiu_net_pp_arch.USE_CONVNEXT_BLOCKS_KEY: USE_CONVNEXT_FLAGS[i]
         })
         model_object = chiu_net_pp_arch.create_model(option_dict)
 
