@@ -1616,8 +1616,10 @@ def create_data_fast_patches(
         [init_time_unix_sec], dtype=int
     )
 
-    # Check input args.
+    # Check input arguments.
     option_dict = _check_generator_args(option_dict)
+
+    # Read input arguments.
     first_init_times_unix_sec = option_dict[FIRST_INIT_TIMES_KEY]
     last_init_times_unix_sec = option_dict[LAST_INIT_TIMES_KEY]
     nwp_lead_times_hours = option_dict[NWP_LEAD_TIMES_KEY]
@@ -1664,6 +1666,7 @@ def create_data_fast_patches(
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
+    # Read normalization parameters.
     print('Reading normalization params from: "{0:s}"...'.format(
         nwp_normalization_file_name
     ))
@@ -1678,6 +1681,7 @@ def create_data_fast_patches(
         target_normalization_file_name
     )
 
+    # Ensure that forecast-initialization time makes sense.
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
         last_time_by_period_unix_sec=last_init_times_unix_sec,
@@ -1695,7 +1699,7 @@ def create_data_fast_patches(
     error_checking.assert_equals(len(init_times_unix_sec), 1)
     init_time_unix_sec = init_times_unix_sec[0]
 
-    # Do actual stuff.
+    # Read time-invariant fields (land/sea mask, orographic height, etc.).
     if nbm_constant_file_name is None:
         full_nbm_constant_matrix = None
     else:
@@ -1716,6 +1720,7 @@ def create_data_fast_patches(
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
 
+    # Read target fields (correct answers from URMA).
     if target_lag_times_hours is None:
         num_target_lag_times = 0
     else:
@@ -1747,6 +1752,10 @@ def create_data_fast_patches(
     if full_target_matrix is None:
         return None
 
+    # Read lagged-truth fields to use as predictors.
+    # TODO(thunderhoser): Currently, lagged-truth fields come from URMA.  In the
+    # future, lagged-truth fields will come from RTMA, since the RTMA is
+    # available in real time and URMA is not.
     if num_target_lag_times > 0:
         try:
             these_matrices = [
@@ -1788,6 +1797,13 @@ def create_data_fast_patches(
     ):
         return None
 
+    # Read residual baseline.  The "residual baseline" is the neural network's
+    # default prediction.  In other words, the NN's task is to predict the
+    # departure -- for every target field at the given lead time -- between the
+    # residual baseline and the URMA truth field.  The residual baseline is
+    # added to the NN's departure prediction, yielding a "full" prediction for
+    # every target field.  This is done inside the NN architecture, so you don't
+    # need to worry about it.
     if do_residual_prediction:
         try:
             full_baseline_matrix = nwp_input.read_residual_baseline_one_example(
@@ -1819,6 +1835,7 @@ def create_data_fast_patches(
     if do_residual_prediction and full_baseline_matrix is None:
         return None
 
+    # Read NWP forecasts.  These are used as predictors.
     try:
         (
             full_predictor_matrix_2pt5km,
@@ -1858,6 +1875,7 @@ def create_data_fast_patches(
     if require_all_predictors and not found_all_predictors:
         return None
 
+    # Read recent biases in NWP forecasts.  These are used as predictors.
     if use_recent_biases:
         try:
             (
@@ -1905,10 +1923,14 @@ def create_data_fast_patches(
         full_recent_bias_matrix_20km = None
         full_recent_bias_matrix_40km = None
 
+    # Initialize patch-metalocation dictionary.  This is explained more in
+    # outside documentation.
     patch_metalocation_dict = __init_patch_metalocation_dict(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
     )
+
+    # Determine number of patches in the full NBM grid.
     pmld = patch_metalocation_dict
     num_patches = 0
 
@@ -1919,6 +1941,8 @@ def create_data_fast_patches(
 
         num_patches += 1
 
+    # Create binary mask for model evaluation.  This is explained more in
+    # outside documentation.
     mask_matrix_for_loss = __patch_buffer_to_mask(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
         patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
@@ -1930,6 +1954,7 @@ def create_data_fast_patches(
     )
     mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
 
+    # Initialize output arrays.
     dummy_patch_location_dict = misc_utils.determine_patch_locations(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
     )
@@ -1975,6 +2000,10 @@ def create_data_fast_patches(
     latitude_matrix_deg_n = numpy.full(target_matrix.shape[:-1], numpy.nan)
     longitude_matrix_deg_e = numpy.full(target_matrix.shape[:-1], numpy.nan)
 
+    # Populate output arrays.  This involves extracting data from "full" arrays
+    # (containing the full NBM grid) and putting the same data into "patch"
+    # arrays, where the patch size in the latter arrays is the same patch size
+    # used in training.
     patch_metalocation_dict = __init_patch_metalocation_dict(
         patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
