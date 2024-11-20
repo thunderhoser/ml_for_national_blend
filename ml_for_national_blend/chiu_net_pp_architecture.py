@@ -723,6 +723,7 @@ def _get_3d_conv_block(
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
             dropout_rates=dropout_rates,
+            do_activation=activation_function_name is not None,
             basic_layer_name=basic_layer_name
         )
 
