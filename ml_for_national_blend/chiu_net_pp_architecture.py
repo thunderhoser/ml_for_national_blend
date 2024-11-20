@@ -243,7 +243,7 @@ def __get_2d_convnext_block(
                 dropout_fraction=dropout_rates[i], layer_name=this_name
             )(current_layer_object)
 
-        this_name = '{0:s}_lyrnorm'.format(basic_layer_name, i)
+        this_name = '{0:s}_lyrscale'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
             INIT_VALUE_FOR_LAYER_SCALE, num_filters, name=this_name
         )(current_layer_object)
@@ -396,7 +396,7 @@ def __get_3d_convnext_block(
                 dropout_fraction=dropout_rates[i], layer_name=this_name
             )(current_layer_object)
 
-        this_name = '{0:s}_lyrnorm'.format(basic_layer_name, i)
+        this_name = '{0:s}_lyrscale'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
             INIT_VALUE_FOR_LAYER_SCALE, num_filters, name=this_name
         )(current_layer_object)
