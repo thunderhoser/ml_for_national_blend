@@ -6,6 +6,7 @@ The Chiu-net++ is a hybrid between the Chiu net
 
 import numpy
 import keras
+import tensorflow.keras as tf_keras
 from ml_for_national_blend.outside_code import architecture_utils
 from ml_for_national_blend.machine_learning import \
     chiu_net_architecture as chiu_net_arch
@@ -101,6 +102,46 @@ PREDICT_DEWPOINT_DEPRESSION_KEY = chiu_net_arch.PREDICT_DEWPOINT_DEPRESSION_KEY
 LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 METRIC_FUNCTIONS_KEY = chiu_net_arch.METRIC_FUNCTIONS_KEY
+
+
+@tf_keras.saving.register_keras_serializable()
+class LayerScale(keras.layers.Layer):
+    """Layer scale module.
+    References:
+    - https://arxiv.org/abs/2103.17239
+    Args:
+        init_values (float): Initial value for layer scale. Should be within
+            [0, 1].
+        projection_dim (int): Projection dimensionality. (Number of channels)
+    Returns:
+        Tensor multiplied to the scale.
+    """
+
+    def __init__(self, init_values, projection_dim, **kwargs):
+        super().__init__(**kwargs)
+        self.init_values = init_values
+        self.projection_dim = projection_dim
+
+    def build(self, _):
+        self.gamma = self.add_weight(
+            shape=(self.projection_dim,),
+            initializer=tf_keras.initializers.Constant(self.init_values),
+            trainable=True,
+            name="gamma",
+        )
+
+    def call(self, x):
+        return x * self.gamma
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "init_values": self.init_values,
+                "projection_dim": self.projection_dim,
+            }
+        )
+        return config
 
 
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
@@ -325,6 +366,161 @@ def _get_2d_conv_block(
                 synchronized=batch_norm_synch_flag,
                 layer_name=this_name
             )(current_layer_object)
+
+    return current_layer_object
+
+
+def _get_2d_convnext_block(
+        input_layer_object,
+        num_conv_layers, filter_size_px, num_filters, do_time_distributed_conv,
+        regularizer_object,
+        dropout_rates, use_batch_norm, batch_norm_momentum,
+        batch_norm_synch_flag, basic_layer_name):
+    """Creates ConvNext block for data with 2 spatial dimensions.
+
+    L = number of conv layers
+
+    :param input_layer_object: Input layer to block.
+    :param num_conv_layers: Number of conv layers in block.
+    :param filter_size_px: Filter size for conv layers.  The same filter size
+        will be used in both dimensions, and the same filter size will be used
+        for every conv layer.
+    :param num_filters: Number of filters -- same for every conv layer.
+    :param do_time_distributed_conv: Boolean flag.  If True (False), will do
+        time-distributed (basic) convolution.
+    :param regularizer_object: Regularizer for conv layers (instance of
+        `keras.regularizers.l1_l2` or similar).
+    :param dropout_rates: Dropout rates for conv layers.  This can be a scalar
+        (applied to every conv layer) or length-L numpy array.
+    :param use_batch_norm: Boolean flag.  If True, will use batch normalization.
+    :param batch_norm_momentum: Momentum for batch-normalization layers.  For
+        more details, see documentation for `keras.layers.BatchNormalization`.
+    :param batch_norm_synch_flag: Boolean flag for batch-normalization layers.
+        For more details, see documentation for
+        `keras.layers.BatchNormalization`.
+    :param basic_layer_name: Basic layer name.  Each layer name will be made
+        unique by adding a suffix.
+    :return: output_layer_object: Output layer from block.
+    """
+
+    # TODO(thunderhoser): Should I allow for batch norm?
+
+    # Process input args.
+    num_conv_layers = max([num_conv_layers, 2])
+
+    try:
+        _ = len(dropout_rates)
+    except:
+        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
+
+    if len(dropout_rates) < num_conv_layers:
+        dropout_rates = numpy.concatenate([
+            dropout_rates, dropout_rates[[-1]]
+        ])
+
+    assert len(dropout_rates) == num_conv_layers
+
+    # Do actual stuff.
+    current_layer_object = None
+
+    for i in range(num_conv_layers):
+        if i == 0:
+            this_input_layer_object = input_layer_object
+        else:
+            this_input_layer_object = current_layer_object
+
+        this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_2d_depthwise_conv_layer(
+            num_kernel_rows=filter_size_px,
+            num_kernel_columns=filter_size_px,
+            num_rows_per_stride=1,
+            num_columns_per_stride=1,
+            num_filters=num_filters,
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
+        )
+
+        if do_time_distributed_conv:
+            current_layer_object = keras.layers.TimeDistributed(
+                current_layer_object, name=this_name
+            )(this_input_layer_object)
+        else:
+            current_layer_object = current_layer_object(this_input_layer_object)
+
+        this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
+        current_layer_object = keras.layers.LayerNormalization(
+            epsilon=EPSILON, name=this_name
+        )(
+            current_layer_object
+        )
+
+        this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_dense_layer(
+            num_output_units=EXPANSION_FACTOR * num_filters,
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
+        )(current_layer_object)
+
+        this_name = '{0:s}_gelu'.format(basic_layer_name, i)
+        current_layer_object = keras.layers.Activation('gelu', name=this_name)(
+            current_layer_object
+        )
+
+        if dropout_rates[i] > 0:
+            this_name = '{0:s}_dropout{1:d}a'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_dropout_layer(
+                dropout_fraction=dropout_rates[i], layer_name=this_name
+            )(current_layer_object)
+
+        this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_dense_layer(
+            num_output_units=num_filters,
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
+        )(current_layer_object)
+
+        # TODO(thunderhoser): I don't know if a dropout should be here.
+        if dropout_rates[i] > 0:
+            this_name = '{0:s}_dropout{1:d}b'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_dropout_layer(
+                dropout_fraction=dropout_rates[i], layer_name=this_name
+            )(current_layer_object)
+
+        this_name = '{0:s}_lyrnorm'.format(basic_layer_name, i)
+        current_layer_object = LayerScale(
+            LAYER_SCALE_INIT_VALUE, num_filters, name=this_name
+        )(current_layer_object)
+
+        if i != num_conv_layers - 1:
+            continue
+
+        if input_layer_object.shape[-1] == num_filters:
+            new_layer_object = input_layer_object
+        else:
+            this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
+            new_layer_object = architecture_utils.get_2d_conv_layer(
+                num_kernel_rows=filter_size_px,
+                num_kernel_columns=filter_size_px,
+                num_rows_per_stride=1,
+                num_columns_per_stride=1,
+                num_filters=num_filters,
+                padding_type_string=architecture_utils.YES_PADDING_STRING,
+                weight_regularizer=regularizer_object,
+                layer_name=this_name
+            )
+
+            if do_time_distributed_conv:
+                new_layer_object = keras.layers.TimeDistributed(
+                    new_layer_object, name=this_name
+                )(input_layer_object)
+            else:
+                new_layer_object = new_layer_object(input_layer_object)
+
+        this_name = '{0:s}_residual'.format(basic_layer_name)
+        current_layer_object = keras.layers.Add(name=this_name)([
+            current_layer_object, new_layer_object
+        ])
 
     return current_layer_object
 
