@@ -219,7 +219,7 @@ def __get_2d_convnext_block(
         )(current_layer_object)
 
         if do_activation:
-            this_name = '{0:s}_gelu'.format(basic_layer_name, i)
+            this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
             current_layer_object = keras.layers.Activation(
                 'gelu', name=this_name
             )(current_layer_object)
@@ -372,7 +372,7 @@ def __get_3d_convnext_block(
         )(current_layer_object)
 
         if do_activation:
-            this_name = '{0:s}_gelu'.format(basic_layer_name, i)
+            this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
             current_layer_object = keras.layers.Activation(
                 'gelu', name=this_name
             )(current_layer_object)
