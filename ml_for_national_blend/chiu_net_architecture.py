@@ -31,7 +31,6 @@ INPUT_DIMENSIONS_40KM_RCTBIAS_KEY = 'input_dimensions_40km_rctbias'
 PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
 INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = 'input_dimensions_lagged_targets'
 USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
-USE_CONVNEXT_BLOCKS_KEY = 'use_convnext_blocks'
 
 NWP_ENCODER_NUM_CHANNELS_KEY = 'nwp_encoder_num_channels_by_level'
 NWP_POOLING_SIZE_KEY = 'nwp_pooling_size_by_level_px'
@@ -133,9 +132,6 @@ def check_input_args(option_dict):
     option_dict["input_dimensions_lagged_targets"]: Same but for lagged targets.
     option_dict["use_residual_blocks"]: Boolean flag.  If True, the NN will use
         residual blocks.
-    option_dict["use_convnext_blocks"]: Boolean flag.  If True, the NN will use
-        ConvNext blocks.  If both "use_residual_blocks" and
-        "use_convnext_blocks" are False, the NN will use basic conv blocks.
     option_dict["nwp_encoder_num_channels_by_level"]: length-(L + 1) numpy array
         with number of channels (feature maps) at each level of NWP-encoder.
     option_dict["lagtgt_encoder_num_channels_by_level"]: Same but for lagged
@@ -261,11 +257,6 @@ def check_input_args(option_dict):
         )
 
     error_checking.assert_is_boolean(option_dict[USE_RESIDUAL_BLOCKS_KEY])
-    error_checking.assert_is_boolean(option_dict[USE_CONVNEXT_BLOCKS_KEY])
-    assert not (
-        option_dict[USE_RESIDUAL_BLOCKS_KEY] and
-        option_dict[USE_CONVNEXT_BLOCKS_KEY]
-    )
 
     if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
         expected_dim = numpy.array([
@@ -681,11 +672,9 @@ def create_model(option_dict):
     )
     input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
     use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
-    use_convnext_blocks = option_dict[USE_CONVNEXT_BLOCKS_KEY]
 
     assert input_dimensions_predn_baseline is None
     assert not use_residual_blocks
-    assert not use_convnext_blocks
 
     use_recent_biases = input_dimensions_2pt5km_rctbias is not None
     assert not use_recent_biases
