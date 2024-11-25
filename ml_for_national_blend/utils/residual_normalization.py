@@ -1,5 +1,6 @@
 """Helper methods for residual normalization."""
 
+import os
 import numpy
 import xarray
 from ml_for_national_blend.outside_code import error_checking
@@ -182,11 +183,49 @@ def get_intermediate_norm_params_for_nwp(
         non_resid_normalization_file_name
     )
 
+    already_used_file_names = []
+
     for i in range(len(interp_nwp_file_names)):
-        print('Reading data from: "{0:s}"...'.format(interp_nwp_file_names[i]))
-        nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
+        if interp_nwp_file_names[i] in already_used_file_names:
+            continue
+
+        this_model_name = interp_nwp_model_io.file_name_to_model_name(
             interp_nwp_file_names[i]
         )
+        this_init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
+            interp_nwp_file_names[i]
+        )
+        these_forecast_hours = nwp_model_utils.model_to_forecast_hours(
+            model_name=this_model_name,
+            init_time_unix_sec=this_init_time_unix_sec
+        )
+        this_directory_name = '/'.join(interp_nwp_file_names[i].split('/')[:-2])
+
+        these_file_names = [
+            interp_nwp_model_io.find_file(
+                directory_name=this_directory_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                forecast_hour=f,
+                model_name=this_model_name,
+                raise_error_if_missing=False
+            )
+            for f in these_forecast_hours
+        ]
+        these_file_names = [fn for fn in these_file_names if os.path.isfile(fn)]
+        already_used_file_names += these_file_names
+
+        nwp_forecast_tables_xarray = []
+        for this_file_name in these_file_names:
+            print('Reading data from: "{0:s}"...'.format(this_file_name))
+            nwp_forecast_tables_xarray.append(
+                interp_nwp_model_io.read_file(this_file_name)
+            )
+
+        nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
+            nwp_forecast_tables_xarray
+        )
+        del nwp_forecast_tables_xarray
+
         nwp_forecast_table_xarray = non_resid_normalization.normalize_nwp_data(
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
             norm_param_table_xarray=non_resid_norm_param_table_xarray,
@@ -203,6 +242,12 @@ def get_intermediate_norm_params_for_nwp(
         nwp_forecast_hour_diffs = numpy.concatenate([
             nwp_forecast_hour_diffs[[0]], nwp_forecast_hour_diffs
         ])
+        nwp_forecast_hour_diffs = numpy.expand_dims(
+            nwp_forecast_hour_diffs, axis=-1
+        )
+        nwp_forecast_hour_diffs = numpy.expand_dims(
+            nwp_forecast_hour_diffs, axis=-1
+        )
 
         for j in range(len(nwp_field_names)):
             f = nwp_field_names[j]
@@ -245,7 +290,7 @@ def get_intermediate_norm_params_for_nwp(
                     )
 
                 this_hourly_diff_matrix = (
-                    this_diff_matrix / nwp_forecast_hour_diffs[k]
+                    this_diff_matrix / numpy.squeeze(nwp_forecast_hour_diffs[k])
                 )
 
                 norm_param_dict_dict[f, h] = _update_norm_params_1var_1file(
@@ -395,17 +440,54 @@ def get_normalization_params_for_nwp(
         non_resid_normalization_file_name
     )
 
+    already_used_file_names = []
+
     for i in range(len(interp_nwp_file_names)):
-        print('Reading data from: "{0:s}"...'.format(interp_nwp_file_names[i]))
-        nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
+        if interp_nwp_file_names[i] in already_used_file_names:
+            continue
+
+        this_model_name = interp_nwp_model_io.file_name_to_model_name(
             interp_nwp_file_names[i]
         )
+        this_init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
+            interp_nwp_file_names[i]
+        )
+        these_forecast_hours = nwp_model_utils.model_to_forecast_hours(
+            model_name=this_model_name,
+            init_time_unix_sec=this_init_time_unix_sec
+        )
+        this_directory_name = '/'.join(interp_nwp_file_names[i].split('/')[:-2])
+
+        these_file_names = [
+            interp_nwp_model_io.find_file(
+                directory_name=this_directory_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                forecast_hour=f,
+                model_name=this_model_name,
+                raise_error_if_missing=False
+            )
+            for f in these_forecast_hours
+        ]
+        these_file_names = [fn for fn in these_file_names if os.path.isfile(fn)]
+        already_used_file_names += these_file_names
+
+        nwp_forecast_tables_xarray = []
+        for this_file_name in these_file_names:
+            print('Reading data from: "{0:s}"...'.format(this_file_name))
+            nwp_forecast_tables_xarray.append(
+                interp_nwp_model_io.read_file(this_file_name)
+            )
+
+        nwp_forecast_table_xarray = nwp_model_utils.concat_over_forecast_hours(
+            nwp_forecast_tables_xarray
+        )
+        del nwp_forecast_tables_xarray
+
         nwp_forecast_table_xarray = non_resid_normalization.normalize_nwp_data(
             nwp_forecast_table_xarray=nwp_forecast_table_xarray,
             norm_param_table_xarray=non_resid_norm_param_table_xarray,
             use_quantile_norm=True
         )
-
         nwpft = nwp_forecast_table_xarray
         nwp_field_names = nwpft.coords[nwp_model_utils.FIELD_DIM].values
         nwp_forecast_hours = numpy.round(
@@ -416,6 +498,13 @@ def get_normalization_params_for_nwp(
         nwp_forecast_hour_diffs = numpy.concatenate([
             nwp_forecast_hour_diffs[[0]], nwp_forecast_hour_diffs
         ])
+        nwp_forecast_hour_diffs = numpy.expand_dims(
+            nwp_forecast_hour_diffs, axis=-1
+        )
+        nwp_forecast_hour_diffs = numpy.expand_dims(
+            nwp_forecast_hour_diffs, axis=-1
+        )
+        nwp_forecast_hour_diffs[nwp_forecast_hour_diffs > 12] = numpy.nan
 
         for j in range(len(nwp_field_names)):
             f = nwp_field_names[j]
@@ -458,7 +547,7 @@ def get_normalization_params_for_nwp(
                     )
 
                 this_hourly_diff_matrix = (
-                    this_diff_matrix / nwp_forecast_hour_diffs[k]
+                    this_diff_matrix / numpy.squeeze(nwp_forecast_hour_diffs[k])
                 )
 
                 norm_param_dict_dict[f, h] = _update_norm_params_1var_1file(
@@ -719,6 +808,8 @@ def get_normalization_params_for_targets(urma_file_names,
         valid_hour_diffs = numpy.concatenate([
             valid_hour_diffs[[0]], valid_hour_diffs
         ])
+        valid_hour_diffs = numpy.expand_dims(valid_hour_diffs, axis=-1)
+        valid_hour_diffs = numpy.expand_dims(valid_hour_diffs, axis=-1)
 
         for j in range(len(tutx.coords[urma_utils.FIELD_DIM].values)):
             f = tutx.coords[urma_utils.FIELD_DIM].values[j]
