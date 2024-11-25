@@ -643,7 +643,6 @@ def __get_3d_convnext2_block(
     current_layer_object = None
     num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
-    print(input_layer_object)
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -2313,6 +2312,10 @@ def create_model(option_dict):
         nwp_fcst_module_layer_objects[i] = keras.layers.Permute(
             dims=(2, 3, 1, 4), name=this_name
         )(nwp_encoder_conv_layer_objects[i])
+
+        print(nwp_encoder_conv_layer_objects[i])
+        print(nwp_fcst_module_layer_objects[i])
+        print('\n\n\n')
 
         if nwp_forecast_module_use_3d_conv:
             for j in range(nwp_forecast_module_num_conv_blocks):
