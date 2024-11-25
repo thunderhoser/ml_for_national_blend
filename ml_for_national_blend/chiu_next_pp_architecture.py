@@ -1398,9 +1398,8 @@ def _get_3d_conv_block(
             continue
 
         if do_convnext_v2:
-            current_layer_object = __get_3d_convnext2_block(
+            current_layer_object = __get_2d_convnext2_block(
                 input_layer_object=current_layer_object,
-                num_time_steps=num_time_steps,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
                 regularizer_object=regularizer_object,
@@ -1409,9 +1408,8 @@ def _get_3d_conv_block(
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
             )
         else:
-            current_layer_object = __get_3d_convnext_block(
+            current_layer_object = __get_2d_convnext_block(
                 input_layer_object=current_layer_object,
-                num_time_steps=num_time_steps,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
                 regularizer_object=regularizer_object,
