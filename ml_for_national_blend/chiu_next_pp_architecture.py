@@ -496,11 +496,12 @@ def __get_2d_convnext2_block(
 
 
 def __get_3d_convnext_block(
-        input_layer_object, num_conv_layers, filter_size_px,
+        input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
         regularizer_object, do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `_get_3d_conv_block`.
+    :param num_time_steps: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -511,7 +512,6 @@ def __get_3d_convnext_block(
     """
 
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
@@ -626,11 +626,12 @@ def __get_3d_convnext_block(
 
 
 def __get_3d_convnext2_block(
-        input_layer_object, num_conv_layers, filter_size_px,
+        input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
         regularizer_object, do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext-2 block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `__get_3d_convnext_block`.
+    :param num_time_steps: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -641,7 +642,6 @@ def __get_3d_convnext2_block(
     """
 
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
@@ -1347,12 +1347,13 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, do_convnext_v2, num_conv_layers,
+        input_layer_object, num_time_steps, do_convnext_v2, num_conv_layers,
         filter_size_px, regularizer_object, do_activation,
         dropout_rate, basic_layer_name):
     """Creates conv block for data with 2 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
+    :param num_time_steps: Number of time steps expected in input.
     :param do_convnext_v2: See documentation for `_get_2d_conv_block`.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
@@ -1366,6 +1367,7 @@ def _get_3d_conv_block(
     if do_convnext_v2:
         current_layer_object = __get_3d_convnext2_block(
             input_layer_object=input_layer_object,
+            num_time_steps=num_time_steps,
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
@@ -1379,6 +1381,7 @@ def _get_3d_conv_block(
     else:
         current_layer_object = __get_3d_convnext_block(
             input_layer_object=input_layer_object,
+            num_time_steps=num_time_steps,
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
@@ -1397,6 +1400,7 @@ def _get_3d_conv_block(
         if do_convnext_v2:
             current_layer_object = __get_3d_convnext2_block(
                 input_layer_object=current_layer_object,
+                num_time_steps=num_time_steps,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
                 regularizer_object=regularizer_object,
@@ -1407,6 +1411,7 @@ def _get_3d_conv_block(
         else:
             current_layer_object = __get_3d_convnext_block(
                 input_layer_object=current_layer_object,
+                num_time_steps=num_time_steps,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
                 regularizer_object=regularizer_object,
@@ -2313,15 +2318,12 @@ def create_model(option_dict):
             dims=(2, 3, 1, 4), name=this_name
         )(nwp_encoder_conv_layer_objects[i])
 
-        print(nwp_encoder_conv_layer_objects[i])
-        print(nwp_fcst_module_layer_objects[i])
-        print('\n\n\n')
-
         if nwp_forecast_module_use_3d_conv:
             for j in range(nwp_forecast_module_num_conv_blocks):
                 if j == 0:
                     nwp_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=nwp_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_2pt5km_res[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
@@ -2382,6 +2384,7 @@ def create_model(option_dict):
                 if j == 0:
                     rctbias_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=rctbias_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_2pt5km_rctbias[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
@@ -2484,6 +2487,7 @@ def create_model(option_dict):
                 if j == 0:
                     lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_lagged_targets[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
