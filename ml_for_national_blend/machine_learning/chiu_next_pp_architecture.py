@@ -38,7 +38,7 @@ NWP_ENCODER_NUM_CHANNELS_KEY = chiu_net_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY
 NWP_POOLING_SIZE_KEY = chiu_net_pp_arch.NWP_POOLING_SIZE_KEY
 NWP_ENCODER_NUM_CONV_BLOCKS_KEY = 'nwp_encoder_num_conv_blocks_by_level'
 NWP_ENCODER_DROPOUT_RATES_KEY = chiu_net_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY
-NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY = 'nwp_forecast_module_num_conv_blocks'
+NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY = 'nwp_forecast_num_conv_blocks_by_level'
 NWP_FC_MODULE_DROPOUT_RATES_KEY = 'nwp_forecast_module_drop_rate_by_level'
 NWP_FC_MODULE_USE_3D_CONV = chiu_net_pp_arch.NWP_FC_MODULE_USE_3D_CONV
 
@@ -50,7 +50,9 @@ LAGTGT_ENCODER_NUM_CONV_BLOCKS_KEY = 'lagtgt_encoder_num_conv_blocks_by_level'
 LAGTGT_ENCODER_DROPOUT_RATES_KEY = (
     chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY
 )
-LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY = 'lagtgt_forecast_module_num_conv_blocks'
+LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY = (
+    'lagtgt_forecast_num_conv_blocks_by_level'
+)
 LAGTGT_FC_MODULE_DROPOUT_RATES_KEY = 'lagtgt_forecast_module_drop_rate_by_level'
 LAGTGT_FC_MODULE_USE_3D_CONV = chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV
 
@@ -63,7 +65,7 @@ RCTBIAS_ENCODER_DROPOUT_RATES_KEY = (
     chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY
 )
 RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY = (
-    'rctbias_forecast_module_num_conv_blocks'
+    'rctbias_forecast_num_conv_blocks_by_level'
 )
 RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY = (
     'rctbias_forecast_module_drop_rate_by_level'
@@ -438,7 +440,7 @@ def __get_2d_convnext2_block(
         this_name = '{0:s}_grn{1:d}'.format(basic_layer_name, i)
         current_layer_object = GRN(
             init_values=INIT_VALUE_FOR_LAYER_SCALE,
-            projection_dim=num_filters,
+            projection_dim=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             name=this_name
         )(current_layer_object)
 
@@ -489,11 +491,12 @@ def __get_2d_convnext2_block(
 
 
 def __get_3d_convnext_block(
-        input_layer_object, num_conv_layers, filter_size_px,
+        input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
         regularizer_object, do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `_get_3d_conv_block`.
+    :param num_time_steps: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -504,7 +507,6 @@ def __get_3d_convnext_block(
     """
 
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
@@ -619,11 +621,12 @@ def __get_3d_convnext_block(
 
 
 def __get_3d_convnext2_block(
-        input_layer_object, num_conv_layers, filter_size_px,
+        input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
         regularizer_object, do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext-2 block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `__get_3d_convnext_block`.
+    :param num_time_steps: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -634,7 +637,6 @@ def __get_3d_convnext2_block(
     """
 
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
@@ -700,7 +702,7 @@ def __get_3d_convnext2_block(
         this_name = '{0:s}_grn{1:d}'.format(basic_layer_name, i)
         current_layer_object = GRN(
             init_values=INIT_VALUE_FOR_LAYER_SCALE,
-            projection_dim=num_filters,
+            projection_dim=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             name=this_name
         )(current_layer_object)
 
@@ -804,12 +806,14 @@ def _check_input_args(option_dict):
         targets.  If you do not want to use lagged targets, make this None.
     option_dict["rctbias_encoder_drop_rate_by_level"]: Same but for recent
         NWP biases.  If you do not want to use recent biases, make this None.
-    option_dict["nwp_forecast_module_num_conv_blocks"]: Number of conv blocks in
-        forecasting module at end of NWP-encoder.
-    option_dict["lagtgt_forecast_module_num_conv_blocks"]: Same but for lagged
+    option_dict["nwp_forecast_num_conv_blocks_by_level"]: length-(L + 1) numpy
+        array with number of conv blocks, by level, in forecasting module after
+        NWP-encoder.
+    option_dict["lagtgt_forecast_num_conv_blocks_by_level"]: Same but for lagged
         targets.  If you do not want to use lagged targets, make this None.
-    option_dict["rctbias_forecast_module_num_conv_blocks"]: Same but for recent
-        NWP biases.  If you do not want to use recent biases, make this None.
+    option_dict["rctbias_forecast_num_conv_blocks_by_level"]: Same but for
+        recent NWP biases.  If you do not want to use recent biases, make this
+        None.
     option_dict["nwp_forecast_module_drop_rate_by_level"]: length-(L + 1) numpy
         array with dropout rate in NWP-forecasting module for each level.  Use
         numbers <= 0 to indicate no-dropout.
@@ -1038,11 +1042,19 @@ def _check_input_args(option_dict):
         option_dict[NWP_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
     )
 
-    nwp_fc_module_num_conv_blocks = option_dict[
+    nwp_forecast_num_conv_blocks_by_level = option_dict[
         NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY
     ]
-    error_checking.assert_is_integer(nwp_fc_module_num_conv_blocks)
-    error_checking.assert_is_greater(nwp_fc_module_num_conv_blocks, 0)
+    error_checking.assert_is_numpy_array(
+        nwp_forecast_num_conv_blocks_by_level,
+        exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+    )
+    error_checking.assert_is_integer_numpy_array(
+        nwp_forecast_num_conv_blocks_by_level
+    )
+    error_checking.assert_is_greater_numpy_array(
+        nwp_forecast_num_conv_blocks_by_level, 0
+    )
 
     nwp_fc_module_drop_rate_by_level = option_dict[
         NWP_FC_MODULE_DROPOUT_RATES_KEY
@@ -1099,11 +1111,19 @@ def _check_input_args(option_dict):
             option_dict[LAGTGT_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
         )
 
-        lagtgt_fc_module_num_conv_blocks = option_dict[
+        lagtgt_forecast_num_conv_blocks_by_level = option_dict[
             LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY
         ]
-        error_checking.assert_is_integer(lagtgt_fc_module_num_conv_blocks)
-        error_checking.assert_is_greater(lagtgt_fc_module_num_conv_blocks, 0)
+        error_checking.assert_is_numpy_array(
+            lagtgt_forecast_num_conv_blocks_by_level,
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            lagtgt_forecast_num_conv_blocks_by_level
+        )
+        error_checking.assert_is_greater_numpy_array(
+            lagtgt_forecast_num_conv_blocks_by_level, 0
+        )
 
         lagtgt_fc_module_drop_rate_by_level = option_dict[
             LAGTGT_FC_MODULE_DROPOUT_RATES_KEY
@@ -1166,11 +1186,19 @@ def _check_input_args(option_dict):
             option_dict[RCTBIAS_ENCODER_DROPOUT_RATES_KEY], 1., allow_nan=True
         )
 
-        rctbias_fc_module_num_conv_blocks = option_dict[
+        rctbias_forecast_num_conv_blocks_by_level = option_dict[
             RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY
         ]
-        error_checking.assert_is_integer(rctbias_fc_module_num_conv_blocks)
-        error_checking.assert_is_greater(rctbias_fc_module_num_conv_blocks, 0)
+        error_checking.assert_is_numpy_array(
+            rctbias_forecast_num_conv_blocks_by_level,
+            exact_dimensions=numpy.array([num_levels + 1], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            rctbias_forecast_num_conv_blocks_by_level
+        )
+        error_checking.assert_is_greater_numpy_array(
+            rctbias_forecast_num_conv_blocks_by_level, 0
+        )
 
         rctbias_fc_module_drop_rate_by_level = option_dict[
             RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY
@@ -1340,12 +1368,13 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, do_convnext_v2, num_conv_layers,
+        input_layer_object, num_time_steps, do_convnext_v2, num_conv_layers,
         filter_size_px, regularizer_object, do_activation,
         dropout_rate, basic_layer_name):
     """Creates conv block for data with 2 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
+    :param num_time_steps: Number of time steps expected in input.
     :param do_convnext_v2: See documentation for `_get_2d_conv_block`.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
@@ -1359,6 +1388,7 @@ def _get_3d_conv_block(
     if do_convnext_v2:
         current_layer_object = __get_3d_convnext2_block(
             input_layer_object=input_layer_object,
+            num_time_steps=num_time_steps,
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
@@ -1372,6 +1402,7 @@ def _get_3d_conv_block(
     else:
         current_layer_object = __get_3d_convnext_block(
             input_layer_object=input_layer_object,
+            num_time_steps=num_time_steps,
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
@@ -1388,20 +1419,24 @@ def _get_3d_conv_block(
             continue
 
         if do_convnext_v2:
-            current_layer_object = __get_3d_convnext2_block(
+            current_layer_object = __get_2d_convnext2_block(
                 input_layer_object=current_layer_object,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
+                num_filters=current_layer_object.shape[-1],
+                do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
             )
         else:
-            current_layer_object = __get_3d_convnext_block(
+            current_layer_object = __get_2d_convnext_block(
                 input_layer_object=current_layer_object,
                 num_conv_layers=1,
                 filter_size_px=filter_size_px,
+                num_filters=current_layer_object.shape[-1],
+                do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
@@ -1447,7 +1482,7 @@ def create_model(option_dict):
     nwp_pooling_size_by_level_px = optd[NWP_POOLING_SIZE_KEY]
     nwp_encoder_num_conv_blocks_by_level = optd[NWP_ENCODER_NUM_CONV_BLOCKS_KEY]
     nwp_encoder_drop_rate_by_level = optd[NWP_ENCODER_DROPOUT_RATES_KEY]
-    nwp_forecast_module_num_conv_blocks = optd[
+    nwp_forecast_num_conv_blocks_by_level = optd[
         NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY
     ]
     nwp_forecast_module_drop_rate_by_level = optd[
@@ -1463,7 +1498,7 @@ def create_model(option_dict):
     lagtgt_encoder_drop_rate_by_level = optd[
         LAGTGT_ENCODER_DROPOUT_RATES_KEY
     ]
-    lagtgt_forecast_module_num_conv_blocks = optd[
+    lagtgt_forecast_num_conv_blocks_by_level = optd[
         LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY
     ]
     lagtgt_forecast_module_drop_rate_by_level = optd[
@@ -1481,7 +1516,7 @@ def create_model(option_dict):
     rctbias_encoder_drop_rate_by_level = optd[
         RCTBIAS_ENCODER_DROPOUT_RATES_KEY
     ]
-    rctbias_forecast_module_num_conv_blocks = optd[
+    rctbias_forecast_num_conv_blocks_by_level = optd[
         RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY
     ]
     rctbias_forecast_module_drop_rate_by_level = optd[
@@ -1839,7 +1874,7 @@ def create_model(option_dict):
             else:
                 this_input_layer_object = nwp_encoder_pooling_layer_objects[
                     i - 1
-                ]
+                    ]
 
             for j in range(nwp_encoder_num_conv_blocks_by_level[i]):
                 if j == 0:
@@ -2307,10 +2342,11 @@ def create_model(option_dict):
         )(nwp_encoder_conv_layer_objects[i])
 
         if nwp_forecast_module_use_3d_conv:
-            for j in range(nwp_forecast_module_num_conv_blocks):
+            for j in range(nwp_forecast_num_conv_blocks_by_level[i]):
                 if j == 0:
                     nwp_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=nwp_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_2pt5km_res[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
@@ -2343,7 +2379,7 @@ def create_model(option_dict):
                 target_shape=new_dims, name=this_name
             )(nwp_fcst_module_layer_objects[i])
 
-            for j in range(nwp_forecast_module_num_conv_blocks):
+            for j in range(nwp_forecast_num_conv_blocks_by_level[i]):
                 nwp_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
@@ -2367,10 +2403,11 @@ def create_model(option_dict):
         )(rctbias_encoder_conv_layer_objects[i])
 
         if rctbias_forecast_module_use_3d_conv:
-            for j in range(rctbias_forecast_module_num_conv_blocks):
+            for j in range(rctbias_forecast_num_conv_blocks_by_level[i]):
                 if j == 0:
                     rctbias_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=rctbias_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_2pt5km_rctbias[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
@@ -2405,7 +2442,7 @@ def create_model(option_dict):
                 target_shape=new_dims, name=this_name
             )(rctbias_fcst_module_layer_objects[i])
 
-            for j in range(rctbias_forecast_module_num_conv_blocks):
+            for j in range(rctbias_forecast_num_conv_blocks_by_level[i]):
                 rctbias_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=rctbias_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
@@ -2431,7 +2468,7 @@ def create_model(option_dict):
         else:
             this_input_layer_object = lagtgt_encoder_pooling_layer_objects[
                 i - 1
-            ]
+                ]
 
         for j in range(lagtgt_encoder_num_conv_blocks_by_level[i]):
             if j == 0:
@@ -2469,10 +2506,11 @@ def create_model(option_dict):
         )(lagtgt_encoder_conv_layer_objects[i])
 
         if lagtgt_forecast_module_use_3d_conv:
-            for j in range(lagtgt_forecast_module_num_conv_blocks):
+            for j in range(lagtgt_forecast_num_conv_blocks_by_level[i]):
                 if j == 0:
                     lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
                         input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                        num_time_steps=input_dimensions_lagged_targets[-2],
                         do_convnext_v2=do_convnext_v2,
                         num_conv_layers=2,
                         filter_size_px=1,
@@ -2507,7 +2545,7 @@ def create_model(option_dict):
                 target_shape=new_dims, name=this_name
             )(lagtgt_fcst_module_layer_objects[i])
 
-            for j in range(lagtgt_forecast_module_num_conv_blocks):
+            for j in range(lagtgt_forecast_num_conv_blocks_by_level[i]):
                 lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=lagtgt_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
