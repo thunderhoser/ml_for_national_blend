@@ -445,7 +445,7 @@ def __get_2d_convnext2_block(
         this_name = '{0:s}_grn{1:d}'.format(basic_layer_name, i)
         current_layer_object = GRN(
             init_values=INIT_VALUE_FOR_LAYER_SCALE,
-            projection_dim=num_filters,
+            projection_dim=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             name=this_name
         )(current_layer_object)
 
@@ -707,7 +707,7 @@ def __get_3d_convnext2_block(
         this_name = '{0:s}_grn{1:d}'.format(basic_layer_name, i)
         current_layer_object = GRN(
             init_values=INIT_VALUE_FOR_LAYER_SCALE,
-            projection_dim=num_filters,
+            projection_dim=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             name=this_name
         )(current_layer_object)
 
