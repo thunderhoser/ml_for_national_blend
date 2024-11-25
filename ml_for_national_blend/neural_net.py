@@ -93,6 +93,7 @@ OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 METRIC_FUNCTIONS_KEY = 'metric_function_strings'
 CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
 CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
+CHIU_NEXT_PP_ARCHITECTURE_KEY = 'chiu_next_pp_architecture_dict'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
@@ -101,8 +102,8 @@ PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY,
-    CHIU_NET_ARCHITECTURE_KEY, CHIU_NET_PP_ARCHITECTURE_KEY,
+    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, CHIU_NET_ARCHITECTURE_KEY,
+    CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
     EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY
 ]
@@ -3431,8 +3432,8 @@ def train_model(
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
         loss_function_string, optimizer_function_string,
-        metric_function_strings,
-        chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
+        metric_function_strings, chiu_net_architecture_dict,
+        chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
         output_dir_name):
@@ -3468,6 +3469,9 @@ def train_model(
     :param chiu_net_pp_architecture_dict: Dictionary with architecture options
         for `chiu_net_pp_architecture.create_model`.  If the model being trained
         is not a Chiu-net++, make this None.
+    :param chiu_next_pp_architecture_dict: Dictionary with architecture options
+        for `chiu_next_pp_architecture.create_model`.  If the model being
+        trained is not a Chiu-next++, make this None.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
         where N = plateau_patience_epochs.
@@ -3589,6 +3593,7 @@ def train_model(
         metric_function_strings=metric_function_strings,
         chiu_net_architecture_dict=chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
+        chiu_next_pp_architecture_dict=chiu_next_pp_architecture_dict,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -3922,8 +3927,8 @@ def write_metafile(
         pickle_file_name, num_epochs, num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
         validation_option_dict, loss_function_string, optimizer_function_string,
-        metric_function_strings,
-        chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
+        metric_function_strings, chiu_net_architecture_dict,
+        chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels):
     """Writes metadata to Pickle file.
@@ -3939,6 +3944,7 @@ def write_metafile(
     :param metric_function_strings: Same.
     :param chiu_net_architecture_dict: Same.
     :param chiu_net_pp_architecture_dict: Same.
+    :param chiu_next_pp_architecture_dict: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -3956,6 +3962,7 @@ def write_metafile(
         METRIC_FUNCTIONS_KEY: metric_function_strings,
         CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
         CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
+        CHIU_NEXT_PP_ARCHITECTURE_KEY: chiu_next_pp_architecture_dict,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
@@ -3984,6 +3991,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["metric_function_strings"]: Same.
     metadata_dict["chiu_net_architecture_dict"]: Same.
     metadata_dict["chiu_net_pp_architecture_dict"]: Same.
+    metadata_dict["chiu_next_pp_architecture_dict"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -4000,10 +4008,8 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
-    if CHIU_NET_ARCHITECTURE_KEY not in metadata_dict:
-        metadata_dict[CHIU_NET_ARCHITECTURE_KEY] = None
-    if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
-        metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
+    if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NEXT_PP_ARCHITECTURE_KEY] = None
 
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -4094,6 +4100,29 @@ def read_model(hdf5_file_name):
                 arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
+    chiu_next_pp_architecture_dict = metadata_dict[
+        CHIU_NEXT_PP_ARCHITECTURE_KEY
+    ]
+    if chiu_next_pp_architecture_dict is not None:
+        import \
+            chiu_next_pp_architecture
+
+        arch_dict = chiu_next_pp_architecture_dict
+
+        for this_key in [
+                chiu_next_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_next_pp_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_next_pp_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_next_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
         return model_object
 
