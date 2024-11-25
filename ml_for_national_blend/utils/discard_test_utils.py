@@ -61,7 +61,7 @@ def _run_discard_test_1field(
         this_percentile_level = 100 * (1 - discard_fractions[k])
         mask_out_matrix = (
             uncertainty_matrix >
-            numpy.percentile(uncertainty_matrix, this_percentile_level)
+            numpy.nanpercentile(uncertainty_matrix, this_percentile_level)
         )
 
         if numpy.sum(mask_out_matrix) == 0:
