@@ -180,6 +180,10 @@ class EMAHelper:
             model=self.model, optimizer=self.optimizer
         )
 
+        print('Restoring optimizer state from: "{0:s}"...'.format(
+            checkpoint_dir
+        ))
+
         if raise_error_if_missing:
             checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
