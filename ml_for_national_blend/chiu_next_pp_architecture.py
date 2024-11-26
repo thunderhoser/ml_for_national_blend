@@ -351,14 +351,15 @@ def __get_2d_convnext_block(
         )
 
         this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
@@ -367,14 +368,15 @@ def __get_2d_convnext_block(
             )(current_layer_object)
 
         this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
@@ -488,14 +490,15 @@ def __get_2d_convnext2_block(
         )
 
         this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
@@ -511,14 +514,15 @@ def __get_2d_convnext2_block(
         )(current_layer_object)
 
         this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if i != num_conv_layers - 1:
             continue
@@ -598,12 +602,13 @@ def __get_3d_convnext_block(
                 padding_type_string=architecture_utils.NO_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name=this_name
-            )(input_layer_object)
+            )
 
             if use_spectral_norm:
                 current_layer_object = SpectralNormalization(
                     current_layer_object
                 )
+            current_layer_object = current_layer_object(input_layer_object)
 
             new_dims = (
                 current_layer_object.shape[1:3] +
@@ -615,7 +620,7 @@ def __get_3d_convnext_block(
                 target_shape=new_dims, name=this_name
             )(current_layer_object)
         else:
-            current_layer_object = (
+            dwconv_layer_object = (
                 architecture_utils.get_2d_depthwise_conv_layer(
                     num_kernel_rows=filter_size_px,
                     num_kernel_columns=filter_size_px,
@@ -625,13 +630,14 @@ def __get_3d_convnext_block(
                     padding_type_string=architecture_utils.YES_PADDING_STRING,
                     weight_regularizer=regularizer_object,
                     layer_name=this_name
-                )(current_layer_object)
+                )
             )
 
             if use_spectral_norm:
-                current_layer_object = SpectralNormalization(
-                    current_layer_object
+                dwconv_layer_object = SpectralNormalization(
+                    dwconv_layer_object
                 )
+            current_layer_object = dwconv_layer_object(current_layer_object)
 
         this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
         current_layer_object = keras.layers.LayerNormalization(
@@ -641,14 +647,15 @@ def __get_3d_convnext_block(
         )
 
         this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
@@ -657,14 +664,15 @@ def __get_3d_convnext_block(
             )(current_layer_object)
 
         this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
@@ -746,12 +754,13 @@ def __get_3d_convnext2_block(
                 padding_type_string=architecture_utils.NO_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name=this_name
-            )(input_layer_object)
+            )
 
             if use_spectral_norm:
                 current_layer_object = SpectralNormalization(
                     current_layer_object
                 )
+            current_layer_object = current_layer_object(input_layer_object)
 
             new_dims = (
                 current_layer_object.shape[1:3] +
@@ -763,7 +772,7 @@ def __get_3d_convnext2_block(
                 target_shape=new_dims, name=this_name
             )(current_layer_object)
         else:
-            current_layer_object = (
+            dwconv_layer_object = (
                 architecture_utils.get_2d_depthwise_conv_layer(
                     num_kernel_rows=filter_size_px,
                     num_kernel_columns=filter_size_px,
@@ -773,13 +782,14 @@ def __get_3d_convnext2_block(
                     padding_type_string=architecture_utils.YES_PADDING_STRING,
                     weight_regularizer=regularizer_object,
                     layer_name=this_name
-                )(current_layer_object)
+                )
             )
 
             if use_spectral_norm:
-                current_layer_object = SpectralNormalization(
-                    current_layer_object
+                dwconv_layer_object = SpectralNormalization(
+                    dwconv_layer_object
                 )
+            current_layer_object = dwconv_layer_object(current_layer_object)
 
         this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
         current_layer_object = keras.layers.LayerNormalization(
@@ -789,14 +799,15 @@ def __get_3d_convnext2_block(
         )
 
         this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
@@ -812,14 +823,15 @@ def __get_3d_convnext2_block(
         )(current_layer_object)
 
         this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
+        dense_layer_object = architecture_utils.get_dense_layer(
             num_output_units=num_filters,
             weight_regularizer=regularizer_object,
             layer_name=this_name
-        )(current_layer_object)
+        )
 
         if use_spectral_norm:
-            current_layer_object = SpectralNormalization(current_layer_object)
+            dense_layer_object = SpectralNormalization(dense_layer_object)
+        current_layer_object = dense_layer_object(current_layer_object)
 
         if i != num_conv_layers - 1:
             continue
