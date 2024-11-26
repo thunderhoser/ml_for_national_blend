@@ -275,6 +275,7 @@ def _run():
             neural_net.write_metafile(
                 pickle_file_name=metafile_name,
                 num_epochs=100,
+                use_exp_moving_average_with_decay=False,
                 num_training_batches_per_epoch=32,
                 training_option_dict={},
                 num_validation_batches_per_epoch=16,
