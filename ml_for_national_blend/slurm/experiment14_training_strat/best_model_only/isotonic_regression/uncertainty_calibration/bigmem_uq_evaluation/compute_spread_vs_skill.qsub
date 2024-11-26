@@ -32,17 +32,10 @@ CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment14_training_strat"
 TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
-# GRAD_ACCUM_STEP_COUNTS=("010" "010" "010" "010" "010")
-# BATCH_SIZES=("1000" "1000" "1000" "1000" "1000")
-# USE_CONVNEXT_FLAGS=("1" "1" "1" "1" "1")
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
-
-num_grad_accum_steps=${GRAD_ACCUM_STEP_COUNTS[$SLURM_ARRAY_TASK_ID]}
-batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
-use_convnext_flag=${USE_CONVNEXT_FLAGS[$SLURM_ARRAY_TASK_ID]}
 target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
 
-model_dir_name="${TOP_MODEL_DIR_NAME}/num-grad-accum-steps=${num_grad_accum_steps}_batch-size=${batch_size}_use-convnext=${use_convnext_flag}"
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-grad-accum-steps=010_batch-size=3000_use-convnext=1"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/compute_spread_vs_skill.py" \

@@ -34,7 +34,7 @@ TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_b
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
 target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
 
-# model_dir_name="${TOP_MODEL_DIR_NAME}/num-nwp-lead-times=4_num-lag-times=4"
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-grad-accum-steps=010_batch-size=3000_use-convnext=1"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/concat_bias_corr_files_across_clusters.py" \
