@@ -6,6 +6,7 @@ import warnings
 import numpy
 import keras
 import pandas
+import tensorflow
 from tensorflow.keras.saving import load_model
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
@@ -82,6 +83,7 @@ LATITUDE_MATRIX_KEY = 'latitude_matrix_deg_n'
 LONGITUDE_MATRIX_KEY = 'longitude_matrix_deg_e'
 
 NUM_EPOCHS_KEY = 'num_epochs'
+EMA_DECAY_KEY = 'use_exp_moving_average_with_decay'
 NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
 TRAINING_OPTIONS_KEY = 'training_option_dict'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
@@ -98,7 +100,8 @@ EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
 
 METADATA_KEYS = [
-    NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
+    NUM_EPOCHS_KEY, EMA_DECAY_KEY,
+    NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
     OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
@@ -125,6 +128,54 @@ RECENT_BIAS_MATRIX_40KM_KEY = 'recent_bias_matrix_40km'
 PREDICTOR_MATRIX_BASELINE_KEY = 'predictor_matrix_resid_baseline'
 PREDICTOR_MATRIX_LAGTGT_KEY = 'predictor_matrix_lagged_targets'
 # TARGET_MATRIX_KEY = 'target_matrix'
+
+
+class EMAHelper:
+    def __init__(self, model, optimizer, decay=0.99):
+        self.model = model
+        self.optimizer = optimizer
+        self.decay = decay
+        self.shadow_weights = [
+            tensorflow.Variable(w, trainable=False) for w in model.weights
+        ]
+        self.original_weights = [
+            tensorflow.Variable(w, trainable=False) for w in model.weights
+        ]
+
+    def apply_ema(self):  # Updates only the shadow weights.
+        for sw, w in zip(self.shadow_weights, self.model.weights):
+            sw.assign(self.decay * sw + (1 - self.decay) * w)
+
+    def set_ema_weights(self):
+        for orig_w, w, sw in zip(
+                self.original_weights, self.model.weights, self.shadow_weights
+        ):
+            orig_w.assign(w)  # Save the current (non-EMA) weights
+            w.assign(sw)      # Set the model weights to EMA weights
+
+    def restore_original_weights(self):
+        for orig_w, w in zip(self.original_weights, self.model.weights):
+            w.assign(orig_w)
+
+    def save_optimizer_state(self, checkpoint_dir, epoch):
+        checkpoint_object = tensorflow.train.Checkpoint(
+            model=self.model, optimizer=self.optimizer
+        )
+        checkpoint_object.save(f'{checkpoint_dir}/checkpoint_epoch_{epoch}')
+
+    def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
+        checkpoint_object = tensorflow.train.Checkpoint(
+            model=self.model, optimizer=self.optimizer
+        )
+
+        try:
+            checkpoint_object.restore(
+                tensorflow.train.latest_checkpoint(checkpoint_dir)
+            )
+            return checkpoint_object
+        except:
+            if raise_error_if_missing:
+                raise
 
 
 def __report_data_properties(
@@ -528,6 +579,52 @@ def __patch_buffer_to_mask(patch_size_2pt5km_pixels,
     mask_matrix[:, -patch_buffer_size_2pt5km_pixels:] = 0
 
     return mask_matrix
+
+
+def _set_model_weights_to_ema(model_object, metafile_name):
+    """Sets model weights to exponential moving average.
+
+    :param model_object: Trained instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :param metafile_name: Path to metafile.
+    """
+
+    metadata_dict = read_metafile(metafile_name)
+
+    ema_object = EMAHelper(
+        model=model_object,
+        optimizer=model_object.optimizer,
+        decay=metadata_dict[EMA_DECAY_KEY]
+    )
+
+    ema_backup_dir_name = '{0:s}/exponential_moving_average'.format(
+        os.path.split(metafile_name)[0]
+    )
+    ema_object.restore_optimizer_state(
+        checkpoint_dir=ema_backup_dir_name, raise_error_if_missing=True
+    )
+
+    for layer_object in model_object.layers:
+        if 'conv' not in layer_object.name.lower():
+            continue
+
+        weight_matrix = numpy.array(layer_object.get_weights()[0])
+        print('Weights for {0:s}:\n{1:s} before EMA'.format(
+            layer_object.name, str(weight_matrix)
+        ))
+        break
+
+    ema_object.set_ema_weights()
+
+    for layer_object in model_object.layers:
+        if 'conv' not in layer_object.name.lower():
+            continue
+
+        weight_matrix = numpy.array(layer_object.get_weights()[0])
+        print('Weights for {0:s}:\n{1:s} after EMA'.format(
+            layer_object.name, str(weight_matrix)
+        ))
+        break
 
 
 def _check_generator_args(option_dict):
@@ -3565,7 +3662,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
 
 
 def train_model(
-        model_object, num_epochs,
+        model_object, num_epochs, use_exp_moving_average_with_decay,
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
         loss_function_string, optimizer_function_string,
@@ -3579,6 +3676,9 @@ def train_model(
     :param model_object: Untrained neural net (instance of
         `keras.models.Model`).
     :param num_epochs: Number of training epochs.
+    :param use_exp_moving_average_with_decay: Decay parameter for EMA
+        (exponential moving average) training method.  If you do not want to use
+        EMA, make this None.
     :param num_training_batches_per_epoch: Number of training batches per epoch.
     :param training_option_dict: See doc for `data_generator`.  This dictionary
         will be used to generate training data.
@@ -3631,6 +3731,12 @@ def train_model(
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=backup_dir_name
     )
+
+    if use_exp_moving_average_with_decay is not None:
+        error_checking.assert_is_geq(use_exp_moving_average_with_decay, 0.5)
+        error_checking.assert_is_less_than(
+            use_exp_moving_average_with_decay, 1.
+        )
 
     error_checking.assert_is_integer(num_epochs)
     error_checking.assert_is_geq(num_epochs, 2)
@@ -3721,6 +3827,7 @@ def train_model(
     write_metafile(
         pickle_file_name=metafile_name,
         num_epochs=num_epochs,
+        use_exp_moving_average_with_decay=use_exp_moving_average_with_decay,
         num_training_batches_per_epoch=num_training_batches_per_epoch,
         training_option_dict=training_option_dict,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
@@ -3738,16 +3845,55 @@ def train_model(
         patch_overlap_fast_gen_2pt5km_pixels
     )
 
-    model_object.fit(
-        x=training_generator,
-        steps_per_epoch=num_training_batches_per_epoch,
-        epochs=num_epochs,
-        initial_epoch=initial_epoch,
-        verbose=1,
-        callbacks=list_of_callback_objects,
-        validation_data=validation_generator,
-        validation_steps=num_validation_batches_per_epoch
+    if use_exp_moving_average_with_decay is None:
+        model_object.fit(
+            x=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch,
+            epochs=num_epochs,
+            initial_epoch=initial_epoch,
+            verbose=1,
+            callbacks=list_of_callback_objects,
+            validation_data=validation_generator,
+            validation_steps=num_validation_batches_per_epoch
+        )
+        return
+
+    ema_object = EMAHelper(
+        model=model_object,
+        optimizer=model_object.optimizer,
+        decay=use_exp_moving_average_with_decay
     )
+
+    ema_backup_dir_name = '{0:s}/exponential_moving_average'.format(
+        output_dir_name
+    )
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=ema_backup_dir_name
+    )
+
+    # TODO(thunderhoser): I don't know what happens here if the directory
+    # doesn't exist.
+    ema_object.restore_optimizer_state(
+        checkpoint_dir=ema_backup_dir_name,
+        raise_error_if_missing=initial_epoch > 0
+    )
+
+    for this_epoch in range(initial_epoch, num_epochs):
+        model_object.fit(
+            x=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch,
+            epochs=this_epoch + 1,
+            initial_epoch=this_epoch,
+            verbose=1,
+            callbacks=list_of_callback_objects,
+            validation_data=validation_generator,
+            validation_steps=num_validation_batches_per_epoch
+        )
+
+        ema_object.apply_ema()
+        ema_object.save_optimizer_state(
+            checkpoint_dir=ema_backup_dir_name, epoch=this_epoch
+        )
 
 
 def apply_patchwise_model_to_full_grid(
@@ -4061,7 +4207,8 @@ def find_metafile(model_file_name, raise_error_if_missing=True):
 
 
 def write_metafile(
-        pickle_file_name, num_epochs, num_training_batches_per_epoch,
+        pickle_file_name, num_epochs, use_exp_moving_average_with_decay,
+        num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
         validation_option_dict, loss_function_string, optimizer_function_string,
         metric_function_strings, chiu_net_architecture_dict,
@@ -4072,6 +4219,7 @@ def write_metafile(
 
     :param pickle_file_name: Path to output file.
     :param num_epochs: See doc for `train_model`.
+    :param use_exp_moving_average_with_decay: Same.
     :param num_training_batches_per_epoch: Same.
     :param training_option_dict: Same.
     :param num_validation_batches_per_epoch: Same.
@@ -4090,6 +4238,7 @@ def write_metafile(
 
     metadata_dict = {
         NUM_EPOCHS_KEY: num_epochs,
+        EMA_DECAY_KEY: use_exp_moving_average_with_decay,
         NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
         TRAINING_OPTIONS_KEY: training_option_dict,
         NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
@@ -4119,6 +4268,7 @@ def read_metafile(pickle_file_name):
     :param pickle_file_name: Path to input file.
     :return: metadata_dict: Dictionary with the following keys.
     metadata_dict["num_epochs"]: See doc for `train_model`.
+    metadata_dict["use_exp_moving_average_with_decay"]: Same.
     metadata_dict["num_training_batches_per_epoch"]: Same.
     metadata_dict["training_option_dict"]: Same.
     metadata_dict["num_validation_batches_per_epoch"]: Same.
@@ -4147,6 +4297,8 @@ def read_metafile(pickle_file_name):
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NEXT_PP_ARCHITECTURE_KEY] = None
+    if EMA_DECAY_KEY not in metadata_dict:
+        metadata_dict[EMA_DECAY_KEY] = None
 
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -4223,6 +4375,12 @@ def read_model(hdf5_file_name):
 
         model_object = chiu_net_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
+
+        if metadata_dict[EMA_DECAY_KEY] is not None:
+            _set_model_weights_to_ema(
+                model_object=model_object, metafile_name=metafile_name
+            )
+
         return model_object
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
@@ -4244,6 +4402,12 @@ def read_model(hdf5_file_name):
 
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
+
+        if metadata_dict[EMA_DECAY_KEY] is not None:
+            _set_model_weights_to_ema(
+                model_object=model_object, metafile_name=metafile_name
+            )
+
         return model_object
 
     chiu_next_pp_architecture_dict = metadata_dict[
@@ -4267,6 +4431,12 @@ def read_model(hdf5_file_name):
 
         model_object = chiu_next_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
+
+        if metadata_dict[EMA_DECAY_KEY] is not None:
+            _set_model_weights_to_ema(
+                model_object=model_object, metafile_name=metafile_name
+            )
+
         return model_object
 
     custom_object_dict = {

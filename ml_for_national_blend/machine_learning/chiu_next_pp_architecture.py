@@ -33,6 +33,7 @@ INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = (
     chiu_net_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY
 )
 DO_CONVNEXT_V2_KEY = 'do_convnext_v2'
+USE_SPECTRAL_NORM_KEY = 'use_spectral_norm'
 
 NWP_ENCODER_NUM_CHANNELS_KEY = chiu_net_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY
 NWP_POOLING_SIZE_KEY = chiu_net_pp_arch.NWP_POOLING_SIZE_KEY
@@ -190,9 +191,12 @@ class GRN(keras.layers.Layer):
         )
 
     def call(self, inputs):
-        gx = tensorflow.norm(
-            inputs, ord=2, axis=(1, 2), keepdims=True
-        )
+        # gx = tensorflow.norm(
+        #     inputs, ord=2, axis=(1, 2), keepdims=True
+        # )
+        gx = tensorflow.sqrt(tensorflow.reduce_sum(
+            tensorflow.square(inputs), axis=(1, 2), keepdims=True
+        ))
         denominator = self.epsilon + tensorflow.math.reduce_mean(
             gx, axis=-1, keepdims=True
         )
@@ -240,9 +244,41 @@ class StochasticDepth(keras.layers.Layer):
         return config
 
 
+@keras.saving.register_keras_serializable()
+class SpectralNormalization(keras.layers.Layer):
+    def __init__(self, layer):
+        super(SpectralNormalization, self).__init__()
+        self.layer = layer
+
+    def build(self, input_shape):
+        self.layer.build(input_shape)
+        self.w = self.layer.kernel
+        self.u = self.add_weight(
+            shape=(1, self.w.shape[-1]),
+            initializer='random_normal',
+            trainable=False,
+            name='u'
+        )
+
+    def call(self, inputs):
+        v = tensorflow.linalg.matvec(
+            tensorflow.transpose(self.w), self.u, transpose_a=True
+        )
+        v = tensorflow.math.l2_normalize(v)
+
+        u = tensorflow.linalg.matvec(self.w, v)
+        u = tensorflow.math.l2_normalize(u)
+
+        sigma = tensorflow.linalg.matvec(u, tensorflow.linalg.matvec(self.w, v))
+
+        self.u.assign(u)
+        self.layer.kernel.assign(self.w / sigma)
+        return self.layer(inputs)
+
+
 def __get_2d_convnext_block(
         input_layer_object, num_conv_layers, filter_size_px, num_filters,
-        do_time_distributed_conv, regularizer_object,
+        do_time_distributed_conv, regularizer_object, use_spectral_norm,
         do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext block for data with 2 spatial dimensions.
 
@@ -254,6 +290,7 @@ def __get_2d_convnext_block(
     :param num_filters: Same.
     :param do_time_distributed_conv: Same.
     :param regularizer_object: Same.
+    :param use_spectral_norm: Same.
     :param do_activation: Same.
     :param dropout_rate: Same.
     :param basic_layer_name: Same.
@@ -286,6 +323,9 @@ def __get_2d_convnext_block(
             layer_name=this_name
         )
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if do_time_distributed_conv:
             current_layer_object = keras.layers.TimeDistributed(
                 current_layer_object, name=this_name
@@ -307,6 +347,9 @@ def __get_2d_convnext_block(
             layer_name=this_name
         )(current_layer_object)
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
             current_layer_object = keras.layers.Activation(
@@ -319,6 +362,9 @@ def __get_2d_convnext_block(
             weight_regularizer=regularizer_object,
             layer_name=this_name
         )(current_layer_object)
+
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
 
         this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
@@ -343,6 +389,9 @@ def __get_2d_convnext_block(
                 layer_name=this_name
             )
 
+            if use_spectral_norm:
+                new_layer_object = SpectralNormalization(new_layer_object)
+
             if do_time_distributed_conv:
                 new_layer_object = keras.layers.TimeDistributed(
                     new_layer_object, name=this_name
@@ -366,8 +415,8 @@ def __get_2d_convnext_block(
 
 def __get_2d_convnext2_block(
         input_layer_object, num_conv_layers, filter_size_px, num_filters,
-        do_time_distributed_conv, regularizer_object, do_activation,
-        dropout_rate, basic_layer_name):
+        do_time_distributed_conv, regularizer_object, use_spectral_norm,
+        do_activation, dropout_rate, basic_layer_name):
     """Creates ConvNext-2 block for data with 2 spatial dimensions.
 
     L = number of conv layers
@@ -378,6 +427,7 @@ def __get_2d_convnext2_block(
     :param num_filters: Same.
     :param do_time_distributed_conv: Same.
     :param regularizer_object: Same.
+    :param use_spectral_norm: Same.
     :param do_activation: Same.
     :param dropout_rate: Same.
     :param basic_layer_name: Same.
@@ -410,6 +460,9 @@ def __get_2d_convnext2_block(
             layer_name=this_name
         )
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if do_time_distributed_conv:
             current_layer_object = keras.layers.TimeDistributed(
                 current_layer_object, name=this_name
@@ -431,6 +484,9 @@ def __get_2d_convnext2_block(
             layer_name=this_name
         )(current_layer_object)
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
             current_layer_object = keras.layers.Activation(
@@ -451,6 +507,9 @@ def __get_2d_convnext2_block(
             layer_name=this_name
         )(current_layer_object)
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if i != num_conv_layers - 1:
             continue
 
@@ -468,6 +527,9 @@ def __get_2d_convnext2_block(
                 weight_regularizer=regularizer_object,
                 layer_name=this_name
             )
+
+            if use_spectral_norm:
+                new_layer_object = SpectralNormalization(new_layer_object)
 
             if do_time_distributed_conv:
                 new_layer_object = keras.layers.TimeDistributed(
@@ -492,7 +554,8 @@ def __get_2d_convnext2_block(
 
 def __get_3d_convnext_block(
         input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
-        regularizer_object, do_activation, dropout_rate, basic_layer_name):
+        regularizer_object, use_spectral_norm, do_activation, dropout_rate,
+        basic_layer_name):
     """Creates ConvNext block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `_get_3d_conv_block`.
@@ -500,6 +563,7 @@ def __get_3d_convnext_block(
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
+    :param use_spectral_norm: Same.
     :param do_activation: Same.
     :param dropout_rate: Same.
     :param basic_layer_name: Same.
@@ -526,6 +590,11 @@ def __get_3d_convnext_block(
                 layer_name=this_name
             )(input_layer_object)
 
+            if use_spectral_norm:
+                current_layer_object = SpectralNormalization(
+                    current_layer_object
+                )
+
             new_dims = (
                 current_layer_object.shape[1:3] +
                 (current_layer_object.shape[-1],)
@@ -549,6 +618,11 @@ def __get_3d_convnext_block(
                 )(current_layer_object)
             )
 
+            if use_spectral_norm:
+                current_layer_object = SpectralNormalization(
+                    current_layer_object
+                )
+
         this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
         current_layer_object = keras.layers.LayerNormalization(
             epsilon=EPSILON_FOR_LAYER_NORM, name=this_name
@@ -563,6 +637,9 @@ def __get_3d_convnext_block(
             layer_name=this_name
         )(current_layer_object)
 
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
+
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
             current_layer_object = keras.layers.Activation(
@@ -575,6 +652,9 @@ def __get_3d_convnext_block(
             weight_regularizer=regularizer_object,
             layer_name=this_name
         )(current_layer_object)
+
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
 
         this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
         current_layer_object = LayerScale(
@@ -622,7 +702,8 @@ def __get_3d_convnext_block(
 
 def __get_3d_convnext2_block(
         input_layer_object, num_time_steps, num_conv_layers, filter_size_px,
-        regularizer_object, do_activation, dropout_rate, basic_layer_name):
+        regularizer_object, use_spectral_norm, do_activation, dropout_rate,
+        basic_layer_name):
     """Creates ConvNext-2 block for data with 3 spatial dimensions.
 
     :param input_layer_object: See documentation for `__get_3d_convnext_block`.
@@ -630,6 +711,7 @@ def __get_3d_convnext2_block(
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
+    :param use_spectral_norm: Same.
     :param do_activation: Same.
     :param basic_layer_name: Same.
     :param dropout_rate: Same.
@@ -656,6 +738,11 @@ def __get_3d_convnext2_block(
                 layer_name=this_name
             )(input_layer_object)
 
+            if use_spectral_norm:
+                current_layer_object = SpectralNormalization(
+                    current_layer_object
+                )
+
             new_dims = (
                 current_layer_object.shape[1:3] +
                 (current_layer_object.shape[-1],)
@@ -679,6 +766,11 @@ def __get_3d_convnext2_block(
                 )(current_layer_object)
             )
 
+            if use_spectral_norm:
+                current_layer_object = SpectralNormalization(
+                    current_layer_object
+                )
+
         this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
         current_layer_object = keras.layers.LayerNormalization(
             epsilon=EPSILON_FOR_LAYER_NORM, name=this_name
@@ -692,6 +784,9 @@ def __get_3d_convnext2_block(
             weight_regularizer=regularizer_object,
             layer_name=this_name
         )(current_layer_object)
+
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
 
         if do_activation:
             this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
@@ -712,6 +807,9 @@ def __get_3d_convnext2_block(
             weight_regularizer=regularizer_object,
             layer_name=this_name
         )(current_layer_object)
+
+        if use_spectral_norm:
+            current_layer_object = SpectralNormalization(current_layer_object)
 
         if i != num_conv_layers - 1:
             continue
@@ -779,6 +877,8 @@ def _check_input_args(option_dict):
     option_dict["input_dimensions_lagged_targets"]: Same but for lagged targets.
     option_dict["do_convnext_v2"]: Boolean flag.  If True, will use version 2 of
         ConvNext.
+    option_dict["use_spectral_norm"]: Boolean flag.  If True, will use spectral
+        normalization to regularize every conv layer.
     option_dict["nwp_encoder_num_channels_by_level"]: length-(L + 1) numpy array
         with number of channels (feature maps) at each level of NWP-encoder.
     option_dict["lagtgt_encoder_num_channels_by_level"]: Same but for lagged
@@ -893,6 +993,7 @@ def _check_input_args(option_dict):
         )
 
     error_checking.assert_is_boolean(option_dict[DO_CONVNEXT_V2_KEY])
+    error_checking.assert_is_boolean(option_dict[USE_SPECTRAL_NORM_KEY])
 
     if option_dict[INPUT_DIMENSIONS_CONST_KEY] is not None:
         expected_dim = numpy.array([
@@ -1275,7 +1376,7 @@ def _check_input_args(option_dict):
 
 
 def _get_2d_conv_block(
-        input_layer_object, do_convnext_v2, num_conv_layers,
+        input_layer_object, do_convnext_v2, use_spectral_norm, num_conv_layers,
         filter_size_px, num_filters,
         do_time_distributed_conv, regularizer_object, do_activation,
         dropout_rate, basic_layer_name):
@@ -1286,6 +1387,8 @@ def _get_2d_conv_block(
     :param input_layer_object: Input layer to block.
     :param do_convnext_v2: Boolean flag.  If True, will use version 2 of
         ConvNext.
+    :param use_spectral_norm: Boolean flag.  If True, will use spectral
+        normalization for every conv layer.
     :param num_conv_layers: Number of conv layers in block.
     :param filter_size_px: Filter size for conv layers.  The same filter size
         will be used in both dimensions, and the same filter size will be used
@@ -1312,6 +1415,7 @@ def _get_2d_conv_block(
             num_filters=num_filters,
             do_time_distributed_conv=do_time_distributed_conv,
             regularizer_object=regularizer_object,
+            use_spectral_norm=use_spectral_norm,
             do_activation=do_activation,
             dropout_rate=dropout_rate,
             basic_layer_name=(
@@ -1327,6 +1431,7 @@ def _get_2d_conv_block(
             num_filters=num_filters,
             do_time_distributed_conv=do_time_distributed_conv,
             regularizer_object=regularizer_object,
+            use_spectral_norm=use_spectral_norm,
             do_activation=do_activation,
             dropout_rate=dropout_rate,
             basic_layer_name=(
@@ -1347,6 +1452,7 @@ def _get_2d_conv_block(
                 num_filters=num_filters,
                 do_time_distributed_conv=do_time_distributed_conv,
                 regularizer_object=regularizer_object,
+                use_spectral_norm=use_spectral_norm,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
@@ -1359,6 +1465,7 @@ def _get_2d_conv_block(
                 num_filters=num_filters,
                 do_time_distributed_conv=do_time_distributed_conv,
                 regularizer_object=regularizer_object,
+                use_spectral_norm=use_spectral_norm,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
@@ -1368,14 +1475,15 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, num_time_steps, do_convnext_v2, num_conv_layers,
-        filter_size_px, regularizer_object, do_activation,
+        input_layer_object, num_time_steps, do_convnext_v2, use_spectral_norm,
+        num_conv_layers, filter_size_px, regularizer_object, do_activation,
         dropout_rate, basic_layer_name):
     """Creates conv block for data with 2 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
     :param num_time_steps: Number of time steps expected in input.
     :param do_convnext_v2: See documentation for `_get_2d_conv_block`.
+    :param use_spectral_norm: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -1392,6 +1500,7 @@ def _get_3d_conv_block(
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
+            use_spectral_norm=use_spectral_norm,
             do_activation=do_activation,
             dropout_rate=dropout_rate,
             basic_layer_name=(
@@ -1406,6 +1515,7 @@ def _get_3d_conv_block(
             num_conv_layers=1,
             filter_size_px=filter_size_px,
             regularizer_object=regularizer_object,
+            use_spectral_norm=use_spectral_norm,
             do_activation=do_activation,
             dropout_rate=dropout_rate,
             basic_layer_name=(
@@ -1426,6 +1536,7 @@ def _get_3d_conv_block(
                 num_filters=current_layer_object.shape[-1],
                 do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
+                use_spectral_norm=use_spectral_norm,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
@@ -1438,6 +1549,7 @@ def _get_3d_conv_block(
                 num_filters=current_layer_object.shape[-1],
                 do_time_distributed_conv=False,
                 regularizer_object=regularizer_object,
+                use_spectral_norm=use_spectral_norm,
                 do_activation=do_activation,
                 dropout_rate=dropout_rate,
                 basic_layer_name='{0:s}_{1:d}'.format(basic_layer_name, i)
@@ -1477,6 +1589,7 @@ def create_model(option_dict):
     )
     input_dimensions_predn_baseline = optd[PREDN_BASELINE_DIMENSIONS_KEY]
     do_convnext_v2 = optd[DO_CONVNEXT_V2_KEY]
+    use_spectral_norm = optd[USE_SPECTRAL_NORM_KEY]
 
     nwp_encoder_num_channels_by_level = optd[NWP_ENCODER_NUM_CHANNELS_KEY]
     nwp_pooling_size_by_level_px = optd[NWP_POOLING_SIZE_KEY]
@@ -1735,6 +1848,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=this_input_layer_object,
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1748,6 +1862,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1786,6 +1901,7 @@ def create_model(option_dict):
                 rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=this_input_layer_object,
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1800,6 +1916,7 @@ def create_model(option_dict):
                 rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=rctbias_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1881,6 +1998,7 @@ def create_model(option_dict):
                     nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=this_input_layer_object,
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1895,6 +2013,7 @@ def create_model(option_dict):
                     nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=nwp_encoder_conv_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1934,6 +2053,7 @@ def create_model(option_dict):
                     rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=this_input_layer_object,
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1949,6 +2069,7 @@ def create_model(option_dict):
                         input_layer_object=
                         rctbias_encoder_conv_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2017,6 +2138,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=this_input_layer_object,
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2031,6 +2153,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2068,6 +2191,7 @@ def create_model(option_dict):
                     rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=this_input_layer_object,
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2083,6 +2207,7 @@ def create_model(option_dict):
                         input_layer_object=
                         rctbias_encoder_conv_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2151,6 +2276,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=this_input_layer_object,
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2165,6 +2291,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2200,6 +2327,7 @@ def create_model(option_dict):
                     rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=this_input_layer_object,
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2215,6 +2343,7 @@ def create_model(option_dict):
                         input_layer_object=
                         rctbias_encoder_conv_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=7,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2247,6 +2376,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_encoder_pooling_layer_objects[i - 1],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2261,6 +2391,7 @@ def create_model(option_dict):
                 nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2295,6 +2426,7 @@ def create_model(option_dict):
                     input_layer_object=
                     rctbias_encoder_pooling_layer_objects[i - 1],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2310,6 +2442,7 @@ def create_model(option_dict):
                     input_layer_object=
                     rctbias_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2348,6 +2481,7 @@ def create_model(option_dict):
                         input_layer_object=nwp_fcst_module_layer_objects[i],
                         num_time_steps=input_dimensions_2pt5km_res[-2],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=2,
                         filter_size_px=1,
                         regularizer_object=regularizer_object,
@@ -2360,6 +2494,7 @@ def create_model(option_dict):
                     nwp_fcst_module_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=nwp_fcst_module_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=1,
                         num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2383,6 +2518,7 @@ def create_model(option_dict):
                 nwp_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=nwp_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=1,
                     num_filters=nwp_encoder_num_channels_by_level[i],
@@ -2409,6 +2545,7 @@ def create_model(option_dict):
                         input_layer_object=rctbias_fcst_module_layer_objects[i],
                         num_time_steps=input_dimensions_2pt5km_rctbias[-2],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=2,
                         filter_size_px=1,
                         regularizer_object=regularizer_object,
@@ -2422,6 +2559,7 @@ def create_model(option_dict):
                     rctbias_fcst_module_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=rctbias_fcst_module_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=1,
                         num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2446,6 +2584,7 @@ def create_model(option_dict):
                 rctbias_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=rctbias_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=1,
                     num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -2475,6 +2614,7 @@ def create_model(option_dict):
                 lagtgt_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=this_input_layer_object,
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -2489,6 +2629,7 @@ def create_model(option_dict):
                 lagtgt_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=lagtgt_encoder_conv_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -2512,6 +2653,7 @@ def create_model(option_dict):
                         input_layer_object=lagtgt_fcst_module_layer_objects[i],
                         num_time_steps=input_dimensions_lagged_targets[-2],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=2,
                         filter_size_px=1,
                         regularizer_object=regularizer_object,
@@ -2525,6 +2667,7 @@ def create_model(option_dict):
                     lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
                         input_layer_object=lagtgt_fcst_module_layer_objects[i],
                         do_convnext_v2=do_convnext_v2,
+                        use_spectral_norm=use_spectral_norm,
                         num_conv_layers=1,
                         filter_size_px=1,
                         num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -2549,6 +2692,7 @@ def create_model(option_dict):
                 lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
                     input_layer_object=lagtgt_fcst_module_layer_objects[i],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=1,
                     num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -2622,6 +2766,7 @@ def create_model(option_dict):
             last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
                 input_layer_object=this_layer_object,
                 do_convnext_v2=do_convnext_v2,
+                use_spectral_norm=use_spectral_norm,
                 num_conv_layers=1,
                 filter_size_px=7,
                 num_filters=this_num_channels,
@@ -2646,6 +2791,7 @@ def create_model(option_dict):
                 last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
                     input_layer_object=last_conv_layer_matrix[i_new, j],
                     do_convnext_v2=do_convnext_v2,
+                    use_spectral_norm=use_spectral_norm,
                     num_conv_layers=1,
                     filter_size_px=7,
                     num_filters=decoder_num_channels_by_level[i_new],
@@ -2661,6 +2807,7 @@ def create_model(option_dict):
         last_conv_layer_matrix[0, -1] = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_convnext_v2=do_convnext_v2,
+            use_spectral_norm=use_spectral_norm,
             num_conv_layers=1,
             filter_size_px=7,
             num_filters=2 * num_output_channels * ensemble_size,
@@ -2679,6 +2826,7 @@ def create_model(option_dict):
     simple_output_layer_object = _get_2d_conv_block(
         input_layer_object=last_conv_layer_matrix[0, -1],
         do_convnext_v2=do_convnext_v2,
+        use_spectral_norm=use_spectral_norm,
         num_conv_layers=1,
         filter_size_px=1,
         num_filters=(
@@ -2704,6 +2852,7 @@ def create_model(option_dict):
         dd_output_layer_object = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_convnext_v2=do_convnext_v2,
+            use_spectral_norm=use_spectral_norm,
             num_conv_layers=1,
             filter_size_px=1,
             num_filters=ensemble_size,
@@ -2729,6 +2878,7 @@ def create_model(option_dict):
         gf_output_layer_object = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_convnext_v2=do_convnext_v2,
+            use_spectral_norm=use_spectral_norm,
             num_conv_layers=1,
             filter_size_px=1,
             num_filters=ensemble_size,
