@@ -267,6 +267,11 @@ class SpectralNormalization(keras.layers.Layer):
         )
 
     def call(self, inputs):
+        print(self.layer.name)
+        print(self.w.shape)
+        print(self.u.shape)
+        print('\n\n')
+
         v = tensorflow.linalg.matvec(
             tensorflow.transpose(self.w), self.u, transpose_a=True
         )
