@@ -616,8 +616,10 @@ def _set_model_weights_to_ema(model_object, metafile_name):
     ema_backup_dir_name = '{0:s}/exponential_moving_average'.format(
         os.path.split(metafile_name)[0]
     )
+
+    # TODO(thunderhoser): Don't know about always making the flag False.
     ema_object.restore_optimizer_state(
-        checkpoint_dir=ema_backup_dir_name, raise_error_if_missing=True
+        checkpoint_dir=ema_backup_dir_name, raise_error_if_missing=False
     )
 
     for layer_object in model_object.layers:

@@ -256,7 +256,10 @@ class SpectralNormalization(keras.layers.Layer):
         layer_type_string = str(type(self.layer)).lower()
 
         if 'depthwise' in layer_type_string:
-            self.w = self.layer.depthwise_kernel
+            try:
+                self.w = self.layer.depthwise_kernel
+            except:
+                self.w = self.layer.kernel
         elif 'conv3d' in layer_type_string:
             self.w = self.layer.kernel
         elif 'conv2d' in layer_type_string:
@@ -285,28 +288,23 @@ class SpectralNormalization(keras.layers.Layer):
         elif 'dense' in layer_type_string:
             w_reshaped = self.w
 
-        print('LAYER NAME = {0:s}'.format(self.layer.name))
-        print(self.w.shape)
-        print(self.u.shape)
-        print(w_reshaped.shape)
-        print('\n')
-
-        v = tensorflow.linalg.matvec(
-            tensorflow.transpose(w_reshaped), self.u, transpose_a=True
-        )
+        v = tensorflow.linalg.matvec(w_reshaped, self.u, transpose_a=False)
         v = tensorflow.math.l2_normalize(v)
 
-        u = tensorflow.linalg.matvec(w_reshaped, v)
+        u = tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         u = tensorflow.math.l2_normalize(u)
 
         sigma = tensorflow.linalg.matvec(
             u,
-            tensorflow.linalg.matvec(w_reshaped, v)
+            tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         )
         self.u.assign(u)
 
         if 'depthwise' in layer_type_string:
-            self.layer.depthwise_kernel.assign(self.w / sigma)
+            try:
+                self.layer.depthwise_kernel.assign(self.w / sigma)
+            except:
+                self.layer.kernel.assign(self.w / sigma)
         else:
             self.layer.kernel.assign(self.w / sigma)
 
