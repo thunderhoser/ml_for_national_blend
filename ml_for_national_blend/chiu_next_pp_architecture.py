@@ -299,12 +299,13 @@ class SpectralNormalization(keras.layers.Layer):
         print(self.w.shape)
         print(self.u.shape)
         print(w_reshaped.shape)
-        print('\n')
 
         v = tensorflow.linalg.matvec(
             tensorflow.transpose(w_reshaped), self.u, transpose_a=True
         )
         v = tensorflow.math.l2_normalize(v)
+        print(v.shape)
+        print('\n')
 
         u = tensorflow.linalg.matvec(w_reshaped, v)
         u = tensorflow.math.l2_normalize(u)
