@@ -136,7 +136,7 @@ DEFAULT_OPTION_DICT = {
     chiu_next_pp_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY: None,
     chiu_next_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 5], dtype=int),
     # chiu_next_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY: numpy.array([PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 2, 1], dtype=int),
-    chiu_next_pp_arch.USE_SPECTRAL_NORM_KEY: True,
+    chiu_next_pp_arch.USE_SPECTRAL_NORM_KEY: False,
     chiu_next_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192], dtype=int),
     chiu_next_pp_arch.NWP_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
     chiu_next_pp_arch.NWP_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
