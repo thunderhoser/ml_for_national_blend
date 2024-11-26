@@ -282,6 +282,9 @@ class SpectralNormalization(keras.layers.Layer):
         self.layer.kernel.assign(self.w / sigma)
         return self.layer(inputs)
 
+    def compute_output_shape(self, input_shape):
+        return self.layer.compute_output_shape(input_shape)
+
 
 def __get_2d_convnext_block(
         input_layer_object, num_conv_layers, filter_size_px, num_filters,
