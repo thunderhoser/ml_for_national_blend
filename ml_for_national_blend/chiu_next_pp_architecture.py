@@ -251,7 +251,6 @@ class StochasticDepth(keras.layers.Layer):
         return config
 
 
-@keras.saving.register_keras_serializable()
 class SpectralNormalization(keras.layers.Layer):
     def __init__(self, layer):
         super(SpectralNormalization, self).__init__()
