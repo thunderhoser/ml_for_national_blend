@@ -159,7 +159,9 @@ class EMAHelper:
 
     def save_optimizer_state(self, checkpoint_dir, epoch):
         checkpoint_object = tensorflow.train.Checkpoint(
-            model=self.model, optimizer=self.optimizer
+            model=self.model,
+            optimizer=self.optimizer,
+            ema_shadow_weights=self.shadow_weights
         )
         output_path = '{0:s}/checkpoint_epoch_{1:d}'.format(
             checkpoint_dir, epoch
@@ -175,6 +177,10 @@ class EMAHelper:
             model=self.model, optimizer=self.optimizer
         )
 
+        print('Restoring optimizer state from: "{0:s}"...'.format(
+            checkpoint_dir
+        ))
+
         if raise_error_if_missing:
             checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
@@ -184,6 +190,7 @@ class EMAHelper:
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
             )
 
+        self.shadow_weights = checkpoint_object.ema_shadow_weights
         return checkpoint_object
 
 
