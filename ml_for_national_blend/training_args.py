@@ -59,6 +59,7 @@ VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'
 VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'
 
 NUM_EPOCHS_ARG_NAME = 'num_epochs'
+EMA_DECAY_ARG_NAME = 'use_exp_moving_average_with_decay'
 NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'
 NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
 
@@ -279,6 +280,10 @@ VALIDATION_TARGET_DIR_HELP_STRING = (
 )
 
 NUM_EPOCHS_HELP_STRING = 'Number of epochs.'
+EMA_DECAY_HELP_STRING = (
+    'Decay parameter for EMA (exponential moving average) training method.  If '
+    'you do not want EMA, leave this argument alone.'
+)
 NUM_TRAINING_BATCHES_HELP_STRING = 'Number of training batches per epoch.'
 NUM_VALIDATION_BATCHES_HELP_STRING = 'Number of validation batches per epoch.'
 
@@ -481,6 +486,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + NUM_EPOCHS_ARG_NAME, type=int, required=False, default=1000,
         help=NUM_EPOCHS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + EMA_DECAY_ARG_NAME, type=float, required=False, default=-1.,
+        help=EMA_DECAY_HELP_STRING
     )
     parser_object.add_argument(
         '--' + NUM_TRAINING_BATCHES_ARG_NAME, type=int, required=False,

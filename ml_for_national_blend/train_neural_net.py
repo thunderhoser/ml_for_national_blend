@@ -82,8 +82,8 @@ def _run(template_file_name, output_dir_name,
          first_init_time_strings_for_validation,
          last_init_time_strings_for_validation,
          nwp_dir_names_for_validation, target_dir_name_for_validation,
-         num_epochs, num_training_batches_per_epoch,
-         num_validation_batches_per_epoch,
+         num_epochs, use_exp_moving_average_with_decay,
+         num_training_batches_per_epoch, num_validation_batches_per_epoch,
          plateau_patience_epochs, plateau_learning_rate_multiplier,
          early_stopping_patience_epochs):
     """Trains neural net.
@@ -133,6 +133,7 @@ def _run(template_file_name, output_dir_name,
     :param nwp_dir_names_for_validation: Same.
     :param target_dir_name_for_validation: Same.
     :param num_epochs: Same.
+    :param use_exp_moving_average_with_decay: Same.
     :param num_training_batches_per_epoch: Same.
     :param num_validation_batches_per_epoch: Same.
     :param plateau_patience_epochs: Same.
@@ -154,6 +155,8 @@ def _run(template_file_name, output_dir_name,
         patch_overlap_size_2pt5km_pixels = None
     if patch_size_2pt5km_pixels < 0:
         patch_size_2pt5km_pixels = None
+    if use_exp_moving_average_with_decay < 0:
+        use_exp_moving_average_with_decay = None
 
     if nbm_constant_file_name == '':
         nbm_constant_file_name = None
@@ -259,6 +262,7 @@ def _run(template_file_name, output_dir_name,
     neural_net.train_model(
         model_object=model_object,
         num_epochs=num_epochs,
+        use_exp_moving_average_with_decay=use_exp_moving_average_with_decay,
         num_training_batches_per_epoch=num_training_batches_per_epoch,
         training_option_dict=training_option_dict,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
@@ -420,6 +424,9 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, training_args.VALIDATION_TARGET_DIR_ARG_NAME
         ),
         num_epochs=getattr(INPUT_ARG_OBJECT, training_args.NUM_EPOCHS_ARG_NAME),
+        use_exp_moving_average_with_decay=getattr(
+            INPUT_ARG_OBJECT, training_args.EMA_DECAY_ARG_NAME
+        ),
         num_training_batches_per_epoch=getattr(
             INPUT_ARG_OBJECT, training_args.NUM_TRAINING_BATCHES_ARG_NAME
         ),
