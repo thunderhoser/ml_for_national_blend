@@ -18,6 +18,7 @@ NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
 NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_MODEL_TO_FIELDS_ARG_NAME = 'nwp_model_to_field_names'
 NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'
+NWP_RESID_NORM_FILE_ARG_NAME = 'nwp_resid_norm_file_name'
 NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'
 BACKUP_NWP_MODEL_ARG_NAME = 'backup_nwp_model_name'
 BACKUP_NWP_DIR_ARG_NAME = 'backup_nwp_dir_name'
@@ -25,6 +26,7 @@ TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_hours'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
+TARGET_RESID_NORM_FILE_ARG_NAME = 'target_resid_norm_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 RECENT_BIAS_LAG_TIMES_ARG_NAME = 'recent_bias_init_time_lags_hours'
 RECENT_BIAS_LEAD_TIMES_ARG_NAME = 'recent_bias_lead_times_hours'
@@ -92,12 +94,15 @@ NWP_MODEL_TO_FIELDS_HELP_STRING = (
     str(nwp_model_utils.ALL_FIELD_NAMES)
 )
 NWP_NORMALIZATION_FILE_HELP_STRING = (
-    'Path to normalization file for NWP predictors (will be read by '
-    '`nwp_model_io.read_normalization_file`).  Use this argument only if you '
-    'want to normalize predictors on the fly -- i.e., `{0:s}` and `{1:s}` '
-    'contain unnormalized data, but you want to train with normalized data.'
-).format(
-    TRAINING_NWP_DIRS_ARG_NAME, VALIDATION_NWP_DIRS_ARG_NAME
+    'Path to normalization file for NWP predictors (readable by '
+    '`nwp_model_io.read_normalization_file`), containing params for two-step '
+    'z-score normalization.'
+)
+NWP_RESID_NORM_FILE_HELP_STRING = (
+    'Path to residual-normalization file for NWP predictors (readable by '
+    '`nwp_model_io.read_normalization_file`), containing params for residual '
+    'normalization.  If you just want z-score normalization, leave this '
+    'argument alone.'
 )
 NWP_USE_QUANTILE_NORM_HELP_STRING = (
     'Boolean flag.  If 1, will do two-step normalization: conversion to '
@@ -124,12 +129,15 @@ TARGET_LAG_TIMES_HELP_STRING = (
     'list with a negative number -- for example, [-1].'
 )
 TARGET_NORMALIZATION_FILE_HELP_STRING = (
-    'Path to normalization file for target variables (will be read by '
-    '`urma_io.read_normalization_file`).  Use this argument only if you want '
-    'to normalize targets on the fly -- i.e., `{0:s}` and `{1:s}` contain '
-    'unnormalized data, but you want to train with normalized targets.'
-).format(
-    TRAINING_TARGET_DIR_ARG_NAME, VALIDATION_TARGET_DIR_ARG_NAME
+    'Path to normalization file for target variables (readable by '
+    '`urma_io.read_normalization_file`), containing params for two-step '
+    'z-score normalization.'
+)
+TARGET_RESID_NORM_FILE_HELP_STRING = (
+    'Path to residual-normalization file for target variables (readable by '
+    '`urma_io.read_normalization_file`), containing params for residual '
+    'normalization.  If you just want z-score normalization, leave this '
+    'argument alone.'
 )
 TARGETS_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for targets.'.format(
     NWP_USE_QUANTILE_NORM_ARG_NAME
@@ -319,8 +327,12 @@ def add_input_args(parser_object):
         help=NWP_MODEL_TO_FIELDS_HELP_STRING
     )
     parser_object.add_argument(
-        '--' + NWP_NORMALIZATION_FILE_ARG_NAME, type=str, required=False,
-        default='', help=NWP_NORMALIZATION_FILE_HELP_STRING
+        '--' + NWP_NORMALIZATION_FILE_ARG_NAME, type=str, required=True,
+        help=NWP_NORMALIZATION_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + NWP_RESID_NORM_FILE_ARG_NAME, type=str, required=False,
+        default='', help=NWP_RESID_NORM_FILE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + NWP_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
@@ -347,8 +359,12 @@ def add_input_args(parser_object):
         help=TARGET_LAG_TIMES_HELP_STRING
     )
     parser_object.add_argument(
-        '--' + TARGET_NORMALIZATION_FILE_ARG_NAME, type=str, required=False,
-        default='', help=TARGET_NORMALIZATION_FILE_HELP_STRING
+        '--' + TARGET_NORMALIZATION_FILE_ARG_NAME, type=str, required=True,
+        help=TARGET_NORMALIZATION_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + TARGET_RESID_NORM_FILE_ARG_NAME, type=str, required=False,
+        default='', help=TARGET_RESID_NORM_FILE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGETS_USE_QUANTILE_NORM_ARG_NAME, type=int, required=False,
