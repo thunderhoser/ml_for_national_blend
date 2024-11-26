@@ -263,7 +263,10 @@ class SpectralNormalization(keras.layers.Layer):
         layer_type_string = str(type(self.layer)).lower()
 
         if 'depthwise' in layer_type_string:
-            self.w = self.layer.depthwise_kernel
+            try:
+                self.w = self.layer.depthwise_kernel
+            except:
+                self.w = self.layer.kernel
         elif 'conv3d' in layer_type_string:
             self.w = self.layer.kernel
         elif 'conv2d' in layer_type_string:
