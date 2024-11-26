@@ -190,12 +190,16 @@ class EMAHelper:
             checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
             ).assert_consumed()
+
+            self.shadow_weights = checkpoint_object.ema_shadow_weights
         else:
             checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
             )
 
-        self.shadow_weights = checkpoint_object.ema_shadow_weights
+            if hasattr(checkpoint_object, 'ema_shadow_weights'):
+                self.shadow_weights = checkpoint_object.ema_shadow_weights
+
         return checkpoint_object
 
 
