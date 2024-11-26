@@ -14,7 +14,9 @@ from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
-from ml_for_national_blend.utils import normalization
+from ml_for_national_blend.utils import normalization as non_resid_normalization
+from ml_for_national_blend.utils import \
+    residual_normalization as resid_normalization
 
 HOURS_TO_SECONDS = 3600
 MAX_INTERPOLATION_TIME_HOURS = 24
@@ -61,7 +63,8 @@ def __nwp_forecast_to_urma_table(nwp_forecast_matrix, target_field_names):
 
 def __read_targets_one_example(
         valid_time_unix_sec, target_field_names, target_dir_name,
-        target_norm_param_table_xarray, use_quantile_norm, patch_location_dict):
+        target_norm_param_table_xarray, use_quantile_norm,
+        target_resid_norm_param_table_xarray, patch_location_dict):
     """Reads target fields for one example.
 
     M = number of rows in NBM grid (2.5-km target grid)
@@ -75,6 +78,8 @@ def __read_targets_one_example(
     :param target_norm_param_table_xarray: xarray table with normalization
         parameters for target variables.
     :param use_quantile_norm: See documentation for `neural_net.data_generator`.
+    :param target_resid_norm_param_table_xarray: xarray table with residual-
+        normalization parameters for target variables.
     :param patch_location_dict: Dictionary produced by
         `misc_utils.determine_patch_locations`.  If you are training with the
         full grid (not the patchwise approach), make this None.
@@ -108,11 +113,16 @@ def __read_targets_one_example(
         urma_table_xarray=urma_table_xarray,
         desired_field_names=target_field_names
     )
-    # urma_table_xarray = normalization.normalize_targets(
+    # urma_table_xarray = non_resid_normalization.normalize_targets(
     #     urma_table_xarray=urma_table_xarray,
     #     norm_param_table_xarray=target_norm_param_table_xarray,
     #     use_quantile_norm=use_quantile_norm
     # )
+    # if target_resid_norm_param_table_xarray is not None:
+    #     urma_table_xarray = resid_normalization.normalize_targets(
+    #         urma_table_xarray=urma_table_xarray,
+    #         norm_param_table_xarray=target_resid_norm_param_table_xarray
+    #     )
 
     target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
@@ -734,7 +744,8 @@ def _find_predictors_1example_1model(
 def _read_predictors_1example_1model(
         nwp_forecast_file_names, desired_nwp_model_name,
         desired_valid_times_unix_sec, field_names, patch_location_dict,
-        nwp_norm_param_table_xarray, use_quantile_norm):
+        nwp_norm_param_table_xarray, use_quantile_norm,
+        nwp_resid_norm_param_table_xarray):
     """Reads predictors for one example and one NWP model.
 
     M = number of rows in grid for desired NWP model
@@ -751,6 +762,7 @@ def _read_predictors_1example_1model(
     :param patch_location_dict: See documentation for
         `read_predictors_one_example`.
     :param nwp_norm_param_table_xarray: Same.
+    :param nwp_resid_norm_param_table_xarray: Same.
     :param use_quantile_norm: Same.
     :return: predictor_matrix: M-by-N-by-V-by-F numpy array of predictor values.
     """
@@ -850,10 +862,21 @@ def _read_predictors_1example_1model(
         if nwp_norm_param_table_xarray is not None:
             print('Normalizing predictor variables to z-scores...')
             nwp_forecast_table_xarray = (
-                normalization.normalize_nwp_data(
+                non_resid_normalization.normalize_nwp_data(
                     nwp_forecast_table_xarray=nwp_forecast_table_xarray,
                     norm_param_table_xarray=nwp_norm_param_table_xarray,
                     use_quantile_norm=use_quantile_norm
+                )
+            )
+
+        if nwp_resid_norm_param_table_xarray is not None:
+            assert nwp_norm_param_table_xarray is not None
+
+            print('Normalizing predictor variables to residual scores...')
+            nwp_forecast_table_xarray = (
+                resid_normalization.normalize_nwp_data(
+                    nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+                    norm_param_table_xarray=nwp_resid_norm_param_table_xarray
                 )
             )
 
@@ -1161,6 +1184,7 @@ def read_recent_biases_one_example(
         nwp_lead_times_hours, nwp_model_to_dir_name,
         target_field_names, target_dir_name,
         target_norm_param_table_xarray, use_quantile_norm,
+        target_resid_norm_param_table_xarray,
         backup_nwp_model_name, backup_nwp_directory_name,
         patch_location_dict):
     """Reads recent-bias fields for one example.
@@ -1190,6 +1214,8 @@ def read_recent_biases_one_example(
         parameters for target variables.
     :param use_quantile_norm: See documentation for
         `neural_net.data_generator`.
+    :param target_resid_norm_param_table_xarray: xarray table with residual-
+        normalization parameters for target variables.
     :param backup_nwp_model_name: Same.
     :param backup_nwp_directory_name: Same.
     :param patch_location_dict: Dictionary produced by
@@ -1256,6 +1282,8 @@ def read_recent_biases_one_example(
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
             target_norm_param_table_xarray=target_norm_param_table_xarray,
+            target_resid_norm_param_table_xarray=
+            target_resid_norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm,
             patch_location_dict=patch_location_dict
         )
@@ -1294,6 +1322,7 @@ def read_recent_biases_one_example(
                     field_names=nwp_model_to_field_names[nwp_model_names[i]],
                     patch_location_dict=patch_location_dict,
                     nwp_norm_param_table_xarray=None,
+                    nwp_resid_norm_param_table_xarray=None,
                     use_quantile_norm=False
                 )
 
@@ -1320,6 +1349,7 @@ def read_recent_biases_one_example(
                         nwp_model_to_field_names[nwp_model_names[i]],
                         patch_location_dict=patch_location_dict,
                         nwp_norm_param_table_xarray=None,
+                        nwp_resid_norm_param_table_xarray=None,
                         use_quantile_norm=False
                     )
 
@@ -1347,15 +1377,20 @@ def read_recent_biases_one_example(
                 nwp_forecast_matrix=this_forecast_matrix[..., 0, :],
                 target_field_names=target_field_names
             )
-            # this_urma_table_xarray = normalization.normalize_targets(
+            # this_urma_table_xarray = non_resid_normalization.normalize_targets(
             #     urma_table_xarray=this_urma_table_xarray,
             #     norm_param_table_xarray=target_norm_param_table_xarray,
             #     use_quantile_norm=use_quantile_norm
             # )
+            # if target_resid_norm_param_table_xarray is not None:
+            #     this_urma_table_xarray = resid_normalization.normalize_targets(
+            #         urma_table_xarray=this_urma_table_xarray,
+            #         norm_param_table_xarray=target_resid_norm_param_table_xarray
+            #     )
+
             this_forecast_matrix = (
                 this_urma_table_xarray[urma_utils.DATA_KEY].values[0, ...]
             )
-
             dsf = nwp_downsampling_factors[i]
             this_bias_matrix = (
                 this_forecast_matrix - this_target_matrix[::dsf, ::dsf, ...]
@@ -1439,6 +1474,7 @@ def read_predictors_one_example(
         init_time_unix_sec, nwp_model_names, nwp_lead_times_hours,
         nwp_model_to_field_names, nwp_model_to_dir_name,
         nwp_norm_param_table_xarray, use_quantile_norm,
+        nwp_resid_norm_param_table_xarray,
         backup_nwp_model_name, backup_nwp_directory_name, patch_location_dict,
         rigid_flag=False):
     """Reads predictor fields for one example.
@@ -1454,6 +1490,9 @@ def read_predictors_one_example(
         parameters for predictor variables.  If you do not want to normalize (or
         if the input directory already contains normalized data), this should be
         None.
+    :param nwp_resid_norm_param_table_xarray: xarray table with
+        residual-normalization parameters for predictor variables.  This can
+        also be None.
     :param use_quantile_norm: See documentation for
         `neural_net.data_generator`.
     :param backup_nwp_model_name: Same.
@@ -1527,6 +1566,8 @@ def read_predictors_one_example(
                 field_names=nwp_model_to_field_names[nwp_model_names[i]],
                 patch_location_dict=patch_location_dict,
                 nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                nwp_resid_norm_param_table_xarray=
+                nwp_resid_norm_param_table_xarray,
                 use_quantile_norm=use_quantile_norm
             )
 
@@ -1560,6 +1601,8 @@ def read_predictors_one_example(
                     field_names=nwp_model_to_field_names[nwp_model_names[i]],
                     patch_location_dict=patch_location_dict,
                     nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                    nwp_resid_norm_param_table_xarray=
+                    nwp_resid_norm_param_table_xarray,
                     use_quantile_norm=use_quantile_norm
                 )
 

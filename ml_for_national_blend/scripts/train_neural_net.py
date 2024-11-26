@@ -54,9 +54,11 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 def _run(template_file_name, output_dir_name,
          nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
          nwp_normalization_file_name, nwp_use_quantile_norm,
+         nwp_resid_norm_file_name,
          backup_nwp_model_name, backup_nwp_dir_name,
          target_lead_time_hours, target_field_names, target_lag_times_hours,
          target_normalization_file_name, targets_use_quantile_norm,
+         target_resid_norm_file_name,
          recent_bias_init_time_lags_hours, recent_bias_lead_times_hours,
          nbm_constant_field_names, nbm_constant_file_name,
          compare_to_baseline_in_loss, num_examples_per_batch, sentinel_value,
@@ -86,6 +88,7 @@ def _run(template_file_name, output_dir_name,
     :param nwp_model_names: Same.
     :param nwp_model_to_field_names: Same.
     :param nwp_normalization_file_name: Same.
+    :param nwp_resid_norm_file_name: Same.
     :param nwp_use_quantile_norm: Same.
     :param backup_nwp_model_name: Same.
     :param backup_nwp_dir_name: Same.
@@ -93,6 +96,7 @@ def _run(template_file_name, output_dir_name,
     :param target_field_names: Same.
     :param target_lag_times_hours: Same.
     :param target_normalization_file_name: Same.
+    :param target_resid_norm_file_name: Same.
     :param targets_use_quantile_norm: Same.
     :param recent_bias_init_time_lags_hours: Same.
     :param recent_bias_lead_times_hours: Same.
@@ -128,10 +132,10 @@ def _run(template_file_name, output_dir_name,
     :param early_stopping_patience_epochs: Same.
     """
 
-    if nwp_normalization_file_name == '':
-        nwp_normalization_file_name = None
-    if target_normalization_file_name == '':
-        target_normalization_file_name = None
+    if nwp_resid_norm_file_name == '':
+        nwp_resid_norm_file_name = None
+    if target_resid_norm_file_name == '':
+        target_resid_norm_file_name = None
     if resid_baseline_model_name == '':
         resid_baseline_model_name = None
     if resid_baseline_model_dir_name == '':
@@ -197,6 +201,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
         neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
         neural_net.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
+        neural_net.NWP_RESID_NORM_FILE_KEY: nwp_resid_norm_file_name,
         neural_net.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
         neural_net.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
         neural_net.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
@@ -205,6 +210,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
         neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
+        neural_net.TARGET_RESID_NORM_FILE_KEY: target_resid_norm_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
         neural_net.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
@@ -255,6 +261,8 @@ def _run(template_file_name, output_dir_name,
         chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
         chiu_net_pp_architecture_dict=
         mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
+        chiu_next_pp_architecture_dict=
+        mmd[neural_net.CHIU_NEXT_PP_ARCHITECTURE_KEY],
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -286,6 +294,9 @@ if __name__ == '__main__':
         nwp_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.NWP_NORMALIZATION_FILE_ARG_NAME
         ),
+        nwp_resid_norm_file_name=getattr(
+            INPUT_ARG_OBJECT, training_args.NWP_RESID_NORM_FILE_ARG_NAME
+        ),
         nwp_use_quantile_norm=bool(getattr(
             INPUT_ARG_OBJECT, training_args.NWP_USE_QUANTILE_NORM_ARG_NAME
         )),
@@ -307,6 +318,9 @@ if __name__ == '__main__':
         ),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORMALIZATION_FILE_ARG_NAME
+        ),
+        target_resid_norm_file_name=getattr(
+            INPUT_ARG_OBJECT, training_args.TARGET_RESID_NORM_FILE_ARG_NAME
         ),
         targets_use_quantile_norm=bool(getattr(
             INPUT_ARG_OBJECT, training_args.TARGETS_USE_QUANTILE_NORM_ARG_NAME

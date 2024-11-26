@@ -22,7 +22,9 @@ from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nbm_constant_utils
-from ml_for_national_blend.utils import normalization
+from ml_for_national_blend.utils import normalization as non_resid_normalization
+from ml_for_national_blend.utils import \
+    residual_normalization as resid_normalization
 from ml_for_national_blend.machine_learning import nwp_input
 from ml_for_national_blend.machine_learning import custom_losses
 from ml_for_national_blend.machine_learning import custom_metrics
@@ -40,6 +42,7 @@ NWP_LEAD_TIMES_KEY = 'nwp_lead_times_hours'
 NWP_MODEL_TO_DIR_KEY = 'nwp_model_to_dir_name'
 NWP_MODEL_TO_FIELDS_KEY = 'nwp_model_to_field_names'
 NWP_NORM_FILE_KEY = 'nwp_normalization_file_name'
+NWP_RESID_NORM_FILE_KEY = 'nwp_resid_norm_file_name'
 NWP_USE_QUANTILE_NORM_KEY = 'nwp_use_quantile_norm'
 BACKUP_NWP_MODEL_KEY = 'backup_nwp_model_name'
 BACKUP_NWP_DIR_KEY = 'backup_nwp_directory_name'
@@ -48,6 +51,7 @@ TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_hours'
 TARGET_DIR_KEY = 'target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
+TARGET_RESID_NORM_FILE_KEY = 'target_resid_norm_file_name'
 TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
 RECENT_BIAS_LAG_TIMES_KEY = 'recent_bias_init_time_lags_hours'
 RECENT_BIAS_LEAD_TIMES_KEY = 'recent_bias_lead_times_hours'
@@ -593,6 +597,9 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[NWP_USE_QUANTILE_NORM_KEY])
+    if option_dict[NWP_RESID_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[NWP_RESID_NORM_FILE_KEY])
+
     error_checking.assert_is_string(option_dict[BACKUP_NWP_MODEL_KEY])
     error_checking.assert_is_string(option_dict[BACKUP_NWP_DIR_KEY])
 
@@ -619,6 +626,10 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_string(option_dict[TARGET_DIR_KEY])
     error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[TARGETS_USE_QUANTILE_NORM_KEY])
+    if option_dict[TARGET_RESID_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(
+            option_dict[TARGET_RESID_NORM_FILE_KEY]
+        )
 
     use_recent_biases = not (
         option_dict[RECENT_BIAS_LAG_TIMES_KEY] is None
@@ -976,7 +987,8 @@ def _init_matrices_1batch(
 def _read_targets_one_example(
         init_time_unix_sec, target_lead_time_hours,
         target_field_names, target_dir_name,
-        target_norm_param_table_xarray, use_quantile_norm, patch_location_dict):
+        target_norm_param_table_xarray, use_quantile_norm,
+        target_resid_norm_param_table_xarray, patch_location_dict):
     """Reads target fields for one example.
 
     NBM = National Blend of Models
@@ -992,6 +1004,8 @@ def _read_targets_one_example(
     :param target_norm_param_table_xarray: xarray table with normalization
         parameters for target variables.
     :param use_quantile_norm: See documentation for `data_generator`.
+    :param target_resid_norm_param_table_xarray: xarray table with
+        residual-normalization parameters for target variables.
     :param patch_location_dict: Dictionary produced by
         `misc_utils.determine_patch_locations`.  If you are training with the
         full grid (not the patchwise approach), make this None.
@@ -1066,11 +1080,18 @@ def _read_targets_one_example(
         })
     else:
         print('Normalizing target variables to z-scores...')
-        urma_table_xarray = normalization.normalize_targets(
+        urma_table_xarray = non_resid_normalization.normalize_targets(
             urma_table_xarray=urma_table_xarray,
             norm_param_table_xarray=target_norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm
         )
+
+        if target_resid_norm_param_table_xarray is not None:
+            print('Normalizing target variables to residual scores...')
+            urma_table_xarray = resid_normalization.normalize_targets(
+                urma_table_xarray=urma_table_xarray,
+                norm_param_table_xarray=target_resid_norm_param_table_xarray
+            )
 
     target_matrix = numpy.transpose(
         urma_table_xarray[urma_utils.DATA_KEY].values[0, ...],
@@ -1186,6 +1207,7 @@ def create_data(option_dict, init_time_unix_sec,
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_resid_norm_file_name = option_dict[NWP_RESID_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
@@ -1194,6 +1216,7 @@ def create_data(option_dict, init_time_unix_sec,
     target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    target_resid_norm_file_name = option_dict[TARGET_RESID_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
     recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
@@ -1240,12 +1263,34 @@ def create_data(option_dict, init_time_unix_sec,
         nwp_normalization_file_name
     )
 
+    if nwp_resid_norm_file_name is None:
+        nwp_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            nwp_resid_norm_file_name
+        ))
+        nwp_resid_norm_param_table_xarray = (
+            nwp_model_io.read_normalization_file(
+                nwp_resid_norm_file_name
+            )
+        )
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
     ))
     target_norm_param_table_xarray = urma_io.read_normalization_file(
         target_normalization_file_name
     )
+
+    if target_resid_norm_file_name is None:
+        target_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            target_resid_norm_file_name
+        ))
+        target_resid_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_resid_norm_file_name
+        )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -1298,6 +1343,7 @@ def create_data(option_dict, init_time_unix_sec,
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
             target_norm_param_table_xarray=None,
+            target_resid_norm_param_table_xarray=None,
             use_quantile_norm=False,
             patch_location_dict=patch_location_dict
         )
@@ -1329,6 +1375,8 @@ def create_data(option_dict, init_time_unix_sec,
                     target_dir_name=target_dir_name,
                     target_norm_param_table_xarray=
                     target_norm_param_table_xarray,
+                    target_resid_norm_param_table_xarray=
+                    target_resid_norm_param_table_xarray,
                     use_quantile_norm=targets_use_quantile_norm,
                     patch_location_dict=None
                 )
@@ -1413,6 +1461,7 @@ def create_data(option_dict, init_time_unix_sec,
             nwp_model_to_field_names=nwp_model_to_field_names,
             nwp_model_to_dir_name=nwp_model_to_dir_name,
             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+            nwp_resid_norm_param_table_xarray=nwp_resid_norm_param_table_xarray,
             use_quantile_norm=nwp_use_quantile_norm,
             backup_nwp_model_name=backup_nwp_model_name,
             backup_nwp_directory_name=backup_nwp_directory_name,
@@ -1471,6 +1520,8 @@ def create_data(option_dict, init_time_unix_sec,
                 target_field_names=target_field_names,
                 target_dir_name=target_dir_name,
                 target_norm_param_table_xarray=target_norm_param_table_xarray,
+                target_resid_norm_param_table_xarray=
+                target_resid_norm_param_table_xarray,
                 use_quantile_norm=targets_use_quantile_norm,
                 backup_nwp_model_name=backup_nwp_model_name,
                 backup_nwp_directory_name=backup_nwp_directory_name,
@@ -1621,6 +1672,7 @@ def create_data_fast_patches(
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_resid_norm_file_name = option_dict[NWP_RESID_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
@@ -1629,6 +1681,7 @@ def create_data_fast_patches(
     target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    target_resid_norm_file_name = option_dict[TARGET_RESID_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
     recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
@@ -1669,12 +1722,34 @@ def create_data_fast_patches(
         nwp_normalization_file_name
     )
 
+    if nwp_resid_norm_file_name is None:
+        nwp_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            nwp_resid_norm_file_name
+        ))
+        nwp_resid_norm_param_table_xarray = (
+            nwp_model_io.read_normalization_file(
+                nwp_resid_norm_file_name
+            )
+        )
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
     ))
     target_norm_param_table_xarray = urma_io.read_normalization_file(
         target_normalization_file_name
     )
+
+    if target_resid_norm_file_name is None:
+        target_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            target_resid_norm_file_name
+        ))
+        target_resid_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_resid_norm_file_name
+        )
 
     # Ensure that forecast-initialization time makes sense.
     init_times_unix_sec = _find_relevant_init_times(
@@ -1728,6 +1803,7 @@ def create_data_fast_patches(
             target_field_names=target_field_names,
             target_dir_name=target_dir_name,
             target_norm_param_table_xarray=None,
+            target_resid_norm_param_table_xarray=None,
             use_quantile_norm=False,
             patch_location_dict=None
         )
@@ -1761,6 +1837,8 @@ def create_data_fast_patches(
                     target_dir_name=target_dir_name,
                     target_norm_param_table_xarray=
                     target_norm_param_table_xarray,
+                    target_resid_norm_param_table_xarray=
+                    target_resid_norm_param_table_xarray,
                     use_quantile_norm=targets_use_quantile_norm,
                     patch_location_dict=None
                 )
@@ -1846,6 +1924,7 @@ def create_data_fast_patches(
             nwp_model_to_field_names=nwp_model_to_field_names,
             nwp_model_to_dir_name=nwp_model_to_dir_name,
             nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+            nwp_resid_norm_param_table_xarray=nwp_resid_norm_param_table_xarray,
             use_quantile_norm=nwp_use_quantile_norm,
             backup_nwp_model_name=backup_nwp_model_name,
             backup_nwp_directory_name=backup_nwp_directory_name,
@@ -1889,6 +1968,8 @@ def create_data_fast_patches(
                 target_field_names=target_field_names,
                 target_dir_name=target_dir_name,
                 target_norm_param_table_xarray=target_norm_param_table_xarray,
+                target_resid_norm_param_table_xarray=
+                target_resid_norm_param_table_xarray,
                 use_quantile_norm=targets_use_quantile_norm,
                 backup_nwp_model_name=backup_nwp_model_name,
                 backup_nwp_directory_name=backup_nwp_directory_name,
@@ -2150,6 +2231,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_resid_norm_file_name = option_dict[NWP_RESID_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
@@ -2158,6 +2240,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    target_resid_norm_file_name = option_dict[TARGET_RESID_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
     recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
@@ -2210,12 +2293,34 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
         nwp_normalization_file_name
     )
 
+    if nwp_resid_norm_file_name is None:
+        nwp_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            nwp_resid_norm_file_name
+        ))
+        nwp_resid_norm_param_table_xarray = (
+            nwp_model_io.read_normalization_file(
+                nwp_resid_norm_file_name
+            )
+        )
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
     ))
     target_norm_param_table_xarray = urma_io.read_normalization_file(
         target_normalization_file_name
     )
+
+    if target_resid_norm_file_name is None:
+        target_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            target_resid_norm_file_name
+        ))
+        target_resid_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_resid_norm_file_name
+        )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -2356,6 +2461,7 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                         target_field_names=target_field_names,
                         target_dir_name=target_dir_name,
                         target_norm_param_table_xarray=None,
+                        target_resid_norm_param_table_xarray=None,
                         use_quantile_norm=False,
                         patch_location_dict=None
                     )
@@ -2404,6 +2510,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                             target_dir_name=target_dir_name,
                             target_norm_param_table_xarray=
                             target_norm_param_table_xarray,
+                            target_resid_norm_param_table_xarray=
+                            target_resid_norm_param_table_xarray,
                             use_quantile_norm=targets_use_quantile_norm,
                             patch_location_dict=None
                         )
@@ -2538,6 +2646,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                         nwp_model_to_field_names=nwp_model_to_field_names,
                         nwp_model_to_dir_name=nwp_model_to_dir_name,
                         nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                        nwp_resid_norm_param_table_xarray=
+                        nwp_resid_norm_param_table_xarray,
                         use_quantile_norm=nwp_use_quantile_norm,
                         backup_nwp_model_name=backup_nwp_model_name,
                         backup_nwp_directory_name=backup_nwp_directory_name,
@@ -2606,6 +2716,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                         target_dir_name=target_dir_name,
                         target_norm_param_table_xarray=
                         target_norm_param_table_xarray,
+                        target_resid_norm_param_table_xarray=
+                        target_resid_norm_param_table_xarray,
                         use_quantile_norm=targets_use_quantile_norm,
                         backup_nwp_model_name=backup_nwp_model_name,
                         backup_nwp_directory_name=backup_nwp_directory_name,
@@ -2947,6 +3059,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
     nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
     nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
     nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    nwp_resid_norm_file_name = option_dict[NWP_RESID_NORM_FILE_KEY]
     nwp_use_quantile_norm = option_dict[NWP_USE_QUANTILE_NORM_KEY]
     backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
     backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
@@ -2955,6 +3068,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
     target_lag_times_hours = option_dict[TARGET_LAG_TIMES_KEY]
     target_dir_name = option_dict[TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    target_resid_norm_file_name = option_dict[TARGET_RESID_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     recent_bias_init_time_lags_hours = option_dict[RECENT_BIAS_LAG_TIMES_KEY]
     recent_bias_lead_times_hours = option_dict[RECENT_BIAS_LEAD_TIMES_KEY]
@@ -3011,12 +3125,34 @@ def data_generator(option_dict, return_predictors_as_dict=False):
         nwp_normalization_file_name
     )
 
+    if nwp_resid_norm_file_name is None:
+        nwp_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            nwp_resid_norm_file_name
+        ))
+        nwp_resid_norm_param_table_xarray = (
+            nwp_model_io.read_normalization_file(
+                nwp_resid_norm_file_name
+            )
+        )
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_normalization_file_name
     ))
     target_norm_param_table_xarray = urma_io.read_normalization_file(
         target_normalization_file_name
     )
+
+    if target_resid_norm_file_name is None:
+        target_resid_norm_param_table_xarray = None
+    else:
+        print('Reading residual-normalization params from: "{0:s}"...'.format(
+            target_resid_norm_file_name
+        ))
+        target_resid_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_resid_norm_file_name
+        )
 
     init_times_unix_sec = _find_relevant_init_times(
         first_time_by_period_unix_sec=first_init_times_unix_sec,
@@ -3120,6 +3256,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                     target_field_names=target_field_names,
                     target_dir_name=target_dir_name,
                     target_norm_param_table_xarray=None,
+                    target_resid_norm_param_table_xarray=None,
                     use_quantile_norm=False,
                     patch_location_dict=patch_location_dict
                 )
@@ -3173,6 +3310,8 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                             target_dir_name=target_dir_name,
                             target_norm_param_table_xarray=
                             target_norm_param_table_xarray,
+                            target_resid_norm_param_table_xarray=
+                            target_resid_norm_param_table_xarray,
                             use_quantile_norm=targets_use_quantile_norm,
                             patch_location_dict=patch_location_dict
                         )
@@ -3284,6 +3423,8 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                     nwp_model_to_field_names=nwp_model_to_field_names,
                     nwp_model_to_dir_name=nwp_model_to_dir_name,
                     nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                    nwp_resid_norm_param_table_xarray=
+                    nwp_resid_norm_param_table_xarray,
                     use_quantile_norm=nwp_use_quantile_norm,
                     patch_location_dict=patch_location_dict,
                     backup_nwp_model_name=backup_nwp_model_name,
@@ -3345,6 +3486,8 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                         target_dir_name=target_dir_name,
                         target_norm_param_table_xarray=
                         target_norm_param_table_xarray,
+                        target_resid_norm_param_table_xarray=
+                        target_resid_norm_param_table_xarray,
                         use_quantile_norm=targets_use_quantile_norm,
                         backup_nwp_model_name=backup_nwp_model_name,
                         backup_nwp_directory_name=backup_nwp_directory_name,
@@ -4025,6 +4168,12 @@ def read_metafile(pickle_file_name):
         validation_option_dict[RECENT_BIAS_LAG_TIMES_KEY] = None
         training_option_dict[RECENT_BIAS_LEAD_TIMES_KEY] = None
         validation_option_dict[RECENT_BIAS_LEAD_TIMES_KEY] = None
+    if NWP_RESID_NORM_FILE_KEY not in training_option_dict:
+        training_option_dict[NWP_RESID_NORM_FILE_KEY] = None
+        validation_option_dict[NWP_RESID_NORM_FILE_KEY] = None
+    if TARGET_RESID_NORM_FILE_KEY not in training_option_dict:
+        training_option_dict[TARGET_RESID_NORM_FILE_KEY] = None
+        validation_option_dict[TARGET_RESID_NORM_FILE_KEY] = None
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
