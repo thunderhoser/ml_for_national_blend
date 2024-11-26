@@ -222,13 +222,17 @@ def get_intermediate_norm_params_for_nwp(
                 interp_nwp_model_io.read_file(this_file_name)
             )
 
+        nwp_forecast_tables_xarray = [
+            nwpft.drop_vars(attrs=list(nwpft.attrs.keys()))
+            for nwpft in nwp_forecast_tables_xarray
+        ]
+
         try:
             nwp_forecast_table_xarray = xarray.concat(
                 nwp_forecast_tables_xarray,
                 dim=nwp_model_utils.FORECAST_HOUR_DIM,
                 data_vars=[nwp_model_utils.DATA_KEY],
-                coords='minimal', compat='identical', join='exact',
-                combine_attrs='drop'
+                coords='minimal', compat='identical', join='exact'
             )
         except Exception as this_exception:
             warning_string = (
@@ -619,13 +623,17 @@ def get_normalization_params_for_nwp(
                 interp_nwp_model_io.read_file(this_file_name)
             )
 
+        nwp_forecast_tables_xarray = [
+            nwpft.drop_vars(attrs=list(nwpft.attrs.keys()))
+            for nwpft in nwp_forecast_tables_xarray
+        ]
+
         try:
             nwp_forecast_table_xarray = xarray.concat(
                 nwp_forecast_tables_xarray,
                 dim=nwp_model_utils.FORECAST_HOUR_DIM,
                 data_vars=[nwp_model_utils.DATA_KEY],
-                coords='minimal', compat='identical', join='exact',
-                combine_attrs='drop'
+                coords='minimal', compat='identical', join='exact'
             )
         except Exception as this_exception:
             warning_string = (
