@@ -1,6 +1,7 @@
 """Helper methods for residual normalization."""
 
 import os
+import warnings
 import numpy
 import xarray
 from ml_for_national_blend.outside_code import error_checking
@@ -229,7 +230,14 @@ def get_intermediate_norm_params_for_nwp(
                 coords='minimal', compat='identical', join='exact',
                 combine_attrs='no_conflicts'
             )
-        except:
+        except Exception as this_exception:
+            warning_string = (
+                'POTENTIAL ERROR: Could not concatenate tables:\n{0:s}'
+            ).format(
+                str(this_exception)
+            )
+
+            warnings.warn(warning_string)
             continue
 
         del nwp_forecast_tables_xarray
@@ -619,7 +627,14 @@ def get_normalization_params_for_nwp(
                 coords='minimal', compat='identical', join='exact',
                 combine_attrs='no_conflicts'
             )
-        except:
+        except Exception as this_exception:
+            warning_string = (
+                'POTENTIAL ERROR: Could not concatenate tables:\n{0:s}'
+            ).format(
+                str(this_exception)
+            )
+
+            warnings.warn(warning_string)
             continue
 
         del nwp_forecast_tables_xarray
