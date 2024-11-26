@@ -3894,6 +3894,7 @@ def train_model(
 
     # TODO(thunderhoser): I don't know what happens here if the directory
     # doesn't exist.
+    print('INITIAL EPOCH: {0:d}'.format(initial_epoch))
     ema_object.restore_optimizer_state(
         checkpoint_dir=ema_backup_dir_name,
         raise_error_if_missing=initial_epoch > 0
