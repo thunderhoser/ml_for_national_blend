@@ -235,7 +235,7 @@ def get_intermediate_norm_params_for_nwp(
                 dim=nwp_model_utils.FORECAST_HOUR_DIM,
                 data_vars=[nwp_model_utils.DATA_KEY],
                 coords='minimal', compat='identical', join='exact',
-                combine_attrs='no_conflicts'
+                combine_attrs='drop'
             )
         except Exception as this_exception:
             warning_string = (
@@ -632,7 +632,7 @@ def get_normalization_params_for_nwp(
                 dim=nwp_model_utils.FORECAST_HOUR_DIM,
                 data_vars=[nwp_model_utils.DATA_KEY],
                 coords='minimal', compat='identical', join='exact',
-                combine_attrs='no_conflicts'
+                combine_attrs='drop'
             )
         except Exception as this_exception:
             warning_string = (
