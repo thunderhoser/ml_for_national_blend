@@ -228,6 +228,7 @@ def get_intermediate_norm_params_for_nwp(
             nwp_forecast_tables_xarray.append(
                 interp_nwp_model_io.read_file(this_file_name)
             )
+            nwp_forecast_tables_xarray[-1].attrs = {}
 
         nwp_forecast_tables_xarray = [
             nwpft.drop_vars(attrs=list(nwpft.attrs.keys()))
@@ -629,6 +630,7 @@ def get_normalization_params_for_nwp(
             nwp_forecast_tables_xarray.append(
                 interp_nwp_model_io.read_file(this_file_name)
             )
+            nwp_forecast_tables_xarray[-1].attrs = {}
 
         nwp_forecast_tables_xarray = [
             nwpft.drop_vars(attrs=list(nwpft.attrs.keys()))
