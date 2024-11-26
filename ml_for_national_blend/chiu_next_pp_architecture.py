@@ -300,24 +300,26 @@ class SpectralNormalization(keras.layers.Layer):
         print(self.u.shape)
         print(w_reshaped.shape)
 
-        v = tensorflow.linalg.matvec(
-            tensorflow.transpose(w_reshaped), self.u, transpose_a=True
-        )
+        v = tensorflow.linalg.matvec(w_reshaped, self.u, transpose_a=False)
         v = tensorflow.math.l2_normalize(v)
         print(v.shape)
-        print('\n')
 
-        u = tensorflow.linalg.matvec(w_reshaped, v)
+        u = tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         u = tensorflow.math.l2_normalize(u)
 
         sigma = tensorflow.linalg.matvec(
             u,
-            tensorflow.linalg.matvec(w_reshaped, v)
+            tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         )
         self.u.assign(u)
+        print(sigma)
+        print('\n')
 
         if 'depthwise' in layer_type_string:
-            self.layer.depthwise_kernel.assign(self.w / sigma)
+            try:
+                self.layer.depthwise_kernel.assign(self.w / sigma)
+            except:
+                self.layer.kernel.assign(self.w / sigma)
         else:
             self.layer.kernel.assign(self.w / sigma)
 
