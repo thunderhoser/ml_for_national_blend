@@ -295,14 +295,8 @@ class SpectralNormalization(keras.layers.Layer):
         elif 'dense' in layer_type_string:
             w_reshaped = self.w
 
-        print('LAYER NAME = {0:s}'.format(self.layer.name))
-        print(self.w.shape)
-        print(self.u.shape)
-        print(w_reshaped.shape)
-
         v = tensorflow.linalg.matvec(w_reshaped, self.u, transpose_a=False)
         v = tensorflow.math.l2_normalize(v)
-        print(v.shape)
 
         u = tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         u = tensorflow.math.l2_normalize(u)
@@ -312,8 +306,6 @@ class SpectralNormalization(keras.layers.Layer):
             tensorflow.linalg.matvec(tensorflow.transpose(w_reshaped), v)
         )
         self.u.assign(u)
-        print(sigma)
-        print('\n')
 
         if 'depthwise' in layer_type_string:
             try:
