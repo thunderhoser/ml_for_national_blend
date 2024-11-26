@@ -14,6 +14,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import error_checking
 import architecture_utils
 import chiu_net_architecture as chiu_net_arch
 
@@ -39,7 +40,6 @@ INPUT_DIMENSIONS_LAGGED_TARGETS_KEY = (
     chiu_net_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY
 )
 USE_RESIDUAL_BLOCKS_KEY = chiu_net_arch.USE_RESIDUAL_BLOCKS_KEY
-USE_CONVNEXT_BLOCKS_KEY = chiu_net_arch.USE_CONVNEXT_BLOCKS_KEY
 
 NWP_ENCODER_NUM_CHANNELS_KEY = chiu_net_arch.NWP_ENCODER_NUM_CHANNELS_KEY
 NWP_POOLING_SIZE_KEY = chiu_net_arch.NWP_POOLING_SIZE_KEY
@@ -110,421 +110,10 @@ LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 METRIC_FUNCTIONS_KEY = chiu_net_arch.METRIC_FUNCTIONS_KEY
 
-EPSILON_FOR_LAYER_NORM = 1e-6
-EXPANSION_FACTOR_FOR_CONVNEXT = 4
-INIT_VALUE_FOR_LAYER_SCALE = 1e-6
-
-
-@keras.saving.register_keras_serializable()
-class LayerScale(keras.layers.Layer):
-    """Layer-scale module.
-
-    Scavenged from: https://github.com/danielabdi-noaa/HRRRemulator/blob/
-                    master/tfmodel/convnext.py
-    """
-
-    def __init__(self, init_values, projection_dim, **kwargs):
-        super().__init__(**kwargs)
-        self.init_values = init_values
-        self.projection_dim = projection_dim
-
-    def build(self, _):
-        self.gamma = self.add_weight(
-            shape=(self.projection_dim,),
-            initializer=keras.initializers.Constant(self.init_values),
-            trainable=True,
-            name="gamma",
-        )
-
-    def call(self, x):
-        return x * self.gamma
-
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "init_values": self.init_values,
-                "projection_dim": self.projection_dim,
-            }
-        )
-        return config
-
-
-def __get_2d_convnext_block(
-        input_layer_object, num_conv_layers, filter_size_px, num_filters,
-        do_time_distributed_conv, regularizer_object, dropout_rates,
-        do_activation, basic_layer_name):
-    """Creates ConvNext block for data with 2 spatial dimensions.
-
-    L = number of conv layers
-
-    :param input_layer_object: See documentation for `_get_2d_conv_block`.
-    :param num_conv_layers: Same.
-    :param filter_size_px: Same.
-    :param num_filters: Same.
-    :param do_time_distributed_conv: Same.
-    :param regularizer_object: Same.
-    :param dropout_rates: Same.
-    :param do_activation: Boolean flag.  If True, will include GeLU activation.
-        If False, no activation.
-    :param basic_layer_name: Same.
-    :return: output_layer_object: Same.
-    """
-
-    # TODO(thunderhoser): HACK.
-    if filter_size_px == 3:
-        actual_filter_size_px = 7
-    else:
-        actual_filter_size_px = filter_size_px + 0
-
-    current_layer_object = None
-
-    for i in range(num_conv_layers):
-        if i == 0:
-            this_input_layer_object = input_layer_object
-        else:
-            this_input_layer_object = current_layer_object
-
-        this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_2d_depthwise_conv_layer(
-            num_kernel_rows=actual_filter_size_px,
-            num_kernel_columns=actual_filter_size_px,
-            num_rows_per_stride=1,
-            num_columns_per_stride=1,
-            num_filters=num_filters,
-            padding_type_string=architecture_utils.YES_PADDING_STRING,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )
-
-        if do_time_distributed_conv:
-            current_layer_object = keras.layers.TimeDistributed(
-                current_layer_object, name=this_name
-            )(this_input_layer_object)
-        else:
-            current_layer_object = current_layer_object(this_input_layer_object)
-
-        this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
-        current_layer_object = keras.layers.LayerNormalization(
-            epsilon=EPSILON_FOR_LAYER_NORM, name=this_name
-        )(
-            current_layer_object
-        )
-
-        this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
-            num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )(current_layer_object)
-
-        if do_activation:
-            this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
-            current_layer_object = keras.layers.Activation(
-                'gelu', name=this_name
-            )(current_layer_object)
-
-        if dropout_rates[i] > 0:
-            this_name = '{0:s}_dropout{1:d}a'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_dropout_layer(
-                dropout_fraction=dropout_rates[i], layer_name=this_name
-            )(current_layer_object)
-
-        this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
-            num_output_units=num_filters,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )(current_layer_object)
-
-        if dropout_rates[i] > 0:
-            this_name = '{0:s}_dropout{1:d}b'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_dropout_layer(
-                dropout_fraction=dropout_rates[i], layer_name=this_name
-            )(current_layer_object)
-
-        this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
-        current_layer_object = LayerScale(
-            INIT_VALUE_FOR_LAYER_SCALE, num_filters, name=this_name
-        )(current_layer_object)
-
-        if i != num_conv_layers - 1:
-            continue
-
-        if input_layer_object.shape[-1] == num_filters:
-            new_layer_object = input_layer_object
-        else:
-            this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
-            new_layer_object = architecture_utils.get_2d_conv_layer(
-                num_kernel_rows=1,
-                num_kernel_columns=1,
-                num_rows_per_stride=1,
-                num_columns_per_stride=1,
-                num_filters=num_filters,
-                padding_type_string=architecture_utils.YES_PADDING_STRING,
-                weight_regularizer=regularizer_object,
-                layer_name=this_name
-            )
-
-            if do_time_distributed_conv:
-                new_layer_object = keras.layers.TimeDistributed(
-                    new_layer_object, name=this_name
-                )(input_layer_object)
-            else:
-                new_layer_object = new_layer_object(input_layer_object)
-
-        this_name = '{0:s}_residual'.format(basic_layer_name)
-        current_layer_object = keras.layers.Add(name=this_name)([
-            current_layer_object, new_layer_object
-        ])
-
-    return current_layer_object
-
-
-def __get_3d_convnext_block(
-        input_layer_object, num_conv_layers, filter_size_px,
-        regularizer_object, dropout_rates, do_activation, basic_layer_name):
-    """Creates ConvNext block for data with 3 spatial dimensions.
-
-    :param input_layer_object: See documentation for `_get_3d_conv_block`.
-    :param num_conv_layers: Same.
-    :param filter_size_px: Same.
-    :param regularizer_object: Same.
-    :param dropout_rates: Same.
-    :param do_activation: Boolean flag.  If True, will include GeLU activation.
-        If False, no activation.
-    :param basic_layer_name: Same.
-    :return: output_layer_object: Same.
-    """
-
-    # Process input args.
-    num_conv_layers = max([num_conv_layers, 2])
-
-    try:
-        _ = len(dropout_rates)
-    except:
-        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
-
-    if len(dropout_rates) < num_conv_layers:
-        dropout_rates = numpy.concatenate([
-            dropout_rates, dropout_rates[[-1]]
-        ])
-
-    assert len(dropout_rates) == num_conv_layers
-
-    # Do actual stuff.
-    current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
-    num_filters = input_layer_object.shape[-1]
-
-    for i in range(num_conv_layers):
-        this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
-
-        if i == 0:
-            current_layer_object = architecture_utils.get_3d_conv_layer(
-                num_kernel_rows=filter_size_px,
-                num_kernel_columns=filter_size_px,
-                num_kernel_heights=num_time_steps,
-                num_rows_per_stride=1,
-                num_columns_per_stride=1,
-                num_heights_per_stride=1,
-                num_filters=num_filters,
-                padding_type_string=architecture_utils.NO_PADDING_STRING,
-                weight_regularizer=regularizer_object,
-                layer_name=this_name
-            )(input_layer_object)
-
-            new_dims = (
-                current_layer_object.shape[1:3] +
-                (current_layer_object.shape[-1],)
-            )
-
-            this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
-            current_layer_object = keras.layers.Reshape(
-                target_shape=new_dims, name=this_name
-            )(current_layer_object)
-        else:
-            current_layer_object = (
-                architecture_utils.get_2d_depthwise_conv_layer(
-                    num_kernel_rows=filter_size_px,
-                    num_kernel_columns=filter_size_px,
-                    num_rows_per_stride=1,
-                    num_columns_per_stride=1,
-                    num_filters=num_filters,
-                    padding_type_string=architecture_utils.YES_PADDING_STRING,
-                    weight_regularizer=regularizer_object,
-                    layer_name=this_name
-                )(current_layer_object)
-            )
-
-        this_name = '{0:s}_lyrnorm{1:d}'.format(basic_layer_name, i)
-        current_layer_object = keras.layers.LayerNormalization(
-            epsilon=EPSILON_FOR_LAYER_NORM, name=this_name
-        )(
-            current_layer_object
-        )
-
-        this_name = '{0:s}_dense{1:d}a'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
-            num_output_units=EXPANSION_FACTOR_FOR_CONVNEXT * num_filters,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )(current_layer_object)
-
-        if do_activation:
-            this_name = '{0:s}_gelu{1:d}'.format(basic_layer_name, i)
-            current_layer_object = keras.layers.Activation(
-                'gelu', name=this_name
-            )(current_layer_object)
-
-        if dropout_rates[i] > 0:
-            this_name = '{0:s}_dropout{1:d}a'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_dropout_layer(
-                dropout_fraction=dropout_rates[i], layer_name=this_name
-            )(current_layer_object)
-
-        this_name = '{0:s}_dense{1:d}b'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_dense_layer(
-            num_output_units=num_filters,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )(current_layer_object)
-
-        if dropout_rates[i] > 0:
-            this_name = '{0:s}_dropout{1:d}b'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_dropout_layer(
-                dropout_fraction=dropout_rates[i], layer_name=this_name
-            )(current_layer_object)
-
-        this_name = '{0:s}_lyrscale{1:d}'.format(basic_layer_name, i)
-        current_layer_object = LayerScale(
-            INIT_VALUE_FOR_LAYER_SCALE, num_filters, name=this_name
-        )(current_layer_object)
-
-        if i != num_conv_layers - 1:
-            continue
-
-        this_name = '{0:s}_preresidual_avg'.format(basic_layer_name)
-        this_layer_object = architecture_utils.get_3d_pooling_layer(
-            num_rows_in_window=1,
-            num_columns_in_window=1,
-            num_heights_in_window=num_time_steps,
-            num_rows_per_stride=1,
-            num_columns_per_stride=1,
-            num_heights_per_stride=num_time_steps,
-            pooling_type_string=architecture_utils.MEAN_POOLING_STRING,
-            layer_name=this_name
-        )(input_layer_object)
-
-        new_dims = (
-            this_layer_object.shape[1:3] +
-            (this_layer_object.shape[-1],)
-        )
-
-        this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
-        this_layer_object = keras.layers.Reshape(
-            target_shape=new_dims, name=this_name
-        )(this_layer_object)
-
-        this_name = '{0:s}_residual'.format(basic_layer_name)
-        current_layer_object = keras.layers.Add(name=this_name)([
-            current_layer_object, this_layer_object
-        ])
-
-    return current_layer_object
-
-
-def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
-    """Determines number of channels for each input layer to skip connection.
-
-    A = number of input layers.
-
-    :param input_layer_objects: length-A list of input layers (instances of
-        subclass of `keras.layers`).
-    :param num_output_channels: Number of desired output channels (after
-        concatenation).
-    :return: desired_channel_counts: length-A numpy array with number of
-        desired channels for each input layer.
-    """
-
-    current_channel_counts = numpy.array(
-        [l.shape[-1] for l in input_layer_objects], dtype=float
-    )
-
-    num_input_layers = len(input_layer_objects)
-    desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
-
-    half_num_output_channels = int(numpy.round(0.5 * num_output_channels))
-    desired_channel_counts[-1] = half_num_output_channels
-
-    remaining_num_output_channels = (
-        num_output_channels - half_num_output_channels
-    )
-    this_ratio = (
-        float(remaining_num_output_channels) /
-        numpy.sum(current_channel_counts[:-1])
-    )
-    desired_channel_counts[:-1] = numpy.round(
-        current_channel_counts[:-1] * this_ratio
-    ).astype(int)
-
-    while numpy.sum(desired_channel_counts) > num_output_channels:
-        desired_channel_counts[numpy.argmax(desired_channel_counts[:-1])] -= 1
-    while numpy.sum(desired_channel_counts) < num_output_channels:
-        desired_channel_counts[numpy.argmin(desired_channel_counts[:-1])] += 1
-
-    assert numpy.sum(desired_channel_counts) == num_output_channels
-    desired_channel_counts = numpy.maximum(desired_channel_counts, 1)
-
-    return desired_channel_counts
-
-
-def _create_skip_connection(input_layer_objects, num_output_channels,
-                            current_level_num, regularizer_object):
-    """Creates skip connection.
-
-    :param input_layer_objects: 1-D list of input layers (instances of subclass
-        of `keras.layers`).
-    :param num_output_channels: Desired number of output channels.
-    :param current_level_num: Current level in Chiu-net++ architecture.  This
-        should be a zero-based integer index.
-    :param regularizer_object: Regularizer for conv layers (instance of
-        `keras.regularizers.l1_l2` or similar).
-    :return: concat_layer_object: Instance of `keras.layers.Concatenate`.
-    """
-
-    desired_input_channel_counts = _get_channel_counts_for_skip_cnxn(
-        input_layer_objects=input_layer_objects,
-        num_output_channels=num_output_channels
-    )
-    current_width = len(input_layer_objects) - 1
-
-    for j in range(current_width):
-        this_name = 'block{0:d}-{1:d}_preskipconv{2:d}'.format(
-            current_level_num, current_width, j
-        )
-
-        input_layer_objects[j] = architecture_utils.get_2d_conv_layer(
-            num_kernel_rows=1,
-            num_kernel_columns=1,
-            num_rows_per_stride=1,
-            num_columns_per_stride=1,
-            num_filters=desired_input_channel_counts[j],
-            padding_type_string=architecture_utils.YES_PADDING_STRING,
-            weight_regularizer=regularizer_object,
-            layer_name=this_name
-        )(input_layer_objects[j])
-
-    this_name = 'block{0:d}-{1:d}_skip'.format(current_level_num, current_width)
-    return keras.layers.Concatenate(axis=-1, name=this_name)(
-        input_layer_objects
-    )
-
 
 def _get_2d_conv_block(
-        input_layer_object, do_residual, do_convnext,
-        num_conv_layers, filter_size_px, num_filters, do_time_distributed_conv,
-        regularizer_object,
+        input_layer_object, do_residual, num_conv_layers, filter_size_px,
+        num_filters, do_time_distributed_conv, regularizer_object,
         activation_function_name, activation_function_alpha,
         dropout_rates, use_batch_norm, batch_norm_momentum,
         batch_norm_synch_flag, basic_layer_name):
@@ -534,9 +123,6 @@ def _get_2d_conv_block(
 
     :param input_layer_object: Input layer to block.
     :param do_residual: Boolean flag.  If True, this will be a residual block.
-    :param do_convnext: Boolean flag.  If True, this will be a ConvNext block.
-        If `do_residual == do_convnext == False`, this will be a simple conv
-        block.
     :param num_conv_layers: Number of conv layers in block.
     :param filter_size_px: Filter size for conv layers.  The same filter size
         will be used in both dimensions, and the same filter size will be used
@@ -565,7 +151,7 @@ def _get_2d_conv_block(
     """
 
     # Process input args.
-    if do_residual or do_convnext:
+    if do_residual:
         num_conv_layers = max([num_conv_layers, 2])
 
     try:
@@ -581,19 +167,6 @@ def _get_2d_conv_block(
     assert len(dropout_rates) == num_conv_layers
 
     # Do actual stuff.
-    if do_convnext:
-        return __get_2d_convnext_block(
-            input_layer_object=input_layer_object,
-            num_conv_layers=num_conv_layers,
-            filter_size_px=filter_size_px,
-            num_filters=num_filters,
-            do_time_distributed_conv=do_time_distributed_conv,
-            regularizer_object=regularizer_object,
-            dropout_rates=dropout_rates,
-            do_activation=activation_function_name is not None,
-            basic_layer_name=basic_layer_name
-        )
-
     current_layer_object = None
 
     for i in range(num_conv_layers):
@@ -676,16 +249,14 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, do_residual, do_convnext,
-        num_conv_layers, filter_size_px, regularizer_object,
-        activation_function_name, activation_function_alpha,
+        input_layer_object, do_residual, num_conv_layers, filter_size_px,
+        regularizer_object, activation_function_name, activation_function_alpha,
         dropout_rates, use_batch_norm, batch_norm_momentum,
         batch_norm_synch_flag, basic_layer_name):
     """Creates convolutional block for data with 3 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
     :param do_residual: See documentation for `_get_2d_conv_block`.
-    :param do_convnext: Same.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -700,7 +271,7 @@ def _get_3d_conv_block(
     """
 
     # Process input args.
-    if do_residual or do_convnext:
+    if do_residual:
         num_conv_layers = max([num_conv_layers, 2])
 
     try:
@@ -716,17 +287,6 @@ def _get_3d_conv_block(
     assert len(dropout_rates) == num_conv_layers
 
     # Do actual stuff.
-    if do_convnext:
-        return __get_3d_convnext_block(
-            input_layer_object=input_layer_object,
-            num_conv_layers=num_conv_layers,
-            filter_size_px=filter_size_px,
-            regularizer_object=regularizer_object,
-            dropout_rates=dropout_rates,
-            do_activation=activation_function_name is not None,
-            basic_layer_name=basic_layer_name
-        )
-
     current_layer_object = None
     num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
@@ -821,8 +381,102 @@ def _get_3d_conv_block(
     return current_layer_object
 
 
-def _pad_layer(source_layer_object, target_layer_object, padding_layer_name,
-               num_spatiotemporal_dims):
+def get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
+    """Determines number of channels for each input layer to skip connection.
+
+    A = number of input layers.
+
+    :param input_layer_objects: length-A list of input layers (instances of
+        subclass of `keras.layers`).
+    :param num_output_channels: Number of desired output channels (after
+        concatenation).
+    :return: desired_channel_counts: length-A numpy array with number of
+        desired channels for each input layer.
+    """
+
+    error_checking.assert_is_list(input_layer_objects)
+    error_checking.assert_is_integer(num_output_channels)
+    error_checking.assert_is_geq(num_output_channels, 1)
+
+    current_channel_counts = numpy.array(
+        [l.shape[-1] for l in input_layer_objects], dtype=float
+    )
+
+    num_input_layers = len(input_layer_objects)
+    desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
+
+    half_num_output_channels = int(numpy.round(0.5 * num_output_channels))
+    desired_channel_counts[-1] = half_num_output_channels
+
+    remaining_num_output_channels = (
+        num_output_channels - half_num_output_channels
+    )
+    this_ratio = (
+        float(remaining_num_output_channels) /
+        numpy.sum(current_channel_counts[:-1])
+    )
+    desired_channel_counts[:-1] = numpy.round(
+        current_channel_counts[:-1] * this_ratio
+    ).astype(int)
+
+    while numpy.sum(desired_channel_counts) > num_output_channels:
+        desired_channel_counts[numpy.argmax(desired_channel_counts[:-1])] -= 1
+    while numpy.sum(desired_channel_counts) < num_output_channels:
+        desired_channel_counts[numpy.argmin(desired_channel_counts[:-1])] += 1
+
+    assert numpy.sum(desired_channel_counts) == num_output_channels
+    desired_channel_counts = numpy.maximum(desired_channel_counts, 1)
+
+    return desired_channel_counts
+
+
+def create_skip_connection(input_layer_objects, num_output_channels,
+                           current_level_num, regularizer_object):
+    """Creates skip connection.
+
+    :param input_layer_objects: 1-D list of input layers (instances of subclass
+        of `keras.layers`).
+    :param num_output_channels: Desired number of output channels.
+    :param current_level_num: Current level in Chiu-net++ architecture.  This
+        should be a zero-based integer index.
+    :param regularizer_object: Regularizer for conv layers (instance of
+        `keras.regularizers.l1_l2` or similar).
+    :return: concat_layer_object: Instance of `keras.layers.Concatenate`.
+    """
+
+    error_checking.assert_is_integer(current_level_num)
+    error_checking.assert_is_geq(current_level_num, 0)
+
+    desired_input_channel_counts = get_channel_counts_for_skip_cnxn(
+        input_layer_objects=input_layer_objects,
+        num_output_channels=num_output_channels
+    )
+    current_width = len(input_layer_objects) - 1
+
+    for j in range(current_width):
+        this_name = 'block{0:d}-{1:d}_preskipconv{2:d}'.format(
+            current_level_num, current_width, j
+        )
+
+        input_layer_objects[j] = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=1,
+            num_kernel_columns=1,
+            num_rows_per_stride=1,
+            num_columns_per_stride=1,
+            num_filters=desired_input_channel_counts[j],
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
+        )(input_layer_objects[j])
+
+    this_name = 'block{0:d}-{1:d}_skip'.format(current_level_num, current_width)
+    return keras.layers.Concatenate(axis=-1, name=this_name)(
+        input_layer_objects
+    )
+
+
+def pad_layer(source_layer_object, target_layer_object, padding_layer_name,
+              num_spatiotemporal_dims):
     """Pads layer spatially.
 
     :param source_layer_object: Source layer.
@@ -833,6 +487,11 @@ def _pad_layer(source_layer_object, target_layer_object, padding_layer_name,
     :return: source_layer_object: Same as input, except maybe with different
         spatial dimensions.
     """
+
+    error_checking.assert_is_string(padding_layer_name)
+    error_checking.assert_is_integer(num_spatiotemporal_dims)
+    error_checking.assert_is_geq(num_spatiotemporal_dims, 2)
+    error_checking.assert_is_leq(num_spatiotemporal_dims, 3)
 
     num_source_rows = source_layer_object.shape[1]
     num_target_rows = target_layer_object.shape[1]
@@ -870,8 +529,8 @@ def _pad_layer(source_layer_object, target_layer_object, padding_layer_name,
     return source_layer_object
 
 
-def _crop_layer(source_layer_object, target_layer_object, cropping_layer_name,
-                num_spatiotemporal_dims):
+def crop_layer(source_layer_object, target_layer_object, cropping_layer_name,
+               num_spatiotemporal_dims):
     """Crops layer spatially.
 
     :param source_layer_object: Source layer.
@@ -882,6 +541,11 @@ def _crop_layer(source_layer_object, target_layer_object, cropping_layer_name,
     :return: source_layer_object: Same as input, except maybe with different
         spatial dimensions.
     """
+
+    error_checking.assert_is_string(cropping_layer_name)
+    error_checking.assert_is_integer(num_spatiotemporal_dims)
+    error_checking.assert_is_geq(num_spatiotemporal_dims, 2)
+    error_checking.assert_is_leq(num_spatiotemporal_dims, 3)
 
     num_source_rows = source_layer_object.shape[1]
     num_target_rows = target_layer_object.shape[1]
@@ -950,7 +614,6 @@ def create_model(option_dict):
     )
     input_dimensions_predn_baseline = optd[PREDN_BASELINE_DIMENSIONS_KEY]
     use_residual_blocks = optd[USE_RESIDUAL_BLOCKS_KEY]
-    use_convnext_blocks = optd[USE_CONVNEXT_BLOCKS_KEY]
 
     nwp_encoder_num_channels_by_level = optd[NWP_ENCODER_NUM_CHANNELS_KEY]
     nwp_pooling_size_by_level_px = optd[NWP_POOLING_SIZE_KEY]
@@ -1210,7 +873,6 @@ def create_model(option_dict):
         nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1251,7 +913,6 @@ def create_model(option_dict):
         rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1283,7 +944,7 @@ def create_model(option_dict):
 
     if input_dimensions_10km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _crop_layer(
+        this_layer_object = crop_layer(
             target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_10km_res,
             cropping_layer_name='10km_concat-cropping',
@@ -1298,7 +959,7 @@ def create_model(option_dict):
         )
 
         if use_recent_biases:
-            this_layer_object = _crop_layer(
+            this_layer_object = crop_layer(
                 target_layer_object=rctbias_encoder_pooling_layer_objects[i],
                 source_layer_object=layer_object_10km_rctbias,
                 cropping_layer_name='10km_rctbias_concat-cropping',
@@ -1334,7 +995,6 @@ def create_model(option_dict):
             nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=this_input_layer_object,
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
                 filter_size_px=3,
                 num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1375,7 +1035,6 @@ def create_model(option_dict):
             rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=this_input_layer_object,
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
                 filter_size_px=3,
                 num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1407,7 +1066,7 @@ def create_model(option_dict):
 
     if input_dimensions_20km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _crop_layer(
+        this_layer_object = crop_layer(
             target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_20km_res,
             cropping_layer_name='20km_concat-cropping',
@@ -1422,7 +1081,7 @@ def create_model(option_dict):
         )
 
         if use_recent_biases:
-            this_layer_object = _crop_layer(
+            this_layer_object = crop_layer(
                 target_layer_object=rctbias_encoder_pooling_layer_objects[i],
                 source_layer_object=layer_object_20km_rctbias,
                 cropping_layer_name='20km_rctbias_concat-cropping',
@@ -1445,7 +1104,6 @@ def create_model(option_dict):
         nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1484,7 +1142,6 @@ def create_model(option_dict):
             rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=this_input_layer_object,
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
                 filter_size_px=3,
                 num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1516,7 +1173,7 @@ def create_model(option_dict):
 
     if input_dimensions_40km_res is not None:
         i = num_levels_filled - 1
-        this_layer_object = _crop_layer(
+        this_layer_object = crop_layer(
             target_layer_object=nwp_encoder_pooling_layer_objects[i],
             source_layer_object=layer_object_40km_res,
             cropping_layer_name='40km_concat-cropping',
@@ -1531,7 +1188,7 @@ def create_model(option_dict):
         )
 
         if use_recent_biases:
-            this_layer_object = _crop_layer(
+            this_layer_object = crop_layer(
                 target_layer_object=rctbias_encoder_pooling_layer_objects[i],
                 source_layer_object=layer_object_40km_rctbias,
                 cropping_layer_name='40km_rctbias_concat-cropping',
@@ -1554,7 +1211,6 @@ def create_model(option_dict):
         nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1591,7 +1247,6 @@ def create_model(option_dict):
             rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=this_input_layer_object,
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
                 filter_size_px=3,
                 num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1625,7 +1280,6 @@ def create_model(option_dict):
         nwp_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=nwp_encoder_pooling_layer_objects[i - 1],
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=nwp_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1660,7 +1314,6 @@ def create_model(option_dict):
         rctbias_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=rctbias_encoder_pooling_layer_objects[i - 1],
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=rctbias_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1699,7 +1352,6 @@ def create_model(option_dict):
             nwp_fcst_module_layer_objects[i] = _get_3d_conv_block(
                 input_layer_object=nwp_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=nwp_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 regularizer_object=regularizer_object,
@@ -1723,7 +1375,6 @@ def create_model(option_dict):
             nwp_fcst_module_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=nwp_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=nwp_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 num_filters=nwp_encoder_num_channels_by_level[i],
@@ -1750,7 +1401,6 @@ def create_model(option_dict):
             rctbias_fcst_module_layer_objects[i] = _get_3d_conv_block(
                 input_layer_object=rctbias_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=rctbias_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 regularizer_object=regularizer_object,
@@ -1774,7 +1424,6 @@ def create_model(option_dict):
             rctbias_fcst_module_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=rctbias_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=rctbias_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 num_filters=rctbias_encoder_num_channels_by_level[i],
@@ -1805,7 +1454,6 @@ def create_model(option_dict):
         lagtgt_encoder_conv_layer_objects[i] = _get_2d_conv_block(
             input_layer_object=this_input_layer_object,
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=lagtgt_encoder_num_conv_layers_by_level[i],
             filter_size_px=3,
             num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -1829,7 +1477,6 @@ def create_model(option_dict):
             lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
                 input_layer_object=lagtgt_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=lagtgt_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 regularizer_object=regularizer_object,
@@ -1853,7 +1500,6 @@ def create_model(option_dict):
             lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
                 input_layer_object=lagtgt_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=lagtgt_forecast_module_num_conv_layers,
                 filter_size_px=1,
                 num_filters=lagtgt_encoder_num_channels_by_level[i],
@@ -1916,7 +1562,7 @@ def create_model(option_dict):
                 size=(2, 2), name=this_name
             )(last_conv_layer_matrix[i_new + 1, j - 1])
 
-            this_layer_object = _pad_layer(
+            this_layer_object = pad_layer(
                 source_layer_object=this_layer_object,
                 target_layer_object=last_conv_layer_matrix[i_new, 0],
                 padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j),
@@ -1930,7 +1576,6 @@ def create_model(option_dict):
             last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
                 input_layer_object=this_layer_object,
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=1,
                 filter_size_px=3,
                 num_filters=this_num_channels,
@@ -1945,7 +1590,7 @@ def create_model(option_dict):
                 basic_layer_name='block{0:d}-{1:d}_up'.format(i_new, j)
             )
 
-            last_conv_layer_matrix[i_new, j] = _create_skip_connection(
+            last_conv_layer_matrix[i_new, j] = create_skip_connection(
                 input_layer_objects=
                 last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
                 num_output_channels=decoder_num_channels_by_level[i_new],
@@ -1956,7 +1601,6 @@ def create_model(option_dict):
             last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
                 input_layer_object=last_conv_layer_matrix[i_new, j],
                 do_residual=use_residual_blocks,
-                do_convnext=use_convnext_blocks,
                 num_conv_layers=num_decoder_conv_layers_by_level[i_new],
                 filter_size_px=3,
                 num_filters=decoder_num_channels_by_level[i_new],
@@ -1975,7 +1619,6 @@ def create_model(option_dict):
         last_conv_layer_matrix[0, -1] = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=1,
             filter_size_px=3,
             num_filters=2 * num_output_channels * ensemble_size,
@@ -1998,7 +1641,6 @@ def create_model(option_dict):
     simple_output_layer_object = _get_2d_conv_block(
         input_layer_object=last_conv_layer_matrix[0, -1],
         do_residual=use_residual_blocks,
-        do_convnext=use_convnext_blocks,
         num_conv_layers=1,
         filter_size_px=1,
         num_filters=(
@@ -2028,7 +1670,6 @@ def create_model(option_dict):
         dd_output_layer_object = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=1,
             filter_size_px=1,
             num_filters=ensemble_size,
@@ -2058,7 +1699,6 @@ def create_model(option_dict):
         gf_output_layer_object = _get_2d_conv_block(
             input_layer_object=last_conv_layer_matrix[0, -1],
             do_residual=use_residual_blocks,
-            do_convnext=use_convnext_blocks,
             num_conv_layers=1,
             filter_size_px=1,
             num_filters=ensemble_size,
