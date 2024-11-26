@@ -257,8 +257,22 @@ class SpectralNormalization(keras.layers.Layer):
         self.layer = layer
 
     def build(self, input_shape):
+        # Build the wrapped layer (Dense, Conv2D, Conv3D, DepthwiseConv2D)
         self.layer.build(input_shape)
-        self.w = self.layer.kernel
+
+        layer_type_string = str(type(self.layer)).lower()
+
+        if 'depthwise' in layer_type_string:
+            self.w = self.layer.depthwise_kernel
+        elif 'conv3d' in layer_type_string:
+            self.w = self.layer.kernel
+        elif 'conv2d' in layer_type_string:
+            self.w = self.layer.kernel
+        elif 'dense' in layer_type_string:
+            self.w = self.layer.kernel
+        else:
+            raise ValueError(f"Unsupported layer type: {type(self.layer)}")
+
         self.u = self.add_weight(
             shape=(1, self.w.shape[-1]),
             initializer='random_normal',
@@ -267,23 +281,42 @@ class SpectralNormalization(keras.layers.Layer):
         )
 
     def call(self, inputs):
-        print(self.layer.name)
+        layer_type_string = str(type(self.layer)).lower()
+
+        if 'depthwise' in layer_type_string:
+            w_reshaped = tensorflow.reshape(self.w, [-1, self.w.shape[-1]])
+        elif 'conv3d' in layer_type_string:
+            w_reshaped = tensorflow.reshape(self.w, [-1, self.w.shape[-1]])
+        elif 'conv2d' in layer_type_string:
+            w_reshaped = tensorflow.reshape(self.w, [-1, self.w.shape[-1]])
+        elif 'dense' in layer_type_string:
+            w_reshaped = self.w
+
+        print('LAYER NAME = {0:s}'.format(self.layer.name))
         print(self.w.shape)
         print(self.u.shape)
-        print('\n\n')
+        print(w_reshaped.shape)
+        print('\n')
 
         v = tensorflow.linalg.matvec(
-            tensorflow.transpose(self.w), self.u, transpose_a=True
+            tensorflow.transpose(w_reshaped), self.u, transpose_a=True
         )
         v = tensorflow.math.l2_normalize(v)
 
-        u = tensorflow.linalg.matvec(self.w, v)
+        u = tensorflow.linalg.matvec(w_reshaped, v)
         u = tensorflow.math.l2_normalize(u)
 
-        sigma = tensorflow.linalg.matvec(u, tensorflow.linalg.matvec(self.w, v))
-
+        sigma = tensorflow.linalg.matvec(
+            u,
+            tensorflow.linalg.matvec(w_reshaped, v)
+        )
         self.u.assign(u)
-        self.layer.kernel.assign(self.w / sigma)
+
+        if 'depthwise' in layer_type_string:
+            self.layer.depthwise_kernel.assign(self.w / sigma)
+        else:
+            self.layer.kernel.assign(self.w / sigma)
+
         return self.layer(inputs)
 
     def compute_output_shape(self, input_shape):

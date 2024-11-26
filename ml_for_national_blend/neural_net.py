@@ -166,21 +166,30 @@ class EMAHelper:
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model, optimizer=self.optimizer
         )
-        checkpoint_object.save(f'{checkpoint_dir}/checkpoint_epoch_{epoch}')
+        output_path = '{0:s}/checkpoint_epoch_{1:d}'.format(
+            checkpoint_dir, epoch
+        )
+
+        print('Saving model and optimizer state to: "{0:s}"...'.format(
+            output_path
+        ))
+        checkpoint_object.save(output_path)
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model, optimizer=self.optimizer
         )
 
-        try:
+        if raise_error_if_missing:
+            checkpoint_object.restore(
+                tensorflow.train.latest_checkpoint(checkpoint_dir)
+            ).assert_consumed()
+        else:
             checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
             )
-            return checkpoint_object
-        except:
-            if raise_error_if_missing:
-                raise
+
+        return checkpoint_object
 
 
 def __report_data_properties(
