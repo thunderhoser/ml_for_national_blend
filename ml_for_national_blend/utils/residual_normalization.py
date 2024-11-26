@@ -221,13 +221,17 @@ def get_intermediate_norm_params_for_nwp(
                 interp_nwp_model_io.read_file(this_file_name)
             )
 
-        nwp_forecast_table_xarray = xarray.concat(
-            nwp_forecast_tables_xarray,
-            dim=nwp_model_utils.FORECAST_HOUR_DIM,
-            data_vars=[nwp_model_utils.DATA_KEY],
-            coords='minimal', compat='identical', join='exact',
-            combine_attrs='no_conflicts'
-        )
+        try:
+            nwp_forecast_table_xarray = xarray.concat(
+                nwp_forecast_tables_xarray,
+                dim=nwp_model_utils.FORECAST_HOUR_DIM,
+                data_vars=[nwp_model_utils.DATA_KEY],
+                coords='minimal', compat='identical', join='exact',
+                combine_attrs='no_conflicts'
+            )
+        except:
+            continue
+
         del nwp_forecast_tables_xarray
 
         nwp_forecast_table_xarray = non_resid_normalization.normalize_nwp_data(
@@ -607,13 +611,17 @@ def get_normalization_params_for_nwp(
                 interp_nwp_model_io.read_file(this_file_name)
             )
 
-        nwp_forecast_table_xarray = xarray.concat(
-            nwp_forecast_tables_xarray,
-            dim=nwp_model_utils.FORECAST_HOUR_DIM,
-            data_vars=[nwp_model_utils.DATA_KEY],
-            coords='minimal', compat='identical', join='exact',
-            combine_attrs='no_conflicts'
-        )
+        try:
+            nwp_forecast_table_xarray = xarray.concat(
+                nwp_forecast_tables_xarray,
+                dim=nwp_model_utils.FORECAST_HOUR_DIM,
+                data_vars=[nwp_model_utils.DATA_KEY],
+                coords='minimal', compat='identical', join='exact',
+                combine_attrs='no_conflicts'
+            )
+        except:
+            continue
+
         del nwp_forecast_tables_xarray
 
         nwp_forecast_table_xarray = non_resid_normalization.normalize_nwp_data(
