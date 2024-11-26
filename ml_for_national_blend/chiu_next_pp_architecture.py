@@ -197,9 +197,10 @@ class GRN(keras.layers.Layer):
         )
 
     def call(self, inputs):
-        gx = tensorflow.norm(
-            inputs, ord=2, axis=(1, 2), keepdims=True
-        )
+        gx = tensorflow.sqrt(tensorflow.reduce_sum(
+            tensorflow.square(inputs), axis=(1, 2), keepdims=True
+        ))
+        # gx = tensorflow.norm(inputs, ord=2, axis=(1, 2), keepdims=True)
         denominator = self.epsilon + tensorflow.math.reduce_mean(
             gx, axis=-1, keepdims=True
         )
