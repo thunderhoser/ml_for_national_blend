@@ -284,6 +284,24 @@ class SpectralNormalization(keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         return self.layer.compute_output_shape(input_shape)
 
+    def get_config(self):
+        # Serialize the wrapped layer using its config
+        config = super(SpectralNormalization, self).get_config()
+        config.update({
+            "layer": {
+                "class_name": self.layer.__class__.__name__,
+                "config": self.layer.get_config(),
+            }
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Deserialize the wrapped layer from its config
+        layer_class = getattr(keras.layers, config["layer"]["class_name"])
+        layer = layer_class.from_config(config["layer"]["config"])
+        return cls(layer, **config)
+
 
 def __get_2d_convnext_block(
         input_layer_object, num_conv_layers, filter_size_px, num_filters,
