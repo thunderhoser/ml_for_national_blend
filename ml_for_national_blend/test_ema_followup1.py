@@ -156,8 +156,9 @@ def _run(output_dir_name):
     
     # Check what's in the checkpoint
     print("Checkpoint contents:")
-    for variable in checkpoint:
-        print(variable)
+    print(checkpoint)
+    # for variable in checkpoint:
+    #     print(variable)
 
 
 if __name__ == '__main__':
