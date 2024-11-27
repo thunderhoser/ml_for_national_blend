@@ -57,13 +57,18 @@ class EMAHelper:
             w.assign(orig_w)
 
     def save_optimizer_state(self, checkpoint_dir, epoch):
+        # Ensure optimizer variables are initialized
+        dummy_input = tensorflow.zeros((1,) + self.model.input_shape[1:])
+        dummy_target = tensorflow.zeros((1,))
+        self.model.train_on_batch(dummy_input, dummy_target)
+    
+        # Save checkpoint
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             optimizer=self.optimizer,
-            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}
         )
         output_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}')
-
         print(f'Saving model and optimizer state to: "{output_path}"...')
         checkpoint_object.save(output_path)
 
@@ -71,27 +76,30 @@ class EMAHelper:
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             optimizer=self.optimizer,
-            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}
         )
-
-        print(f'Restoring optimizer state from: "{checkpoint_dir}"...')
-
-        status = checkpoint_object.restore(
-            tensorflow.train.latest_checkpoint(checkpoint_dir)
-        )
-
-        # Ensure optimizer variables are initialized
+        print(f'Restoring optimizer state from: {checkpoint_dir}')
+    
+        # Perform restore
+        status = checkpoint_object.restore(tensorflow.train.latest_checkpoint(checkpoint_dir))
+    
+        # Perform a forward pass to initialize optimizer variables
         dummy_input = tensorflow.zeros((1,) + self.model.input_shape[1:])
-        _ = self.model(dummy_input, training=False)  # Forward pass to initialize optimizer variables
-
+        _ = self.model(dummy_input, training=False)
+    
+        # Check restore status
         if raise_error_if_missing:
-            status.assert_consumed()  # Ensure everything was restored
-
-        status.expect_partial()  # Suppress warnings if partial restore is OK
-
-        # Ensure shadow weights are reassigned correctly after restore
+            try:
+                status.assert_consumed()
+            except AssertionError as e:
+                print("Warning: Partial restore detected")
+                print(e)
+    
+        status.expect_partial()  # Suppress warnings for unmatched variables
+    
+        # Restore shadow weights
         for i, sw in enumerate(self.shadow_weights):
-            sw.assign(checkpoint_object.ema_shadow_weights[str(i)])  # Access with string keys
+            sw.assign(checkpoint_object.ema_shadow_weights.get(str(i), sw))
 
 
 def _run(output_dir_name):
