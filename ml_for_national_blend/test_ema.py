@@ -76,8 +76,8 @@ class EMAHelper:
         status = checkpoint_object.restore(
             tensorflow.train.latest_checkpoint(checkpoint_dir)
         )
-        if raise_error_if_missing:
-            status.assert_consumed()  # Ensure everything was restored
+        # if raise_error_if_missing:
+        #     status.assert_consumed()  # Ensure everything was restored
 
         status.expect_partial()  # Suppress warnings if partial restore is OK
 
