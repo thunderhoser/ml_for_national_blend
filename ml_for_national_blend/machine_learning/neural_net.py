@@ -131,9 +131,8 @@ PREDICTOR_MATRIX_LAGTGT_KEY = 'predictor_matrix_lagged_targets'
 
 
 class EMAHelper:
-    def __init__(self, model, optimizer, decay=0.99):
+    def __init__(self, model, decay=0.99):
         self.model = model
-        self.optimizer = optimizer
         self.decay = decay
         self.shadow_weights = [
             tensorflow.Variable(w, trainable=False) for w in model.weights
@@ -160,8 +159,9 @@ class EMAHelper:
     def save_optimizer_state(self, checkpoint_dir, epoch):
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
-            optimizer=self.optimizer,
-            ema_shadow_weights=self.shadow_weights
+            ema_shadow_weights={
+                str(i): sw for i, sw in enumerate(self.shadow_weights)
+            }
         )
         output_path = '{0:s}/checkpoint_epoch_{1:d}'.format(
             checkpoint_dir, epoch
@@ -174,24 +174,49 @@ class EMAHelper:
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
         checkpoint_object = tensorflow.train.Checkpoint(
-            model=self.model, optimizer=self.optimizer
+            model=self.model,
+            ema_shadow_weights={
+                str(i): sw for i, sw in enumerate(self.shadow_weights)
+            }
         )
 
         print('Restoring optimizer state from: "{0:s}"...'.format(
             checkpoint_dir
         ))
 
-        if raise_error_if_missing:
-            checkpoint_object.restore(
-                tensorflow.train.latest_checkpoint(checkpoint_dir)
-            ).assert_consumed()
-        else:
-            checkpoint_object.restore(
+        try:
+            status = checkpoint_object.restore(
                 tensorflow.train.latest_checkpoint(checkpoint_dir)
             )
+        except:
+            if raise_error_if_missing:
+                raise
 
-        self.shadow_weights = checkpoint_object.ema_shadow_weights
-        return checkpoint_object
+            warning_string = (
+                'POTENTIAL ERROR: Cannot find EMA checkpoint at "{0:s}"'
+            ).format(checkpoint_dir)
+
+            warnings.warn(warning_string)
+            return
+
+        # if raise_error_if_missing:
+        #     status.assert_consumed()
+        status.expect_partial()
+
+        found_any_diff = False
+
+        for i, sw in enumerate(self.shadow_weights):
+            if not found_any_diff:
+                found_any_diff = not numpy.allclose(
+                    sw,
+                    checkpoint_object.ema_shadow_weights[str(i)],
+                    atol=TOLERANCE
+                )
+
+            sw.assign(checkpoint_object.ema_shadow_weights[str(i)])
+
+        if raise_error_if_missing:
+            assert found_any_diff
 
 
 def __report_data_properties(
@@ -606,20 +631,15 @@ def _set_model_weights_to_ema(model_object, metafile_name):
     """
 
     metadata_dict = read_metafile(metafile_name)
-
     ema_object = EMAHelper(
-        model=model_object,
-        optimizer=model_object.optimizer,
-        decay=metadata_dict[EMA_DECAY_KEY]
+        model=model_object, decay=metadata_dict[EMA_DECAY_KEY]
     )
 
     ema_backup_dir_name = '{0:s}/exponential_moving_average'.format(
         os.path.split(metafile_name)[0]
     )
-
-    # TODO(thunderhoser): Don't know about always making the flag False.
     ema_object.restore_optimizer_state(
-        checkpoint_dir=ema_backup_dir_name, raise_error_if_missing=False
+        checkpoint_dir=ema_backup_dir_name, raise_error_if_missing=True
     )
 
     for layer_object in model_object.layers:
@@ -627,7 +647,7 @@ def _set_model_weights_to_ema(model_object, metafile_name):
             continue
 
         weight_matrix = numpy.array(layer_object.get_weights()[0])
-        print('Weights for {0:s}:\n{1:s} before EMA'.format(
+        print('Weights for {0:s} before EMA:\n{1:s}'.format(
             layer_object.name, str(weight_matrix)
         ))
         break
@@ -639,7 +659,7 @@ def _set_model_weights_to_ema(model_object, metafile_name):
             continue
 
         weight_matrix = numpy.array(layer_object.get_weights()[0])
-        print('Weights for {0:s}:\n{1:s} after EMA'.format(
+        print('Weights for {0:s} after EMA:\n{1:s}'.format(
             layer_object.name, str(weight_matrix)
         ))
         break
@@ -3878,7 +3898,6 @@ def train_model(
 
     ema_object = EMAHelper(
         model=model_object,
-        optimizer=model_object.optimizer,
         decay=use_exp_moving_average_with_decay
     )
 
@@ -3889,8 +3908,6 @@ def train_model(
         directory_name=ema_backup_dir_name
     )
 
-    # TODO(thunderhoser): I don't know what happens here if the directory
-    # doesn't exist.
     ema_object.restore_optimizer_state(
         checkpoint_dir=ema_backup_dir_name,
         raise_error_if_missing=initial_epoch > 0
@@ -4360,14 +4377,17 @@ def read_metafile(pickle_file_name):
     raise ValueError(error_string)
 
 
-def read_model(hdf5_file_name):
+def read_model(hdf5_file_name, for_inference):
     """Reads model from HDF5 file.
 
     :param hdf5_file_name: Path to input file.
+    :param for_inference: Boolean flag.  If True (False), reading the model for
+        inference (further training).
     :return: model_object: Instance of `keras.models.Model`.
     """
 
     error_checking.assert_file_exists(hdf5_file_name)
+    error_checking.assert_is_boolean(for_inference)
 
     metafile_name = find_metafile(
         model_file_name=hdf5_file_name, raise_error_if_missing=True
@@ -4394,7 +4414,7 @@ def read_model(hdf5_file_name):
         model_object = chiu_net_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
 
-        if metadata_dict[EMA_DECAY_KEY] is not None:
+        if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
             _set_model_weights_to_ema(
                 model_object=model_object, metafile_name=metafile_name
             )
@@ -4421,7 +4441,7 @@ def read_model(hdf5_file_name):
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
 
-        if metadata_dict[EMA_DECAY_KEY] is not None:
+        if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
             _set_model_weights_to_ema(
                 model_object=model_object, metafile_name=metafile_name
             )
@@ -4450,7 +4470,7 @@ def read_model(hdf5_file_name):
         model_object = chiu_next_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
 
-        if metadata_dict[EMA_DECAY_KEY] is not None:
+        if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
             _set_model_weights_to_ema(
                 model_object=model_object, metafile_name=metafile_name
             )

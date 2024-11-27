@@ -167,7 +167,9 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     """
 
     print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(model_file_name)
+    model_object = neural_net.read_model(
+        hdf5_file_name=model_file_name, for_inference=True
+    )
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
