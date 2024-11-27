@@ -250,7 +250,9 @@ def _run(template_file_name, output_dir_name,
     }
 
     print('Reading model template from: "{0:s}"...'.format(template_file_name))
-    model_object = neural_net.read_model(hdf5_file_name=template_file_name)
+    model_object = neural_net.read_model(
+        hdf5_file_name=template_file_name, for_inference=False
+    )
 
     model_metafile_name = neural_net.find_metafile(
         model_file_name=template_file_name, raise_error_if_missing=True
