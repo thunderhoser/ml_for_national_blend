@@ -105,7 +105,7 @@ def _set_model_weights_to_ema(model_object, checkpoint_dir):
     )
 
     for layer_object in model_object.layers:
-        if 'conv' not in layer_object.name.lower():
+        if 'dense' not in layer_object.name.lower():
             continue
 
         weight_matrix = numpy.array(layer_object.get_weights()[0])
@@ -117,7 +117,7 @@ def _set_model_weights_to_ema(model_object, checkpoint_dir):
     ema_object.set_ema_weights()
 
     for layer_object in model_object.layers:
-        if 'conv' not in layer_object.name.lower():
+        if 'dense' not in layer_object.name.lower():
             continue
 
         weight_matrix = numpy.array(layer_object.get_weights()[0])
