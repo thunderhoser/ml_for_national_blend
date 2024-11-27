@@ -30,9 +30,8 @@ INPUT_ARG_PARSER.add_argument(
 
 
 class EMAHelper:
-    def __init__(self, model, optimizer, decay=0.99):
+    def __init__(self, model, decay=0.99):
         self.model = model
-        self.optimizer = optimizer
         self.decay = decay
         self.shadow_weights = [
             tensorflow.Variable(w, trainable=False) for w in model.weights
@@ -57,49 +56,34 @@ class EMAHelper:
             w.assign(orig_w)
 
     def save_optimizer_state(self, checkpoint_dir, epoch):
-        # Ensure optimizer variables are initialized
-        dummy_input = tensorflow.zeros((1,) + self.model.input_shape[1:])
-        dummy_target = tensorflow.zeros((1,))
-        self.model.train_on_batch(dummy_input, dummy_target)
-    
-        # Save checkpoint
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
-            optimizer=self.optimizer,
-            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
         )
         output_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}')
+
         print(f'Saving model and optimizer state to: "{output_path}"...')
         checkpoint_object.save(output_path)
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
-            optimizer=self.optimizer,
-            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
         )
-        print(f'Restoring optimizer state from: {checkpoint_dir}')
-    
-        # Perform restore
-        status = checkpoint_object.restore(tensorflow.train.latest_checkpoint(checkpoint_dir))
-    
-        # Perform a forward pass to initialize optimizer variables
-        dummy_input = tensorflow.zeros((1,) + self.model.input_shape[1:])
-        _ = self.model(dummy_input, training=False)
-    
-        # Check restore status
+
+        print(f'Restoring optimizer state from: "{checkpoint_dir}"...')
+
+        status = checkpoint_object.restore(
+            tensorflow.train.latest_checkpoint(checkpoint_dir)
+        )
         if raise_error_if_missing:
-            try:
-                status.assert_consumed()
-            except AssertionError as e:
-                print("Warning: Partial restore detected")
-                print(e)
-    
-        status.expect_partial()  # Suppress warnings for unmatched variables
-    
-        # Restore shadow weights
+            status.assert_consumed()  # Ensure everything was restored
+
+        status.expect_partial()  # Suppress warnings if partial restore is OK
+
+        # Ensure shadow weights are reassigned correctly after restore
         for i, sw in enumerate(self.shadow_weights):
-            sw.assign(checkpoint_object.ema_shadow_weights.get(str(i), sw))
+            sw.assign(checkpoint_object.ema_shadow_weights[str(i)])  # Access with string keys
 
 
 def _run(output_dir_name):
@@ -208,7 +192,6 @@ def _run(output_dir_name):
 
     ema_object = EMAHelper(
         model=model_object,
-        optimizer=model_object.optimizer,
         decay=0.9
     )
 
