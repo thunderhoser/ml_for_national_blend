@@ -156,7 +156,7 @@ def _run(output_dir_name):
     
     # Check what's in the checkpoint
     print("Checkpoint contents:")
-    print(checkpoint)
+    print(tensorflow.train.list_variables(checkpoint))
     # for variable in checkpoint:
     #     print(variable)
 
