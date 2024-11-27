@@ -79,6 +79,11 @@ class EMAHelper:
         status = checkpoint_object.restore(
             tensorflow.train.latest_checkpoint(checkpoint_dir)
         )
+
+        # Ensure optimizer variables are initialized
+        dummy_input = tensorflow.zeros((1,) + self.model.input_shape[1:])
+        _ = self.model(dummy_input, training=False)  # Forward pass to initialize optimizer variables
+
         if raise_error_if_missing:
             status.assert_consumed()  # Ensure everything was restored
 
