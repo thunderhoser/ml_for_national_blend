@@ -60,7 +60,7 @@ class EMAHelper:
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             optimizer=self.optimizer,
-            ema_shadow_weights=dict(enumerate(self.shadow_weights))  # Trackable
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
         )
         output_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}')
 
@@ -71,7 +71,7 @@ class EMAHelper:
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             optimizer=self.optimizer,
-            ema_shadow_weights=dict(enumerate(self.shadow_weights))  # Trackable
+            ema_shadow_weights={str(i): sw for i, sw in enumerate(self.shadow_weights)}  # String keys
         )
 
         print(f'Restoring optimizer state from: "{checkpoint_dir}"...')
@@ -85,9 +85,8 @@ class EMAHelper:
         status.expect_partial()  # Suppress warnings if partial restore is OK
 
         # Ensure shadow weights are reassigned correctly after restore
-        restored_shadow_weights = checkpoint_object.ema_shadow_weights
         for i, sw in enumerate(self.shadow_weights):
-            sw.assign(restored_shadow_weights[i])
+            sw.assign(checkpoint_object.ema_shadow_weights[str(i)])  # Access with string keys
 
 
 def _run(output_dir_name):
