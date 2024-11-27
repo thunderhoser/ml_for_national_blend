@@ -86,6 +86,47 @@ class EMAHelper:
             sw.assign(checkpoint_object.ema_shadow_weights[str(i)])  # Access with string keys
 
 
+def _set_model_weights_to_ema(model_object, checkpoint_dir):
+    """Sets model weights to exponential moving average.
+
+    :param model_object: Trained instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :param metafile_name: Path to metafile.
+    """
+
+    ema_object = EMAHelper(
+        model=model_object,
+        decay=0.9
+    )
+
+    # TODO(thunderhoser): Don't know about always making the flag False.
+    ema_object.restore_optimizer_state(
+        checkpoint_dir=checkpoint_dir, raise_error_if_missing=False
+    )
+
+    for layer_object in model_object.layers:
+        if 'conv' not in layer_object.name.lower():
+            continue
+
+        weight_matrix = numpy.array(layer_object.get_weights()[0])
+        print('Weights for {0:s}:\n{1:s} before EMA'.format(
+            layer_object.name, str(weight_matrix)
+        ))
+        break
+
+    ema_object.set_ema_weights()
+
+    for layer_object in model_object.layers:
+        if 'conv' not in layer_object.name.lower():
+            continue
+
+        weight_matrix = numpy.array(layer_object.get_weights()[0])
+        print('Weights for {0:s}:\n{1:s} after EMA'.format(
+            layer_object.name, str(weight_matrix)
+        ))
+        break
+
+
 def _run(output_dir_name):
     """Test script for EMA (exponential moving average) training method.
 
@@ -208,6 +249,9 @@ def _run(output_dir_name):
         checkpoint_dir=ema_backup_dir_name,
         raise_error_if_missing=initial_epoch > 0
     )
+
+    if initial_epoch > 0:
+        _set_model_weights_to_ema(model_object=model_object, checkpoint_dir=ema_backup_dir_name)
 
     for this_epoch in range(initial_epoch, 1000):
         model_object.fit(
