@@ -178,6 +178,8 @@ class EMAHelper:
         checkpoint_object.save(output_path)
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
+        print(self.shadow_weights)
+
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             ema_shadow_weights={
@@ -219,6 +221,8 @@ class EMAHelper:
                 )
 
             sw.assign(checkpoint_object.ema_shadow_weights[str(i)])
+
+        print(self.shadow_weights)
 
         if raise_error_if_missing:
             assert found_any_diff
