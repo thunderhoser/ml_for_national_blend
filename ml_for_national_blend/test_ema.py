@@ -60,41 +60,34 @@ class EMAHelper:
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             optimizer=self.optimizer,
-            ema_shadow_weights=self.shadow_weights
+            ema_shadow_weights=dict(enumerate(self.shadow_weights))  # Trackable
         )
-        output_path = '{0:s}/checkpoint_epoch_{1:d}'.format(
-            checkpoint_dir, epoch
-        )
+        output_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}')
 
-        print('Saving model and optimizer state to: "{0:s}"...'.format(
-            output_path
-        ))
+        print(f'Saving model and optimizer state to: "{output_path}"...')
         checkpoint_object.save(output_path)
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
         checkpoint_object = tensorflow.train.Checkpoint(
-            model=self.model, optimizer=self.optimizer
+            model=self.model,
+            optimizer=self.optimizer,
+            ema_shadow_weights=dict(enumerate(self.shadow_weights))  # Trackable
         )
 
-        print('Restoring optimizer state from: "{0:s}"...'.format(
-            checkpoint_dir
-        ))
+        print(f'Restoring optimizer state from: "{checkpoint_dir}"...')
 
+        status = checkpoint_object.restore(
+            tensorflow.train.latest_checkpoint(checkpoint_dir)
+        )
         if raise_error_if_missing:
-            checkpoint_object.restore(
-                tensorflow.train.latest_checkpoint(checkpoint_dir)
-            ).assert_consumed()
+            status.assert_consumed()  # Ensure everything was restored
 
-            self.shadow_weights = checkpoint_object.ema_shadow_weights
-        else:
-            checkpoint_object.restore(
-                tensorflow.train.latest_checkpoint(checkpoint_dir)
-            )
+        status.expect_partial()  # Suppress warnings if partial restore is OK
 
-            if hasattr(checkpoint_object, 'ema_shadow_weights'):
-                self.shadow_weights = checkpoint_object.ema_shadow_weights
-
-        return checkpoint_object
+        # Ensure shadow weights are reassigned correctly after restore
+        restored_shadow_weights = checkpoint_object.ema_shadow_weights
+        for i, sw in enumerate(self.shadow_weights):
+            sw.assign(restored_shadow_weights[i])
 
 
 def _run(output_dir_name):
