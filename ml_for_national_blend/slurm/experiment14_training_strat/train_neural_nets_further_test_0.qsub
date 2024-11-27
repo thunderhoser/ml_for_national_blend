@@ -95,7 +95,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --last_init_time_strings_for_validation "2022-12-20-18" \
 --nwp_dir_names_for_validation "/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gefs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid" \
 --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
---num_epochs=1000 \
+--num_epochs=1001 \
 --num_training_batches_per_epoch=${batch_size} \
 --num_validation_batches_per_epoch=$((batch_size / 2)) \
 --plateau_patience_epochs=10 \
