@@ -23,15 +23,14 @@ NUM_EXAMPLES_PER_BATCH = 5
 
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
-# TODO(thunderhoser): Need to deal with possibility that targets are normalized,
-# i.e., might need to denormalize predictions.
-
 MODEL_FILE_ARG_NAME = 'input_model_file_name'
 INIT_TIME_ARG_NAME = 'init_time_string'
 NWP_MODELS_ARG_NAME = 'nwp_model_names'
 NWP_DIRECTORIES_ARG_NAME = 'input_nwp_directory_names'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 PATCHES_TO_FULL_GRID_ARG_NAME = 'patches_to_full_grid'
+USE_EMA_ARG_NAME = 'use_ema'
+SAVE_MEAN_ONLY_ARG_NAME = 'save_ensemble_mean_only'
 USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME = 'use_trapezoidal_weighting'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
@@ -60,6 +59,18 @@ PATCHES_TO_FULL_GRID_HELP_STRING = (
     '1, will slide patch around the full grid to generate predictions on the '
     'full grid.  If 0, will generate predictions for patches of the same size '
     'used to train.'
+)
+USE_EMA_HELP_STRING = (
+    'Boolean flag.  If {0:s} == 1 and the neural net was trained with the '
+    'exponential moving average (EMA) metadata, then EMA weights will be used '
+    'at inference time.  Otherwise, instantaneous weights will be used at '
+    'inference time.'
+).format(
+    USE_EMA_ARG_NAME
+)
+SAVE_MEAN_ONLY_HELP_STRING = (
+    'Boolean flag.  If 1, will save only the ensemble mean, not the full '
+    'ensemble.'
 )
 USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING = (
     '[used only if {0:s} == 1] Boolean flag.  If 1, trapezoidal weighting will '
@@ -104,6 +115,14 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCHES_TO_FULL_GRID_ARG_NAME, type=int, required=False, default=0,
     help=PATCHES_TO_FULL_GRID_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_EMA_ARG_NAME, type=int, required=False, default=0,
+    help=USE_EMA_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SAVE_MEAN_ONLY_ARG_NAME, type=int, required=False, default=0,
+    help=SAVE_MEAN_ONLY_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME, type=int, required=False,
@@ -157,8 +176,9 @@ def _process_nwp_directories(nwp_directory_names, nwp_model_names):
 
 def _run(model_file_name, init_time_string, nwp_model_names,
          nwp_directory_names, target_dir_name,
-         patches_to_full_grid, use_trapezoidal_weighting,
-         patch_overlap_size_2pt5km_pixels, output_dir_name):
+         patches_to_full_grid, use_ema, save_ensemble_mean_only,
+         use_trapezoidal_weighting, patch_overlap_size_2pt5km_pixels,
+         output_dir_name):
     """Applies trained neural net -- inference time!
 
     Does inference for neural net trained with patchwise approach.
@@ -169,6 +189,8 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     :param nwp_directory_names: Same.
     :param target_dir_name: Same.
     :param patches_to_full_grid: Same.
+    :param use_ema: Same.
+    :param save_ensemble_mean_only: Same.
     :param use_trapezoidal_weighting: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param output_dir_name: Same.
@@ -176,7 +198,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
 
     print('Reading model from: "{0:s}"...'.format(model_file_name))
     model_object = neural_net.read_model(
-        hdf5_file_name=model_file_name, for_inference=True
+        hdf5_file_name=model_file_name, for_inference=use_ema
     )
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
@@ -245,6 +267,11 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
             use_trapezoidal_weighting=use_trapezoidal_weighting
         )
+
+        if save_ensemble_mean_only:
+            prediction_matrix = numpy.mean(
+                prediction_matrix, axis=-1, keepdims=True
+            )
     else:
         prediction_matrix = neural_net.apply_model(
             model_object=model_object,
@@ -256,6 +283,11 @@ def _run(model_file_name, init_time_string, nwp_model_names,
             predict_gust_excess=vod[neural_net.PREDICT_GUST_EXCESS_KEY],
             target_field_names=vod[neural_net.TARGET_FIELDS_KEY]
         )
+
+        if save_ensemble_mean_only:
+            prediction_matrix = numpy.mean(
+                prediction_matrix, axis=-1, keepdims=True
+            )
 
         while len(mask_matrix.shape) < len(prediction_matrix.shape):
             mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
@@ -294,6 +326,10 @@ if __name__ == '__main__':
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         patches_to_full_grid=bool(
             getattr(INPUT_ARG_OBJECT, PATCHES_TO_FULL_GRID_ARG_NAME)
+        ),
+        use_ema=bool(getattr(INPUT_ARG_OBJECT, USE_EMA_ARG_NAME)),
+        save_ensemble_mean_only=bool(
+            getattr(INPUT_ARG_OBJECT, SAVE_MEAN_ONLY_ARG_NAME)
         ),
         use_trapezoidal_weighting=bool(
             getattr(INPUT_ARG_OBJECT, USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME)
