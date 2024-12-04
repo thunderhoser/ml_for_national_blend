@@ -1,0 +1,118 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_neural_nets_moremore"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=84:00:00
+#SBATCH --array=0-71
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_neural_nets_more_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment15_bells_and_whistles/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment15_bells_and_whistles"
+
+TARGET_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+TARGET_NORMALIZATION_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+NWP_NORMALIZATION_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/normalization_params_long300_20170101-20211220.nc"
+NBM_CONSTANT_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/nbm_constants/with_latlong/nbm_constants_quantile_normalized.nc"
+
+NWP_FIELD_NAME_DICT='{"ensemble":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres","wind_gust_10m_agl_m_s01"],"rap":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"gfs":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"gefs":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"]}'
+
+CONVNEXT_V2_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+BOTTLENECK_LAYER_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3")
+SPECTRAL_NORM_FLAGS=("0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1")
+DROPOUT_STRATEGIES=("none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable" "none" "none" "constant0.1" "constant0.1" "variable" "variable")
+RESIDUAL_NORM_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+convnext_v2_flag=${CONVNEXT_V2_FLAGS[$SLURM_ARRAY_TASK_ID]}
+num_bottleneck_layers=${BOTTLENECK_LAYER_COUNTS[$SLURM_ARRAY_TASK_ID]}
+spectral_norm_flag=${SPECTRAL_NORM_FLAGS[$SLURM_ARRAY_TASK_ID]}
+dropout_strategy=${DROPOUT_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
+residual_norm_flag=${RESIDUAL_NORM_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+nwp_lead_times_hours="36 42 48 54 60"
+urma_lag_times_hours="0 12 24 36"
+
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/convnext-v2=${convnext_v2_flag}_num-bottleneck-layers=${num_bottleneck_layers}_spectral-norm=${spectral_norm_flag}_dropout-strategy=${dropout_strategy}_residual-norm=${residual_norm_flag}"
+echo $output_dir_name
+
+input_model_file_name="${TEMPLATE_DIR_NAME}/convnext-v2=${convnext_v2_flag}_num-bottleneck-layers=${num_bottleneck_layers}_spectral-norm=${spectral_norm_flag}_dropout-strategy=${dropout_strategy}/model.keras"
+
+if [ "${residual_norm_flag}" == "1" ]; then
+    TARGET_RESID_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/residual_normalization_params_20170101-20211220.nc"
+    NWP_RESID_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/residual_normalization_params_long300_20170101-20211220.nc"
+else
+    TARGET_RESID_NORM_FILE_NAME=""
+    NWP_RESID_NORM_FILE_NAME=""
+fi
+
+python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+--input_template_file_name="${input_model_file_name}" \
+--output_model_dir_name="${output_dir_name}" \
+--nwp_lead_times_hours ${nwp_lead_times_hours} \
+--nwp_model_names "ensemble" "gfs" "gefs" "rap" \
+--nwp_model_to_field_names=${NWP_FIELD_NAME_DICT} \
+--nwp_normalization_file_name="${NWP_NORMALIZATION_FILE_NAME}" \
+--nwp_resid_norm_file_name="${NWP_RESID_NORM_FILE_NAME}" \
+--nwp_use_quantile_norm=1 \
+--backup_nwp_model_name="ensemble" \
+--backup_nwp_dir_name="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" \
+--target_lead_time_hours=48 \
+--target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
+--target_lag_times_hours ${urma_lag_times_hours} \
+--target_normalization_file_name="${TARGET_NORMALIZATION_FILE_NAME}" \
+--target_resid_norm_file_name="${TARGET_RESID_NORM_FILE_NAME}" \
+--targets_use_quantile_norm=1 \
+--nbm_constant_field_names "orographic_height_m_asl" "land_sea_mask_land1" "latitude_matrix_deg_n" "longitude_matrix_deg_e" \
+--nbm_constant_file_name="${NBM_CONSTANT_FILE_NAME}" \
+--compare_to_baseline_in_loss=1 \
+--num_examples_per_batch=1 \
+--sentinel_value=-10 \
+--patch_size_2pt5km_pixels=208 \
+--patch_buffer_size_2pt5km_pixels=50 \
+--use_fast_patch_generator=1 \
+--patch_overlap_size_2pt5km_pixels=64 \
+--require_all_predictors=0 \
+--predict_dewpoint_depression=1 \
+--predict_gust_excess=1 \
+--do_residual_prediction=1 \
+--resid_baseline_model_name="ensemble" \
+--resid_baseline_lead_time_hours=48 \
+--resid_baseline_model_dir_name="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid" \
+--first_init_time_strings_for_training "2017-01-01-00" \
+--last_init_time_strings_for_training "2021-12-20-18" \
+--nwp_dir_names_for_training "/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gefs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid" \
+--target_dir_name_for_training="${TARGET_DIR_NAME}" \
+--first_init_time_strings_for_validation "2022-01-01-00" \
+--last_init_time_strings_for_validation "2022-12-20-18" \
+--nwp_dir_names_for_validation "/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gefs/processed/interp_to_nbm_grid" "/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid" \
+--target_dir_name_for_validation="${TARGET_DIR_NAME}" \
+--num_epochs=1000 \
+--use_exp_moving_average_with_decay=0.99 \
+--num_training_batches_per_epoch=3000 \
+--num_validation_batches_per_epoch=1500 \
+--plateau_patience_epochs=10 \
+--plateau_learning_rate_multiplier=0.95 \
+--early_stopping_patience_epochs=10000
