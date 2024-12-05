@@ -136,6 +136,7 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
             forecast_hour=forecast_hour,
             raise_error_if_missing=False
         )
+        print(input_file_name)
 
         if not os.path.isfile(input_file_name):
             continue
