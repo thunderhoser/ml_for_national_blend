@@ -15,6 +15,7 @@ import argparse
 import numpy
 from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.io import urma_io
+from ml_for_national_blend.io import operational_nbm_io
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
@@ -332,15 +333,29 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
     last_init_time_unix_sec = time_conversion.string_to_unix_sec(
         last_init_time_string, TIME_FORMAT
     )
-    nwp_forecast_file_names = interp_nwp_model_io.find_files_for_period(
-        directory_name=nwp_forecast_dir_name,
-        model_name=nwp_model_name,
-        forecast_hour=lead_time_hours,
-        first_init_time_unix_sec=first_init_time_unix_sec,
-        last_init_time_unix_sec=last_init_time_unix_sec,
-        raise_error_if_all_missing=True,
-        raise_error_if_any_missing=False
-    )
+
+    # TODO(thunderhoser): This is a HACK.
+    if nwp_model_name == 'operational_nbm':
+        nwp_forecast_file_names = operational_nbm_io.find_files_for_period(
+            directory_name=nwp_forecast_dir_name,
+            forecast_hour=lead_time_hours,
+            first_init_time_unix_sec=first_init_time_unix_sec,
+            last_init_time_unix_sec=last_init_time_unix_sec,
+            raise_error_if_all_missing=True,
+            raise_error_if_any_missing=False
+        )
+
+        nwp_model_name = nwp_model_utils.ENSEMBLE_MODEL_NAME
+    else:
+        nwp_forecast_file_names = interp_nwp_model_io.find_files_for_period(
+            directory_name=nwp_forecast_dir_name,
+            model_name=nwp_model_name,
+            forecast_hour=lead_time_hours,
+            first_init_time_unix_sec=first_init_time_unix_sec,
+            last_init_time_unix_sec=last_init_time_unix_sec,
+            raise_error_if_all_missing=True,
+            raise_error_if_any_missing=False
+        )
 
     init_times_unix_sec = numpy.array([
         interp_nwp_model_io.file_name_to_init_time(f)

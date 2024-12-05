@@ -216,9 +216,9 @@ def read_file(
             orig_dimensions = this_data_matrix.shape
 
             # TODO(thunderhoser): Who fucking knows?
-            this_data_matrix = numpy.reshape(
-                numpy.ravel(this_data_matrix), orig_dimensions, order='F'
-            )
+            # this_data_matrix = numpy.reshape(
+            #     numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+            # )
             assert not numpy.any(numpy.isnan(this_data_matrix))
 
             data_matrix[..., f] = this_data_matrix + 0.
@@ -242,9 +242,9 @@ def read_file(
         )
 
         orig_dimensions = this_data_matrix.shape
-        this_data_matrix = numpy.reshape(
-            numpy.ravel(this_data_matrix), orig_dimensions, order='F'
-        )
+        # this_data_matrix = numpy.reshape(
+        #     numpy.ravel(this_data_matrix), orig_dimensions, order='F'
+        # )
         assert not numpy.any(numpy.isnan(this_data_matrix))
 
         data_matrix[..., f] = this_data_matrix + 0.

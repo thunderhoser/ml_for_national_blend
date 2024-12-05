@@ -239,7 +239,7 @@ def read_field_from_grib_file(
     # Extract field to temporary file.
     if grib_file_type == GRIB1_FILE_TYPE:
         command_string = (
-            '"{0:s}" "{1:s}" -s | grep -w "{2:s}" | "{0:s}" -i "{1:s}" '
+            '"{0:s}" "{1:s}" -s | grep -w "{2:s}" | grep -v "ens std dev" | "{0:s}" -i "{1:s}" '
             '-text -nh -o "{3:s}"'
         ).format(
             wgrib_exe_name, grib_file_name, field_name_grib1,
@@ -247,7 +247,7 @@ def read_field_from_grib_file(
         )
     else:
         command_string = (
-            '"{0:s}" "{1:s}" -s | grep -w "{2:s}" | "{0:s}" -i "{1:s}" '
+            '"{0:s}" "{1:s}" -s | grep -w "{2:s}" | grep -v "ens std dev" | "{0:s}" -i "{1:s}" '
             '-no_header -text "{3:s}"'
         ).format(
             wgrib2_exe_name, grib_file_name,
