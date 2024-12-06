@@ -80,20 +80,6 @@ OPTION_DICT = {
     chiu_net_pp_arch.NWP_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
-    # chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
-    # chiu_net_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
-    # chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    # chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
-    # chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    # chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    # chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
-    # chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
-    # chiu_net_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
-    # chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
-    # chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
-    # chiu_net_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    # chiu_net_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    # chiu_net_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
     chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
         [32, 48, 64, 96, 128], dtype=int
     ),
@@ -117,7 +103,29 @@ OPTION_DICT = {
     chiu_net_pp_arch.PREDICT_DEWPOINT_DEPRESSION_KEY: False,
     chiu_net_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
     chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
-    chiu_net_pp_arch.METRIC_FUNCTIONS_KEY: []
+    chiu_net_pp_arch.METRIC_FUNCTIONS_KEY: [],
+
+    # TODO(important): Any argument starting with "LAGTGT" won't be used,
+    # because we don't have lagged URMA truth in the inputs.  Don't touch any of
+    # these arguments.
+    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
+    chiu_net_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
+    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
+    chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
+    chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
+
+    # TODO(important): Any argument starting with "RCTBIAS" won't be used,
+    # because we don't have recent NWP biases in the inputs.  Don't touch any of
+    # these arguments.
+    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
+    chiu_net_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
+    chiu_net_pp_arch.RCTBIAS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int),
+    chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
+    chiu_net_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
+    chiu_net_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True
 }
 
 
