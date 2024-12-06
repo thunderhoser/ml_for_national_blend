@@ -27,8 +27,8 @@ echo `which python`
 echo `which python3`
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/urma_data/processed"
-NORMALIZATION_FILE_ARG_NAME="${INPUT_DIR_NAME}/normalization_params_20221101-20230531.nc"
+INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+NORMALIZATION_FILE_ARG_NAME="${INPUT_DIR_NAME}/normalization_params_20170101-20211220.nc"
 
 python3 -u "${CODE_DIR_NAME}/determine_loss_function_weights.py" \
 --input_target_dir_name="${INPUT_DIR_NAME}" \
