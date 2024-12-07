@@ -47,37 +47,41 @@ residual_norm_flag=${RESIDUAL_NORM_FLAGS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/convnext-v2=${convnext_v2_flag}_num-bottleneck-layers=${num_bottleneck_layers}_spectral-norm=${spectral_norm_flag}_dropout-strategy=${dropout_strategy}_residual-norm=${residual_norm_flag}"
 echo $model_dir_name
 
-if [ "$target_field_name" = "temperature_2m_agl_kelvins" ]; then
-    num_relia_bins=115
-    min_relia_bin_edge=-60
-    max_relia_bin_edge=55
-elif [ "$target_field_name" = "u_wind_10m_agl_m_s01" ]; then
-    num_relia_bins=80
-    min_relia_bin_edge=-40
-    max_relia_bin_edge=40
-elif [ "$target_field_name" = "v_wind_10m_agl_m_s01" ]; then
-    num_relia_bins=80
-    min_relia_bin_edge=-40
-    max_relia_bin_edge=40
-elif [ "$target_field_name" = "dewpoint_2m_agl_kelvins" ]; then
-    num_relia_bins=115
-    min_relia_bin_edge=-80
-    max_relia_bin_edge=35
-else
-    num_relia_bins=80
-    min_relia_bin_edge=0
-    max_relia_bin_edge=80
-fi
+TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
 
-python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
---input_prediction_dir_name="${model_dir_name}/validation_full_grid/with_ema" \
---init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
---num_bootstrap_reps=1 \
---target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
---input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
---num_relia_bins_by_target 115 80 80 115 80 \
---min_relia_bin_edge_by_target -60 -40 -40 -80 0 \
---max_relia_bin_edge_by_target 55 40 40 35 80 \
---per_grid_cell=0 \
---keep_it_simple=0 \
---output_file_name_or_pattern="${model_dir_name}/validation_full_grid/with_ema/ungridded_evaluation_${target_field_name}.nc"
+for target_field_name in "${TARGET_FIELD_NAMES[@]}"; do
+    if [ "$target_field_name" = "temperature_2m_agl_kelvins" ]; then
+        num_relia_bins=115
+        min_relia_bin_edge=-60
+        max_relia_bin_edge=55
+    elif [ "$target_field_name" = "u_wind_10m_agl_m_s01" ]; then
+        num_relia_bins=80
+        min_relia_bin_edge=-40
+        max_relia_bin_edge=40
+    elif [ "$target_field_name" = "v_wind_10m_agl_m_s01" ]; then
+        num_relia_bins=80
+        min_relia_bin_edge=-40
+        max_relia_bin_edge=40
+    elif [ "$target_field_name" = "dewpoint_2m_agl_kelvins" ]; then
+        num_relia_bins=115
+        min_relia_bin_edge=-80
+        max_relia_bin_edge=35
+    else
+        num_relia_bins=80
+        min_relia_bin_edge=0
+        max_relia_bin_edge=80
+    fi
+
+    python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+    --input_prediction_dir_name="${model_dir_name}/validation_full_grid/with_ema" \
+    --init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
+    --num_bootstrap_reps=1 \
+    --target_field_names "${target_field_name}" \
+    --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+    --num_relia_bins_by_target ${num_relia_bins} \
+    --min_relia_bin_edge_by_target ${min_relia_bin_edge} \
+    --max_relia_bin_edge_by_target ${max_relia_bin_edge} \
+    --per_grid_cell=0 \
+    --keep_it_simple=0 \
+    --output_file_name_or_pattern="${model_dir_name}/validation_full_grid/with_ema/ungridded_evaluation_${target_field_name}.nc"
+done
