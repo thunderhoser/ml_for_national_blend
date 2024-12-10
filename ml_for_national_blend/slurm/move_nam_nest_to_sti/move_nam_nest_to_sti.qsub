@@ -31,5 +31,5 @@ while [ $i -lt $loop_max ] && [ $i -lt ${#INIT_TIME_STRINGS[@]} ]; do
     i=$((i + 1))
 done
 
-command_string+="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid/"
+command_string+=" /scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid/"
 eval "$command_string"
