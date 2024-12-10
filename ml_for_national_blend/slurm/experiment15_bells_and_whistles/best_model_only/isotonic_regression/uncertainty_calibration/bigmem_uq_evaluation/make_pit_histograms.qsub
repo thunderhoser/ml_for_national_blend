@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#SBATCH --job-name="make_pit_histograms"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=08:00:00
+#SBATCH --array=0-4
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=make_pit_histograms_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment15_bells_and_whistles"
+TARGET_NORM_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
+target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/convnext-v2=0_num-bottleneck-layers=1_spectral-norm=0_dropout-strategy=none_residual-norm=0"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/make_pit_histograms.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration" \
+--init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
+--target_field_names "${target_field_name}" \
+--num_bins=26 \
+--output_file_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/pit_histograms_${target_field_name}.nc"
