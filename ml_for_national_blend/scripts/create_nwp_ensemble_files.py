@@ -313,6 +313,7 @@ def _create_ensemble_file_1init_1valid(
         nwp_model_to_field_names=nwp_model_to_field_names,
         nwp_model_to_dir_name=nwp_model_to_dir_name,
         nwp_norm_param_table_xarray=None,
+        nwp_resid_norm_param_table_xarray=None,
         use_quantile_norm=False,
         backup_nwp_model_name=None,
         backup_nwp_directory_name=None,
@@ -418,9 +419,9 @@ def _create_ensemble_file_1init_1valid(
             nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
         )
 
-    ensemble_data_matrix_2pt5km = numpy.nanmean(
-        ensemble_data_matrix_2pt5km, axis=-1
-    )
+    # ensemble_data_matrix_2pt5km = numpy.nanmean(
+    #     ensemble_data_matrix_2pt5km, axis=-1
+    # )
 
     num_rows = ensemble_data_matrix_2pt5km.shape[0]
     num_columns = ensemble_data_matrix_2pt5km.shape[1]
@@ -435,13 +436,17 @@ def _create_ensemble_file_1init_1valid(
         nwp_model_utils.FORECAST_HOUR_DIM: numpy.array(
             [lead_time_hours], dtype=int
         ),
-        nwp_model_utils.FIELD_DIM: all_field_names
+        nwp_model_utils.FIELD_DIM: all_field_names,
+        interp_nwp_model_io.ENSEMBLE_MEMBER_DIM: numpy.linspace(
+            0, num_models - 1, num=num_models, dtype=int
+        ),
     }
 
     these_dims_2d = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
-    these_dims_4d = (
+    these_dims_5d = (
         nwp_model_utils.FORECAST_HOUR_DIM, nwp_model_utils.ROW_DIM,
-        nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM
+        nwp_model_utils.COLUMN_DIM, nwp_model_utils.FIELD_DIM,
+        interp_nwp_model_io.ENSEMBLE_MEMBER_DIM
     )
 
     nbm_latitude_matrix_deg_n, nbm_longitude_matrix_deg_e = (
@@ -456,7 +461,7 @@ def _create_ensemble_file_1init_1valid(
             these_dims_2d, nbm_longitude_matrix_deg_e
         ),
         nwp_model_utils.DATA_KEY: (
-            these_dims_4d,
+            these_dims_5d,
             numpy.expand_dims(ensemble_data_matrix_2pt5km, axis=0)
         )
     }

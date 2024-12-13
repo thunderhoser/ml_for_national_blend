@@ -10,6 +10,8 @@ from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.utils import nwp_model_utils
 
 TIME_FORMAT = '%Y-%m-%d-%H'
+ENSEMBLE_MEMBER_DIM = 'ensemble_member'
+DUMMY_ENSEMBLE_MEMBER_DIM = 'dummy_ensemble_member'
 
 
 def find_file(directory_name, init_time_unix_sec, forecast_hour, model_name,
@@ -172,10 +174,13 @@ def file_name_to_forecast_hour(interp_nwp_file_name):
     return forecast_hour
 
 
-def read_file(netcdf_file_name):
+def read_file(netcdf_file_name, keep_ensemble=False):
     """Reads interpolated NWP forecasts from NetCDF file.
 
     :param netcdf_file_name: Path to input file.
+    :param keep_ensemble: Boolean flag.  If the file contains a full ensemble
+        and `keep_ensemble == True`, this method will return the full ensemble.
+        Otherwise, this method will return just deterministic forecasts.
     :return: nwp_forecast_table_xarray: xarray table.  Documentation in the
         xarray table should make values self-explanatory.
     """
@@ -183,6 +188,17 @@ def read_file(netcdf_file_name):
     error_checking.assert_file_exists(netcdf_file_name)
     nwp_forecast_table_xarray = xarray.open_dataset(netcdf_file_name)
     nwpft = nwp_forecast_table_xarray
+
+    if (
+            ENSEMBLE_MEMBER_DIM in nwpft[nwp_model_utils.DATA_KEY].dims
+            and not keep_ensemble
+    ):
+        nwpft = nwpft.assign({
+            nwp_model_utils.DATA_KEY: (
+                nwpft[nwp_model_utils.DATA_KEY].dims[:-1],
+                numpy.mean(nwpft[nwp_model_utils.DATA_KEY].values, axis=-1)
+            )
+        })
 
     if (
             nwp_model_utils.WIND_GUST_10METRE_NAME not in

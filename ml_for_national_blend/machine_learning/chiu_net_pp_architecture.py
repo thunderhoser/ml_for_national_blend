@@ -1651,7 +1651,7 @@ def create_model(option_dict):
         basic_layer_name='last_conv_simple'
     )
 
-    if not do_residual_prediction:
+    if not do_residual_prediction and output_activ_function_name is not None:
         simple_output_layer_object = architecture_utils.get_activation_layer(
             activation_function_string=output_activ_function_name,
             alpha_for_relu=output_activ_function_alpha,
@@ -1677,7 +1677,7 @@ def create_model(option_dict):
             basic_layer_name='last_conv_dd'
         )
 
-        if not do_residual_prediction:
+        if not do_residual_prediction and output_activ_function_name is not None:
             dd_output_layer_object = architecture_utils.get_activation_layer(
                 activation_function_string=
                 architecture_utils.RELU_FUNCTION_STRING,
@@ -1706,7 +1706,7 @@ def create_model(option_dict):
             basic_layer_name='last_conv_gex'
         )
 
-        if not do_residual_prediction:
+        if not do_residual_prediction and output_activ_function_name is not None:
             gf_output_layer_object = architecture_utils.get_activation_layer(
                 activation_function_string=
                 architecture_utils.RELU_FUNCTION_STRING,
