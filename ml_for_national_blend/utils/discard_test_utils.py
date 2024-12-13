@@ -55,7 +55,7 @@ def _run_discard_test_1field(
     rtx = result_table_xarray
 
     uncertainty_matrix = uncertainty_function(prediction_matrix)
-    deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
+    deterministic_pred_matrix = numpy.nanmean(prediction_matrix, axis=-1)
 
     for k in range(num_fractions):
         this_percentile_level = 100 * (1 - discard_fractions[k])
@@ -149,7 +149,7 @@ def get_rmse_error_func_1field():
         """
 
         squared_error_matrix = (target_matrix - deterministic_pred_matrix) ** 2
-        return numpy.sqrt(numpy.mean(squared_error_matrix))
+        return numpy.sqrt(numpy.nanmean(squared_error_matrix))
 
     return error_function
 
