@@ -31,7 +31,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-NWP_FORECAST_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid"
+NWP_FORECAST_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid"
 URMA_DIRECTORY_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
 PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files"
 

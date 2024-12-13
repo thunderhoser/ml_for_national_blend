@@ -427,9 +427,10 @@ def _create_ensemble_file_1init_1valid(
             nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].values[0, ...]
         )
 
-    # ensemble_data_matrix_2pt5km = numpy.nanmean(
-    #     ensemble_data_matrix_2pt5km, axis=-1
-    # )
+    if not targets_only:
+        ensemble_data_matrix_2pt5km = numpy.nanmean(
+            ensemble_data_matrix_2pt5km, axis=-1, keepdims=True
+        )
 
     num_rows = ensemble_data_matrix_2pt5km.shape[0]
     num_columns = ensemble_data_matrix_2pt5km.shape[1]
@@ -447,7 +448,7 @@ def _create_ensemble_file_1init_1valid(
         nwp_model_utils.FIELD_DIM: all_field_names,
         interp_nwp_model_io.ENSEMBLE_MEMBER_DIM: numpy.linspace(
             0, num_models - 1, num=num_models, dtype=int
-        ),
+        )
     }
 
     these_dims_2d = (nwp_model_utils.ROW_DIM, nwp_model_utils.COLUMN_DIM)
