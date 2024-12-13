@@ -1195,7 +1195,6 @@ def read_inputs(prediction_file_names, target_field_names, take_ensemble_mean):
 
         pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
         prediction_tables_xarray[i] = pt_i
-        print(prediction_tables_xarray[i])
 
     return prediction_tables_xarray
 
@@ -1456,11 +1455,6 @@ def get_scores_with_bootstrapping(
         ptx[prediction_io.TARGET_KEY].values
         for ptx in prediction_tables_xarray
     ], axis=0)
-
-    print(prediction_matrix.shape)
-    print(target_matrix.shape)
-    print(numpy.mean(numpy.isnan(prediction_matrix)))
-    print(numpy.mean(numpy.isnan(target_matrix)))
 
     model_file_name = (
         prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY]

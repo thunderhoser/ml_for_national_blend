@@ -80,9 +80,14 @@ def __compute_pit_values_1field(prediction_matrix_2d, target_values_1d):
     pit_values_1d = numpy.full(num_scalar_examples, numpy.nan)
 
     for i in range(num_scalar_examples):
-        if numpy.any(numpy.isnan(prediction_matrix_2d[i, :])):
+        # if numpy.any(numpy.isnan(prediction_matrix_2d[i, :])):
+        #     continue
+        # if numpy.any(numpy.isnan(target_values_1d[i])):
+        #     continue
+
+        if numpy.isnan(target_values_1d[i]):
             continue
-        if numpy.any(numpy.isnan(target_values_1d[i])):
+        if numpy.all(numpy.isnan(prediction_matrix_2d[i, :])):
             continue
 
         if numpy.mod(i, 10000) == 0:
@@ -92,8 +97,11 @@ def __compute_pit_values_1field(prediction_matrix_2d, target_values_1d):
                 i, num_scalar_examples
             ))
 
+        these_inputs = prediction_matrix_2d[i, :][
+            numpy.isnan(prediction_matrix_2d[i, :]) == False
+        ]
         pit_values_1d[i] = 0.01 * percentileofscore(
-            a=prediction_matrix_2d[i, :], score=target_values_1d[i], kind='mean'
+            a=these_inputs, score=target_values_1d[i], kind='mean'
         )
 
     print('Computed PIT value for all {0:d} scalar examples!'.format(

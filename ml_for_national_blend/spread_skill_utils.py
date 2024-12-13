@@ -48,13 +48,24 @@ def memory_efficient_stdev(input_matrix):
     ensemble_size = input_matrix.shape[-1]
     error_checking.assert_is_greater(ensemble_size, 1)
 
-    mean_matrix = numpy.mean(input_matrix, axis=-1)
+    mean_matrix = numpy.nanmean(input_matrix, axis=-1)
 
     variance_matrix = (input_matrix[..., 0] - mean_matrix) ** 2
-    for k in range(1, ensemble_size):
-        variance_matrix += (input_matrix[..., k] - mean_matrix) ** 2
+    ensemble_size_matrix = numpy.invert(
+        numpy.isnan(input_matrix[..., 0])
+    ).astype(float)
 
-    variance_matrix /= (ensemble_size - 1)
+    for k in range(1, ensemble_size):
+        variance_matrix += (
+            numpy.nan_to_num(input_matrix[..., k], nan=0.) - mean_matrix
+        ) ** 2
+
+        ensemble_size_matrix += numpy.invert(
+            numpy.isnan(input_matrix[..., k])
+        ).astype(float)
+
+    ensemble_size_matrix[ensemble_size_matrix < 2] = numpy.nan
+    variance_matrix /= (ensemble_size_matrix - 1)
     return numpy.sqrt(variance_matrix)
 
 
@@ -270,7 +281,7 @@ def get_spread_vs_skill(
     ])
 
     # Do actual stuff.
-    deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
+    deterministic_pred_matrix = numpy.nanmean(prediction_matrix, axis=-1)
     prediction_stdev_matrix = memory_efficient_stdev(prediction_matrix)
     squared_error_matrix = (deterministic_pred_matrix - target_matrix) ** 2
 
