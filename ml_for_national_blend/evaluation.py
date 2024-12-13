@@ -1457,6 +1457,9 @@ def get_scores_with_bootstrapping(
         for ptx in prediction_tables_xarray
     ], axis=0)
 
+    print(prediction_matrix.shape)
+    print(target_matrix.shape)
+
     model_file_name = (
         prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY]
     )
