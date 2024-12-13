@@ -1195,6 +1195,7 @@ def read_inputs(prediction_file_names, target_field_names, take_ensemble_mean):
 
         pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
         prediction_tables_xarray[i] = pt_i
+        print(prediction_tables_xarray[i])
 
     return prediction_tables_xarray
 
