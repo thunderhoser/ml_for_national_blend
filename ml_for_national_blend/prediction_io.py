@@ -463,7 +463,7 @@ def take_ensemble_mean(prediction_table_xarray):
     ptx = ptx.assign({
         PREDICTION_KEY: (
             these_dim,
-            numpy.mean(ptx[PREDICTION_KEY].values, axis=-1, keepdims=True)
+            numpy.nanmean(ptx[PREDICTION_KEY].values, axis=-1, keepdims=True)
         )
     })
 
@@ -490,11 +490,11 @@ def prep_for_uncertainty_calib_training(prediction_table_xarray):
     ensemble_size = len(ptx.coords[ENSEMBLE_MEMBER_DIM].values)
     assert ensemble_size > 1
 
-    prediction_variance_matrix = numpy.var(
+    prediction_variance_matrix = numpy.nanvar(
         ptx[PREDICTION_KEY].values, axis=-1, ddof=1, keepdims=True
     )
     squared_error_matrix = (
-        numpy.mean(ptx[PREDICTION_KEY].values, axis=-1) -
+        numpy.nanmean(ptx[PREDICTION_KEY].values, axis=-1) -
         ptx[TARGET_KEY].values
     ) ** 2
 
