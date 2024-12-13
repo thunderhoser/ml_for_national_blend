@@ -1459,6 +1459,8 @@ def get_scores_with_bootstrapping(
 
     print(prediction_matrix.shape)
     print(target_matrix.shape)
+    print(numpy.mean(numpy.isnan(prediction_matrix)))
+    print(numpy.mean(numpy.isnan(target_matrix)))
 
     model_file_name = (
         prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY]
