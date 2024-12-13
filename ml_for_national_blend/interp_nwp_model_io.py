@@ -203,7 +203,7 @@ def read_file(netcdf_file_name, keep_ensemble=False):
         nwpft = nwpft.assign({
             nwp_model_utils.DATA_KEY: (
                 nwpft[nwp_model_utils.DATA_KEY].dims[:-1],
-                numpy.mean(nwpft[nwp_model_utils.DATA_KEY].values, axis=-1)
+                numpy.nanmean(nwpft[nwp_model_utils.DATA_KEY].values, axis=-1)
             )
         })
 
