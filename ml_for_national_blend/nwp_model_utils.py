@@ -19,6 +19,10 @@ import time_conversion
 import error_checking
 import nbm_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 TOLERANCE = 1e-6
 
 HOURS_TO_SECONDS = 3600
@@ -679,7 +683,7 @@ def get_field(nwp_forecast_table_xarray, field_name):
     k = numpy.where(
         nwp_forecast_table_xarray.coords[FIELD_DIM].values == field_name
     )[0][0]
-    return nwp_forecast_table_xarray[DATA_KEY].values[..., k]
+    return nwp_forecast_table_xarray[DATA_KEY].values[:, :, :, k, ...]
 
 
 def interp_data_to_nbm_grid(

@@ -1,3 +1,4 @@
+
 """Plots error distributions.
 
 Specifically, this script creates 4 plots for every target variable:
@@ -9,6 +10,8 @@ Specifically, this script creates 4 plots for every target variable:
 #3 Comparison of right tails (PDF plot for right tail of both distributions
    [target and predicted] on the same axes)
 #4 Comparison of left tails
+#5 Comparison of full distributions (PDF plot of both target and predicted
+   distributions, not restricted to just the tails)
 """
 
 import os
@@ -74,6 +77,7 @@ MAX_BIN_EDGES_ARG_NAME = 'max_bin_edge_by_target'
 VIOLIN_OR_BOX_ARG_NAME = 'violin_or_box_plots'
 LEFT_TAIL_PERCENTILE_ARG_NAME = 'left_tail_percentile'
 RIGHT_TAIL_PERCENTILE_ARG_NAME = 'right_tail_percentile'
+MAX_NUM_PDF_VALUES_ARG_NAME = 'max_num_pdf_values'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -134,6 +138,16 @@ LEFT_TAIL_PERCENTILE_HELP_STRING = (
 RIGHT_TAIL_PERCENTILE_HELP_STRING = 'Same as {0:s} but for right tail.'.format(
     LEFT_TAIL_PERCENTILE_ARG_NAME
 )
+MAX_NUM_PDF_VALUES_HELP_STRING = (
+    'Maximum number of values to include in one PDF.  This is the number of '
+    'atomic examples (one atomic example = one grid point at one time step).  '
+    'If you want to use all values, make this argument -1.  But be warned that '
+    'kernel-density estimation (KDE) might take a *really* long time if you '
+    'have many values.  For example, 100 time steps with the NBM grid leads to '
+    '~400M atomic examples (because the NBM grid has ~4M grid points).  In '
+    'this case, for producing plot #5 (full distributions and not just the '
+    'tails), KDE will take over an hour for each variable.'
+)
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Figures will be saved here.'
 )
@@ -184,17 +198,21 @@ INPUT_ARG_PARSER.add_argument(
     default=99.5, help=RIGHT_TAIL_PERCENTILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_NUM_PDF_VALUES_ARG_NAME, type=int, required=False, default=-1,
+    help=MAX_NUM_PDF_VALUES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
 
 
-def _plot_distribution_tails(
+def _plot_distributions(
         target_values, predicted_values, tail_percentile, target_field_name):
-    """Plots distribution tails for one target variable.
+    """Plots distributions (target and predicted) for one variable.
 
-    Specifically, this method creates either plot #3 or plot #3 (see definitions
-    at top of this script).
+    Specifically, this method creates plot #3 or #4 or #5 (see definitions at
+    top of this script).
 
     E = number of atomic examples, where one "atomic example" is one valid time
         at one grid point.
@@ -202,7 +220,8 @@ def _plot_distribution_tails(
     :param target_values: length-E numpy array of actual values.
     :param predicted_values: length-E numpy array of predicted values.
     :param tail_percentile: Percentile (ranging from 0...100) used to define
-        "tail" of distribution.
+        "tail" of distribution.  If you are plotting the full distributions
+        (not just the left or right tail), make this None.
     :param target_field_name: Name of target field.
     :return: figure_object: Figure handle (instance of
         `matplotlib.figure.Figure`).
@@ -210,38 +229,54 @@ def _plot_distribution_tails(
         `matplotlib.axes._subplots.AxesSubplot`).
     """
 
-    left_or_right_tail = tail_percentile < 50.
-    tail_threshold = numpy.nanpercentile(
-        numpy.concatenate([target_values, predicted_values]),
-        tail_percentile
-    )
+    if tail_percentile is None:
+        tail_percentile = numpy.nan
 
-    if left_or_right_tail:
+    plotting_left_tail = tail_percentile < 50.
+    plotting_right_tail = tail_percentile > 50.
+
+    if plotting_left_tail or plotting_right_tail:
+        tail_threshold = numpy.nanpercentile(
+            numpy.concatenate([target_values, predicted_values]),
+            tail_percentile
+        )
+    else:
+        tail_threshold = None
+
+    if plotting_left_tail:
         relevant_target_values = target_values[target_values <= tail_threshold]
         relevant_predicted_values = predicted_values[
             predicted_values <= tail_threshold
         ]
-    else:
+    elif plotting_right_tail:
         relevant_target_values = target_values[target_values >= tail_threshold]
         relevant_predicted_values = predicted_values[
             predicted_values >= tail_threshold
         ]
-
-    target_kde_object = gaussian_kde(relevant_target_values)
-    prediction_kde_object = gaussian_kde(relevant_predicted_values)
-
-    if left_or_right_tail:
-        x_min = min([
-            numpy.min(relevant_target_values),
-            numpy.min(relevant_predicted_values)
-        ])
-        x_values = numpy.linspace(x_min, tail_threshold, num=1001)
     else:
-        x_max = max([
-            numpy.max(relevant_target_values),
-            numpy.max(relevant_predicted_values)
-        ])
+        relevant_target_values = target_values
+        relevant_predicted_values = predicted_values
+
+    target_kde_object = gaussian_kde(relevant_target_values, bw_method='scott')
+    prediction_kde_object = gaussian_kde(
+        relevant_predicted_values, bw_method='scott'
+    )
+
+    x_min = min([
+        numpy.min(relevant_target_values),
+        numpy.min(relevant_predicted_values)
+    ])
+    x_max = max([
+        numpy.max(relevant_target_values),
+        numpy.max(relevant_predicted_values)
+    ])
+
+    if plotting_left_tail:
+        x_values = numpy.linspace(x_min, tail_threshold, num=1001)
+    elif plotting_right_tail:
         x_values = numpy.linspace(tail_threshold, x_max, num=1001)
+    else:
+        x_values = numpy.linspace(x_min, x_max, num=1001)
 
     target_y_values = target_kde_object(x_values)
     prediction_y_values = prediction_kde_object(x_values)
@@ -258,7 +293,9 @@ def _plot_distribution_tails(
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
-    axes_object.set_yscale('log')
+
+    if plotting_left_tail or plotting_right_tail:
+        axes_object.set_yscale('log')
 
     target_handle = axes_object.plot(
         x_values, target_y_values,
@@ -269,29 +306,44 @@ def _plot_distribution_tails(
         linestyle='solid', linewidth=3, color=PREDICTION_COLOUR
     )[0]
 
+    axes_object.fill_between(
+        x_values, target_y_values, color=TARGET_COLOUR, alpha=0.2
+    )
+    axes_object.fill_between(
+        x_values, prediction_y_values, color=PREDICTION_COLOUR, alpha=0.2
+    )
+
     axes_object.set_xlabel(TARGET_FIELD_NAME_TO_VERBOSE[target_field_name])
-    axes_object.set_ylabel('Probability density (log scale)')
+    axes_object.set_ylabel('Probability density')
 
     legend_handles = [target_handle, prediction_handle]
     legend_strings = ['Actual', 'Predicted']
 
-    if left_or_right_tail:
+    if plotting_left_tail:
         axes_object.legend(
             legend_handles, legend_strings, loc='lower right',
             bbox_to_anchor=(0.9, 0.1), fancybox=True, shadow=False,
             facecolor='white', edgecolor='k', framealpha=1., ncol=1
         )
-    else:
+    elif plotting_right_tail:
         axes_object.legend(
             legend_handles, legend_strings, loc='lower left',
             bbox_to_anchor=(0.1, 0.1), fancybox=True, shadow=False,
             facecolor='white', edgecolor='k', framealpha=1., ncol=1
         )
+    else:
+        axes_object.legend(
+            legend_handles, legend_strings, loc='lower center',
+            bbox_to_anchor=(0.5, 0.1), fancybox=True, shadow=False,
+            facecolor='white', edgecolor='k', framealpha=1., ncol=1
+        )
 
     axes_object.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-    title_string = 'Comparison of {0:s} tails for {1:s}'.format(
-        'left' if left_or_right_tail else 'right',
+    title_string = 'Comparison of {0:s} for {1:s}'.format(
+        'left tails' if plotting_left_tail
+        else 'right tails' if plotting_right_tail
+        else 'distributions',
         TARGET_FIELD_NAME_TO_VERBOSE[target_field_name]
     )
     axes_object.set_title(title_string)
@@ -452,7 +504,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
          evaluate_hour, target_field_names, num_bins_by_target,
          min_bin_edge_by_target, max_bin_edge_by_target,
          violin_or_box_plots, left_tail_percentile, right_tail_percentile,
-         output_dir_name):
+         max_num_pdf_values, output_dir_name):
     """Plots error distributions.
 
     This is effectively the main method.
@@ -468,6 +520,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
     :param violin_or_box_plots: Same.
     :param left_tail_percentile: Same.
     :param right_tail_percentile: Same.
+    :param max_num_pdf_values: Same.
     :param output_dir_name: Same.
     """
 
@@ -510,6 +563,9 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
     error_checking.assert_is_greater(left_tail_percentile, 0.)
     error_checking.assert_is_geq(right_tail_percentile, 90.)
     error_checking.assert_is_less_than(right_tail_percentile, 100.)
+
+    if max_num_pdf_values <= 0:
+        max_num_pdf_values = int(1e15)
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
@@ -611,6 +667,14 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
         target_matrix, (-1, num_target_fields)
     )
 
+    nan_flags = numpy.logical_or(
+        numpy.any(numpy.isnan(prediction_matrix), axis=1),
+        numpy.any(numpy.isnan(target_matrix), axis=1)
+    )
+    real_indices = numpy.where(numpy.invert(nan_flags))[0]
+    prediction_matrix = prediction_matrix[real_indices, :]
+    target_matrix = target_matrix[real_indices, :]
+
     for j in range(num_target_fields):
         figure_object, axes_object = _plot_error_distribution(
             target_values=target_matrix[:, j],
@@ -662,7 +726,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
         pyplot.close(figure_object)
 
     for j in range(num_target_fields):
-        figure_object, axes_object = _plot_distribution_tails(
+        figure_object, axes_object = _plot_distributions(
             target_values=target_matrix[:, j],
             predicted_values=prediction_matrix[:, j],
             tail_percentile=left_tail_percentile,
@@ -682,7 +746,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
         pyplot.close(figure_object)
 
     for j in range(num_target_fields):
-        figure_object, axes_object = _plot_distribution_tails(
+        figure_object, axes_object = _plot_distributions(
             target_values=target_matrix[:, j],
             predicted_values=prediction_matrix[:, j],
             tail_percentile=right_tail_percentile,
@@ -690,6 +754,39 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
         )
 
         figure_file_name = '{0:s}/right_tail_comparison_{1:s}.jpg'.format(
+            output_dir_name,
+            target_field_names[j].replace('_', '-')
+        )
+
+        print('Saving figure to: "{0:s}"...'.format(figure_file_name))
+        figure_object.savefig(
+            figure_file_name, dpi=FIGURE_RESOLUTION_DPI,
+            pad_inches=0, bbox_inches='tight'
+        )
+        pyplot.close(figure_object)
+
+    if target_matrix.shape[0] > max_num_pdf_values:
+        combined_matrix = numpy.stack(
+            [target_matrix, prediction_matrix], axis=-1
+        )
+        del target_matrix
+        del prediction_matrix
+
+        numpy.random.shuffle(combined_matrix)
+        combined_matrix = combined_matrix[:max_num_pdf_values, ...]
+        target_matrix = combined_matrix[..., 0]
+        prediction_matrix = combined_matrix[..., 1]
+        del combined_matrix
+
+    for j in range(num_target_fields):
+        figure_object, axes_object = _plot_distributions(
+            target_values=target_matrix[:, j],
+            predicted_values=prediction_matrix[:, j],
+            tail_percentile=None,
+            target_field_name=target_field_names[j]
+        )
+
+        figure_file_name = '{0:s}/full_dist_comparison_{1:s}.jpg'.format(
             output_dir_name,
             target_field_names[j].replace('_', '-')
         )
@@ -732,6 +829,9 @@ if __name__ == '__main__':
         ),
         right_tail_percentile=getattr(
             INPUT_ARG_OBJECT, RIGHT_TAIL_PERCENTILE_ARG_NAME
+        ),
+        max_num_pdf_values=getattr(
+            INPUT_ARG_OBJECT, MAX_NUM_PDF_VALUES_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

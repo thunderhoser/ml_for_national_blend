@@ -134,26 +134,16 @@ def _convert_nwp_forecasts_1init(
     :param prediction_dir_name: Same.
     """
 
-    try:
-        nwp_model_name = interp_nwp_model_io.file_name_to_model_name(
-            nwp_forecast_file_name
-        )
-    except:
-        nwp_model_name = 'ensemble'
-
+    nwp_model_name = interp_nwp_model_io.file_name_to_model_name(
+        nwp_forecast_file_name
+    )
     downsampling_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
         nwp_model_name
     )
 
-    try:
-        init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
-            nwp_forecast_file_name
-        )
-    except:
-        init_time_unix_sec = operational_nbm_io.file_name_to_init_time(
-            nwp_forecast_file_name
-        )
-
+    init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
+        nwp_forecast_file_name
+    )
     valid_time_unix_sec = (
         init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
     )
@@ -169,7 +159,8 @@ def _convert_nwp_forecasts_1init(
         nwp_forecast_file_name
     ))
     nwp_forecast_table_xarray = interp_nwp_model_io.read_file(
-        nwp_forecast_file_name
+        netcdf_file_name=nwp_forecast_file_name,
+        keep_ensemble=downsampling_factor == 1
     )
 
     if downsampling_factor > 1:
@@ -210,7 +201,14 @@ def _convert_nwp_forecasts_1init(
             these_matrices[first_good_index].shape, numpy.nan
         )
 
-    prediction_matrix = numpy.stack(these_matrices, axis=-1)
+    if (
+            interp_nwp_model_io.ENSEMBLE_MEMBER_DIM in
+            nwp_forecast_table_xarray[nwp_model_utils.DATA_KEY].dims
+    ):
+        prediction_matrix = numpy.stack(these_matrices, axis=-2)
+    else:
+        prediction_matrix = numpy.stack(these_matrices, axis=-1)
+        prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
     print('Reading URMA labels from: "{0:s}"...'.format(urma_file_name))
     urma_table_xarray = urma_io.read_file(urma_file_name)
@@ -229,16 +227,16 @@ def _convert_nwp_forecasts_1init(
     )
 
     k = urma_field_names.index(urma_utils.TEMPERATURE_2METRE_NAME)
-    prediction_matrix[..., k] = temperature_conv.kelvins_to_celsius(
-        prediction_matrix[..., k]
+    prediction_matrix[..., k, :] = temperature_conv.kelvins_to_celsius(
+        prediction_matrix[..., k, :]
     )
     target_matrix[..., k] = temperature_conv.kelvins_to_celsius(
         target_matrix[..., k]
     )
 
     k = urma_field_names.index(urma_utils.DEWPOINT_2METRE_NAME)
-    prediction_matrix[..., k] = temperature_conv.kelvins_to_celsius(
-        prediction_matrix[..., k]
+    prediction_matrix[..., k, :] = temperature_conv.kelvins_to_celsius(
+        prediction_matrix[..., k, :]
     )
     target_matrix[..., k] = temperature_conv.kelvins_to_celsius(
         target_matrix[..., k]
@@ -305,14 +303,14 @@ def _convert_nwp_forecasts_1init(
         chiu_net_architecture_dict=None,
         chiu_net_pp_architecture_dict=None,
         chiu_next_pp_architecture_dict=None,
-        use_exp_moving_average_with_decay=0.9
+        use_exp_moving_average_with_decay=0.99
     )
 
     print('Writing prediction file: "{0:s}"...'.format(output_file_name))
     prediction_io.write_file(
         netcdf_file_name=output_file_name,
         target_matrix=target_matrix,
-        prediction_matrix=numpy.expand_dims(prediction_matrix, axis=-1),
+        prediction_matrix=prediction_matrix,
         latitude_matrix_deg_n=nwp_latitude_matrix_deg_n,
         longitude_matrix_deg_e=nwp_longitude_matrix_deg_e,
         field_names=urma_field_names,
@@ -374,16 +372,10 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
             raise_error_if_any_missing=False
         )
 
-    try:
-        init_times_unix_sec = numpy.array([
-            interp_nwp_model_io.file_name_to_init_time(f)
-            for f in nwp_forecast_file_names
-        ], dtype=int)
-    except:
-        init_times_unix_sec = numpy.array([
-            operational_nbm_io.file_name_to_init_time(f)
-            for f in nwp_forecast_file_names
-        ], dtype=int)
+    init_times_unix_sec = numpy.array([
+        interp_nwp_model_io.file_name_to_init_time(f)
+        for f in nwp_forecast_file_names
+    ], dtype=int)
 
     if nwp_model_name == nwp_model_utils.RAP_MODEL_NAME:
         good_indices = numpy.where(numpy.logical_and(
