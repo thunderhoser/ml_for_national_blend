@@ -210,9 +210,13 @@ def read_file(netcdf_file_name):
     prediction_table_xarray = xarray.open_dataset(netcdf_file_name)
     ptx = prediction_table_xarray
 
-    target_field_names = [
-        f.decode('utf-8') for f in ptx[FIELD_NAME_KEY].values
-    ]
+    try:
+        target_field_names = [
+            f.decode('utf-8') for f in ptx[FIELD_NAME_KEY].values
+        ]
+    except AttributeError:
+        target_field_names = [str(f) for f in ptx[FIELD_NAME_KEY].values]
+
     ptx = ptx.assign({
         FIELD_NAME_KEY: (ptx[FIELD_NAME_KEY].dims, target_field_names)
     })
