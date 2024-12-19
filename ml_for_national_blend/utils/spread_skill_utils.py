@@ -94,10 +94,16 @@ def read_inputs(prediction_file_names, target_field_names):
         )
         tpt = this_prediction_table_xarray
 
+        # TODO(thunderhoser): This is a HACK to allow for prediction
+        # files without the model attribute.
+        if prediction_io.MODEL_FILE_KEY not in tpt:
+            tpt.attrs[prediction_io.MODEL_FILE_KEY] = 'foo'
+
         if model_file_name is None:
             model_file_name = copy.deepcopy(
                 tpt.attrs[prediction_io.MODEL_FILE_KEY]
             )
+
             num_grid_rows = tpt[prediction_io.PREDICTION_KEY].values.shape[0]
             num_grid_columns = tpt[prediction_io.PREDICTION_KEY].values.shape[1]
             ensemble_size = tpt[prediction_io.PREDICTION_KEY].values.shape[-1]

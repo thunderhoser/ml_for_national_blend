@@ -1173,6 +1173,12 @@ def read_inputs(prediction_file_names, target_field_names, take_ensemble_mean):
             )
 
         pt_i = prediction_tables_xarray[i]
+
+        # TODO(thunderhoser): This is a HACK to allow for prediction
+        # files without the model attribute.
+        if prediction_io.MODEL_FILE_KEY not in pt_i:
+            pt_i.attrs[prediction_io.MODEL_FILE_KEY] = 'foo'
+
         if model_file_name is None:
             model_file_name = copy.deepcopy(
                 pt_i.attrs[prediction_io.MODEL_FILE_KEY]
@@ -1221,6 +1227,12 @@ def _read_spread_skill_inputs(prediction_file_names, target_field_names):
         )
 
         pt_i = prediction_tables_xarray[i]
+
+        # TODO(thunderhoser): This is a HACK to allow for prediction
+        # files without the model attribute.
+        if prediction_io.MODEL_FILE_KEY not in pt_i:
+            pt_i.attrs[prediction_io.MODEL_FILE_KEY] = 'foo'
+
         if model_file_name is None:
             model_file_name = copy.deepcopy(
                 pt_i.attrs[prediction_io.MODEL_FILE_KEY]
@@ -1447,6 +1459,11 @@ def get_scores_with_bootstrapping(
         ptx[prediction_io.TARGET_KEY].values
         for ptx in prediction_tables_xarray
     ], axis=0)
+
+    # TODO(thunderhoser): This is a HACK to allow for prediction
+    # files without the model attribute.
+    if prediction_io.MODEL_FILE_KEY not in prediction_tables_xarray[0]:
+        prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY] = 'foo'
 
     model_file_name = (
         prediction_tables_xarray[0].attrs[prediction_io.MODEL_FILE_KEY]
