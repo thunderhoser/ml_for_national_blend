@@ -73,7 +73,7 @@ for target_field_name in "${TARGET_FIELD_NAMES[@]}"; do
     fi
 
     python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
-    --input_prediction_dir_name="${model_dir_name}/validation_full_grid/without_ema" \
+    --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
     --init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
     --num_bootstrap_reps=1 \
     --target_field_names "${target_field_name}" \
@@ -83,5 +83,5 @@ for target_field_name in "${TARGET_FIELD_NAMES[@]}"; do
     --max_relia_bin_edge_by_target ${max_relia_bin_edge} \
     --per_grid_cell=0 \
     --keep_it_simple=0 \
-    --output_file_name_or_pattern="${model_dir_name}/validation_full_grid/without_ema/ungridded_evaluation_${target_field_name}.nc"
+    --output_file_name_or_pattern="${model_dir_name}/validation_full_grid/ungridded_evaluation_${target_field_name}.nc"
 done

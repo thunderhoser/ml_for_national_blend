@@ -10,7 +10,7 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=36:00:00
-#SBATCH --array=0
+#SBATCH --array=0-71
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -61,5 +61,5 @@ for this_init_date_string in "${INIT_DATE_STRINGS[@]}"; do
     --use_ema=0 \
     --save_ensemble_mean_only=1 \
     --patch_overlap_size_2pt5km_pixels=64 \
-    --output_dir_name="${model_dir_name}/validation_full_grid/without_ema"
+    --output_dir_name="${model_dir_name}/validation_full_grid"
 done
