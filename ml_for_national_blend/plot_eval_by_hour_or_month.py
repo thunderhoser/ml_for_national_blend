@@ -324,6 +324,11 @@ def _run(evaluation_file_pattern, by_month, by_hour,
                 'not per-grid-point evaluation.'
             )
 
+        # TODO(thunderhoser): This is a HACK to allow for prediction
+        # files without the model attribute.
+        if evaluation.MODEL_FILE_KEY not in etx_i:
+            etx_i.attrs[evaluation.MODEL_FILE_KEY] = 'foo'
+
         this_model_file_name = etx_i.attrs[evaluation.MODEL_FILE_KEY]
         if i == 0:
             model_file_name = copy.deepcopy(this_model_file_name)

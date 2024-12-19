@@ -31,6 +31,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import prediction_io
 import urma_utils
 import evaluation
+import neural_net
 import time_conversion
 import file_system_utils
 import error_checking
@@ -599,16 +600,22 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
     #     prediction_file_names[0]
     # )
     # first_ptx = first_prediction_table_xarray
-    # model_file_name = first_ptx.attrs[prediction_io.MODEL_FILE_KEY]
-    # model_metafile_name = neural_net.find_metafile(
-    #     model_file_name=model_file_name, raise_error_if_missing=True
-    # )
     #
-    # print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    # model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-    # model_lead_time_hours = model_metadata_dict[
-    #     neural_net.TRAINING_OPTIONS_KEY
-    # ][neural_net.TARGET_LEAD_TIME_KEY]
+    # if 'model_lead_time_hours' in first_ptx.attrs:
+    #     model_lead_time_hours = first_ptx.attrs['model_lead_time_hours']
+    # else:
+    #     model_file_name = first_ptx.attrs[prediction_io.MODEL_FILE_KEY]
+    #     model_metafile_name = neural_net.find_metafile(
+    #         model_file_name=model_file_name, raise_error_if_missing=True
+    #     )
+    #
+    #     print('Reading model metadata from: "{0:s}"...'.format(
+    #         model_metafile_name
+    #     ))
+    #     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+    #     model_lead_time_hours = model_metadata_dict[
+    #         neural_net.TRAINING_OPTIONS_KEY
+    #     ][neural_net.TARGET_LEAD_TIME_KEY]
 
     model_lead_time_hours = 48
 
