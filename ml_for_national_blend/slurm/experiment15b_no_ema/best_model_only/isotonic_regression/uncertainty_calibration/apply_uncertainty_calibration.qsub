@@ -37,7 +37,7 @@ LAST_INIT_TIME_STRINGS=("2022-01-01-18" "2022-01-06-18" "2022-01-11-18" "2022-01
 first_init_time_string=${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
 last_init_time_string=${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
 
-model_dir_name="${TOP_MODEL_DIR_NAME}/convnext-v2=0_num-bottleneck-layers=1_spectral-norm=0_dropout-strategy=none_residual-norm=0"
+model_dir_name="${TOP_MODEL_DIR_NAME}/convnext-v2=1_num-bottleneck-layers=2_spectral-norm=0_dropout-strategy=none_residual-norm=1"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
