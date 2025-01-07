@@ -258,7 +258,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             return_predictors_as_dict=True
         )
 
-    for _ in range(100):
+    for _ in range(200):
         predictor_matrix_dict, target_matrix = next(training_generator)
     target_matrix = target_matrix[0, ...]
 
