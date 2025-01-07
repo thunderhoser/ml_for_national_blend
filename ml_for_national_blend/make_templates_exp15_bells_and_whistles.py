@@ -6,6 +6,8 @@ import copy
 import numpy
 import keras
 
+z = ['none', 'constant0.1', 'variable']
+
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
 ))
@@ -218,7 +220,7 @@ DEFAULT_OPTION_DICT = {
 CONVNEXT_V2_FLAGS_AXIS1 = numpy.array([0, 1], dtype=bool)
 BOTTLENECK_LAYER_COUNTS_AXIS2 = numpy.array([1, 2, 3], dtype=int)
 SPECTRAL_NORM_FLAGS_AXIS3 = numpy.array([0, 1], dtype=bool)
-DROPOUT_STRATEGIES_AXIS4 = ['none', 'constant0.1', 'variable']
+DROPOUT_STRATEGIES_AXIS4 = z
 
 
 def _run():

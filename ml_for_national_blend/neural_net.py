@@ -2,7 +2,6 @@
 
 import os
 import sys
-import copy
 import pickle
 import warnings
 import numpy
@@ -179,8 +178,6 @@ class EMAHelper:
         checkpoint_object.save(output_path)
 
     def restore_optimizer_state(self, checkpoint_dir, raise_error_if_missing):
-        orig_shadow_weights = copy.deepcopy(self.shadow_weights)
-
         checkpoint_object = tensorflow.train.Checkpoint(
             model=self.model,
             ema_shadow_weights={
@@ -216,7 +213,7 @@ class EMAHelper:
         for i, sw in enumerate(self.shadow_weights):
             if not found_any_diff:
                 found_any_diff = not numpy.allclose(
-                    orig_shadow_weights[i],
+                    sw,
                     checkpoint_object.ema_shadow_weights[str(i)],
                     atol=TOLERANCE
                 )
@@ -738,8 +735,9 @@ def _check_generator_args(option_dict):
         for this_field_name in nwp_model_to_field_names[this_model_name]:
             nwp_model_utils.check_field_name(this_field_name)
 
-    error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[NWP_USE_QUANTILE_NORM_KEY])
+    if option_dict[NWP_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[NWP_NORM_FILE_KEY])
     if option_dict[NWP_RESID_NORM_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[NWP_RESID_NORM_FILE_KEY])
 
@@ -767,8 +765,9 @@ def _check_generator_args(option_dict):
         )[::-1]
 
     error_checking.assert_is_string(option_dict[TARGET_DIR_KEY])
-    error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
     error_checking.assert_is_boolean(option_dict[TARGETS_USE_QUANTILE_NORM_KEY])
+    if option_dict[TARGET_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[TARGET_NORM_FILE_KEY])
     if option_dict[TARGET_RESID_NORM_FILE_KEY] is not None:
         error_checking.assert_file_exists(
             option_dict[TARGET_RESID_NORM_FILE_KEY]
@@ -1399,12 +1398,15 @@ def create_data(option_dict, init_time_unix_sec,
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        nwp_normalization_file_name
-    ))
-    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-        nwp_normalization_file_name
-    )
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
 
     if nwp_resid_norm_file_name is None:
         nwp_resid_norm_param_table_xarray = None
@@ -1418,12 +1420,15 @@ def create_data(option_dict, init_time_unix_sec,
             )
         )
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        target_normalization_file_name
-    ))
-    target_norm_param_table_xarray = urma_io.read_normalization_file(
-        target_normalization_file_name
-    )
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     if target_resid_norm_file_name is None:
         target_resid_norm_param_table_xarray = None
@@ -1858,12 +1863,15 @@ def create_data_fast_patches(
     nwp_model_names.sort()
 
     # Read normalization parameters.
-    print('Reading normalization params from: "{0:s}"...'.format(
-        nwp_normalization_file_name
-    ))
-    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-        nwp_normalization_file_name
-    )
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
 
     if nwp_resid_norm_file_name is None:
         nwp_resid_norm_param_table_xarray = None
@@ -1877,12 +1885,15 @@ def create_data_fast_patches(
             )
         )
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        target_normalization_file_name
-    ))
-    target_norm_param_table_xarray = urma_io.read_normalization_file(
-        target_normalization_file_name
-    )
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     if target_resid_norm_file_name is None:
         target_resid_norm_param_table_xarray = None
@@ -2429,12 +2440,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        nwp_normalization_file_name
-    ))
-    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-        nwp_normalization_file_name
-    )
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
 
     if nwp_resid_norm_file_name is None:
         nwp_resid_norm_param_table_xarray = None
@@ -2448,12 +2462,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             )
         )
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        target_normalization_file_name
-    ))
-    target_norm_param_table_xarray = urma_io.read_normalization_file(
-        target_normalization_file_name
-    )
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     if target_resid_norm_file_name is None:
         target_resid_norm_param_table_xarray = None
@@ -3261,12 +3278,15 @@ def data_generator(option_dict, return_predictors_as_dict=False):
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        nwp_normalization_file_name
-    ))
-    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
-        nwp_normalization_file_name
-    )
+    if nwp_normalization_file_name is None:
+        nwp_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            nwp_normalization_file_name
+        ))
+        nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+            nwp_normalization_file_name
+        )
 
     if nwp_resid_norm_file_name is None:
         nwp_resid_norm_param_table_xarray = None
@@ -3280,12 +3300,15 @@ def data_generator(option_dict, return_predictors_as_dict=False):
             )
         )
 
-    print('Reading normalization params from: "{0:s}"...'.format(
-        target_normalization_file_name
-    ))
-    target_norm_param_table_xarray = urma_io.read_normalization_file(
-        target_normalization_file_name
-    )
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = urma_io.read_normalization_file(
+            target_normalization_file_name
+        )
 
     if target_resid_norm_file_name is None:
         target_resid_norm_param_table_xarray = None
