@@ -1157,7 +1157,8 @@ def _read_targets_one_example(
     if target_lead_time_hours > 0:
         target_norm_param_table_xarray = None
     else:
-        assert target_norm_param_table_xarray is not None
+        pass
+        # assert target_norm_param_table_xarray is not None
 
     target_valid_time_unix_sec = (
         init_time_unix_sec + HOURS_TO_SECONDS * target_lead_time_hours
@@ -2656,79 +2657,54 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
                 continue
 
-            if (
-                    num_target_lag_times > 0 and
-                    full_predictor_matrix_lagged_targets is None
-            ):
-                these_matrices = [
-                    _read_targets_one_example(
-                        init_time_unix_sec=
-                        init_times_unix_sec[init_time_index],
-                        target_lead_time_hours=-1 * l,
-                        target_field_names=target_field_names,
-                        target_dir_name=target_dir_name,
-                        target_norm_param_table_xarray=
-                        target_norm_param_table_xarray,
-                        target_resid_norm_param_table_xarray=
-                        target_resid_norm_param_table_xarray,
-                        use_quantile_norm=targets_use_quantile_norm,
-                        patch_location_dict=None
-                    )
-                    for l in target_lag_times_hours
-                ]
+            try:
+                if (
+                        num_target_lag_times > 0 and
+                        full_predictor_matrix_lagged_targets is None
+                ):
+                    these_matrices = [
+                        _read_targets_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            target_lead_time_hours=-1 * l,
+                            target_field_names=target_field_names,
+                            target_dir_name=target_dir_name,
+                            target_norm_param_table_xarray=
+                            target_norm_param_table_xarray,
+                            target_resid_norm_param_table_xarray=
+                            target_resid_norm_param_table_xarray,
+                            use_quantile_norm=targets_use_quantile_norm,
+                            patch_location_dict=None
+                        )
+                        for l in target_lag_times_hours
+                    ]
 
-                full_predictor_matrix_lagged_targets = numpy.stack(
-                    these_matrices, axis=-2
+                    full_predictor_matrix_lagged_targets = numpy.stack(
+                        these_matrices, axis=-2
+                    )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read lagged targets for init '
+                    'time {0:s}.  Something went wrong in '
+                    '`_read_targets_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
                 )
 
-            # try:
-            #     if (
-            #             num_target_lag_times > 0 and
-            #             full_predictor_matrix_lagged_targets is None
-            #     ):
-            #         these_matrices = [
-            #             _read_targets_one_example(
-            #                 init_time_unix_sec=
-            #                 init_times_unix_sec[init_time_index],
-            #                 target_lead_time_hours=-1 * l,
-            #                 target_field_names=target_field_names,
-            #                 target_dir_name=target_dir_name,
-            #                 target_norm_param_table_xarray=
-            #                 target_norm_param_table_xarray,
-            #                 target_resid_norm_param_table_xarray=
-            #                 target_resid_norm_param_table_xarray,
-            #                 use_quantile_norm=targets_use_quantile_norm,
-            #                 patch_location_dict=None
-            #             )
-            #             for l in target_lag_times_hours
-            #         ]
-            #
-            #         full_predictor_matrix_lagged_targets = numpy.stack(
-            #             these_matrices, axis=-2
-            #         )
-            # except:
-            #     warning_string = (
-            #         'POTENTIAL ERROR: Could not read lagged targets for init '
-            #         'time {0:s}.  Something went wrong in '
-            #         '`_read_targets_one_example`.'
-            #     ).format(
-            #         time_conversion.unix_sec_to_string(
-            #             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
-            #         )
-            #     )
-            #
-            #     warnings.warn(warning_string)
-            #     full_target_matrix = None
-            #     full_baseline_matrix = None
-            #     full_predictor_matrix_2pt5km = None
-            #     full_predictor_matrix_10km = None
-            #     full_predictor_matrix_20km = None
-            #     full_predictor_matrix_40km = None
-            #     full_recent_bias_matrix_2pt5km = None
-            #     full_recent_bias_matrix_10km = None
-            #     full_recent_bias_matrix_20km = None
-            #     full_recent_bias_matrix_40km = None
-            #     full_predictor_matrix_lagged_targets = None
+                warnings.warn(warning_string)
+                full_target_matrix = None
+                full_baseline_matrix = None
+                full_predictor_matrix_2pt5km = None
+                full_predictor_matrix_10km = None
+                full_predictor_matrix_20km = None
+                full_predictor_matrix_40km = None
+                full_recent_bias_matrix_2pt5km = None
+                full_recent_bias_matrix_10km = None
+                full_recent_bias_matrix_20km = None
+                full_recent_bias_matrix_40km = None
+                full_predictor_matrix_lagged_targets = None
 
             if (
                     num_target_lag_times > 0 and
