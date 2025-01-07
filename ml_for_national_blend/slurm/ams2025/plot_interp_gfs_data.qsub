@@ -31,7 +31,7 @@ echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 INPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gfs/processed/interp_to_nbm_grid"
-OUTPUT_DIR_NAME="${INPUT_DIR_NAME}/plots"
+OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_project/ams2025/overview_plots"
 
 python3 -u "${CODE_DIR_NAME}/plot_nwp_data.py" \
 --input_nwp_directory_name="${INPUT_DIR_NAME}" \
