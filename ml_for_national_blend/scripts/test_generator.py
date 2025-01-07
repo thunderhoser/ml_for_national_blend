@@ -218,7 +218,9 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
         neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
-        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
+        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors,
+        neural_net.NWP_RESID_NORM_FILE_KEY: None,
+        neural_net.TARGET_RESID_NORM_FILE_KEY: None
     }
 
     use_recent_biases = not (
@@ -248,7 +250,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             return_predictors_as_dict=True
         )
 
-    for _ in range(32):
+    for _ in range(100):
         predictor_matrix_dict, target_matrix = next(training_generator)
     target_matrix = target_matrix[0, ...]
 
@@ -341,8 +343,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                 plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                 axes_object=axes_object,
-                meridian_spacing_deg=20.,
-                parallel_spacing_deg=10.
+                meridian_spacing_deg=2.,
+                parallel_spacing_deg=1.
             )
 
             axes_object.set_xlim(
@@ -358,7 +360,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 nwp_model_names_2pt5km[j],
                 field_names_2pt5km[j],
                 nwp_lead_times_hours[i]
-            ))
+            ), fontsize=15)
 
             output_file_name = '{0:s}/{1:s}_{2:03d}hours_{3:s}.jpg'.format(
                 output_dir_name,
@@ -420,8 +422,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
             plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
             plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
             axes_object=axes_object,
-            meridian_spacing_deg=20.,
-            parallel_spacing_deg=10.
+            meridian_spacing_deg=2.,
+            parallel_spacing_deg=1.
         )
 
         axes_object.set_xlim(
@@ -432,7 +434,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             numpy.min(latitude_matrix_deg_n),
             numpy.max(latitude_matrix_deg_n)
         )
-        axes_object.set_title('NBM {0:s}'.format(nbm_constant_field_names[j]))
+        axes_object.set_title('NBM {0:s}'.format(nbm_constant_field_names[j]), fontsize=15)
 
         output_file_name = '{0:s}/{1:s}_nbm.jpg'.format(
             output_dir_name, nbm_constant_field_names[j]
@@ -513,8 +515,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -529,7 +531,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 axes_object.set_title('URMA {0:s} at {1:d}-hour lag time'.format(
                     target_field_names[j],
                     target_lag_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = '{0:s}/{1:s}_{2:03d}hours_urma.jpg'.format(
                     output_dir_name,
@@ -608,8 +610,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -629,7 +631,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     field_names_2pt5km[j],
                     recent_bias_init_time_lags_hours[i],
                     recent_bias_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = (
                     '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
@@ -727,8 +729,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -744,7 +746,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     nwp_model_names_10km[j],
                     field_names_10km[j],
                     nwp_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = '{0:s}/{1:s}_{2:03d}hours_{3:s}.jpg'.format(
                     output_dir_name,
@@ -826,8 +828,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -847,7 +849,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     field_names_10km[j],
                     recent_bias_init_time_lags_hours[i],
                     recent_bias_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = (
                     '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
@@ -944,8 +946,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -961,7 +963,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     nwp_model_names_20km[j],
                     field_names_20km[j],
                     nwp_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = '{0:s}/{1:s}_{2:03d}hours_{3:s}.jpg'.format(
                     output_dir_name,
@@ -1043,8 +1045,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -1064,7 +1066,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     field_names_20km[j],
                     recent_bias_init_time_lags_hours[i],
                     recent_bias_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = (
                     '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
@@ -1161,8 +1163,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -1178,7 +1180,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     nwp_model_names_40km[j],
                     field_names_40km[j],
                     nwp_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = '{0:s}/{1:s}_{2:03d}hours_{3:s}.jpg'.format(
                     output_dir_name,
@@ -1260,8 +1262,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                     plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                     axes_object=axes_object,
-                    meridian_spacing_deg=20.,
-                    parallel_spacing_deg=10.
+                    meridian_spacing_deg=2.,
+                    parallel_spacing_deg=1.
                 )
 
                 axes_object.set_xlim(
@@ -1281,7 +1283,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
                     field_names_40km[j],
                     recent_bias_init_time_lags_hours[i],
                     recent_bias_lead_times_hours[i]
-                ))
+                ), fontsize=15)
 
                 output_file_name = (
                     '{0:s}/{1:s}_bias_lag={2:03d}hours_lead={3:03d}hours_'
@@ -1368,8 +1370,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
                 plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
                 plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
                 axes_object=axes_object,
-                meridian_spacing_deg=20.,
-                parallel_spacing_deg=10.
+                meridian_spacing_deg=2.,
+                parallel_spacing_deg=1.
             )
 
             axes_object.set_xlim(
@@ -1382,7 +1384,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             )
             axes_object.set_title('Residual-baseline {0:s}'.format(
                 target_field_names[j]
-            ))
+            ), fontsize=15)
 
             output_file_name = '{0:s}/{1:s}_residual.jpg'.format(
                 output_dir_name, target_field_names[j]
@@ -1457,8 +1459,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
             plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
             plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
             axes_object=axes_object,
-            meridian_spacing_deg=20.,
-            parallel_spacing_deg=10.
+            meridian_spacing_deg=2.,
+            parallel_spacing_deg=1.
         )
 
         axes_object.set_xlim(
@@ -1469,7 +1471,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             numpy.min(latitude_matrix_deg_n),
             numpy.max(latitude_matrix_deg_n)
         )
-        axes_object.set_title('Target {0:s}'.format(target_field_names[j]))
+        axes_object.set_title('Target {0:s}'.format(target_field_names[j]), fontsize=15)
 
         output_file_name = '{0:s}/{1:s}_target.jpg'.format(
             output_dir_name, target_field_names[j]
@@ -1544,8 +1546,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
             plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
             plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
             axes_object=axes_object,
-            meridian_spacing_deg=20.,
-            parallel_spacing_deg=10.
+            meridian_spacing_deg=2.,
+            parallel_spacing_deg=1.
         )
 
         axes_object.set_xlim(
@@ -1556,7 +1558,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
             numpy.min(latitude_matrix_deg_n),
             numpy.max(latitude_matrix_deg_n)
         )
-        axes_object.set_title('Baseline-comparison {0:s}'.format(target_field_names[j]))
+        axes_object.set_title('Baseline-comparison {0:s}'.format(target_field_names[j]), fontsize=15)
 
         output_file_name = '{0:s}/{1:s}_comparison.jpg'.format(
             output_dir_name, target_field_names[j]
@@ -1618,8 +1620,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         plot_latitudes_deg_n=numpy.ravel(latitude_matrix_deg_n),
         plot_longitudes_deg_e=numpy.ravel(longitude_matrix_deg_e),
         axes_object=axes_object,
-        meridian_spacing_deg=20.,
-        parallel_spacing_deg=10.
+        meridian_spacing_deg=2.,
+        parallel_spacing_deg=1.
     )
 
     axes_object.set_xlim(
@@ -1630,7 +1632,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
         numpy.min(latitude_matrix_deg_n),
         numpy.max(latitude_matrix_deg_n)
     )
-    axes_object.set_title('Evaluation weights')
+    axes_object.set_title('Evaluation weights', fontsize=15)
 
     output_file_name = '{0:s}/evaluation_weights.jpg'.format(output_dir_name)
     print('Saving figure to: "{0:s}"...'.format(output_file_name))

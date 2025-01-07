@@ -21,6 +21,8 @@ MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
 NUM_SLICES_FOR_MULTIPROCESSING = 24
 MAX_STDEV_INFLATION_FACTOR = 1000.
 
+MAX_NUM_TRAINING_VALUES = 2.5e7
+
 EVALUATION_WEIGHT_KEY = 'evaluation_weight'
 
 MODEL_KEY = 'model_object'
@@ -173,6 +175,18 @@ def _train_one_model(prediction_tables_xarray):
     predicted_values = predicted_values[real_mask]
     target_values = target_values[real_mask]
     eval_weights = eval_weights[real_mask]
+
+    if len(predicted_values) > MAX_NUM_TRAINING_VALUES:
+        good_indices = numpy.linspace(
+            0, len(predicted_values) - 1, num=len(predicted_values), dtype=int
+        )
+        good_indices = numpy.random.choice(
+            good_indices, size=MAX_NUM_TRAINING_VALUES, replace=False
+        )
+
+        predicted_values = predicted_values[good_indices]
+        target_values = target_values[good_indices]
+        eval_weights = eval_weights[good_indices]
 
     percentile_levels = numpy.linspace(0, 100, num=11, dtype=float)
     print((

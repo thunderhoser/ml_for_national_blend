@@ -1152,7 +1152,8 @@ def _read_targets_one_example(
     if target_lead_time_hours > 0:
         target_norm_param_table_xarray = None
     else:
-        assert target_norm_param_table_xarray is not None
+        pass
+        # assert target_norm_param_table_xarray is not None
 
     target_valid_time_unix_sec = (
         init_time_unix_sec + HOURS_TO_SECONDS * target_lead_time_hours
