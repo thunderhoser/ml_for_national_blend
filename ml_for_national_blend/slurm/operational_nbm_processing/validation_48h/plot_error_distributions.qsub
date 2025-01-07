@@ -59,7 +59,7 @@ else
 fi
 
 python3 -u "${CODE_DIR_NAME}/plot_error_distributions.py" \
---input_prediction_dir_name="${PREDICTION_DIR_NAME}/validation" \
+--input_prediction_dir_name="${PREDICTION_DIR_NAME}" \
 --init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
 --target_field_names ${target_field_name} \
 --num_bins_by_target ${num_bins} \
