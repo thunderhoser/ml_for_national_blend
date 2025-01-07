@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_interp_rap_data"
+#SBATCH --job-name="plot_interp_raw_ensemble_data"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -17,7 +17,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_interp_rap_data_%A.out
+#SBATCH --output=plot_interp_raw_ensemble_data_%A.out
 
 conda init
 conda activate base
@@ -30,15 +30,15 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-INPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/rap/processed/interp_to_nbm_grid"
+INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid"
 OUTPUT_DIR_NAME="${INPUT_DIR_NAME}/plots"
 
 python3 -u "${CODE_DIR_NAME}/plot_nwp_data.py" \
 --input_nwp_directory_name="${INPUT_DIR_NAME}" \
 --plot_interp_data=1 \
---model_name="rap" \
---init_time_string="2022-11-01-03" \
---forecast_hour=21 \
+--model_name="ensemble" \
+--init_time_string="2022-11-01-00" \
+--forecast_hour=24 \
 --field_names "pressure_surface_pascals" "temperature_2m_agl_kelvins" \
 --min_colour_percentiles 0.1 0.1 \
 --max_colour_percentiles 99.9 99.9 \
