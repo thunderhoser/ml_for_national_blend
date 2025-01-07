@@ -14,6 +14,7 @@ Specifically, this script creates 4 plots for every target variable:
    distributions, not restricted to just the tails)
 """
 
+import time
 import argparse
 import numpy
 import matplotlib
@@ -250,11 +251,6 @@ def _plot_distributions(
         relevant_target_values = target_values
         relevant_predicted_values = predicted_values
 
-    target_kde_object = gaussian_kde(relevant_target_values, bw_method='scott')
-    prediction_kde_object = gaussian_kde(
-        relevant_predicted_values, bw_method='scott'
-    )
-
     x_min = min([
         numpy.min(relevant_target_values),
         numpy.min(relevant_predicted_values)
@@ -271,8 +267,25 @@ def _plot_distributions(
     else:
         x_values = numpy.linspace(x_min, x_max, num=1001)
 
+    print((
+        'Applying KDE for {0:d} target values and {1:d} predicted values...'
+    ).format(
+        len(relevant_target_values),
+        len(relevant_predicted_values)
+    ))
+    exec_start_time_unix_sec = time.time()
+
+    target_kde_object = gaussian_kde(relevant_target_values, bw_method='scott')
+    prediction_kde_object = gaussian_kde(
+        relevant_predicted_values, bw_method='scott'
+    )
+
     target_y_values = target_kde_object(x_values)
     prediction_y_values = prediction_kde_object(x_values)
+
+    print('Elapsed time = {0:.1f} seconds'.format(
+        time.time() - exec_start_time_unix_sec
+    ))
 
     target_y_values = numpy.maximum(
         target_y_values,
@@ -392,6 +405,12 @@ def _plot_error_distribution(
     good_bin_indices = []
 
     for j in range(num_bins):
+        print((
+            'Have plotted error distribution for {0:d} of {1:d} bins...'
+        ).format(
+            j, num_bins
+        ))
+
         if bin_by_target_or_predicted_values:
             good_flags = numpy.logical_and(
                 target_values >= bin_edges_for_test[j],
