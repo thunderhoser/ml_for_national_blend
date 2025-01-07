@@ -226,7 +226,10 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
         neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
-        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
+        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors,
+        neural_net.NWP_RESID_NORM_FILE_KEY: None,
+        neural_net.TARGET_RESID_NORM_FILE_KEY: None,
+        neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: False
     }
 
     use_recent_biases = not (
