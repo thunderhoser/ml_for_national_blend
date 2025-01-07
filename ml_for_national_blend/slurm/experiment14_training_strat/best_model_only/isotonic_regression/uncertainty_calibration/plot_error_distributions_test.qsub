@@ -69,6 +69,6 @@ python3 -u "${CODE_DIR_NAME}/plot_error_distributions.py" \
 --max_bin_edge_by_target ${max_bin_edge} \
 --violin_or_box_plots=1 \
 --left_tail_percentile=0.5 \
---right_tail_percentile=0.5 \
+--right_tail_percentile=99.5 \
 --max_num_pdf_values=1000000 \
 --output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/error_distributions_test"
