@@ -118,7 +118,8 @@ MAX_BIN_EDGES_HELP_STRING = (
 VIOLIN_OR_BOX_HELP_STRING = (
     'Boolean flag.  If 1, the first two plots (error distribution as a '
     'function of target value, error dist AAFO predicted value) will be violin '
-    'plots.  If 0, they will be boxplots.'
+    'plots.  If 0, they will be boxplots.  If -1, these plots will not be '
+    'created at all.'
 )
 LEFT_TAIL_PERCENTILE_HELP_STRING = (
     'Percentile (ranging from 0...100) used to define left tail of '
@@ -694,6 +695,9 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
     target_matrix = target_matrix[real_indices, :]
 
     for j in range(num_target_fields):
+        if violin_or_box_plots < 0:
+            continue
+
         figure_object, axes_object = _plot_error_distribution(
             target_values=target_matrix[:, j],
             predicted_values=prediction_matrix[:, j],
@@ -701,7 +705,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
             max_bin_edge=max_bin_edge_by_target[j],
             num_bins=num_bins_by_target[j],
             bin_by_target_or_predicted_values=True,
-            violin_or_box_plots=violin_or_box_plots,
+            violin_or_box_plots=bool(violin_or_box_plots),
             target_field_name=target_field_names[j]
         )
 
@@ -718,6 +722,9 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
         pyplot.close(figure_object)
 
     for j in range(num_target_fields):
+        if violin_or_box_plots < 0:
+            continue
+
         figure_object, axes_object = _plot_error_distribution(
             target_values=target_matrix[:, j],
             predicted_values=prediction_matrix[:, j],
@@ -725,7 +732,7 @@ def _run(prediction_dir_name, init_time_limit_strings, evaluate_month,
             max_bin_edge=max_bin_edge_by_target[j],
             num_bins=num_bins_by_target[j],
             bin_by_target_or_predicted_values=False,
-            violin_or_box_plots=violin_or_box_plots,
+            violin_or_box_plots=bool(violin_or_box_plots),
             target_field_name=target_field_names[j]
         )
 
@@ -839,9 +846,7 @@ if __name__ == '__main__':
         max_bin_edge_by_target=numpy.array(
             getattr(INPUT_ARG_OBJECT, MAX_BIN_EDGES_ARG_NAME), dtype=float
         ),
-        violin_or_box_plots=bool(
-            getattr(INPUT_ARG_OBJECT, VIOLIN_OR_BOX_ARG_NAME)
-        ),
+        violin_or_box_plots=getattr(INPUT_ARG_OBJECT, VIOLIN_OR_BOX_ARG_NAME),
         left_tail_percentile=getattr(
             INPUT_ARG_OBJECT, LEFT_TAIL_PERCENTILE_ARG_NAME
         ),

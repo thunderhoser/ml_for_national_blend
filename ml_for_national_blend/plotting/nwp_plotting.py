@@ -87,7 +87,8 @@ MODEL_NAME_TO_FANCY = {
     nwp_model_utils.GEFS_MODEL_NAME: 'GEFS',
     nwp_model_utils.GRIDDED_LAMP_MODEL_NAME: 'GLAMP',
     nwp_model_utils.ECMWF_MODEL_NAME: 'ECMWF',
-    nwp_model_utils.GRIDDED_MOS_MODEL_NAME: 'GMOS'
+    nwp_model_utils.GRIDDED_MOS_MODEL_NAME: 'GMOS',
+    nwp_model_utils.ENSEMBLE_MODEL_NAME: 'Raw-ensemble'
 }
 
 
