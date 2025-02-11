@@ -65,7 +65,7 @@ def __get_slices_for_multiprocessing(bin_ids):
 def __find_clusters_one_scale(
         bin_id_matrix, unique_bin_ids_to_process,
         cluster_id_matrix, last_cluster_id,
-        buffer_distance_px, min_cluster_size):
+        buffer_distance_px, min_cluster_size_px):
     """Finds clusters at one spatial scale.
 
     M = number of rows in grid
@@ -81,7 +81,7 @@ def __find_clusters_one_scale(
     :param last_cluster_id: Last cluster ID assigned.  This method will only
         increase the cluster ID.
     :param buffer_distance_px: See documentation for `find_clusters`.
-    :param min_cluster_size: Same.
+    :param min_cluster_size_px: Same.
     :return: cluster_id_matrix: Updated version of input.
     :return: last_cluster_id: Updated version of input.
     """
@@ -118,7 +118,7 @@ def __find_clusters_one_scale(
             )
 
             this_cluster_size = numpy.sum(this_cluster_mask)
-            if this_cluster_size < min_cluster_size:
+            if this_cluster_size < min_cluster_size_px:
                 continue
 
             last_cluster_id += 1
@@ -241,15 +241,16 @@ def _discretize_biases(bias_matrix, discretization_interval):
     return bin_id_matrix
 
 
-def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
-                  buffer_distance_px, do_multiprocessing=True):
+def find_clusters(
+        bias_matrix, min_cluster_size_px, bias_discretization_intervals,
+        buffer_distance_px, do_multiprocessing=True):
     """Finds clusters.
 
     M = number of rows in grid
     N = number of columns in grid
 
     :param bias_matrix: M-by-N numpy array of biases.
-    :param min_cluster_size: Minimum cluster size (number of pixels).
+    :param min_cluster_size_px: Minimum cluster size (number of pixels).
     :param bias_discretization_intervals: 1-D list of bias-discretization
         intervals, from the smallest scale to the largest.
     :param buffer_distance_px: Buffer distance (number of pixels).  A non-zero
@@ -264,8 +265,8 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
     # TODO(thunderhoser): Make this work with multiple fields.
 
     error_checking.assert_is_numpy_array(bias_matrix, num_dimensions=2)
-    error_checking.assert_is_integer(min_cluster_size)
-    error_checking.assert_is_geq(min_cluster_size, 1)
+    error_checking.assert_is_integer(min_cluster_size_px)
+    error_checking.assert_is_geq(min_cluster_size_px, 1)
     error_checking.assert_is_geq(buffer_distance_px, 0.)
     error_checking.assert_is_boolean(do_multiprocessing)
     error_checking.assert_is_numpy_array(
@@ -314,7 +315,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
                     cluster_id_matrix,
                     last_cluster_id,
                     buffer_distance_px,
-                    min_cluster_size
+                    min_cluster_size_px
                 ))
 
             with Pool() as pool_object:
@@ -337,7 +338,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
                 cluster_id_matrix=cluster_id_matrix,
                 last_cluster_id=last_cluster_id,
                 buffer_distance_px=buffer_distance_px,
-                min_cluster_size=min_cluster_size
+                min_cluster_size_px=min_cluster_size_px
             )
 
     if not numpy.any(cluster_id_matrix == 0):
@@ -409,7 +410,7 @@ def find_clusters(bias_matrix, min_cluster_size, bias_discretization_intervals,
 
 
 def find_clusters_backwards(
-        bias_matrix, min_cluster_size, bias_discretization_intervals,
+        bias_matrix, min_cluster_size_px, bias_discretization_intervals,
         buffer_distance_px, do_multiprocessing=True):
     """Finds clusters.
 
@@ -417,7 +418,7 @@ def find_clusters_backwards(
     N = number of columns in grid
 
     :param bias_matrix: M-by-N numpy array of biases.
-    :param min_cluster_size: Minimum cluster size (number of pixels).
+    :param min_cluster_size_px: Minimum cluster size (number of pixels).
     :param bias_discretization_intervals: 1-D list of bias-discretization
         intervals, from the smallest scale to the largest.
     :param buffer_distance_px: Buffer distance (number of pixels).  A non-zero
@@ -432,8 +433,8 @@ def find_clusters_backwards(
     # TODO(thunderhoser): Make this work with multiple fields.
 
     error_checking.assert_is_numpy_array(bias_matrix, num_dimensions=2)
-    error_checking.assert_is_integer(min_cluster_size)
-    error_checking.assert_is_geq(min_cluster_size, 1)
+    error_checking.assert_is_integer(min_cluster_size_px)
+    error_checking.assert_is_geq(min_cluster_size_px, 1)
     error_checking.assert_is_geq(buffer_distance_px, 0.)
     error_checking.assert_is_boolean(do_multiprocessing)
     error_checking.assert_is_numpy_array(
@@ -481,7 +482,7 @@ def find_clusters_backwards(
                     cluster_id_matrix,
                     last_cluster_id,
                     buffer_distance_px,
-                    min_cluster_size
+                    min_cluster_size_px
                 ))
 
             with Pool() as pool_object:
@@ -504,7 +505,7 @@ def find_clusters_backwards(
                 cluster_id_matrix=cluster_id_matrix,
                 last_cluster_id=last_cluster_id,
                 buffer_distance_px=buffer_distance_px,
-                min_cluster_size=min_cluster_size
+                min_cluster_size_px=min_cluster_size_px
             )
 
     if not numpy.any(cluster_id_matrix == 0):
