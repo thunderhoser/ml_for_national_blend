@@ -26,8 +26,7 @@ def max_prediction(
     T = number of target variables (channels)
     S = ensemble size
 
-    :param channel_index: Will compute metric for the [k]th channel, where
-        k = `channel_index`.
+    :param channel_index: Channel index or "hdwi".
     :param u_wind_index: Array index for sustained u-wind.  This tells the
         method that u-wind predictions and targets can be found in
         prediction_tensor[:, :, :, u_wind_index, ...] and
@@ -44,11 +43,13 @@ def max_prediction(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -72,7 +73,7 @@ def max_prediction(
 
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -87,8 +88,27 @@ def max_prediction(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+            relevant_target_tensor = target_tensor[..., :-1]
+
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         relevant_prediction_tensor = (
-            prediction_tensor[:, :, :, channel_index, ...]
+            prediction_tensor[:, :, :, new_channel_index, ...]
         )
 
         if expect_ensemble:
@@ -127,11 +147,13 @@ def spatial_max_bias(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -154,7 +176,7 @@ def spatial_max_bias(
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -169,14 +191,32 @@ def spatial_max_bias(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         if expect_ensemble:
             relevant_prediction_tensor = K.mean(
-                prediction_tensor[..., channel_index, :], axis=-1
+                prediction_tensor[..., new_channel_index, :], axis=-1
             )
         else:
-            relevant_prediction_tensor = prediction_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[..., new_channel_index]
+            )
 
-        relevant_target_tensor = relevant_target_tensor[..., channel_index]
+        relevant_target_tensor = relevant_target_tensor[..., new_channel_index]
         mask_weight_tensor = mask_weight_tensor[..., 0]
 
         relevant_prediction_tensor = tensorflow.where(
@@ -216,11 +256,13 @@ def min_prediction(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -240,7 +282,7 @@ def min_prediction(
 
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -255,8 +297,27 @@ def min_prediction(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+            relevant_target_tensor = target_tensor[..., :-1]
+
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         relevant_prediction_tensor = (
-            prediction_tensor[:, :, :, channel_index, ...]
+            prediction_tensor[:, :, :, new_channel_index, ...]
         )
         if expect_ensemble:
             mask_weight_tensor = tensorflow.broadcast_to(
@@ -294,11 +355,13 @@ def spatial_min_bias(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -321,7 +384,7 @@ def spatial_min_bias(
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -336,14 +399,32 @@ def spatial_min_bias(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         if expect_ensemble:
             relevant_prediction_tensor = K.mean(
-                prediction_tensor[..., channel_index, :], axis=-1
+                prediction_tensor[..., new_channel_index, :], axis=-1
             )
         else:
-            relevant_prediction_tensor = prediction_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[..., new_channel_index]
+            )
 
-        relevant_target_tensor = relevant_target_tensor[..., channel_index]
+        relevant_target_tensor = relevant_target_tensor[..., new_channel_index]
         mask_weight_tensor = mask_weight_tensor[..., 0]
 
         relevant_prediction_tensor = tensorflow.where(
@@ -383,11 +464,13 @@ def mean_squared_error(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -410,7 +493,7 @@ def mean_squared_error(
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -425,17 +508,33 @@ def mean_squared_error(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                target_tensor[..., channel_index], axis=-1
+                target_tensor[..., new_channel_index], axis=-1
             )
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index, :]
+                prediction_tensor[:, :, :, new_channel_index, :]
             )
         else:
-            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_target_tensor = target_tensor[..., new_channel_index]
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index]
+                prediction_tensor[:, :, :, new_channel_index]
             )
             mask_weight_tensor = mask_weight_tensor[..., 0]
 
@@ -469,11 +568,13 @@ def dual_weighted_mse(
     :return: metric: Metric function (defined below).
     """
 
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
 
     custom_losses.check_index_args(
         u_wind_index=u_wind_index,
@@ -496,7 +597,7 @@ def dual_weighted_mse(
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         relevant_target_tensor = target_tensor[..., :-1]
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = custom_losses.process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -511,17 +612,33 @@ def dual_weighted_mse(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            prediction_tensor, relevant_target_tensor = (
+                custom_losses.compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_target_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                target_tensor[..., channel_index], axis=-1
+                target_tensor[..., new_channel_index], axis=-1
             )
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index, :]
+                prediction_tensor[:, :, :, new_channel_index, :]
             )
         else:
-            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_target_tensor = target_tensor[..., new_channel_index]
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index]
+                prediction_tensor[:, :, :, new_channel_index]
             )
             mask_weight_tensor = mask_weight_tensor[..., 0]
 

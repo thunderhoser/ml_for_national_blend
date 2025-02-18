@@ -33,8 +33,6 @@ USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 REQUIRE_ALL_PREDICTORS_ARG_NAME = 'require_all_predictors'
 
-PREDICT_DEWPOINT_DEPRESSION_ARG_NAME = 'predict_dewpoint_depression'
-PREDICT_GUST_EXCESS_ARG_NAME = 'predict_gust_excess'
 DO_RESIDUAL_PREDICTION_ARG_NAME = 'do_residual_prediction'
 RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'
 RESID_BASELINE_LEAD_TIME_ARG_NAME = 'resid_baseline_lead_time_hours'
@@ -198,14 +196,6 @@ REQUIRE_ALL_PREDICTORS_HELP_STRING = (
     'found will be used.'
 )
 
-PREDICT_DEWPOINT_DEPRESSION_HELP_STRING = (
-    'Boolean flag.  If True, the NN is trained to predict dewpoint depression, '
-    'rather than predicting dewpoint temperature directly.'
-)
-PREDICT_GUST_EXCESS_HELP_STRING = (
-    'Boolean flag.  If True, the NN is trained to predict gust excess, rather '
-    'than predicting gust speed directly.'
-)
 DO_RESIDUAL_PREDICTION_HELP_STRING = (
     'Boolean flag.  If True, the NN is trained to predict a residual -- i.e., '
     'the departure between URMA truth and a single NWP forecast.  If False, '
@@ -416,14 +406,6 @@ def add_input_args(parser_object):
         help=REQUIRE_ALL_PREDICTORS_HELP_STRING
     )
 
-    parser_object.add_argument(
-        '--' + PREDICT_DEWPOINT_DEPRESSION_ARG_NAME, type=int, required=True,
-        help=PREDICT_DEWPOINT_DEPRESSION_HELP_STRING
-    )
-    parser_object.add_argument(
-        '--' + PREDICT_GUST_EXCESS_ARG_NAME, type=int, required=True,
-        help=PREDICT_GUST_EXCESS_HELP_STRING
-    )
     parser_object.add_argument(
         '--' + DO_RESIDUAL_PREDICTION_ARG_NAME, type=int, required=True,
         help=DO_RESIDUAL_PREDICTION_HELP_STRING

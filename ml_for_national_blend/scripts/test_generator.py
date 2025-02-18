@@ -88,7 +88,6 @@ def _run(output_dir_name, nwp_lead_times_hours,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          require_all_predictors,
-         predict_dewpoint_depression, predict_gust_excess,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
          first_init_time_strings_for_training,
@@ -122,8 +121,6 @@ def _run(output_dir_name, nwp_lead_times_hours,
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param require_all_predictors: Same.
-    :param predict_dewpoint_depression: Same.
-    :param predict_gust_excess: Same.
     :param do_residual_prediction: Same.
     :param resid_baseline_model_name: Same.
     :param resid_baseline_lead_time_hours: Same.
@@ -210,8 +207,6 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: True,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
-        neural_net.PREDICT_DEWPOINT_DEPRESSION_KEY: predict_dewpoint_depression,
-        neural_net.PREDICT_GUST_EXCESS_KEY: predict_gust_excess,
         neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
         neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
         neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
@@ -1727,12 +1722,6 @@ if __name__ == '__main__':
         ),
         require_all_predictors=bool(getattr(
             INPUT_ARG_OBJECT, test_generator_args.REQUIRE_ALL_PREDICTORS_ARG_NAME
-        )),
-        predict_dewpoint_depression=bool(getattr(
-            INPUT_ARG_OBJECT, test_generator_args.PREDICT_DEWPOINT_DEPRESSION_ARG_NAME
-        )),
-        predict_gust_excess=bool(getattr(
-            INPUT_ARG_OBJECT, test_generator_args.PREDICT_GUST_EXCESS_ARG_NAME
         )),
         do_residual_prediction=bool(getattr(
             INPUT_ARG_OBJECT, test_generator_args.DO_RESIDUAL_PREDICTION_ARG_NAME

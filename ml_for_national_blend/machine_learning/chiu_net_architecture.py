@@ -10,6 +10,7 @@ import numpy
 import keras
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.outside_code import architecture_utils
+from ml_for_national_blend.utils import urma_utils
 
 INPUT_DIMENSIONS_CONST_KEY = 'input_dimensions_const'
 INPUT_DIMENSIONS_2PT5KM_RES_KEY = 'input_dimensions_2pt5km_res'
@@ -66,9 +67,7 @@ BATCH_NORM_MOMENTUM_KEY = 'batch_norm_momentum'
 BATCH_NORM_SYNCH_FLAG_KEY = 'batch_norm_synch_flag'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
-NUM_OUTPUT_CHANNELS_KEY = 'num_output_channels'
-PREDICT_GUST_EXCESS_KEY = 'predict_gust_excess'
-PREDICT_DEWPOINT_DEPRESSION_KEY = 'predict_dewpoint_depression'
+TARGET_FIELDS_KEY = 'target_field_names'
 LOSS_FUNCTION_KEY = 'loss_function'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 METRIC_FUNCTIONS_KEY = 'metric_function_list'
@@ -209,11 +208,8 @@ def check_input_args(option_dict):
         layers.  For more details, see documentation for
         `keras.layers.BatchNormalization`.
     option_dict["ensemble_size"]: Number of ensemble members.
-    option_dict["num_output_channels"]: Number of output channels.
-    option_dict["predict_gust_excess"]: Boolean flag.  If True, the model needs
-        to predict gust excess.
-    option_dict["predict_dewpoint_depression"]: Boolean flag.  If True, the
-        model needs to predict dewpoint depression.
+    option_dict["target_field_names"]: 1-D list with names of target fields
+        (each must be accepted by `urma_utils.check_field_name`).
     option_dict["loss_function"]: Loss function.
     option_dict["optimizer_function"]: Optimizer function.
     option_dict["metric_function_list"]: 1-D list of metric functions.
@@ -238,7 +234,35 @@ def check_input_args(option_dict):
 
     num_rows_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][0]
     num_columns_2pt5km = option_dict[INPUT_DIMENSIONS_2PT5KM_RES_KEY][1]
-    num_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
+
+    error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
+    for this_field_name in option_dict[TARGET_FIELDS_KEY]:
+        urma_utils.check_field_name(this_field_name)
+
+    predict_dewpoint_depression = (
+        urma_utils.DEWPOINT_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+    )
+    if predict_dewpoint_depression:
+        assert (
+            urma_utils.TEMPERATURE_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        )
+        option_dict[TARGET_FIELDS_KEY].remove(urma_utils.DEWPOINT_2METRE_NAME)
+        option_dict[TARGET_FIELDS_KEY].append(urma_utils.DEWPOINT_2METRE_NAME)
+
+    predict_gust_excess = (
+        urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+    )
+    if predict_gust_excess:
+        assert (
+            urma_utils.U_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        )
+        assert (
+            urma_utils.V_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        )
+        option_dict[TARGET_FIELDS_KEY].remove(urma_utils.WIND_GUST_10METRE_NAME)
+        option_dict[TARGET_FIELDS_KEY].append(urma_utils.WIND_GUST_10METRE_NAME)
+
+    num_channels = len(option_dict[TARGET_FIELDS_KEY])
 
     if option_dict[PREDN_BASELINE_DIMENSIONS_KEY] is not None:
         expected_dim = numpy.array(
@@ -596,12 +620,6 @@ def check_input_args(option_dict):
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
     error_checking.assert_is_geq(option_dict[ENSEMBLE_SIZE_KEY], 1)
-    error_checking.assert_is_integer(option_dict[NUM_OUTPUT_CHANNELS_KEY])
-    error_checking.assert_is_geq(option_dict[NUM_OUTPUT_CHANNELS_KEY], 1)
-    error_checking.assert_is_boolean(option_dict[PREDICT_GUST_EXCESS_KEY])
-    error_checking.assert_is_boolean(
-        option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
-    )
 
     if not option_dict[USE_BATCH_NORM_KEY]:
         option_dict[BATCH_NORM_MOMENTUM_KEY] = 0.99
@@ -700,9 +718,8 @@ def create_model(option_dict):
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     metric_function_list = option_dict[METRIC_FUNCTIONS_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
-    num_output_channels = option_dict[NUM_OUTPUT_CHANNELS_KEY]
-    predict_gust_excess = option_dict[PREDICT_GUST_EXCESS_KEY]
-    predict_dewpoint_depression = option_dict[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    num_output_channels = len(target_field_names)
 
     num_lead_times = input_dimensions_2pt5km_res[2]
 
@@ -1473,6 +1490,12 @@ def create_model(option_dict):
             [conv_layer_by_level[i - 1], upconv_layer_by_level[i - 1]]
         )
 
+    predict_gust_excess = (
+        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
+    )
+    predict_dewpoint_depression = (
+        urma_utils.DEWPOINT_2METRE_NAME in target_field_names
+    )
     this_offset = int(predict_gust_excess) + int(predict_dewpoint_depression)
 
     simple_output_layer_object = architecture_utils.get_2d_conv_layer(

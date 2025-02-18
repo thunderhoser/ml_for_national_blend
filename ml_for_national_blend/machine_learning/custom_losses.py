@@ -6,11 +6,20 @@ import tensorflow.math as tf_math
 from tensorflow.keras import backend as K
 from ml_for_national_blend.outside_code import error_checking
 
+PASCALS_TO_MB = 0.01
+CELSIUS_TO_KELVINS_ADDEND = 273.15
+
+BASE_VAPOUR_PRESSURE_PASCALS = 610.78
+MAGNUS_NUMERATOR_COEFF_WATER = 17.08085
+MAGNUS_NUMERATOR_COEFF_ICE = 17.84362
+MAGNUS_DENOMINATOR_COEFF_WATER = 234.175
+MAGNUS_DENOMINATOR_COEFF_ICE = 245.425
+
 
 def __get_num_target_fields(prediction_tensor, expect_ensemble):
     """Determines number of target fields.
 
-    :param prediction_tensor: See documentation for `mean_squared_error`.
+    :param prediction_tensor: See documentation for `dual_weighted_mse`.
     :param expect_ensemble: Same.
     :return: num_target_fields: Integer.
     """
@@ -35,6 +44,65 @@ def _log2(input_tensor):
     )
 
 
+def _dewpoint_to_vapour_pressure(dewpoint_tensor_kelvins,
+                                 temperature_tensor_kelvins):
+    """Converts dewpoint to vapour pressure.
+
+    Source:
+    https://content.meteoblue.com/hu/specifications/weather-variables/humidity
+
+    :param dewpoint_tensor_kelvins: Tensor of dewpoints.
+    :param temperature_tensor_kelvins: Tensor of temperatures (must have same
+        shape as `dewpoint_tensor_kelvins`).
+    :return: vapour_pressure_tensor_pascals: Tensor of vapour pressures (with
+        same shape as both input tensors).
+    """
+
+    temperature_tensor_kelvins = K.maximum(temperature_tensor_kelvins, 0.)
+    dewpoint_tensor_kelvins = K.maximum(dewpoint_tensor_kelvins, 0.)
+    dewpoint_tensor_kelvins = K.minimum(
+        dewpoint_tensor_kelvins, temperature_tensor_kelvins
+    )
+
+    temperature_tensor_deg_c = (
+        temperature_tensor_kelvins - CELSIUS_TO_KELVINS_ADDEND
+    )
+    dewpoint_tensor_deg_c = (
+        dewpoint_tensor_kelvins - CELSIUS_TO_KELVINS_ADDEND
+    )
+
+    numerator_coeff_tensor = tensorflow.where(
+        temperature_tensor_deg_c >= 0,
+        MAGNUS_NUMERATOR_COEFF_WATER,
+        MAGNUS_NUMERATOR_COEFF_ICE
+    )
+    denominator_coeff_tensor = tensorflow.where(
+        temperature_tensor_deg_c >= 0,
+        MAGNUS_DENOMINATOR_COEFF_WATER,
+        MAGNUS_DENOMINATOR_COEFF_ICE
+    )
+    denominator_tensor = denominator_coeff_tensor + dewpoint_tensor_deg_c
+    exponential_arg_tensor = (
+        numerator_coeff_tensor * dewpoint_tensor_deg_c / denominator_tensor
+    )
+
+    vapour_pressure_tensor_pascals = (
+        BASE_VAPOUR_PRESSURE_PASCALS * K.exp(exponential_arg_tensor)
+    )
+    vapour_pressure_tensor_pascals = tensorflow.where(
+        denominator_tensor <= 0.,
+        0.,
+        vapour_pressure_tensor_pascals
+    )
+    vapour_pressure_tensor_pascals = tensorflow.where(
+        tf_math.is_finite(vapour_pressure_tensor_pascals),
+        vapour_pressure_tensor_pascals,
+        0.
+    )
+
+    return K.minimum(vapour_pressure_tensor_pascals, 10000.)
+
+
 def process_dewpoint_predictions(prediction_tensor, temperature_index,
                                  dewpoint_index):
     """Processes dewpoint predictions.
@@ -49,9 +117,9 @@ def process_dewpoint_predictions(prediction_tensor, temperature_index,
     T = number of target variables (channels)
     S = ensemble size
 
-    :param prediction_tensor: Tensor of predicted values.  If
-        expect_ensemble == True, will expect dimensions E x M x N x T x S.
-        Otherwise, will expect E x M x N x T.
+    :param prediction_tensor: Tensor of predicted values.  For an ensemble
+        model, dimensions should be E x M x N x T x S.
+        Otherwise, dimensions should be E x M x N x T.
     :param temperature_index: Array index for temperature.  This tells the
         method that temperature predictions can be found in
         prediction_tensor[:, :, :, temperature_index, ...].
@@ -127,15 +195,125 @@ def process_gust_predictions(prediction_tensor, u_wind_index, v_wind_index,
     return prediction_tensor
 
 
+def compute_hdwi(prediction_tensor, target_tensor, u_wind_index, v_wind_index,
+                 temperature_index, dewpoint_index):
+    """Computes hot-dry-windy index (HDWI) in both predictions and targets.
+
+    E = number of examples
+    M = number of grid rows
+    N = number of grid columns
+    T = number of target variables (channels)
+    S = ensemble size
+
+    WARNING: This method assumes that you have already run
+    `process_dewpoint_predictions` and `process_gust_predictions`, to convert
+    dewpoint depressions into actual dewpoints and gust excesses into actual
+    gust speeds.  Furthermore, this method assumes that `target_tensor`
+    contains only the target fields and nothing else.
+
+    :param prediction_tensor: Tensor of predicted values.  For an ensemble
+        model, dimensions should be E x M x N x T x S.
+        Otherwise, dimensions should be E x M x N x T.
+    :param target_tensor: Tensor of target values, with dimensions
+        E x M x N x T.
+    :param u_wind_index: Array index for u-wind.  This tells the method that
+        u-wind predictions can be found in
+        prediction_tensor[:, :, :, u_wind_index, ...] and u-wind targets can be
+        found in target_tensor[:, :, :, u_wind_index].
+    :param v_wind_index: Same as above but for v-wind.
+    :param temperature_index: Same as above but for temperature.
+    :param dewpoint_index: Same as above but for dewpoint.
+    :return: prediction_tensor: Same as input but with dimensions
+        E x M x N x (T + 1) x S or E x M x N x (T + 1).  The extra slice along
+        the channel axis contains HDWI values.
+    :return: target_tensor: Same as input but with dimensions
+        E x M x N x (T + 1).  The extra slice along the channel axis contains
+        HDWI values.
+    """
+
+    error_checking.assert_is_integer(u_wind_index)
+    error_checking.assert_is_geq(u_wind_index, 0)
+    error_checking.assert_is_integer(v_wind_index)
+    error_checking.assert_is_geq(v_wind_index, 0)
+    error_checking.assert_is_integer(temperature_index)
+    error_checking.assert_is_geq(temperature_index, 0)
+    error_checking.assert_is_integer(dewpoint_index)
+    error_checking.assert_is_geq(dewpoint_index, 0)
+
+    unique_indices = set([
+        u_wind_index, v_wind_index, temperature_index, dewpoint_index
+    ])
+    assert len(unique_indices) == 4
+
+    pred_vapour_press_tensor_pascals = _dewpoint_to_vapour_pressure(
+        dewpoint_tensor_kelvins=prediction_tensor[:, :, :, dewpoint_index, ...],
+        temperature_tensor_kelvins=
+        prediction_tensor[:, :, :, temperature_index, ...]
+    )
+    pred_sat_vapour_press_tensor_pascals = _dewpoint_to_vapour_pressure(
+        dewpoint_tensor_kelvins=
+        prediction_tensor[:, :, :, temperature_index, ...],
+        temperature_tensor_kelvins=
+        prediction_tensor[:, :, :, temperature_index, ...]
+    )
+
+    pred_vapour_press_depr_tensor_mb = PASCALS_TO_MB * (
+        pred_sat_vapour_press_tensor_pascals - pred_vapour_press_tensor_pascals
+    )
+    pred_wind_speed_tensor_m_s01 = K.sqrt(
+        prediction_tensor[:, :, :, u_wind_index, ...] ** 2 +
+        prediction_tensor[:, :, :, v_wind_index, ...] ** 2
+    )
+    pred_hdwi_tensor = (
+        pred_wind_speed_tensor_m_s01 * pred_vapour_press_depr_tensor_mb
+    )
+
+    prediction_tensor = K.concatenate([
+        prediction_tensor,
+        K.expand_dims(pred_hdwi_tensor, axis=3)
+    ], axis=3)
+
+    target_vapour_press_tensor_pascals = _dewpoint_to_vapour_pressure(
+        dewpoint_tensor_kelvins=target_tensor[..., dewpoint_index],
+        temperature_tensor_kelvins=target_tensor[..., temperature_index]
+    )
+    target_sat_vapour_press_tensor_pascals = _dewpoint_to_vapour_pressure(
+        dewpoint_tensor_kelvins=target_tensor[..., temperature_index],
+        temperature_tensor_kelvins=target_tensor[..., temperature_index]
+    )
+
+    target_vapour_press_depr_tensor_mb = PASCALS_TO_MB * (
+        target_sat_vapour_press_tensor_pascals -
+        target_vapour_press_tensor_pascals
+    )
+    target_wind_speed_tensor_m_s01 = K.sqrt(
+        target_tensor[..., u_wind_index] ** 2 +
+        target_tensor[..., v_wind_index] ** 2
+    )
+    target_hdwi_tensor = (
+        target_wind_speed_tensor_m_s01 * target_vapour_press_depr_tensor_mb
+    )
+
+    target_tensor = K.concatenate([
+        target_tensor,
+        K.expand_dims(target_hdwi_tensor, axis=3)
+    ], axis=3)
+
+    return prediction_tensor, target_tensor
+
+
 def check_index_args(u_wind_index, v_wind_index, gust_index, temperature_index,
                      dewpoint_index):
     """Error-checks index arguments.
 
-    :param u_wind_index: See doc for `mean_squared_error`.
-    :param v_wind_index: Same.
-    :param gust_index: Same.
-    :param temperature_index: Same.
-    :param dewpoint_index: Same.
+    :param u_wind_index: Array index for u-wind.  This tells the method that
+        u-wind predictions can be found in
+        prediction_tensor[:, :, :, u_wind_index, ...] and u-wind targets can be
+        found in target_tensor[:, :, :, u_wind_index].
+    :param v_wind_index: Same as above but for v-wind.
+    :param gust_index: Same as above but for wind gust.
+    :param temperature_index: Same as above but for temperature.
+    :param dewpoint_index: Same as above but for dewpoint.
     """
 
     error_checking.assert_is_integer(u_wind_index)
@@ -154,124 +332,37 @@ def check_index_args(u_wind_index, v_wind_index, gust_index, temperature_index,
     assert len(all_indices) == len(numpy.unique(all_indices))
 
 
-def mean_squared_error(
-        u_wind_index, v_wind_index, gust_index, temperature_index,
-        dewpoint_index, function_name, expect_ensemble=True, test_mode=False):
-    """Creates mean squared error (MSE) loss function.
-
-    E = number of examples
-    M = number of grid rows
-    N = number of grid columns
-    T = number of target variables (channels)
-    S = ensemble size
-
-    For the following input args -- u_wind_index, v_wind_index, gust_index,
-    temperature_index, dewpoint_index -- if said quantity is not a target
-    variable, just make the argument negative!
-
-    :param function_name: Function name (string).
-    :param u_wind_index: Array index for sustained u-wind.  This tells the
-        method that u-wind predictions and targets can be found in
-        prediction_tensor[:, :, :, u_wind_index, ...] and
-        target_tensor[:, :, :, u_wind_index, ...], respectively.
-    :param v_wind_index: Same but for v-wind.
-    :param gust_index: Same but for wind gust.
-    :param temperature_index: Same but for temperature.
-    :param dewpoint_index: Same but for dewpoint.
-    :param expect_ensemble: Boolean flag.  If True, will expect
-        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
-        expect prediction_tensor to have dimensions E x M x N x T.
-    :param test_mode: Leave this alone.
-    :return: loss: Loss function (defined below).
-    """
-
-    check_index_args(
-        u_wind_index=u_wind_index,
-        v_wind_index=v_wind_index,
-        gust_index=gust_index,
-        temperature_index=temperature_index,
-        dewpoint_index=dewpoint_index
-    )
-
-    error_checking.assert_is_string(function_name)
-    error_checking.assert_is_boolean(expect_ensemble)
-    error_checking.assert_is_boolean(test_mode)
-
-    def loss(target_tensor, prediction_tensor):
-        """Computes loss (mean squared error).
-
-        :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
-            target_tensor[..., :-1] contains the actual target values and
-            target_tensor[..., -1] contains weights.
-        :param prediction_tensor: Tensor of predicted values.  If
-            expect_ensemble == True, will expect dimensions E x M x N x T x S.
-            Otherwise, will expect E x M x N x T.
-        :return: scalar_mse: MSE (a scalar value).
-        """
-
-        if dewpoint_index >= 0 and temperature_index >= 0:
-            prediction_tensor = process_dewpoint_predictions(
-                prediction_tensor=prediction_tensor,
-                temperature_index=temperature_index,
-                dewpoint_index=dewpoint_index
-            )
-
-        if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
-            prediction_tensor = process_gust_predictions(
-                prediction_tensor=prediction_tensor,
-                u_wind_index=u_wind_index,
-                v_wind_index=v_wind_index,
-                gust_index=gust_index
-            )
-
-        num_target_fields = __get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        relevant_target_tensor = target_tensor[..., :num_target_fields]
-        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-
-        if expect_ensemble:
-            relevant_target_tensor = K.expand_dims(
-                relevant_target_tensor, axis=-1
-            )
-            mask_weight_tensor = K.expand_dims(
-                mask_weight_tensor, axis=-1
-            )
-
-        squared_error_tensor = (relevant_target_tensor - prediction_tensor) ** 2
-        return (
-            K.sum(mask_weight_tensor * squared_error_tensor) /
-            K.sum(mask_weight_tensor * K.ones_like(squared_error_tensor))
-        )
-
-    loss.__name__ = function_name
-    return loss
-
-
 def dual_weighted_mse(
         channel_weights, u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index, function_name,
-        dual_weight_exponent=1., expect_ensemble=True, test_mode=False):
+        dual_weight_exponent=1., expect_ensemble=True, include_hdwi=False,
+        test_mode=False):
     """Creates dual-weighted mean squared error (DWMSE) loss function.
 
-    T = number of target variables (channels)
+    T = number of target variables (channels).  If `include_hdwi == True`,
+    this number includes HDWI.
 
     :param channel_weights: length-T numpy array of channel weights.
-    :param u_wind_index: See documentation for `mean_squared_error`.
-    :param v_wind_index: Same.
-    :param gust_index: Same.
-    :param temperature_index: Same.
-    :param dewpoint_index: Same.
-    :param function_name: Same.
+    :param u_wind_index: Array index for u-wind.  This tells the method that
+        u-wind predictions can be found in
+        prediction_tensor[:, :, :, u_wind_index, ...] and u-wind targets can be
+        found in target_tensor[:, :, :, u_wind_index].
+    :param v_wind_index: Same as above but for v-wind.
+    :param gust_index: Same as above but for wind gust.
+    :param temperature_index: Same as above but for temperature.
+    :param dewpoint_index: Same as above but for dewpoint.
+    :param function_name: Name of function (string).
     :param dual_weight_exponent: Exponent for dual weight.  If 1, the weight for
         every data point will be max(abs(target), abs(prediction)).  If the
         exponent is E, this weight will be
         max(abs(target), abs(prediction)) ** E.
-    :param expect_ensemble: Same.
-    :param test_mode: Same.
+    :param expect_ensemble: Boolean flag.  If True, will assume that
+        `prediction_tensor` contains an ensemble for every grid point and
+        variable.  If False, will assume that `prediction_tensor` contains one
+        deterministic forecast for every grid point and variable.
+    :param include_hdwi: Boolean flag.  If True, will include hot-dry-windy
+        index (HDWI) in the target variables.
+    :param test_mode: Leave this alone.
     :return: loss: Loss function (defined below).
     """
 
@@ -288,24 +379,36 @@ def dual_weighted_mse(
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_geq(dual_weight_exponent, 1.)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(include_hdwi)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (DWMSE).
 
-        :param target_tensor: See doc for `mean_squared_error`.
-        :param prediction_tensor: Same.
+        E = number of examples
+        M = number of grid rows
+        N = number of grid columns
+        T = number of target variables (channels)
+        S = ensemble size
+
+        :param prediction_tensor: Tensor of predicted values.  For an ensemble
+            model, dimensions should be E x M x N x T x S.
+            Otherwise, dimensions should be E x M x N x T.
+        :param target_tensor: Tensor of target values, with dimensions
+            E x M x N x (T + 1).  target_tensor[..., :-1] contains actual target
+            values, and target_tensor[..., -1] contains a binary mask for
+            evaluation.
         :return: scalar_dwmse: DWMSE (a scalar value).
         """
 
-        if dewpoint_index >= 0 and temperature_index >= 0:
+        if include_hdwi or dewpoint_index >= 0:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
                 dewpoint_index=dewpoint_index
             )
 
-        if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
+        if gust_index >= 0:
             prediction_tensor = process_gust_predictions(
                 prediction_tensor=prediction_tensor,
                 u_wind_index=u_wind_index,
@@ -321,6 +424,16 @@ def dual_weighted_mse(
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         relevant_target_tensor = target_tensor[..., :num_target_fields]
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+
+        if include_hdwi:
+            prediction_tensor, relevant_target_tensor = compute_hdwi(
+                prediction_tensor=prediction_tensor,
+                target_tensor=relevant_target_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
@@ -362,7 +475,8 @@ def dual_weighted_mse(
 def dual_weighted_msess(
         channel_weights, u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index, function_name,
-        dual_weight_exponent=1., expect_ensemble=True, test_mode=False):
+        dual_weight_exponent=1., expect_ensemble=True, include_hdwi=False,
+        test_mode=False):
     """Creates DWMSE-skill-score loss function.
 
     :param channel_weights: See documentation for `dual_weighted_mse`.
@@ -374,6 +488,7 @@ def dual_weighted_msess(
     :param function_name: Same.
     :param dual_weight_exponent: Same.
     :param expect_ensemble: Same.
+    :param include_hdwi: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
@@ -391,24 +506,25 @@ def dual_weighted_msess(
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_geq(dual_weight_exponent, 1.)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(include_hdwi)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (DWMSE skill score).
 
-        :param target_tensor: See doc for `mean_squared_error`.
+        :param target_tensor: See doc for `dual_weighted_mse`.
         :param prediction_tensor: Same.
         :return: scalar_dwmsess: DWMSE skill score (a scalar value).
         """
 
-        if dewpoint_index >= 0 and temperature_index >= 0:
+        if include_hdwi or dewpoint_index >= 0:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
                 dewpoint_index=dewpoint_index
             )
 
-        if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
+        if gust_index >= 0:
             prediction_tensor = process_gust_predictions(
                 prediction_tensor=prediction_tensor,
                 u_wind_index=u_wind_index,
@@ -427,6 +543,27 @@ def dual_weighted_msess(
             target_tensor[..., num_target_fields:-1]
         )
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+
+        if include_hdwi:
+            prediction_tensor, relevant_target_tensor = compute_hdwi(
+                prediction_tensor=prediction_tensor,
+                target_tensor=relevant_target_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+            prediction_tensor, relevant_baseline_prediction_tensor = (
+                compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_baseline_prediction_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+            prediction_tensor = prediction_tensor[:, :, :, :-1, ...]
 
         # Ensure compatible tensor shapes.
         if expect_ensemble:
@@ -510,7 +647,7 @@ def dual_weighted_msess(
 def dual_weighted_crpss(
         channel_weights, u_wind_index, v_wind_index, gust_index,
         temperature_index, dewpoint_index, function_name,
-        dual_weight_exponent=1., test_mode=False):
+        dual_weight_exponent=1., include_hdwi=False, test_mode=False):
     """Creates dual-weighted-CRPSS loss function.
 
     :param channel_weights: See documentation for `dual_weighted_mse`.
@@ -521,6 +658,7 @@ def dual_weighted_crpss(
     :param dewpoint_index: Same.
     :param function_name: Same.
     :param dual_weight_exponent: Same.
+    :param include_hdwi: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
@@ -537,19 +675,20 @@ def dual_weighted_crpss(
     error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_geq(dual_weight_exponent, 1.)
+    error_checking.assert_is_boolean(include_hdwi)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (dual-weighted CRPSS).
 
-        :param target_tensor: See doc for `mean_squared_error`.
+        :param target_tensor: See doc for `dual_weighted_mse`.
         :param prediction_tensor: Same.
         :return: scalar_dual_weighted_crpss: Dual-weighted CRPSS (a scalar
             value).
         """
 
         # E x M x N x T x S
-        if dewpoint_index >= 0 and temperature_index >= 0:
+        if include_hdwi or dewpoint_index >= 0:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -557,7 +696,7 @@ def dual_weighted_crpss(
             )
 
         # E x M x N x T x S
-        if u_wind_index >= 0 and v_wind_index >= 0 and gust_index >= 0:
+        if gust_index >= 0:
             prediction_tensor = process_gust_predictions(
                 prediction_tensor=prediction_tensor,
                 u_wind_index=u_wind_index,
@@ -576,6 +715,27 @@ def dual_weighted_crpss(
             target_tensor[..., num_target_fields:-1]  # E x M x N x T
         )
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)  # E x M x N x 1
+
+        if include_hdwi:
+            prediction_tensor, relevant_target_tensor = compute_hdwi(
+                prediction_tensor=prediction_tensor,
+                target_tensor=relevant_target_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+            prediction_tensor, relevant_baseline_prediction_tensor = (
+                compute_hdwi(
+                    prediction_tensor=prediction_tensor,
+                    target_tensor=relevant_baseline_prediction_tensor,
+                    u_wind_index=u_wind_index,
+                    v_wind_index=v_wind_index,
+                    temperature_index=temperature_index,
+                    dewpoint_index=dewpoint_index
+                )
+            )
+            prediction_tensor = prediction_tensor[:, :, :, :-1, ...]
 
         # Ensure compatible tensor shapes.
         relevant_target_tensor = K.expand_dims(relevant_target_tensor, axis=-1)  # E x M x N x T x 1
@@ -743,14 +903,14 @@ def dual_weighted_mse_1channel(
     """Creates DWMSE loss function for one channel (target variable).
 
     :param channel_weight: Channel weight.
-    :param channel_index: Channel index.
-    :param u_wind_index: Same.
+    :param channel_index: Channel index or "hdwi".
+    :param u_wind_index: See doc for `dual_weighted_mse`.
     :param v_wind_index: Same.
     :param gust_index: Same.
     :param temperature_index: Same.
     :param dewpoint_index: Same.
-    :param function_name: See doc for `mean_squared_error`.
-    :param dual_weight_exponent: See doc for `dual_weighted_mse`.
+    :param function_name: Same.
+    :param dual_weight_exponent: Same.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -765,17 +925,19 @@ def dual_weighted_mse_1channel(
     )
 
     error_checking.assert_is_greater(channel_weight, 0.)
-    error_checking.assert_is_integer(channel_index)
-    error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
     error_checking.assert_is_geq(dual_weight_exponent, 1.)
 
+    if channel_index != 'hdwi':
+        error_checking.assert_is_integer(channel_index)
+        error_checking.assert_is_geq(channel_index, 0)
+
     def loss(target_tensor, prediction_tensor):
         """Computes loss (one-channel DWMSE).
 
-        :param target_tensor: See doc for `mean_squared_error`.
+        :param target_tensor: See doc for `dual_weighted_mse`.
         :param prediction_tensor: Same.
         :return: scalar_dwmse: DWMSE (a scalar value).
         """
@@ -784,7 +946,7 @@ def dual_weighted_mse_1channel(
         relevant_target_tensor = target_tensor[..., :-1]
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
-        if channel_index == dewpoint_index:
+        if channel_index in ['hdwi', dewpoint_index]:
             prediction_tensor = process_dewpoint_predictions(
                 prediction_tensor=prediction_tensor,
                 temperature_index=temperature_index,
@@ -799,17 +961,32 @@ def dual_weighted_mse_1channel(
                 gust_index=gust_index
             )
 
+        if channel_index == 'hdwi':
+            prediction_tensor, relevant_target_tensor = compute_hdwi(
+                prediction_tensor=prediction_tensor,
+                target_tensor=relevant_target_tensor,
+                u_wind_index=u_wind_index,
+                v_wind_index=v_wind_index,
+                temperature_index=temperature_index,
+                dewpoint_index=dewpoint_index
+            )
+            new_channel_index = -1
+        else:
+            new_channel_index = channel_index + 0
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                relevant_target_tensor[..., channel_index], axis=-1
+                relevant_target_tensor[..., new_channel_index], axis=-1
             )
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index, :]
+                prediction_tensor[:, :, :, new_channel_index, :]
             )
         else:
-            relevant_target_tensor = relevant_target_tensor[..., channel_index]
+            relevant_target_tensor = (
+                relevant_target_tensor[..., new_channel_index]
+            )
             relevant_prediction_tensor = (
-                prediction_tensor[:, :, :, channel_index]
+                prediction_tensor[:, :, :, new_channel_index]
             )
             mask_weight_tensor = mask_weight_tensor[..., 0]
 
