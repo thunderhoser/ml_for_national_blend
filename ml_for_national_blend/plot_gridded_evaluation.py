@@ -16,14 +16,12 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grids
-import time_conversion
 import longitude_conversion as lng_conversion
 import file_system_utils
 import error_checking
 import border_io
 import urma_utils
 import evaluation
-import neural_net
 import plotting_utils
 import target_plotting
 

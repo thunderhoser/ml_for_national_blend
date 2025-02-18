@@ -32,7 +32,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import prediction_io
 import urma_utils
 import evaluation
-import neural_net
 import time_conversion
 import file_system_utils
 import error_checking

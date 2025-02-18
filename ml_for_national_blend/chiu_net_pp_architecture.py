@@ -16,6 +16,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 import architecture_utils
+import urma_utils
 import chiu_net_architecture as chiu_net_arch
 
 INPUT_DIMENSIONS_CONST_KEY = chiu_net_arch.INPUT_DIMENSIONS_CONST_KEY
@@ -103,9 +104,7 @@ BATCH_NORM_MOMENTUM_KEY = chiu_net_arch.BATCH_NORM_MOMENTUM_KEY
 BATCH_NORM_SYNCH_FLAG_KEY = chiu_net_arch.BATCH_NORM_SYNCH_FLAG_KEY
 ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 
-NUM_OUTPUT_CHANNELS_KEY = chiu_net_arch.NUM_OUTPUT_CHANNELS_KEY
-PREDICT_GUST_EXCESS_KEY = chiu_net_arch.PREDICT_GUST_EXCESS_KEY
-PREDICT_DEWPOINT_DEPRESSION_KEY = chiu_net_arch.PREDICT_DEWPOINT_DEPRESSION_KEY
+TARGET_FIELDS_KEY = chiu_net_arch.TARGET_FIELDS_KEY
 LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 METRIC_FUNCTIONS_KEY = chiu_net_arch.METRIC_FUNCTIONS_KEY
@@ -676,9 +675,8 @@ def create_model(option_dict):
     batch_norm_momentum = optd[BATCH_NORM_MOMENTUM_KEY]
     batch_norm_synch_flag = optd[BATCH_NORM_SYNCH_FLAG_KEY]
     ensemble_size = optd[ENSEMBLE_SIZE_KEY]
-    num_output_channels = optd[NUM_OUTPUT_CHANNELS_KEY]
-    predict_gust_excess = optd[PREDICT_GUST_EXCESS_KEY]
-    predict_dewpoint_depression = optd[PREDICT_DEWPOINT_DEPRESSION_KEY]
+    target_field_names = optd[TARGET_FIELDS_KEY]
+    num_output_channels = len(target_field_names)
 
     loss_function = optd[LOSS_FUNCTION_KEY]
     optimizer_function = optd[OPTIMIZER_FUNCTION_KEY]
@@ -1632,6 +1630,13 @@ def create_model(option_dict):
             batch_norm_synch_flag=batch_norm_synch_flag,
             basic_layer_name='penultimate'
         )
+
+    predict_gust_excess = (
+        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
+    )
+    predict_dewpoint_depression = (
+        urma_utils.DEWPOINT_2METRE_NAME in target_field_names
+    )
 
     num_constrained_output_channels = (
         int(predict_gust_excess) + int(predict_dewpoint_depression)

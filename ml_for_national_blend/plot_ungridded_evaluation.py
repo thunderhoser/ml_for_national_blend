@@ -16,7 +16,6 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
-import time_conversion
 import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
@@ -24,7 +23,6 @@ import urma_io
 import prediction_io
 import urma_utils
 import evaluation
-import neural_net
 import evaluation_plotting as eval_plotting
 
 TARGET_FIELD_NAME_TO_VERBOSE = {
