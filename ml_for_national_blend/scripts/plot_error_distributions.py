@@ -24,7 +24,6 @@ from scipy.stats import gaussian_kde
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import evaluation
-from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking

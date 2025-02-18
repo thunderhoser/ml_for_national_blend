@@ -9,7 +9,6 @@ matplotlib.use('agg')
 import matplotlib.colors
 import matplotlib.patches
 from matplotlib import pyplot
-from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import \
     temperature_conversions as temperature_conv
 from ml_for_national_blend.outside_code import file_system_utils
@@ -18,7 +17,6 @@ from ml_for_national_blend.io import urma_io
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import evaluation
-from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.plotting import evaluation_plotting as eval_plotting
 
 TARGET_FIELD_NAME_TO_VERBOSE = {

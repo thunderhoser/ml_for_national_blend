@@ -252,15 +252,6 @@ def determine_patch_locations(patch_size_2pt5km_pixels, start_row_2pt5km=None,
         for column.
     """
 
-    # TODO(thunderhoser): I will eventually need two different patch sizes,
-    # representing an outer domain (for predictors) and an inner domain (for
-    # targets).  However, I will do this by including a binary mask in the
-    # target_matrix and using the binary mask in the loss function.  This binary
-    # mask will prevent the NN from being penalized for any predictions it
-    # makes in the outer domain, so that only the inner domain matters.  This
-    # will avoid edge effects, allowing the NN to not worry about predictions
-    # near the edge of the patch.
-
     # Check input args.
     error_checking.assert_is_integer(patch_size_2pt5km_pixels)
     error_checking.assert_is_greater(patch_size_2pt5km_pixels, 0)

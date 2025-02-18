@@ -9,7 +9,6 @@ matplotlib.use('agg')
 from matplotlib import pyplot
 import matplotlib.colors
 from ml_for_national_blend.outside_code import grids
-from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import \
     longitude_conversion as lng_conversion
 from ml_for_national_blend.outside_code import file_system_utils
@@ -17,7 +16,6 @@ from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import evaluation
-from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.plotting import plotting_utils
 from ml_for_national_blend.plotting import target_plotting
 
