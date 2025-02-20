@@ -78,8 +78,6 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --use_fast_patch_generator=1 \
 --patch_overlap_size_2pt5km_pixels=64 \
 --require_all_predictors=0 \
---predict_dewpoint_depression=1 \
---predict_gust_excess=1 \
 --do_residual_prediction=1 \
 --resid_baseline_model_name="ensemble" \
 --resid_baseline_lead_time_hours=48 \
