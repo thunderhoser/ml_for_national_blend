@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import pickle
 import warnings
 import numpy
@@ -2637,9 +2638,6 @@ def data_generator_fast_patches(
                     full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
                     full_predictor_matrix_lagged_targets = None
 
-                print(full_target_matrix)
-                print('FOOOOOOOO')
-
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -3035,8 +3033,11 @@ def data_generator_fast_patches(
                 )
 
             if not success:
-                in_progress_file_name = '{0:s}_tmp{1:s}'.format(
+                current_nanoseconds = int(numpy.round(time.time_ns()))
+
+                in_progress_file_name = '{0:s}_tmp{1:d}{2:s}'.format(
                     os.path.splitext(full_grid_numpy_file_name)[0],
+                    current_nanoseconds,
                     os.path.splitext(full_grid_numpy_file_name)[1]
                 )
 
@@ -3092,7 +3093,10 @@ def data_generator_fast_patches(
                     )
                 )
 
-                os.rename(in_progress_file_name, full_grid_numpy_file_name)
+                try:
+                    os.rename(in_progress_file_name, full_grid_numpy_file_name)
+                except:
+                    os.remove(in_progress_file_name)
 
             patch_location_dict = misc_utils.determine_patch_locations(
                 patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
