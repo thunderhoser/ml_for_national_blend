@@ -101,6 +101,7 @@ PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
+TEMPORARY_PREDICTOR_DIR_KEY = 'temporary_predictor_dir_name'
 
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, EMA_DECAY_KEY,
@@ -109,7 +110,8 @@ METADATA_KEYS = [
     OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
-    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY
+    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY,
+    TEMPORARY_PREDICTOR_DIR_KEY
 ]
 
 NUM_FULL_ROWS_KEY = 'num_rows_in_full_grid'
@@ -220,6 +222,37 @@ class EMAHelper:
 
         if raise_error_if_missing:
             assert found_any_diff
+
+
+def __find_temporary_full_grid_file(temporary_dir_name, init_time_unix_sec,
+                                    raise_error_if_missing):
+    """Finds temporary file with training data on full grid.
+
+    :param temporary_dir_name: Path to temporary directory.
+    :param init_time_unix_sec: Forecast-initialization time.
+    :param raise_error_if_missing: Boolean flag.  If file is missing and
+        `raise_error_if_missing == True`, will throw error.  If file is missing
+        and `raise_error_if_missing == False`, will return *expected* file path.
+    :return: full_grid_numpy_file_name: Path to .npz file with training data on
+        full grid.
+    :return: success: Boolean flag, indicating whether or not file exists.
+    :raises: ValueError: if file is missing
+        and `raise_error_if_missing == True`.
+    """
+
+    full_grid_numpy_file_name = '{0:s}/{1:s}.npz'.format(
+        temporary_dir_name,
+        time_conversion.unix_sec_to_string(init_time_unix_sec, '%Y-%m-%d-%H')
+    )
+
+    success = os.path.isfile(full_grid_numpy_file_name)
+    if raise_error_if_missing and not success:
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            full_grid_numpy_file_name
+        )
+        raise ValueError(error_string)
+
+    return full_grid_numpy_file_name, success
 
 
 def __report_data_properties(
@@ -2364,13 +2397,18 @@ def create_data_fast_patches(
     }
 
 
-def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
-                                return_predictors_as_dict=False):
+def data_generator_fast_patches(
+        option_dict, patch_overlap_size_2pt5km_pixels,
+        temporary_predictor_dir_name=None, return_predictors_as_dict=False):
     """Fast data-generator for patchwise training.
 
     :param option_dict: See documentation for `data_generator`.
     :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
         measured in number of pixels on the finest-resolution (2.5-km) grid.
+    :param temporary_predictor_dir_name: Path to temporary directory.  For a
+        given forecast-init time, after full-domain predictors have been read
+        from the source directories once, they will be stored here in a .npz
+        file.  If you do not want a temporary directory, make this None.
     :param return_predictors_as_dict: See documentation for
         `__report_data_properties`.
     :return: predictor_matrices: See documentation for `data_generator`.
@@ -2433,6 +2471,10 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
 
     error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
     error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
+    if temporary_predictor_dir_name is not None:
+        file_system_utils.mkdir_recursive_if_necessary(
+            directory_name=temporary_predictor_dir_name
+        )
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
@@ -2534,6 +2576,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
     full_recent_bias_matrix_40km = None
     full_predictor_matrix_lagged_targets = None
 
+    full_domain_var_names = [
+        'full_target_matrix', 'full_baseline_matrix',
+        'full_predictor_matrix_2pt5km', 'full_predictor_matrix_10km',
+        'full_predictor_matrix_20km', 'full_predictor_matrix_40km',
+        'full_recent_bias_matrix_2pt5km', 'full_recent_bias_matrix_10km',
+        'full_recent_bias_matrix_20km', 'full_recent_bias_matrix_40km',
+        'full_predictor_matrix_lagged_targets'
+    ]
+
     num_target_fields = len(target_field_names)
     if target_lag_times_hours is None:
         num_target_lag_times = 0
@@ -2592,17 +2643,8 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
             )
 
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2610,18 +2652,79 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
                 continue
 
+            if temporary_predictor_dir_name is None:
+                full_grid_numpy_file_name = 'foo'
+                success = False
+            else:
+                full_grid_numpy_file_name, success = (
+                    __find_temporary_full_grid_file(
+                        temporary_dir_name=temporary_predictor_dir_name,
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        raise_error_if_missing=False
+                    )
+                )
+
             try:
                 if full_target_matrix is None:
-                    full_target_matrix = _read_targets_one_example(
-                        init_time_unix_sec=init_times_unix_sec[init_time_index],
-                        target_lead_time_hours=target_lead_time_hours,
-                        target_field_names=target_field_names,
-                        target_dir_name=target_dir_name,
-                        target_norm_param_table_xarray=None,
-                        target_resid_norm_param_table_xarray=None,
-                        use_quantile_norm=False,
-                        patch_location_dict=None
-                    )
+                    if success:
+                        full_grid_dict = numpy.load(full_grid_numpy_file_name)
+                        fgd = full_grid_dict
+
+                        full_target_matrix = (
+                            None if fgd['full_target_matrix'].size() == 0
+                            else fgd['full_target_matrix']
+                        )
+                        full_baseline_matrix = (
+                            None if fgd['full_baseline_matrix'].size() == 0
+                            else fgd['full_baseline_matrix']
+                        )
+                        full_predictor_matrix_2pt5km = (
+                            None if fgd['full_predictor_matrix_2pt5km'].size() == 0
+                            else fgd['full_predictor_matrix_2pt5km']
+                        )
+                        full_predictor_matrix_10km = (
+                            None if fgd['full_predictor_matrix_10km'].size() == 0
+                            else fgd['full_predictor_matrix_10km']
+                        )
+                        full_predictor_matrix_20km = (
+                            None if fgd['full_predictor_matrix_20km'].size() == 0
+                            else fgd['full_predictor_matrix_20km']
+                        )
+                        full_predictor_matrix_40km = (
+                            None if fgd['full_predictor_matrix_40km'].size() == 0
+                            else fgd['full_predictor_matrix_40km']
+                        )
+                        full_recent_bias_matrix_2pt5km = (
+                            None if fgd['full_recent_bias_matrix_2pt5km'].size() == 0
+                            else fgd['full_recent_bias_matrix_2pt5km']
+                        )
+                        full_recent_bias_matrix_10km = (
+                            None if fgd['full_recent_bias_matrix_10km'].size() == 0
+                            else fgd['full_recent_bias_matrix_10km']
+                        )
+                        full_recent_bias_matrix_20km = (
+                            None if fgd['full_recent_bias_matrix_20km'].size() == 0
+                            else fgd['full_recent_bias_matrix_20km']
+                        )
+                        full_recent_bias_matrix_40km = (
+                            None if fgd['full_recent_bias_matrix_40km'].size() == 0
+                            else fgd['full_recent_bias_matrix_40km']
+                        )
+                        full_predictor_matrix_lagged_targets = (
+                            None if fgd['full_predictor_matrix_lagged_targets'].size() == 0
+                            else fgd['full_predictor_matrix_lagged_targets']
+                        )
+                    else:
+                        full_target_matrix = _read_targets_one_example(
+                            init_time_unix_sec=init_times_unix_sec[init_time_index],
+                            target_lead_time_hours=target_lead_time_hours,
+                            target_field_names=target_field_names,
+                            target_dir_name=target_dir_name,
+                            target_norm_param_table_xarray=None,
+                            target_resid_norm_param_table_xarray=None,
+                            use_quantile_norm=False,
+                            patch_location_dict=None
+                        )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read targets for init time '
@@ -2634,19 +2737,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
 
                 warnings.warn(warning_string)
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
 
             if full_target_matrix is None:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2690,22 +2785,14 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
 
                 warnings.warn(warning_string)
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
 
             if (
                     num_target_lag_times > 0 and
                     full_predictor_matrix_lagged_targets is None
             ):
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2771,19 +2858,11 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
 
                 warnings.warn(warning_string)
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
 
             if do_residual_prediction and full_baseline_matrix is None:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2828,21 +2907,13 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
 
                 warnings.warn(warning_string)
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
                 found_any_predictors = False
                 found_all_predictors = False
 
             if not found_any_predictors:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2850,6 +2921,9 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 continue
 
             if require_all_predictors and not found_all_predictors:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2898,23 +2972,15 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 )
 
                 warnings.warn(warning_string)
-                full_target_matrix = None
-                full_baseline_matrix = None
-                full_predictor_matrix_2pt5km = None
-                full_predictor_matrix_10km = None
-                full_predictor_matrix_20km = None
-                full_predictor_matrix_40km = None
-                full_recent_bias_matrix_2pt5km = None
-                full_recent_bias_matrix_10km = None
-                full_recent_bias_matrix_20km = None
-                full_recent_bias_matrix_40km = None
-                full_predictor_matrix_lagged_targets = None
                 found_any_predictors = False
                 found_all_predictors = False
 
             # TODO(thunderhoser): I don't think this condition needs to be
             # `use_recent_biases and not found_any_predictors`?
             if not found_any_predictors:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
@@ -2922,11 +2988,86 @@ def data_generator_fast_patches(option_dict, patch_overlap_size_2pt5km_pixels,
                 continue
 
             if require_all_predictors and not found_all_predictors:
+                for this_var in full_domain_var_names:
+                    locals()[this_var] = None
+
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
                     init_times_unix_sec=init_times_unix_sec
                 )
                 continue
+
+            if temporary_predictor_dir_name is None:
+                full_grid_numpy_file_name = 'foo'
+                success = True
+            else:
+                full_grid_numpy_file_name, success = (
+                    __find_temporary_full_grid_file(
+                        temporary_dir_name=temporary_predictor_dir_name,
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        raise_error_if_missing=False
+                    )
+                )
+
+            if not success:
+                in_progress_file_name = '{0:s}_tmp{1:s}'.format(
+                    os.path.splitext(full_grid_numpy_file_name)[0],
+                    os.path.splitext(full_grid_numpy_file_name)[1]
+                )
+
+                print('Writing full-grid predictors to: "{0:s}"...'.format(
+                    in_progress_file_name
+                ))
+                numpy.savez(
+                    in_progress_file_name,
+                    full_target_matrix=(
+                        numpy.array([]) if full_target_matrix is None
+                        else full_target_matrix
+                    ),
+                    full_baseline_matrix=(
+                        numpy.array([]) if full_baseline_matrix is None
+                        else full_baseline_matrix
+                    ),
+                    full_predictor_matrix_2pt5km=(
+                        numpy.array([]) if full_predictor_matrix_2pt5km is None
+                        else full_predictor_matrix_2pt5km
+                    ),
+                    full_predictor_matrix_10km=(
+                        numpy.array([]) if full_predictor_matrix_10km is None
+                        else full_predictor_matrix_10km
+                    ),
+                    full_predictor_matrix_20km=(
+                        numpy.array([]) if full_predictor_matrix_20km is None
+                        else full_predictor_matrix_20km
+                    ),
+                    full_predictor_matrix_40km=(
+                        numpy.array([]) if full_predictor_matrix_40km is None
+                        else full_predictor_matrix_40km
+                    ),
+
+                    full_recent_bias_matrix_2pt5km=(
+                        numpy.array([]) if full_recent_bias_matrix_2pt5km is None
+                        else full_recent_bias_matrix_2pt5km
+                    ),
+                    full_recent_bias_matrix_10km=(
+                        numpy.array([]) if full_recent_bias_matrix_10km is None
+                        else full_recent_bias_matrix_10km
+                    ),
+                    full_recent_bias_matrix_20km=(
+                        numpy.array([]) if full_recent_bias_matrix_20km is None
+                        else full_recent_bias_matrix_20km
+                    ),
+                    full_recent_bias_matrix_40km=(
+                        numpy.array([]) if full_recent_bias_matrix_40km is None
+                        else full_recent_bias_matrix_40km
+                    ),
+                    full_predictor_matrix_lagged_targets=(
+                        numpy.array([]) if full_predictor_matrix_lagged_targets is None
+                        else full_predictor_matrix_lagged_targets
+                    )
+                )
+
+                os.rename(in_progress_file_name, full_grid_numpy_file_name)
 
             patch_location_dict = misc_utils.determine_patch_locations(
                 patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
@@ -3734,7 +3875,7 @@ def train_model(
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
-        output_dir_name):
+        temporary_predictor_dir_name, output_dir_name):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -3783,6 +3924,7 @@ def train_model(
         early_stopping_patience_epochs.
     :param patch_overlap_fast_gen_2pt5km_pixels: See documentation for
         `data_generator_fast_patches`.
+    :param temporary_predictor_dir_name: Same.
     :param output_dir_name: Path to output directory (model and training history
         will be saved here).
     """
@@ -3875,12 +4017,14 @@ def train_model(
         training_generator = data_generator_fast_patches(
             option_dict=training_option_dict,
             patch_overlap_size_2pt5km_pixels=
-            patch_overlap_fast_gen_2pt5km_pixels
+            patch_overlap_fast_gen_2pt5km_pixels,
+            temporary_predictor_dir_name=temporary_predictor_dir_name
         )
         validation_generator = data_generator_fast_patches(
             option_dict=validation_option_dict,
             patch_overlap_size_2pt5km_pixels=
-            patch_overlap_fast_gen_2pt5km_pixels
+            patch_overlap_fast_gen_2pt5km_pixels,
+            temporary_predictor_dir_name=temporary_predictor_dir_name
         )
 
     metafile_name = find_metafile(
@@ -3906,7 +4050,8 @@ def train_model(
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
         patch_overlap_fast_gen_2pt5km_pixels=
-        patch_overlap_fast_gen_2pt5km_pixels
+        patch_overlap_fast_gen_2pt5km_pixels,
+        temporary_predictor_dir_name=temporary_predictor_dir_name
     )
 
     if use_exp_moving_average_with_decay is None:
@@ -4262,7 +4407,8 @@ def write_metafile(
         metric_function_strings, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels):
+        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
+        temporary_predictor_dir_name):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -4282,6 +4428,7 @@ def write_metafile(
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
     :param patch_overlap_fast_gen_2pt5km_pixels: Same.
+    :param temporary_predictor_dir_name: Same.
     """
 
     metadata_dict = {
@@ -4300,7 +4447,8 @@ def write_metafile(
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
-        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels
+        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels,
+        TEMPORARY_PREDICTOR_DIR_KEY: temporary_predictor_dir_name
     }
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=pickle_file_name)
@@ -4331,6 +4479,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
     metadata_dict["patch_overlap_fast_gen_2pt5km_pixels"]: Same.
+    metadata_dict["temporary_predictor_dir_name"]: Same.
 
     :raises: ValueError: if any expected key is not found in dictionary.
     """
@@ -4343,6 +4492,8 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
+    if TEMPORARY_PREDICTOR_DIR_KEY not in metadata_dict:
+        metadata_dict[TEMPORARY_PREDICTOR_DIR_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NEXT_PP_ARCHITECTURE_KEY] = None
     if EMA_DECAY_KEY not in metadata_dict:

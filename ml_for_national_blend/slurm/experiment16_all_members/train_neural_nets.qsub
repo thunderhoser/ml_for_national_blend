@@ -97,4 +97,5 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --num_validation_batches_per_epoch=1500 \
 --plateau_patience_epochs=10 \
 --plateau_learning_rate_multiplier=0.95 \
---early_stopping_patience_epochs=10000
+--early_stopping_patience_epochs=10000 \
+--temporary_predictor_dir_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment16_all_members/temporary_predictor_files"
