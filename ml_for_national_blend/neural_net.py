@@ -2645,8 +2645,9 @@ def data_generator_fast_patches(
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
                 for this_var in full_domain_var_names:
                     locals()[this_var] = None
-                    print(full_target_matrix)
-                    print('FOOOOOOOO')
+
+                print(full_target_matrix)
+                print('FOOOOOOOO')
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
