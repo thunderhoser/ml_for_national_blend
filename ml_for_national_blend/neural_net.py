@@ -2664,6 +2664,58 @@ def data_generator_fast_patches(
                     )
                 )
 
+            if success:
+                print('Reading data from: "{0:s}"...'.format(
+                    full_grid_numpy_file_name
+                ))
+                full_grid_dict = numpy.load(full_grid_numpy_file_name)
+                fgd = full_grid_dict
+
+                full_target_matrix = (
+                    None if fgd['full_target_matrix'].size() == 0
+                    else fgd['full_target_matrix']
+                )
+                full_baseline_matrix = (
+                    None if fgd['full_baseline_matrix'].size() == 0
+                    else fgd['full_baseline_matrix']
+                )
+                full_predictor_matrix_2pt5km = (
+                    None if fgd['full_predictor_matrix_2pt5km'].size() == 0
+                    else fgd['full_predictor_matrix_2pt5km']
+                )
+                full_predictor_matrix_10km = (
+                    None if fgd['full_predictor_matrix_10km'].size() == 0
+                    else fgd['full_predictor_matrix_10km']
+                )
+                full_predictor_matrix_20km = (
+                    None if fgd['full_predictor_matrix_20km'].size() == 0
+                    else fgd['full_predictor_matrix_20km']
+                )
+                full_predictor_matrix_40km = (
+                    None if fgd['full_predictor_matrix_40km'].size() == 0
+                    else fgd['full_predictor_matrix_40km']
+                )
+                full_recent_bias_matrix_2pt5km = (
+                    None if fgd['full_recent_bias_matrix_2pt5km'].size() == 0
+                    else fgd['full_recent_bias_matrix_2pt5km']
+                )
+                full_recent_bias_matrix_10km = (
+                    None if fgd['full_recent_bias_matrix_10km'].size() == 0
+                    else fgd['full_recent_bias_matrix_10km']
+                )
+                full_recent_bias_matrix_20km = (
+                    None if fgd['full_recent_bias_matrix_20km'].size() == 0
+                    else fgd['full_recent_bias_matrix_20km']
+                )
+                full_recent_bias_matrix_40km = (
+                    None if fgd['full_recent_bias_matrix_40km'].size() == 0
+                    else fgd['full_recent_bias_matrix_40km']
+                )
+                full_predictor_matrix_lagged_targets = (
+                    None if fgd['full_predictor_matrix_lagged_targets'].size() == 0
+                    else fgd['full_predictor_matrix_lagged_targets']
+                )
+
             try:
                 if full_target_matrix is None:
                     if success:
