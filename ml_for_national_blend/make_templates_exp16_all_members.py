@@ -145,9 +145,14 @@ INPUT_DIMS_40KM = numpy.array(
 INPUT_DIMS_LAGGED_TARGETS = numpy.array(
     [PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, NUM_LAG_TIMES, 5], dtype=int
 )
+TARGET_FIELD_NAMES = [
+    'temperature_2m_agl_kelvins', 'u_wind_10m_agl_m_s01',
+    'v_wind_10m_agl_m_s01', 'dewpoint_2m_agl_kelvins', 'wind_gust_10m_agl_m_s01'
+]
 
 DEFAULT_OPTION_DICT = {
-    chiu_next_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array([PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 4], dtype=int),
+    chiu_next_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array(
+        [PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 4], dtype=int),
     chiu_next_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: INPUT_DIMS_2PT5KM,
     chiu_next_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: INPUT_DIMS_10KM,
     chiu_next_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: INPUT_DIMS_20KM,
@@ -207,9 +212,7 @@ DEFAULT_OPTION_DICT = {
     chiu_next_pp_arch.L1_WEIGHT_KEY: 0.,
     chiu_next_pp_arch.L2_WEIGHT_KEY: 1e-7,
     chiu_next_pp_arch.ENSEMBLE_SIZE_KEY: 25,
-    chiu_next_pp_arch.NUM_OUTPUT_CHANNELS_KEY: 5,
-    chiu_next_pp_arch.PREDICT_GUST_EXCESS_KEY: True,
-    chiu_next_pp_arch.PREDICT_DEWPOINT_DEPRESSION_KEY: True,
+    chiu_next_pp_arch.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
     chiu_next_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
     chiu_next_pp_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS,
     chiu_next_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
@@ -294,7 +297,8 @@ def _run():
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
-        patch_overlap_fast_gen_2pt5km_pixels=144
+        patch_overlap_fast_gen_2pt5km_pixels=144,
+        temporary_predictor_dir_name=None
     )
 
 
