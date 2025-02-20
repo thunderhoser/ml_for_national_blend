@@ -1,6 +1,7 @@
 """Methods for neural network (NN) training and inference."""
 
 import os
+import time
 import pickle
 import warnings
 import numpy
@@ -2559,26 +2560,13 @@ def data_generator_fast_patches(
         patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
     )
 
-    full_target_matrix = None
-    full_baseline_matrix = None
-    full_predictor_matrix_2pt5km = None
-    full_predictor_matrix_10km = None
-    full_predictor_matrix_20km = None
-    full_predictor_matrix_40km = None
-    full_recent_bias_matrix_2pt5km = None
-    full_recent_bias_matrix_10km = None
-    full_recent_bias_matrix_20km = None
-    full_recent_bias_matrix_40km = None
-    full_predictor_matrix_lagged_targets = None
-
-    full_domain_var_names = [
-        'full_target_matrix', 'full_baseline_matrix',
-        'full_predictor_matrix_2pt5km', 'full_predictor_matrix_10km',
-        'full_predictor_matrix_20km', 'full_predictor_matrix_40km',
-        'full_recent_bias_matrix_2pt5km', 'full_recent_bias_matrix_10km',
-        'full_recent_bias_matrix_20km', 'full_recent_bias_matrix_40km',
-        'full_predictor_matrix_lagged_targets'
-    ]
+    # TODO(thunderhoser): Clean this up with a dictionary or something.
+    full_target_matrix = full_baseline_matrix = \
+        full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+        full_predictor_matrix_20km = full_predictor_matrix_40km = \
+        full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+        full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+        full_predictor_matrix_lagged_targets = None
 
     num_target_fields = len(target_field_names)
     if target_lag_times_hours is None:
@@ -2638,8 +2626,12 @@ def data_generator_fast_patches(
             )
 
             if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2665,52 +2657,51 @@ def data_generator_fast_patches(
                         print('Reading data from: "{0:s}"...'.format(
                             full_grid_numpy_file_name
                         ))
-
                         full_grid_dict = numpy.load(full_grid_numpy_file_name)
                         fgd = full_grid_dict
 
                         full_target_matrix = (
-                            None if fgd['full_target_matrix'].size() == 0
+                            None if fgd['full_target_matrix'].size == 0
                             else fgd['full_target_matrix']
                         )
                         full_baseline_matrix = (
-                            None if fgd['full_baseline_matrix'].size() == 0
+                            None if fgd['full_baseline_matrix'].size == 0
                             else fgd['full_baseline_matrix']
                         )
                         full_predictor_matrix_2pt5km = (
-                            None if fgd['full_predictor_matrix_2pt5km'].size() == 0
+                            None if fgd['full_predictor_matrix_2pt5km'].size == 0
                             else fgd['full_predictor_matrix_2pt5km']
                         )
                         full_predictor_matrix_10km = (
-                            None if fgd['full_predictor_matrix_10km'].size() == 0
+                            None if fgd['full_predictor_matrix_10km'].size == 0
                             else fgd['full_predictor_matrix_10km']
                         )
                         full_predictor_matrix_20km = (
-                            None if fgd['full_predictor_matrix_20km'].size() == 0
+                            None if fgd['full_predictor_matrix_20km'].size == 0
                             else fgd['full_predictor_matrix_20km']
                         )
                         full_predictor_matrix_40km = (
-                            None if fgd['full_predictor_matrix_40km'].size() == 0
+                            None if fgd['full_predictor_matrix_40km'].size == 0
                             else fgd['full_predictor_matrix_40km']
                         )
                         full_recent_bias_matrix_2pt5km = (
-                            None if fgd['full_recent_bias_matrix_2pt5km'].size() == 0
+                            None if fgd['full_recent_bias_matrix_2pt5km'].size == 0
                             else fgd['full_recent_bias_matrix_2pt5km']
                         )
                         full_recent_bias_matrix_10km = (
-                            None if fgd['full_recent_bias_matrix_10km'].size() == 0
+                            None if fgd['full_recent_bias_matrix_10km'].size == 0
                             else fgd['full_recent_bias_matrix_10km']
                         )
                         full_recent_bias_matrix_20km = (
-                            None if fgd['full_recent_bias_matrix_20km'].size() == 0
+                            None if fgd['full_recent_bias_matrix_20km'].size == 0
                             else fgd['full_recent_bias_matrix_20km']
                         )
                         full_recent_bias_matrix_40km = (
-                            None if fgd['full_recent_bias_matrix_40km'].size() == 0
+                            None if fgd['full_recent_bias_matrix_40km'].size == 0
                             else fgd['full_recent_bias_matrix_40km']
                         )
                         full_predictor_matrix_lagged_targets = (
-                            None if fgd['full_predictor_matrix_lagged_targets'].size() == 0
+                            None if fgd['full_predictor_matrix_lagged_targets'].size == 0
                             else fgd['full_predictor_matrix_lagged_targets']
                         )
                     else:
@@ -2738,8 +2729,12 @@ def data_generator_fast_patches(
                 warnings.warn(warning_string)
 
             if full_target_matrix is None:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2789,8 +2784,12 @@ def data_generator_fast_patches(
                     num_target_lag_times > 0 and
                     full_predictor_matrix_lagged_targets is None
             ):
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2859,8 +2858,12 @@ def data_generator_fast_patches(
                 warnings.warn(warning_string)
 
             if do_residual_prediction and full_baseline_matrix is None:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2910,8 +2913,12 @@ def data_generator_fast_patches(
                 found_all_predictors = False
 
             if not found_any_predictors:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2920,8 +2927,12 @@ def data_generator_fast_patches(
                 continue
 
             if require_all_predictors and not found_all_predictors:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2977,8 +2988,12 @@ def data_generator_fast_patches(
             # TODO(thunderhoser): I don't think this condition needs to be
             # `use_recent_biases and not found_any_predictors`?
             if not found_any_predictors:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -2987,8 +3002,12 @@ def data_generator_fast_patches(
                 continue
 
             if require_all_predictors and not found_all_predictors:
-                for this_var in full_domain_var_names:
-                    locals()[this_var] = None
+                full_target_matrix = full_baseline_matrix = \
+                    full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
+                    full_predictor_matrix_20km = full_predictor_matrix_40km = \
+                    full_recent_bias_matrix_2pt5km = full_recent_bias_matrix_10km = \
+                    full_recent_bias_matrix_20km = full_recent_bias_matrix_40km = \
+                    full_predictor_matrix_lagged_targets = None
 
                 init_time_index, init_times_unix_sec = __increment_init_time(
                     current_index=init_time_index,
@@ -3009,8 +3028,11 @@ def data_generator_fast_patches(
                 )
 
             if not success:
-                in_progress_file_name = '{0:s}_tmp{1:s}'.format(
+                current_nanoseconds = int(numpy.round(time.time_ns()))
+
+                in_progress_file_name = '{0:s}_tmp{1:d}{2:s}'.format(
                     os.path.splitext(full_grid_numpy_file_name)[0],
+                    current_nanoseconds,
                     os.path.splitext(full_grid_numpy_file_name)[1]
                 )
 
@@ -3066,7 +3088,10 @@ def data_generator_fast_patches(
                     )
                 )
 
-                os.rename(in_progress_file_name, full_grid_numpy_file_name)
+                try:
+                    os.rename(in_progress_file_name, full_grid_numpy_file_name)
+                except:
+                    os.remove(in_progress_file_name)
 
             patch_location_dict = misc_utils.determine_patch_locations(
                 patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
@@ -4560,7 +4585,7 @@ def read_model(hdf5_file_name, for_inference):
 
     chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
     if chiu_net_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import chiu_net_architecture
+        import chiu_net_architecture
 
         arch_dict = chiu_net_architecture_dict
 
@@ -4586,7 +4611,7 @@ def read_model(hdf5_file_name, for_inference):
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     if chiu_net_pp_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import \
+        import \
             chiu_net_pp_architecture
 
         arch_dict = chiu_net_pp_architecture_dict
@@ -4615,7 +4640,7 @@ def read_model(hdf5_file_name, for_inference):
         CHIU_NEXT_PP_ARCHITECTURE_KEY
     ]
     if chiu_next_pp_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import \
+        import \
             chiu_next_pp_architecture
 
         arch_dict = chiu_next_pp_architecture_dict
