@@ -2662,6 +2662,10 @@ def data_generator_fast_patches(
             try:
                 if full_target_matrix is None:
                     if success:
+                        print('Reading data from: "{0:s}"...'.format(
+                            full_grid_numpy_file_name
+                        ))
+
                         full_grid_dict = numpy.load(full_grid_numpy_file_name)
                         fgd = full_grid_dict
 
