@@ -116,17 +116,42 @@ PATCH_SIZE_ONE_DIM = 208
 NUM_CONV_BLOCKS_PER_LEVEL = 1
 NUM_NWP_LEAD_TIMES = 5
 
+# Predictors will include 6 NWP models at 2.5-km resolution:
+# - Raw ensemble with 8 variables (MSLP, surface pressure, 2-m temperature,
+#   2-m dewpoint, 10-m u-wind, 10-m v-wind, accumulated precip, 10-m wind gust)
+# - WRF-ARW with 7 variables (all of the above except gust)
+# - NAM Nest with 7 variables (all of the above except gust)
+# - HRRR with 7 variables (all of the above except gust)
+# - Gridded LAMP with 5 variables (temp, dewp, u-wind, v-wind, gust)
+# - GMOS with 5 variables (temp, dewp, u-wind, v-wind, gust)
+#
+# Thus, we have a total of 8 + 7 + 7 + 7 + 5 + 5 = 39 variables from these
+# models.
 INPUT_DIMS_2PT5KM = numpy.array(
     [PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, NUM_NWP_LEAD_TIMES, 39], dtype=int
 )
+
+# Predictors will include two NWP models at 10-km resolution:
+# - NAM with 7 variables (MSLP, surface pressure, 2-m temperature,
+#   2-m dewpoint, 10-m u-wind, 10-m v-wind, accumulated precip)
+# - RAP with the same 7 variables
 INPUT_DIMS_10KM = numpy.array(
     [PATCH_SIZE_ONE_DIM // 4, PATCH_SIZE_ONE_DIM // 4, NUM_NWP_LEAD_TIMES, 14],
     dtype=int
 )
+
+# Predictors will include two NWP models at 20-km resolution:
+# - GFS with 7 variables (MSLP, surface pressure, 2-m temperature,
+#   2-m dewpoint, 10-m u-wind, 10-m v-wind, accumulated precip)
+# - ECMWF with the same 7 variables
 INPUT_DIMS_20KM = numpy.array(
     [PATCH_SIZE_ONE_DIM // 8, PATCH_SIZE_ONE_DIM // 8, NUM_NWP_LEAD_TIMES, 14],
     dtype=int
 )
+
+# Predictors will include one NWP model at 40-km resolution:
+# - GEFS with 7 variables (MSLP, surface pressure, 2-m temperature,
+#   2-m dewpoint, 10-m u-wind, 10-m v-wind, accumulated precip)
 INPUT_DIMS_40KM = numpy.array(
     [PATCH_SIZE_ONE_DIM // 16, PATCH_SIZE_ONE_DIM // 16, NUM_NWP_LEAD_TIMES, 7],
     dtype=int
