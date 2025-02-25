@@ -890,16 +890,19 @@ def _check_generator_args(option_dict):
         option_dict[TARGET_FIELDS_KEY].append(urma_utils.WIND_GUST_10METRE_NAME)
 
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
-    if not option_dict[DO_RESIDUAL_PREDICTION_KEY]:
-        option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY] = False
+    error_checking.assert_is_boolean(
+        option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
+    )
+
+    if not (
+            option_dict[DO_RESIDUAL_PREDICTION_KEY] or
+            option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
+    ):
         option_dict[RESID_BASELINE_MODEL_KEY] = None
         option_dict[RESID_BASELINE_MODEL_DIR_KEY] = None
         option_dict[RESID_BASELINE_LEAD_TIME_KEY] = -1
         return option_dict
 
-    error_checking.assert_is_boolean(
-        option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
-    )
     error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_KEY])
     error_checking.assert_is_string(option_dict[RESID_BASELINE_MODEL_DIR_KEY])
     error_checking.assert_is_integer(option_dict[RESID_BASELINE_LEAD_TIME_KEY])
@@ -2797,8 +2800,12 @@ def data_generator_fast_patches(
                 )
                 continue
 
+            need_baseline = (
+                do_residual_prediction or compare_to_baseline_in_loss
+            )
+
             try:
-                if do_residual_prediction and full_baseline_matrix is None:
+                if need_baseline and full_baseline_matrix is None:
                     full_baseline_matrix = (
                         nwp_input.read_residual_baseline_one_example(
                             init_time_unix_sec=
@@ -2857,7 +2864,7 @@ def data_generator_fast_patches(
 
                 warnings.warn(warning_string)
 
-            if do_residual_prediction and full_baseline_matrix is None:
+            if need_baseline and full_baseline_matrix is None:
                 full_target_matrix = full_baseline_matrix = \
                     full_predictor_matrix_2pt5km = full_predictor_matrix_10km = \
                     full_predictor_matrix_20km = full_predictor_matrix_40km = \
@@ -3666,7 +3673,11 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                     this_predictor_matrix_lagged_targets
                 )
 
-            if do_residual_prediction:
+            need_baseline = (
+                do_residual_prediction or compare_to_baseline_in_loss
+            )
+
+            if need_baseline:
                 this_raw_baseline_matrix = None
 
                 try:
@@ -3734,6 +3745,7 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                         target_matrix[i, ..., num_target_fields:] = (
                             this_raw_baseline_matrix
                         )
+
             try:
                 (
                     this_predictor_matrix_2pt5km,
