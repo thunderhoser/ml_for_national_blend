@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="train_neural_nets"
+#SBATCH --job-name="train_neural_net"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -15,7 +15,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=train_neural_nets_%A.out
+#SBATCH --output=train_neural_net_%A.out
 
 # You need to load the CUDA library before calling train_neural_net.py.  This is used to accelerate the training on GPUs.
 # You also need to submit training jobs to the fge partition, which contains 800 GPUs (100 nodes with 8 GPUs each).
@@ -46,6 +46,9 @@ TARGET_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_pr
 
 # Define the dictionary mapping NWP models to predictor variables.
 NWP_FIELD_NAME_DICT='{"ensemble":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres","wind_gust_10m_agl_m_s01"],"rap":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"gfs":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"gefs":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"hrrr":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"wrf_arw":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"nam_nest":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"nam":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"ecmwf":["pressure_mean_sea_level_pascals","pressure_surface_pascals","temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","accumulated_precip_metres"],"gridded_lamp":["temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","wind_gust_10m_agl_m_s01"],"gridded_gfs_mos":["temperature_2m_agl_kelvins","dewpoint_2m_agl_kelvins","u_wind_10m_agl_m_s01","v_wind_10m_agl_m_s01","wind_gust_10m_agl_m_s01"]}'
+
+# Define where normalization params for NWP data can be found.
+NWP_NORMALIZATION_FILE_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/normalization_params_long300_20170101-20211220.nc"
 
 # Call train_neural_net.py and train the model.
 python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
