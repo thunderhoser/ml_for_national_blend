@@ -141,6 +141,8 @@ def _run(template_file_name, output_dir_name,
 
     if nwp_resid_norm_file_name == '':
         nwp_resid_norm_file_name = None
+    if target_normalization_file_name == '':
+        target_normalization_file_name = None
     if target_resid_norm_file_name == '':
         target_resid_norm_file_name = None
     if resid_baseline_model_name == '':
