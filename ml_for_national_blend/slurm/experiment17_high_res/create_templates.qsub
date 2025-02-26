@@ -28,4 +28,4 @@ echo `which python3`
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 
-python3 -u "${CODE_DIR_NAME}/make_templates_exp16_high_res.py"
+python3 -u "${CODE_DIR_NAME}/make_templates_exp17_high_res.py"
