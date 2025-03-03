@@ -90,6 +90,7 @@ VALIDATION_OPTIONS_KEY = 'validation_option_dict'
 LOSS_FUNCTION_KEY = 'loss_function_string'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 METRIC_FUNCTIONS_KEY = 'metric_function_strings'
+U_NET_ARCHITECTURE_KEY = 'u_net_architecture_dict'
 CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
 CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
 CHIU_NEXT_PP_ARCHITECTURE_KEY = 'chiu_next_pp_architecture_dict'
@@ -103,7 +104,8 @@ METADATA_KEYS = [
     NUM_EPOCHS_KEY, EMA_DECAY_KEY,
     NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, CHIU_NET_ARCHITECTURE_KEY,
+    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY,
+    U_NET_ARCHITECTURE_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
     EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY,
@@ -3907,7 +3909,8 @@ def train_model(
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
         loss_function_string, optimizer_function_string,
-        metric_function_strings, chiu_net_architecture_dict,
+        metric_function_strings,
+        u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
@@ -3941,6 +3944,9 @@ def train_model(
     :param metric_function_strings: 1-D list with names of metrics.  Each string
         should be formatted such that `eval(metric_function_strings[i])` returns
         the actual metric function.
+    :param u_net_architecture_dict: Dictionary with architecture options for
+        `u_net_architecture.create_model`.  If the model being trained is not
+        a U-net, make this None.
     :param chiu_net_architecture_dict: Dictionary with architecture options for
         `chiu_net_architecture.create_model`.  If the model being trained is not
         a Chiu-net, make this None.
@@ -4079,6 +4085,7 @@ def train_model(
         loss_function_string=loss_function_string,
         optimizer_function_string=optimizer_function_string,
         metric_function_strings=metric_function_strings,
+        u_net_architecture_dict=u_net_architecture_dict,
         chiu_net_architecture_dict=chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
         chiu_next_pp_architecture_dict=chiu_next_pp_architecture_dict,
@@ -4440,7 +4447,8 @@ def write_metafile(
         num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
         validation_option_dict, loss_function_string, optimizer_function_string,
-        metric_function_strings, chiu_net_architecture_dict,
+        metric_function_strings,
+        u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
@@ -4457,6 +4465,7 @@ def write_metafile(
     :param loss_function_string: Same.
     :param optimizer_function_string: Same.
     :param metric_function_strings: Same.
+    :param u_net_architecture_dict: Same.
     :param chiu_net_architecture_dict: Same.
     :param chiu_net_pp_architecture_dict: Same.
     :param chiu_next_pp_architecture_dict: Same.
@@ -4477,6 +4486,7 @@ def write_metafile(
         LOSS_FUNCTION_KEY: loss_function_string,
         OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
         METRIC_FUNCTIONS_KEY: metric_function_strings,
+        U_NET_ARCHITECTURE_KEY: u_net_architecture_dict,
         CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
         CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
         CHIU_NEXT_PP_ARCHITECTURE_KEY: chiu_next_pp_architecture_dict,
@@ -4508,6 +4518,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["loss_function_string"]: Same.
     metadata_dict["optimizer_function_string"]: Same.
     metadata_dict["metric_function_strings"]: Same.
+    metadata_dict["u_net_architecture_dict"]: Same.
     metadata_dict["chiu_net_architecture_dict"]: Same.
     metadata_dict["chiu_net_pp_architecture_dict"]: Same.
     metadata_dict["chiu_next_pp_architecture_dict"]: Same.
@@ -4530,6 +4541,8 @@ def read_metafile(pickle_file_name):
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
     if TEMPORARY_PREDICTOR_DIR_KEY not in metadata_dict:
         metadata_dict[TEMPORARY_PREDICTOR_DIR_KEY] = None
+    if U_NET_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[U_NET_ARCHITECTURE_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NEXT_PP_ARCHITECTURE_KEY] = None
     if EMA_DECAY_KEY not in metadata_dict:
@@ -4594,6 +4607,32 @@ def read_model(hdf5_file_name, for_inference):
     )
     metadata_dict = read_metafile(metafile_name)
     print(metadata_dict[LOSS_FUNCTION_KEY])
+
+    u_net_architecture_dict = metadata_dict[U_NET_ARCHITECTURE_KEY]
+    if u_net_architecture_dict is not None:
+        import u_net_architecture
+
+        arch_dict = u_net_architecture_dict
+
+        for this_key in [
+            u_net_architecture.LOSS_FUNCTION_KEY,
+            u_net_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [u_net_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = u_net_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+
+        if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
+            _set_model_weights_to_ema(
+                model_object=model_object, metafile_name=metafile_name
+            )
+
+        return model_object
 
     chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
     if chiu_net_architecture_dict is not None:
