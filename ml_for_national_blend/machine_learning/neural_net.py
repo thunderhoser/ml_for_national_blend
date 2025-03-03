@@ -306,6 +306,11 @@ def __report_data_properties(
         str(these_max)
     ))
 
+    # TODO(thunderhoser): This HACK removes the lead-time axis if there is only
+    # one lead time.  Needed to make my simple U-net architecture work.
+    if predictor_matrix_2pt5km is not None and predictor_matrix_2pt5km.shape[-2] == 1:
+        predictor_matrix_2pt5km = predictor_matrix_2pt5km[..., 0, :]
+
     predictor_matrices = (
         predictor_matrix_2pt5km, nbm_constant_matrix,
         predictor_matrix_lagged_targets, predictor_matrix_10km,
