@@ -576,6 +576,9 @@ def create_model(option_dict):
                     )(skip_layer_by_level[i])
                 )
 
+        if i == 0:
+            break
+
         # Upsample to the next-coarsest resolution.
         this_name = 'upsampling_level{0:d}'.format(i - 1)
         size_arg = (
