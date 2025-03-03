@@ -476,6 +476,8 @@ def create_model(option_dict):
         layer_name=this_name
     )(this_layer_object)
 
+    print(upconv_layer_by_level[i])
+
     if inner_activ_function_alpha is not None:
         this_name = 'upsampling_level{0:d}_activation'.format(num_levels - 1)
         upconv_layer_by_level[i] = architecture_utils.get_activation_layer(
