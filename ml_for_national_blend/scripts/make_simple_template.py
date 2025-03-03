@@ -193,9 +193,8 @@ def _run():
         chiu_net_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY:
             numpy.full(MODEL_DEPTH + 1, 0.),
         chiu_net_pp_arch.NWP_FC_MODULE_NUM_CONV_LAYERS_KEY:
-            numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-        chiu_net_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY:
-            numpy.full(MODEL_DEPTH + 1, 0.),
+            NUM_CONV_BLOCKS_PER_LEVEL,
+        chiu_net_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
         chiu_net_pp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
 
         # The seven arguments below are all dummy arguments, because this NN
@@ -211,9 +210,8 @@ def _run():
         chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY:
             numpy.full(MODEL_DEPTH + 1, 0.),
         chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY:
-            numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-        chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY:
-            numpy.full(MODEL_DEPTH + 1, 0.),
+            NUM_CONV_BLOCKS_PER_LEVEL,
+        chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
         chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
 
         # The seven arguments below are all dummy arguments, because this NN
@@ -229,9 +227,8 @@ def _run():
         chiu_net_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY:
             numpy.full(MODEL_DEPTH + 1, 0.),
         chiu_net_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_LAYERS_KEY:
-            numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-        chiu_net_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY:
-            numpy.full(MODEL_DEPTH + 1, 0.),
+            NUM_CONV_BLOCKS_PER_LEVEL,
+        chiu_net_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
         chiu_net_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
 
         chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
