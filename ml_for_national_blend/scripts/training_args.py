@@ -3,19 +3,19 @@
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
-TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'  # TODO: document and discuss directory
-OUTPUT_DIR_ARG_NAME = 'output_model_dir_name'  # TODO: document
+TEMPLATE_FILE_ARG_NAME = 'input_template_file_name'
+OUTPUT_DIR_ARG_NAME = 'output_model_dir_name'
 
-NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'  # TODO: document
-NWP_MODELS_ARG_NAME = 'nwp_model_names'  # TODO: document
-NWP_MODEL_TO_FIELDS_ARG_NAME = 'nwp_model_to_field_names'  # TODO: document
-NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'  # TODO: document
+NWP_LEAD_TIMES_ARG_NAME = 'nwp_lead_times_hours'
+NWP_MODELS_ARG_NAME = 'nwp_model_names'
+NWP_MODEL_TO_FIELDS_ARG_NAME = 'nwp_model_to_field_names'
+NWP_NORMALIZATION_FILE_ARG_NAME = 'nwp_normalization_file_name'
 NWP_RESID_NORM_FILE_ARG_NAME = 'nwp_resid_norm_file_name'
-NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'  # TODO: document
-BACKUP_NWP_MODEL_ARG_NAME = 'backup_nwp_model_name'  # TODO: document
-BACKUP_NWP_DIR_ARG_NAME = 'backup_nwp_dir_name'  # TODO: document
-TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'  # TODO: document
-TARGET_FIELDS_ARG_NAME = 'target_field_names'  # TODO: document
+NWP_USE_QUANTILE_NORM_ARG_NAME = 'nwp_use_quantile_norm'
+BACKUP_NWP_MODEL_ARG_NAME = 'backup_nwp_model_name'
+BACKUP_NWP_DIR_ARG_NAME = 'backup_nwp_dir_name'
+TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_hours'
+TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_hours'
 TARGET_NORMALIZATION_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGET_RESID_NORM_FILE_ARG_NAME = 'target_resid_norm_file_name'
@@ -24,39 +24,39 @@ RECENT_BIAS_LAG_TIMES_ARG_NAME = 'recent_bias_init_time_lags_hours'
 RECENT_BIAS_LEAD_TIMES_ARG_NAME = 'recent_bias_lead_times_hours'
 NBM_CONSTANT_FIELDS_ARG_NAME = 'nbm_constant_field_names'
 NBM_CONSTANT_FILE_ARG_NAME = 'nbm_constant_file_name'
-COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'  # TODO: document
-BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'  # TODO: document
-SENTINEL_VALUE_ARG_NAME = 'sentinel_value'  # TODO: document
-PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'  # TODO: document
-PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'  # TODO: document
-USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'  # TODO: document
-PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'  # TODO: document
+COMPARE_TO_BASELINE_ARG_NAME = 'compare_to_baseline_in_loss'
+BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
+SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
+PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
+PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'
+USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
+PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 TEMPORARY_PREDICTOR_DIR_ARG_NAME = 'temporary_predictor_dir_name'
 REQUIRE_ALL_PREDICTORS_ARG_NAME = 'require_all_predictors'
 
-DO_RESIDUAL_PREDICTION_ARG_NAME = 'do_residual_prediction'  # TODO: document
-RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'  # TODO: document
-RESID_BASELINE_LEAD_TIME_ARG_NAME = 'resid_baseline_lead_time_hours'  # TODO: document
-RESID_BASELINE_MODEL_DIR_ARG_NAME = 'resid_baseline_model_dir_name'  # TODO: document
+DO_RESIDUAL_PREDICTION_ARG_NAME = 'do_residual_prediction'
+RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'
+RESID_BASELINE_LEAD_TIME_ARG_NAME = 'resid_baseline_lead_time_hours'
+RESID_BASELINE_MODEL_DIR_ARG_NAME = 'resid_baseline_model_dir_name'
 
-FIRST_TRAINING_TIMES_ARG_NAME = 'first_init_time_strings_for_training'  # TODO: document
-LAST_TRAINING_TIMES_ARG_NAME = 'last_init_time_strings_for_training'  # TODO: document
-TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'  # TODO: document
-TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'  # TODO: document
+FIRST_TRAINING_TIMES_ARG_NAME = 'first_init_time_strings_for_training'
+LAST_TRAINING_TIMES_ARG_NAME = 'last_init_time_strings_for_training'
+TRAINING_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_training'
+TRAINING_TARGET_DIR_ARG_NAME = 'target_dir_name_for_training'
 
-FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'  # TODO: document
-LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'  # TODO: document
-VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'  # TODO: document
-VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'  # TODO: document
+FIRST_VALIDATION_TIMES_ARG_NAME = 'first_init_time_strings_for_validation'
+LAST_VALIDATION_TIMES_ARG_NAME = 'last_init_time_strings_for_validation'
+VALIDATION_NWP_DIRS_ARG_NAME = 'nwp_dir_names_for_validation'
+VALIDATION_TARGET_DIR_ARG_NAME = 'target_dir_name_for_validation'
 
-NUM_EPOCHS_ARG_NAME = 'num_epochs'  # TODO: document
+NUM_EPOCHS_ARG_NAME = 'num_epochs'
 EMA_DECAY_ARG_NAME = 'use_exp_moving_average_with_decay'
-NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'  # TODO: document
-NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'  # TODO: document
+NUM_TRAINING_BATCHES_ARG_NAME = 'num_training_batches_per_epoch'
+NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
 
-PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'  # TODO: document
-PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'  # TODO: document
-EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'  # TODO: document
+PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'
+PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'
+EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'
 
 TEMPLATE_FILE_HELP_STRING = (
     'Path to template file, containing model architecture.  This will be read '
