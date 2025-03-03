@@ -476,8 +476,6 @@ def create_model(option_dict):
         layer_name=this_name
     )(this_layer_object)
 
-    print(upconv_layer_by_level[i])
-
     if inner_activ_function_alpha is not None:
         this_name = 'upsampling_level{0:d}_activation'.format(num_levels - 1)
         upconv_layer_by_level[i] = architecture_utils.get_activation_layer(
@@ -593,6 +591,10 @@ def create_model(option_dict):
             this_layer_object = keras.layers.UpSampling2D(
                 size=size_arg, name=this_name
             )(skip_layer_by_level[i])
+
+        print(i)
+        print(this_layer_object)
+        print('\n\n\n')
 
         # This convolutional layer helps recover higher-resolution information
         # that cannot be recovered by the simple `UpSampling2D` layer, which
