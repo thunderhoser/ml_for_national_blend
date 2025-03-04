@@ -925,6 +925,157 @@ def _check_generator_args(option_dict):
     return option_dict
 
 
+def _check_u_net_generator_args(option_dict):
+    """Checks input arguments for generator.
+
+    :param option_dict: See doc for `data_generator_u_net_patches`.
+    :return: option_dict: Same as input, except defaults may have been added.
+    """
+
+    orig_option_dict = option_dict.copy()
+    option_dict = DEFAULT_GENERATOR_OPTION_DICT.copy()
+    option_dict.update(orig_option_dict)
+
+    first_init_time_unix_sec = option_dict['first_init_time_unix_sec']
+    last_init_time_unix_sec = option_dict['last_init_time_unix_sec']
+    error_checking.assert_is_integer(first_init_time_unix_sec)
+    error_checking.assert_is_integer(last_init_time_unix_sec)
+    error_checking.assert_is_greater(
+        last_init_time_unix_sec, first_init_time_unix_sec
+    )
+
+    nwp_lead_time_hours = option_dict['nwp_lead_time_hours']
+    error_checking.assert_is_integer(nwp_lead_time_hours)
+    error_checking.assert_is_greater(nwp_lead_time_hours, 0)
+
+    nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
+    nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+
+    first_nwp_model_names = list(nwp_model_to_dir_name.keys())
+    second_nwp_model_names = list(nwp_model_to_field_names.keys())
+    assert set(first_nwp_model_names) == set(second_nwp_model_names)
+
+    nwp_model_names = second_nwp_model_names
+    nwp_model_names.sort()
+
+    for this_model_name in nwp_model_names:
+        nwp_model_utils.check_model_name(
+            model_name=this_model_name, allow_ensemble=True
+        )
+
+        # All NWP data going into the simple U-net must have 2.5-km resolution.
+        this_ds_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+            this_model_name
+        )
+        error_checking.assert_equals(this_ds_factor, 1)
+
+        error_checking.assert_directory_exists(
+            nwp_model_to_dir_name[this_model_name]
+        )
+
+        error_checking.assert_is_string_list(
+            nwp_model_to_field_names[this_model_name]
+        )
+        for this_field_name in nwp_model_to_field_names[this_model_name]:
+            nwp_model_utils.check_field_name(this_field_name)
+
+    nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+    error_checking.assert_file_exists(nwp_normalization_file_name)
+
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
+
+    nwp_model_utils.check_model_name(
+        model_name=backup_nwp_model_name, allow_ensemble=True
+    )
+    error_checking.assert_directory_exists(backup_nwp_directory_name)
+
+    # All NWP data going into the simple U-net must have 2.5-km resolution.
+    backup_model_ds_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+        backup_nwp_model_name
+    )
+    error_checking.assert_equals(backup_model_ds_factor, 1)
+
+    target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_dir_name = option_dict[TARGET_DIR_KEY]
+
+    error_checking.assert_is_integer(target_lead_time_hours)
+    error_checking.assert_is_greater(target_lead_time_hours, 0)
+    error_checking.assert_directory_exists(target_dir_name)
+    error_checking.assert_is_string_list(target_field_names)
+    for this_field_name in target_field_names:
+        urma_utils.check_field_name(this_field_name)
+
+    compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
+    num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+
+    error_checking.assert_is_boolean(compare_to_baseline_in_loss)
+    error_checking.assert_is_integer(num_examples_per_batch)
+    error_checking.assert_is_geq(num_examples_per_batch, 1)
+    error_checking.assert_is_not_nan(sentinel_value)
+
+    patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+
+    error_checking.assert_is_integer(patch_size_2pt5km_pixels)
+    error_checking.assert_is_greater(patch_size_2pt5km_pixels, 0)
+    error_checking.assert_is_integer(patch_buffer_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_buffer_size_2pt5km_pixels, 0)
+    error_checking.assert_is_less_than(
+        patch_buffer_size_2pt5km_pixels,
+        patch_size_2pt5km_pixels // 2
+    )
+
+    # If predicting dewpoint depression, make this the last target field in the
+    # list.
+    predict_dewpoint_depression = (
+        urma_utils.DEWPOINT_2METRE_NAME in target_field_names
+    )
+    if predict_dewpoint_depression:
+        assert urma_utils.TEMPERATURE_2METRE_NAME in target_field_names
+        target_field_names.remove(urma_utils.DEWPOINT_2METRE_NAME)
+        target_field_names.append(urma_utils.DEWPOINT_2METRE_NAME)
+
+    # If predicting gust excess, make this the last target field in the list.
+    predict_gust_excess = (
+        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
+    )
+    if predict_gust_excess:
+        assert urma_utils.U_WIND_10METRE_NAME in target_field_names
+        assert urma_utils.V_WIND_10METRE_NAME in target_field_names
+        target_field_names.remove(urma_utils.WIND_GUST_10METRE_NAME)
+        target_field_names.append(urma_utils.WIND_GUST_10METRE_NAME)
+
+    option_dict[TARGET_FIELDS_KEY] = target_field_names
+
+    if not compare_to_baseline_in_loss:
+        option_dict[RESID_BASELINE_MODEL_KEY] = None
+        option_dict[RESID_BASELINE_MODEL_DIR_KEY] = None
+        option_dict[RESID_BASELINE_LEAD_TIME_KEY] = -1
+        return option_dict
+
+    resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
+    resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
+    resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    nwp_model_utils.check_model_name(
+        model_name=resid_baseline_model_name, allow_ensemble=True
+    )
+    error_checking.assert_directory_exists(resid_baseline_model_dir_name)
+    error_checking.assert_is_integer(resid_baseline_lead_time_hours)
+    error_checking.assert_is_greater(resid_baseline_lead_time_hours, 0)
+
+    # All NWP data going into the simple U-net must have 2.5-km resolution.
+    resid_baseline_ds_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
+        resid_baseline_model_name
+    )
+    error_checking.assert_equals(resid_baseline_ds_factor, 1)
+
+    return option_dict
+
+
 def _init_matrices_1batch(
         nwp_model_names, nwp_model_to_field_names, num_nwp_lead_times,
         target_field_names, num_target_lag_times, num_recent_bias_times,
@@ -2401,6 +2552,434 @@ def create_data_fast_patches(
         LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
         LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
     }
+
+
+def data_generator_u_net_patches(option_dict, patch_overlap_size_2pt5km_pixels):
+    """Data-generator for patchwise training of simple U-net.
+
+    E = number of examples per batch = "batch size"
+    M = number of rows in NBM grid (2.5-km target grid)
+    N = number of columns in NBM grid (2.5-km target grid)
+    P = number of NWP fields (predictor variables) at 2.5-km resolution
+    F = number of target fields
+
+    :param option_dict: Dictionary with the following keys.
+    option_dict["first_init_time_unix_sec"]: Start of training period, i.e.,
+        first forecast-initialization time.
+    option_dict["last_init_time_unix_sec"]: End of training period, i.e.,
+        last forecast-initialization time.
+    option_dict["nwp_lead_time_hours"]: Lead time of NWP forecasts used as
+        predictors.
+    option_dict["nwp_model_to_dir_name"]: Dictionary, where each key is the name
+        of an NWP model used to create predictors and the corresponding value is
+        the directory path for data from said model.  NWP-model names must be
+        accepted by `nwp_model_utils.check_model_name`, and within each
+        directory, relevant files will be found by
+        `interp_nwp_model_io.find_file`.
+    option_dict["nwp_model_to_field_names"]: Dictionary, where each key is
+        the name of an NWP model used to create predictors and the corresponding
+        value is a 1-D list, containing fields from said model to be used as
+        predictors.  NWP-model names must be accepted by
+        `nwp_model_utils.check_model_name`, and field names must be accepted by
+        `nwp_model_utils.check_field_name`.
+    option_dict["nwp_normalization_file_name"]: Path to file with normalization
+        params for NWP data (readable by
+        `nwp_model_io.read_normalization_file`).
+    option_dict["backup_nwp_model_name"]: Name of backup model, used to fill
+        missing data.
+    option_dict["backup_nwp_directory_name"]: Directory for backup model.  Files
+        therein will be found by `interp_nwp_model_io.find_file`.
+    option_dict["target_lead_time_hours"]: Lead time for target fields.
+    option_dict["target_field_names"]: length-F list with names of target
+        fields.  Each must be accepted by `urma_utils.check_field_name`.
+    option_dict["target_dir_name"]: Path to directory with target fields (i.e.,
+        URMA data).  Files within this directory will be found by
+        `urma_io.find_file` and read by `urma_io.read_file`.
+    option_dict["compare_to_baseline_in_loss"]: Boolean flag.  If True, the loss
+        function involves comparing to the residual baseline.  In other words,
+        the loss function involves a skill score, except with the residual
+        baseline instead of climo.
+    option_dict["num_examples_per_batch"]: Number of data examples per batch,
+        usually just called 'batch size'.
+    option_dict["sentinel_value"]: All NaN will be replaced with this value.
+    option_dict["patch_size_2pt5km_pixels"]: Patch size, in units of 2.5-km
+        pixels.  For example, if patch_size_2pt5km_pixels = 448, then grid
+        dimensions at the finest resolution (2.5 km) are 448 x 448.
+    option_dict["patch_buffer_size_2pt5km_pixels"]: Buffer between the outer
+        domain (used for predictors) and the inner domain (used to penalize
+        predictions in loss function).  This must be a non-negative integer.
+    option_dict["resid_baseline_model_name"]: Name of NWP model used to
+        generate residual baseline fields.  If
+        compare_to_baseline_in_loss == False, make this argument None.
+    option_dict["resid_baseline_lead_time_hours"]: Lead time used to generate
+        residual baseline fields.  If compare_to_baseline_in_loss == False, make
+        this argument None.
+    option_dict["resid_baseline_model_dir_name"]: Directory path for residual
+        baseline fields.  Within this directory, relevant files will be found by
+        `interp_nwp_model_io.find_file`.
+
+    :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
+        measured in number of pixels on the 2.5-km NBM grid.
+    :return: predictor_matrix: E-by-M-by-N-by-P numpy array of predictors, all
+        NWP forecasts at 2.5-km resolution.
+    :return: target_matrix: If `compare_to_baseline_in_loss == False`, this is
+        an E-by-M-by-N-by-(F + 1) numpy array of targets at 2.5-km resolution.
+        The first F channels are actual target values; the last channel is a
+        binary mask, where 1 (0) indicates that the pixel should (not) be
+        considered in the loss function.
+
+    If `compare_to_baseline_in_loss == True`, this is an E-by-M-by-N-by-(2F + 1)
+        numpy array, where target_matrix[:F] contains actual values of the
+        target fields; target_matrix[F:-1] contains baseline-forecast values of
+        the target fields; and target_matrix[..., -1] contains the binary mask.
+    """
+
+    # Read input arguments.
+    option_dict = _check_u_net_generator_args(option_dict)
+    first_init_time_unix_sec = option_dict['first_init_time_unix_sec']
+    last_init_time_unix_sec = option_dict['last_init_time_unix_sec']
+    nwp_lead_time_hours = option_dict['nwp_lead_time_hours']
+    nwp_model_to_dir_name = option_dict[NWP_MODEL_TO_DIR_KEY]
+    nwp_model_to_field_names = option_dict[NWP_MODEL_TO_FIELDS_KEY]
+    nwp_normalization_file_name = option_dict[NWP_NORM_FILE_KEY]
+
+    backup_nwp_model_name = option_dict[BACKUP_NWP_MODEL_KEY]
+    backup_nwp_directory_name = option_dict[BACKUP_NWP_DIR_KEY]
+    target_lead_time_hours = option_dict[TARGET_LEAD_TIME_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_dir_name = option_dict[TARGET_DIR_KEY]
+    compare_to_baseline_in_loss = option_dict[COMPARE_TO_BASELINE_IN_LOSS_KEY]
+    num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    patch_size_2pt5km_pixels = option_dict[PATCH_SIZE_KEY]
+    patch_buffer_size_2pt5km_pixels = option_dict[PATCH_BUFFER_SIZE_KEY]
+    resid_baseline_model_name = option_dict[RESID_BASELINE_MODEL_KEY]
+    resid_baseline_model_dir_name = option_dict[RESID_BASELINE_MODEL_DIR_KEY]
+    resid_baseline_lead_time_hours = option_dict[RESID_BASELINE_LEAD_TIME_KEY]
+
+    error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
+
+    # Create mask for use in loss function.  Recall that, when you do patchwise
+    # training, each patch has an inner domain and outer domain -- and model
+    # predictions should be evaluated only on the inner domain.  This Boolean
+    # mask tells the loss function which pixels are part of the inner domain (1)
+    # and which are part of the outer domain (0).
+    mask_matrix_for_loss = __patch_buffer_to_mask(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_buffer_size_2pt5km_pixels=patch_buffer_size_2pt5km_pixels
+    )
+    mask_matrix_for_loss = numpy.repeat(
+        numpy.expand_dims(mask_matrix_for_loss, axis=0),
+        repeats=num_examples_per_batch,
+        axis=0
+    )
+    mask_matrix_for_loss = numpy.expand_dims(mask_matrix_for_loss, axis=-1)
+
+    # Read normalization file.
+    print('Reading normalization parameters from: "{0:s}"...'.format(
+        nwp_normalization_file_name
+    ))
+    nwp_norm_param_table_xarray = nwp_model_io.read_normalization_file(
+        nwp_normalization_file_name
+    )
+
+    # Find all forecast-initialization times in training period.
+    nwp_model_names = list(nwp_model_to_dir_name.keys())
+    nwp_model_names.sort()
+
+    init_times_unix_sec = _find_relevant_init_times(
+        first_time_by_period_unix_sec=
+        numpy.array([first_init_time_unix_sec], dtype=int),
+        last_time_by_period_unix_sec=
+        numpy.array([last_init_time_unix_sec], dtype=int),
+        nwp_model_names=nwp_model_names
+    )
+
+    # Do some housekeeping before entering the main generator loop.
+    numpy.random.shuffle(init_times_unix_sec)
+    init_time_index = 0
+
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+
+    full_grid_target_matrix = None
+    full_grid_baseline_matrix = None
+    full_grid_predictor_matrix_2pt5km = None
+    num_target_fields = len(target_field_names)
+
+    # Enter the main generator loop, captain.  For every iteration through this
+    # loop, the generator yields one batch of data (see the "yield" statement
+    # at the end).
+    while True:
+
+        # Initialize matrices (numpy arrays) for the current batch.
+        dummy_patch_location_dict = misc_utils.determine_patch_locations(
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels
+        )
+
+        matrix_dict = _init_matrices_1batch(
+            nwp_model_names=nwp_model_names,
+            nwp_model_to_field_names=nwp_model_to_field_names,
+            num_nwp_lead_times=1,
+            target_field_names=target_field_names,
+            num_target_lag_times=0,
+            num_recent_bias_times=0,
+            num_examples_per_batch=num_examples_per_batch,
+            patch_location_dict=dummy_patch_location_dict,
+            do_residual_prediction=False
+        )
+        predictor_matrix_2pt5km = matrix_dict[PREDICTOR_MATRIX_2PT5KM_KEY]
+        target_matrix = matrix_dict[TARGET_MATRIX_KEY]
+
+        if compare_to_baseline_in_loss:
+            new_dims = target_matrix.shape[:-1] + (2 * num_target_fields,)
+            target_matrix = numpy.full(new_dims, numpy.nan)
+
+        num_examples_in_memory = 0
+
+        # As long as `num_examples_in_memory < num_examples_per_batch`, the
+        # current batch needs more data.
+        while num_examples_in_memory < num_examples_per_batch:
+
+            # Update the "patch-metalocation dictionary," which moves the patch
+            # to a new location within the full NBM grid.  This ensures that the
+            # model is trained with patches coming from everywhere in the NBM
+            # grid.
+            patch_metalocation_dict = __update_patch_metalocation_dict(
+                patch_metalocation_dict
+            )
+
+            # If the start row is negative, this means that, for the current
+            # initialization time, the patch has gone to all possible locations
+            # in the NBM grid.  Thus, we need to read predictor data (raw NWP
+            # forecasts) for a new initialization time.
+            if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
+                full_grid_target_matrix = None
+                full_grid_baseline_matrix = None
+                full_grid_predictor_matrix_2pt5km = None
+
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            # If `full_grid_target_matrix is None`, we must read data for a new
+            # forecast-initialization time.
+            try:
+                if full_grid_target_matrix is None:
+                    full_grid_target_matrix = _read_targets_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        target_lead_time_hours=target_lead_time_hours,
+                        target_field_names=target_field_names,
+                        target_dir_name=target_dir_name,
+                        target_norm_param_table_xarray=None,
+                        target_resid_norm_param_table_xarray=None,
+                        use_quantile_norm=False,
+                        patch_location_dict=None
+                    )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read targets for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`_read_targets_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+
+            # If `full_grid_target_matrix is None` still, this means something
+            # went wrong while trying to read data (it happens rarely), so let's
+            # just continue to the next initialization time in the list.
+            if full_grid_target_matrix is None:
+                full_grid_target_matrix = None
+                full_grid_baseline_matrix = None
+                full_grid_predictor_matrix_2pt5km = None
+
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            # If `full_grid_baseline_matrix is None`, we must read data for a
+            # new forecast-initialization time.
+            try:
+                if (
+                        compare_to_baseline_in_loss and
+                        full_grid_baseline_matrix is None
+                ):
+                    full_grid_baseline_matrix = (
+                        nwp_input.read_residual_baseline_one_example(
+                            init_time_unix_sec=
+                            init_times_unix_sec[init_time_index],
+                            nwp_model_name=resid_baseline_model_name,
+                            nwp_lead_time_hours=
+                            resid_baseline_lead_time_hours,
+                            nwp_directory_name=
+                            resid_baseline_model_dir_name,
+                            target_field_names=target_field_names,
+                            patch_location_dict=None,
+                            predict_dewpoint_depression=False,
+                            predict_gust_excess=False
+                        )
+                    )
+
+                    full_grid_target_matrix = numpy.concatenate(
+                        [full_grid_target_matrix, full_grid_baseline_matrix],
+                        axis=-1
+                    )
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read residual baseline for '
+                    'init time {0:s}.  Something went wrong in '
+                    '`nwp_input.read_residual_baseline_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+
+            # If `full_grid_baseline_matrix is None` still, this means something
+            # went wrong while trying to read data (it happens rarely), so let's
+            # just continue to the next initialization time in the list.
+            if (
+                    compare_to_baseline_in_loss and
+                    full_grid_baseline_matrix is None
+            ):
+                full_grid_target_matrix = None
+                full_grid_baseline_matrix = None
+                full_grid_predictor_matrix_2pt5km = None
+
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            # If `full_grid_predictor_matrix_2pt5km is None`, we must read data
+            # for a new forecast-initialization time.
+            try:
+                if full_grid_predictor_matrix_2pt5km is None:
+                    (
+                        full_grid_predictor_matrix_2pt5km,
+                        _, _, _,
+                        found_any_predictors,
+                        _
+                    ) = nwp_input.read_predictors_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        nwp_model_names=nwp_model_names,
+                        nwp_lead_times_hours=
+                        numpy.array([nwp_lead_time_hours], dtype=int),
+                        nwp_model_to_field_names=nwp_model_to_field_names,
+                        nwp_model_to_dir_name=nwp_model_to_dir_name,
+                        nwp_norm_param_table_xarray=nwp_norm_param_table_xarray,
+                        nwp_resid_norm_param_table_xarray=None,
+                        use_quantile_norm=True,
+                        backup_nwp_model_name=backup_nwp_model_name,
+                        backup_nwp_directory_name=backup_nwp_directory_name,
+                        patch_location_dict=None
+                    )
+                else:
+                    found_any_predictors = True
+            except:
+                warning_string = (
+                    'POTENTIAL ERROR: Could not read predictors for init time '
+                    '{0:s}.  Something went wrong in '
+                    '`nwp_input.read_predictors_one_example`.'
+                ).format(
+                    time_conversion.unix_sec_to_string(
+                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+                    )
+                )
+
+                warnings.warn(warning_string)
+                found_any_predictors = False
+
+            # If no predictors were found, this means something went wrong while
+            # trying to read data (it happens rarely), so let's just continue to
+            # the next initialization time in the list.
+            if not found_any_predictors:
+                full_grid_target_matrix = None
+                full_grid_baseline_matrix = None
+                full_grid_predictor_matrix_2pt5km = None
+
+                init_time_index, init_times_unix_sec = __increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+                continue
+
+            # If we have gotten this far through the inner loop, we have data on
+            # the full NBM grid!  Now we just need to extract a patch.
+            patch_location_dict = misc_utils.determine_patch_locations(
+                patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+                start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
+                start_column_2pt5km=
+                patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+            )
+            pld = patch_location_dict
+
+            j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+            i = num_examples_in_memory + 0
+
+            target_matrix[i, ...] = (
+                full_grid_target_matrix[j_start:j_end, k_start:k_end, ...]
+            )
+
+            # For earlier URMA data (~2017), there are sometimes NaN values
+            # along the edge of the full NBM grid.  I think this is because
+            # earlier URMA data just had a smaller domain.  In any case, if we
+            # got a patch with NaN's, this means some of the patch has no
+            # correct answers for training, so we just continue to the next
+            # patch location.
+            if numpy.any(numpy.isnan(
+                    target_matrix[i, ..., :num_target_fields]
+            )):
+                continue
+
+            predictor_matrix_2pt5km[i, ...] = (
+                full_grid_predictor_matrix_2pt5km[j_start:j_end, k_start:k_end, ...]
+            )
+
+            num_examples_in_memory += 1
+
+        # Add the Boolean mask to the target matrix (as the last channel).
+        target_matrix = numpy.concatenate(
+            [target_matrix, mask_matrix_for_loss], axis=-1
+        )
+
+        # Report data properties.
+        predictor_matrices = __report_data_properties(
+            predictor_matrix_2pt5km=predictor_matrix_2pt5km,
+            nbm_constant_matrix=None,
+            predictor_matrix_lagged_targets=None,
+            predictor_matrix_10km=None,
+            predictor_matrix_20km=None,
+            predictor_matrix_40km=None,
+            recent_bias_matrix_2pt5km=None,
+            recent_bias_matrix_10km=None,
+            recent_bias_matrix_20km=None,
+            recent_bias_matrix_40km=None,
+            predictor_matrix_resid_baseline=None,
+            target_matrix=target_matrix,
+            sentinel_value=sentinel_value,
+            return_predictors_as_dict=False
+        )
+
+        # Yield the current batch of data.
+        yield predictor_matrices[0], target_matrix
 
 
 def data_generator_fast_patches(
@@ -3909,6 +4488,156 @@ def data_generator(option_dict, return_predictors_as_dict=False):
         yield predictor_matrices, target_matrix
 
 
+def train_u_net(
+        model_object, num_epochs,
+        num_training_batches_per_epoch, training_option_dict,
+        num_validation_batches_per_epoch, validation_option_dict,
+        loss_function_string, optimizer_function_string,
+        metric_function_strings, u_net_architecture_dict,
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs, patch_overlap_size_2pt5km_pixels,
+        output_dir_name):
+    """Trains simple U-net.
+
+    :param model_object: See documentation for `train_model`.
+    :param num_epochs: Same.
+    :param num_training_batches_per_epoch: Same.
+    :param training_option_dict: Same.
+    :param num_validation_batches_per_epoch: Same.
+    :param validation_option_dict: Same.
+    :param loss_function_string: Same.
+    :param optimizer_function_string: Same.
+    :param metric_function_strings: Same.
+    :param u_net_architecture_dict: Same.
+    :param plateau_patience_epochs: Same.
+    :param plateau_learning_rate_multiplier: Same.
+    :param early_stopping_patience_epochs: Same.
+    :param patch_overlap_size_2pt5km_pixels: Same.
+    :param output_dir_name: Same.
+    """
+
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
+
+    backup_dir_name = '{0:s}/backup_and_restore'.format(output_dir_name)
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=backup_dir_name
+    )
+
+    error_checking.assert_is_integer(num_epochs)
+    error_checking.assert_is_geq(num_epochs, 2)
+    error_checking.assert_is_integer(num_training_batches_per_epoch)
+    error_checking.assert_is_geq(num_training_batches_per_epoch, 2)
+    error_checking.assert_is_integer(num_validation_batches_per_epoch)
+    error_checking.assert_is_geq(num_validation_batches_per_epoch, 2)
+    error_checking.assert_is_integer(plateau_patience_epochs)
+    error_checking.assert_is_geq(plateau_patience_epochs, 2)
+    error_checking.assert_is_greater(plateau_learning_rate_multiplier, 0.)
+    error_checking.assert_is_less_than(plateau_learning_rate_multiplier, 1.)
+    error_checking.assert_is_integer(early_stopping_patience_epochs)
+    error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
+
+    validation_keys_to_keep = [
+        'first_init_time_unix_sec', 'last_init_time_unix_sec'
+    ]
+    for this_key in list(training_option_dict.keys()):
+        if this_key in validation_keys_to_keep:
+            continue
+
+        validation_option_dict[this_key] = training_option_dict[this_key]
+
+    training_option_dict = _check_u_net_generator_args(training_option_dict)
+    validation_option_dict = _check_u_net_generator_args(validation_option_dict)
+
+    model_file_name = '{0:s}/model.weights.h5'.format(output_dir_name)
+    history_file_name = '{0:s}/history.csv'.format(output_dir_name)
+
+    try:
+        history_table_pandas = pandas.read_csv(history_file_name)
+        initial_epoch = history_table_pandas['epoch'].max() + 1
+        best_validation_loss = history_table_pandas['val_loss'].min()
+    except:
+        initial_epoch = 0
+        best_validation_loss = numpy.inf
+
+    history_object = keras.callbacks.CSVLogger(
+        filename=history_file_name, separator=',', append=True
+    )
+    checkpoint_object = keras.callbacks.ModelCheckpoint(
+        filepath=model_file_name, monitor='val_loss', verbose=1,
+        save_best_only=True, save_weights_only=True, mode='min',
+        save_freq='epoch'
+    )
+    checkpoint_object.best = best_validation_loss
+
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=0.,
+        patience=early_stopping_patience_epochs, verbose=1, mode='min'
+    )
+    plateau_object = keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=plateau_learning_rate_multiplier,
+        patience=plateau_patience_epochs, verbose=1, mode='min',
+        min_delta=0., cooldown=0
+    )
+    backup_object = keras.callbacks.BackupAndRestore(
+        backup_dir_name, save_freq='epoch', delete_checkpoint=False
+    )
+
+    list_of_callback_objects = [
+        history_object, checkpoint_object,
+        early_stopping_object, plateau_object,
+        backup_object
+    ]
+
+    training_generator = data_generator_u_net_patches(
+        option_dict=training_option_dict,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+    validation_generator = data_generator_u_net_patches(
+        option_dict=validation_option_dict,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+
+    metafile_name = find_metafile(
+        model_file_name=model_file_name, raise_error_if_missing=False
+    )
+    print('Writing metadata to: "{0:s}"...'.format(metafile_name))
+
+    write_metafile(
+        pickle_file_name=metafile_name,
+        num_epochs=num_epochs,
+        use_exp_moving_average_with_decay=False,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        training_option_dict=training_option_dict,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+        validation_option_dict=validation_option_dict,
+        loss_function_string=loss_function_string,
+        optimizer_function_string=optimizer_function_string,
+        metric_function_strings=metric_function_strings,
+        u_net_architecture_dict=u_net_architecture_dict,
+        chiu_net_architecture_dict=None,
+        chiu_net_pp_architecture_dict=None,
+        chiu_next_pp_architecture_dict=None,
+        plateau_patience_epochs=plateau_patience_epochs,
+        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs=early_stopping_patience_epochs,
+        patch_overlap_fast_gen_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+        temporary_predictor_dir_name=None
+    )
+
+    model_object.fit(
+        x=training_generator,
+        steps_per_epoch=num_training_batches_per_epoch,
+        epochs=num_epochs,
+        initial_epoch=initial_epoch,
+        verbose=1,
+        callbacks=list_of_callback_objects,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch
+    )
+
+
 def train_model(
         model_object, num_epochs, use_exp_moving_average_with_decay,
         num_training_batches_per_epoch, training_option_dict,
@@ -4620,8 +5349,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = u_net_architecture_dict
 
         for this_key in [
-            u_net_architecture.LOSS_FUNCTION_KEY,
-            u_net_architecture.OPTIMIZER_FUNCTION_KEY
+                u_net_architecture.LOSS_FUNCTION_KEY,
+                u_net_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
