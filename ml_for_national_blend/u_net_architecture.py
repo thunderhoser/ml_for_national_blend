@@ -595,10 +595,6 @@ def create_model(option_dict):
                 size=size_arg, name=this_name
             )(skip_layer_by_level[i])
 
-        print(i)
-        print(this_layer_object)
-        print('\n\n\n')
-
         # This convolutional layer helps recover higher-resolution information
         # that cannot be recovered by the simple `UpSampling2D` layer, which
         # just does interpolation.  The skip connection and post-skip-connection
