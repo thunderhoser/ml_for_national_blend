@@ -431,6 +431,9 @@ def _create_ensemble_file_1init_1valid(
         ensemble_data_matrix_2pt5km = numpy.nanmean(
             ensemble_data_matrix_2pt5km, axis=-1, keepdims=True
         )
+        ensemble_data_matrix_2pt5km = numpy.expand_dims(
+            ensemble_data_matrix_2pt5km, axis=0
+        )
 
     num_rows = ensemble_data_matrix_2pt5km.shape[0]
     num_columns = ensemble_data_matrix_2pt5km.shape[1]
