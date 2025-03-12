@@ -462,6 +462,10 @@ def _create_ensemble_file_1init_1valid(
         nbm_utils.read_coords()
     )
 
+    print(nbm_latitude_matrix_deg_n.shape)
+    print(nbm_longitude_matrix_deg_e.shape)
+    print(ensemble_data_matrix_2pt5km.shape)
+
     main_data_dict = {
         nwp_model_utils.LATITUDE_KEY: (
             these_dims_2d, nbm_latitude_matrix_deg_n
