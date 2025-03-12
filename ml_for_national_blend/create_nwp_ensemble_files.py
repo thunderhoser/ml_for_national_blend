@@ -431,12 +431,10 @@ def _create_ensemble_file_1init_1valid(
         ensemble_data_matrix_2pt5km = numpy.nanmean(
             ensemble_data_matrix_2pt5km, axis=-1, keepdims=True
         )
-        ensemble_data_matrix_2pt5km = numpy.expand_dims(
-            ensemble_data_matrix_2pt5km, axis=0
-        )
 
     num_rows = ensemble_data_matrix_2pt5km.shape[0]
     num_columns = ensemble_data_matrix_2pt5km.shape[1]
+    ensemble_size = ensemble_data_matrix_2pt5km.shape[-1]
 
     coord_dict = {
         nwp_model_utils.ROW_DIM: numpy.linspace(
@@ -450,7 +448,7 @@ def _create_ensemble_file_1init_1valid(
         ),
         nwp_model_utils.FIELD_DIM: all_field_names,
         interp_nwp_model_io.ENSEMBLE_MEMBER_DIM: numpy.linspace(
-            0, num_models - 1, num=num_models, dtype=int
+            0, ensemble_size - 1, num=ensemble_size, dtype=int
         )
     }
 
