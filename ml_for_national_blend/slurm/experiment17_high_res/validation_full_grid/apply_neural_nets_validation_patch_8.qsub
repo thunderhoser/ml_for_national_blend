@@ -1,0 +1,77 @@
+#!/bin/bash
+
+#SBATCH --job-name="apply_neural_nets_validation_patch"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=36:00:00
+#SBATCH --array=8
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_neural_nets_validation_patch_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment17_high_res"
+TARGET_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+
+MODEL_NAME_SETS_ONE_STRING=("ensemble_hrrr_wrf-arw" "ensemble_hrrr_nam-nest" "ensemble_hrrr_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest" "ensemble_wrf-arw_gridded-gfs-mos" "ensemble_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest" "hrrr_wrf-arw_gridded-gfs-mos" "hrrr_nam-nest_gridded-gfs-mos" "wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest" "ensemble_hrrr_wrf-arw_gridded-gfs-mos" "ensemble_hrrr_nam-nest_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest_gridded-gfs-mos")
+model_names_one_string=${MODEL_NAME_SETS_ONE_STRING[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/nwp-inputs=${model_names_one_string}"
+echo $model_dir_name
+
+model_names_one_string=$(echo "$model_names_one_string" | sed -E 's/_/ /g; s/-/_/g')
+read -a model_names <<< "$model_names_one_string"
+
+nwp_directory_names_one_string=""
+
+for this_model_name in "${model_names[@]}"; do
+    if [[ "$this_model_name" == "ensemble" ]]; then
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid"
+    elif [[ "$this_model_name" == "hrrr" ]]; then
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid"
+    elif [[ "$this_model_name" == "wrf_arw" ]]; then
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Allison.Layne/preprocessed_data/wrf_arw/processed/interp_to_nbm_grid"
+    elif [[ "$this_model_name" == "nam_nest" ]]; then
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid"
+    elif [[ "$this_model_name" == "gridded_gfs_mos" ]]; then
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/gridded_gfs_mos/processed/interp_to_nbm_grid"
+    fi
+done
+
+echo ${nwp_directory_names_one_string}
+
+INIT_DATE_STRINGS=("2022-03-22-18" "2022-03-27-18" "2022-04-01-18" "2022-04-06-18" "2022-04-11-18" "2022-04-16-18" "2022-04-21-18" "2022-04-26-18" "2022-05-01-18" "2022-05-06-18" "2022-05-11-18" "2022-05-16-18" "2022-05-21-18" "2022-05-26-18" "2022-05-31-18" "2022-06-05-18" "2022-06-10-18" "2022-06-15-18" "2022-06-20-18" "2022-06-25-18" "2022-06-30-18" "2022-07-05-18" "2022-07-10-18" "2022-07-15-18" "2022-07-20-18" "2022-07-25-18" "2022-07-30-18" "2022-08-04-18" "2022-08-09-18" "2022-08-14-18" "2022-08-19-18" "2022-08-24-18" "2022-08-29-18" "2022-09-03-18" "2022-09-08-18" "2022-09-13-18" "2022-09-18-18" "2022-09-23-18" "2022-09-28-18" "2022-10-03-18" "2022-10-08-18" "2022-10-13-18" "2022-10-18-18" "2022-10-23-18" "2022-10-28-18" "2022-11-01-18" "2022-11-06-18" "2022-11-11-18" "2022-11-16-18" "2022-11-21-18" "2022-11-26-18" "2022-12-01-18" "2022-12-06-18" "2022-12-11-18" "2022-12-16-18" "2022-12-21-18" "2022-12-26-18" "2022-12-31-18")
+
+for this_init_date_string in "${INIT_DATE_STRINGS[@]}"; do
+    python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+    --input_model_file_name="${model_dir_name}/model.weights.h5" \
+    --init_time_string="${this_init_date_string}" \
+    --nwp_model_names ${model_names_one_string} \
+    --input_nwp_directory_names ${nwp_directory_names_one_string} \
+    --input_target_dir_name="${TARGET_DIR_NAME}" \
+    --patches_to_full_grid=1 \
+    --use_ema=0 \
+    --save_ensemble_mean_only=1 \
+    --patch_overlap_size_2pt5km_pixels=64 \
+    --output_dir_name="${model_dir_name}/validation_full_grid"
+done
