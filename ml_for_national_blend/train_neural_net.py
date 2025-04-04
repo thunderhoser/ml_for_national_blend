@@ -273,6 +273,7 @@ def _run(template_file_name, output_dir_name,
         loss_function_string=mmd[neural_net.LOSS_FUNCTION_KEY],
         optimizer_function_string=mmd[neural_net.OPTIMIZER_FUNCTION_KEY],
         metric_function_strings=mmd[neural_net.METRIC_FUNCTIONS_KEY],
+        u_net_architecture_dict=mmd[neural_net.U_NET_ARCHITECTURE_KEY],
         chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
         chiu_net_pp_architecture_dict=
         mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
