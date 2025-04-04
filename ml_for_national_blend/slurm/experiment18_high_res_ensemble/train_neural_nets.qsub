@@ -58,7 +58,7 @@ nwp_directory_names_one_string=""
 
 for this_model_name in "${model_names[@]}"; do
     if [[ "$this_model_name" == "ensemble" ]]; then
-        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid"
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid"
     elif [[ "$this_model_name" == "hrrr" ]]; then
         nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid"
     elif [[ "$this_model_name" == "wrf_arw" ]]; then
