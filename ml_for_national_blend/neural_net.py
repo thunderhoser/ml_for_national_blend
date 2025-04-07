@@ -3395,65 +3395,112 @@ def data_generator_fast_patches(
                 do_residual_prediction or compare_to_baseline_in_loss
             )
 
-            try:
-                if need_baseline and full_baseline_matrix is None:
-                    full_baseline_matrix = (
-                        nwp_input.read_residual_baseline_one_example(
-                            init_time_unix_sec=
-                            init_times_unix_sec[init_time_index],
-                            nwp_model_name=resid_baseline_model_name,
-                            nwp_lead_time_hours=resid_baseline_lead_time_hours,
-                            nwp_directory_name=resid_baseline_model_dir_name,
-                            target_field_names=target_field_names,
-                            patch_location_dict=None,
-                            predict_dewpoint_depression=True,
-                            predict_gust_excess=True
-                        )
-                    )
-
-                    if compare_to_baseline_in_loss:
-                        tfn = target_field_names
-                        if (
-                                urma_utils.DEWPOINT_2METRE_NAME in tfn
-                                or urma_utils.WIND_GUST_10METRE_NAME in tfn
-                        ):
-                            raw_baseline_matrix = (
-                                nwp_input.read_residual_baseline_one_example(
-                                    init_time_unix_sec=
-                                    init_times_unix_sec[init_time_index],
-                                    nwp_model_name=resid_baseline_model_name,
-                                    nwp_lead_time_hours=
-                                    resid_baseline_lead_time_hours,
-                                    nwp_directory_name=
-                                    resid_baseline_model_dir_name,
-                                    target_field_names=target_field_names,
-                                    patch_location_dict=None,
-                                    predict_dewpoint_depression=False,
-                                    predict_gust_excess=False
-                                )
-                            )
-
-                            full_target_matrix = numpy.concatenate(
-                                [full_target_matrix, raw_baseline_matrix],
-                                axis=-1
-                            )
-                        else:
-                            full_target_matrix = numpy.concatenate(
-                                [full_target_matrix, full_baseline_matrix],
-                                axis=-1
-                            )
-            except:
-                warning_string = (
-                    'POTENTIAL ERROR: Could not read residual baseline for '
-                    'init time {0:s}.  Something went wrong in '
-                    '`nwp_input.read_residual_baseline_one_example`.'
-                ).format(
-                    time_conversion.unix_sec_to_string(
-                        init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+            if need_baseline and full_baseline_matrix is None:
+                full_baseline_matrix = (
+                    nwp_input.read_residual_baseline_one_example(
+                        init_time_unix_sec=
+                        init_times_unix_sec[init_time_index],
+                        nwp_model_name=resid_baseline_model_name,
+                        nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                        nwp_directory_name=resid_baseline_model_dir_name,
+                        target_field_names=target_field_names,
+                        patch_location_dict=None,
+                        predict_dewpoint_depression=True,
+                        predict_gust_excess=True
                     )
                 )
 
-                warnings.warn(warning_string)
+                if compare_to_baseline_in_loss:
+                    tfn = target_field_names
+                    if (
+                            urma_utils.DEWPOINT_2METRE_NAME in tfn
+                            or urma_utils.WIND_GUST_10METRE_NAME in tfn
+                    ):
+                        raw_baseline_matrix = (
+                            nwp_input.read_residual_baseline_one_example(
+                                init_time_unix_sec=
+                                init_times_unix_sec[init_time_index],
+                                nwp_model_name=resid_baseline_model_name,
+                                nwp_lead_time_hours=
+                                resid_baseline_lead_time_hours,
+                                nwp_directory_name=
+                                resid_baseline_model_dir_name,
+                                target_field_names=target_field_names,
+                                patch_location_dict=None,
+                                predict_dewpoint_depression=False,
+                                predict_gust_excess=False
+                            )
+                        )
+
+                        full_target_matrix = numpy.concatenate(
+                            [full_target_matrix, raw_baseline_matrix],
+                            axis=-1
+                        )
+                    else:
+                        full_target_matrix = numpy.concatenate(
+                            [full_target_matrix, full_baseline_matrix],
+                            axis=-1
+                        )
+
+            # try:
+            #     if need_baseline and full_baseline_matrix is None:
+            #         full_baseline_matrix = (
+            #             nwp_input.read_residual_baseline_one_example(
+            #                 init_time_unix_sec=
+            #                 init_times_unix_sec[init_time_index],
+            #                 nwp_model_name=resid_baseline_model_name,
+            #                 nwp_lead_time_hours=resid_baseline_lead_time_hours,
+            #                 nwp_directory_name=resid_baseline_model_dir_name,
+            #                 target_field_names=target_field_names,
+            #                 patch_location_dict=None,
+            #                 predict_dewpoint_depression=True,
+            #                 predict_gust_excess=True
+            #             )
+            #         )
+            #
+            #         if compare_to_baseline_in_loss:
+            #             tfn = target_field_names
+            #             if (
+            #                     urma_utils.DEWPOINT_2METRE_NAME in tfn
+            #                     or urma_utils.WIND_GUST_10METRE_NAME in tfn
+            #             ):
+            #                 raw_baseline_matrix = (
+            #                     nwp_input.read_residual_baseline_one_example(
+            #                         init_time_unix_sec=
+            #                         init_times_unix_sec[init_time_index],
+            #                         nwp_model_name=resid_baseline_model_name,
+            #                         nwp_lead_time_hours=
+            #                         resid_baseline_lead_time_hours,
+            #                         nwp_directory_name=
+            #                         resid_baseline_model_dir_name,
+            #                         target_field_names=target_field_names,
+            #                         patch_location_dict=None,
+            #                         predict_dewpoint_depression=False,
+            #                         predict_gust_excess=False
+            #                     )
+            #                 )
+            #
+            #                 full_target_matrix = numpy.concatenate(
+            #                     [full_target_matrix, raw_baseline_matrix],
+            #                     axis=-1
+            #                 )
+            #             else:
+            #                 full_target_matrix = numpy.concatenate(
+            #                     [full_target_matrix, full_baseline_matrix],
+            #                     axis=-1
+            #                 )
+            # except:
+            #     warning_string = (
+            #         'POTENTIAL ERROR: Could not read residual baseline for '
+            #         'init time {0:s}.  Something went wrong in '
+            #         '`nwp_input.read_residual_baseline_one_example`.'
+            #     ).format(
+            #         time_conversion.unix_sec_to_string(
+            #             init_times_unix_sec[init_time_index], '%Y-%m-%d-%H'
+            #         )
+            #     )
+            #
+            #     warnings.warn(warning_string)
 
             if need_baseline and full_baseline_matrix is None:
                 full_target_matrix = full_baseline_matrix = \
