@@ -3758,9 +3758,14 @@ def data_generator_fast_patches(
 
             # TODO(thunderhoser): This can happen along edges of grid for
             # earlier URMA data.
-            if numpy.any(numpy.isnan(
-                    target_matrix[i, ..., :num_target_fields]
-            )):
+            # if numpy.any(numpy.isnan(
+            #         target_matrix[i, ..., :num_target_fields]
+            # )):
+            #     continue
+
+            # TODO(thunderhoser): This can also happen along edges of grid for
+            # residual baseline, if residual baseline is high-res ensemble.
+            if numpy.any(numpy.isnan(target_matrix[i, ...])):
                 continue
 
             if do_residual_prediction:
