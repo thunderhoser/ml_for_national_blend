@@ -62,7 +62,7 @@ for this_model_name in "${model_names[@]}"; do
     elif [[ "$this_model_name" == "hrrr" ]]; then
         nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/hrrr/processed/interp_to_nbm_grid"
     elif [[ "$this_model_name" == "wrf_arw" ]]; then
-        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Allison.Layne/preprocessed_data/wrf_arw/processed/interp_to_nbm_grid"
+        nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/wrf_arw/processed/interp_to_nbm_grid"
     elif [[ "$this_model_name" == "nam_nest" ]]; then
         nwp_directory_names_one_string="${nwp_directory_names_one_string} /scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed/interp_to_nbm_grid"
     elif [[ "$this_model_name" == "gridded_gfs_mos" ]]; then
@@ -86,7 +86,7 @@ while true; do
     --nwp_resid_norm_file_name="${NWP_RESID_NORM_FILE_NAME}" \
     --nwp_use_quantile_norm=1 \
     --backup_nwp_model_name="ensemble" \
-    --backup_nwp_dir_name="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble_all_vars/processed/interp_to_nbm_grid" \
+    --backup_nwp_dir_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid" \
     --target_lead_time_hours=36 \
     --target_field_names "temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01" \
     --target_lag_times_hours ${urma_lag_times_hours} \
@@ -106,7 +106,7 @@ while true; do
     --do_residual_prediction=1 \
     --resid_baseline_model_name="ensemble" \
     --resid_baseline_lead_time_hours=36 \
-    --resid_baseline_model_dir_name="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid" \
+    --resid_baseline_model_dir_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid" \
     --first_init_time_strings_for_training "2017-01-01-00" \
     --last_init_time_strings_for_training "2021-12-20-18" \
     --nwp_dir_names_for_training ${nwp_directory_names_one_string} \
