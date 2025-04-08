@@ -30,6 +30,8 @@ SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
 PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'
+PATCH_START_ROW_ARG_NAME = 'patch_start_row_2pt5km'
+PATCH_START_COLUMN_ARG_NAME = 'patch_start_column_2pt5km'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 
 RESID_BASELINE_MODEL_ARG_NAME = 'resid_baseline_model_name'
@@ -117,6 +119,17 @@ PATCH_BUFFER_SIZE_HELP_STRING = (
     'Buffer between the outer domain (used for predictors) and the inner '
     'domain (used to penalize predictions in loss function).  This must be a '
     'non-negative integer.'
+)
+PATCH_START_ROW_HELP_STRING = (
+    '[used only if {0:s} is positive] Indicates start row for training patch.  '
+    'For example, if {1:s} == k, the patch will always start at the [k]th row '
+    'on the 2.5-km grid.  If you want each patch to be at a different '
+    'location, leave this alone.'
+).format(
+    PATCH_SIZE_ARG_NAME, PATCH_START_ROW_ARG_NAME
+)
+PATCH_START_COLUMN_HELP_STRING = 'Same as {0:s} but for columns.'.format(
+    PATCH_START_ROW_ARG_NAME
 )
 PATCH_OVERLAP_SIZE_HELP_STRING = (
     'Overlap between adjacent patches, measured in number of pixels on the '
@@ -255,6 +268,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + PATCH_BUFFER_SIZE_ARG_NAME, type=int, required=True,
         help=PATCH_BUFFER_SIZE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_START_ROW_ARG_NAME, type=int, required=False, default=-1,
+        help=PATCH_START_ROW_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_START_COLUMN_ARG_NAME, type=int, required=False,
+        default=-1, help=PATCH_START_COLUMN_HELP_STRING
     )
     parser_object.add_argument(
         '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=int, required=True,

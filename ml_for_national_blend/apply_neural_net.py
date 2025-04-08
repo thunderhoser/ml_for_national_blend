@@ -55,7 +55,7 @@ TARGET_DIR_HELP_STRING = (
     'will be found by `urma_io.find_file` and read by `urma_io.read_file`.'
 )
 PATCHES_TO_FULL_GRID_HELP_STRING = (
-    '[used only if NN was trained with patchwise approach] Boolean flag.  If '
+    '[used only if NN was trained with multiple patches] Boolean flag.  If '
     '1, will slide patch around the full grid to generate predictions on the '
     'full grid.  If 0, will generate predictions for patches of the same size '
     'used to train.'
@@ -209,8 +209,10 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     mmd = model_metadata_dict
 
     validation_option_dict = mmd[neural_net.VALIDATION_OPTIONS_KEY]
-    was_nn_trained_patchwise = (
+    was_nn_trained_on_multi_patches = (
         validation_option_dict[neural_net.PATCH_SIZE_KEY] is not None
+        and validation_option_dict[neural_net.PATCH_START_ROW_KEY] is None
+        and validation_option_dict[neural_net.PATCH_START_COLUMN_KEY] is None
     )
     nwp_model_names_for_training = list(
         validation_option_dict[neural_net.NWP_MODEL_TO_DIR_KEY].keys()
@@ -229,7 +231,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         init_time_string, TIME_FORMAT
     )
 
-    if not was_nn_trained_patchwise:
+    if not was_nn_trained_on_multi_patches:
         patches_to_full_grid = False
 
     if patches_to_full_grid:

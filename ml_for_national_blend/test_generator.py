@@ -94,6 +94,7 @@ def _run(output_dir_name, nwp_lead_times_hours,
          nbm_constant_field_names, nbm_constant_file_name,
          num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
+         patch_start_row_2pt5km, patch_start_column_2pt5km,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          require_all_predictors,
          do_residual_prediction, resid_baseline_model_name,
@@ -126,6 +127,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
     :param patch_buffer_size_2pt5km_pixels: Same.
+    :param patch_start_row_2pt5km: Same.
+    :param patch_start_column_2pt5km: Same.
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param require_all_predictors: Same.
@@ -158,6 +161,10 @@ def _run(output_dir_name, nwp_lead_times_hours,
         patch_overlap_size_2pt5km_pixels = None
     if patch_size_2pt5km_pixels < 0:
         patch_size_2pt5km_pixels = None
+    if patch_start_row_2pt5km < 0:
+        patch_start_row_2pt5km = None
+    if patch_start_column_2pt5km < 0:
+        patch_start_column_2pt5km = None
     if len(target_lag_times_hours) == 1 and target_lag_times_hours[0] < 0:
         target_lag_times_hours = None
 
@@ -221,6 +228,8 @@ def _run(output_dir_name, nwp_lead_times_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
         neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        neural_net.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
+        neural_net.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
         neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors,
         neural_net.NWP_RESID_NORM_FILE_KEY: None,
         neural_net.TARGET_RESID_NORM_FILE_KEY: None
@@ -1721,6 +1730,12 @@ if __name__ == '__main__':
         ),
         patch_buffer_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, test_generator_args.PATCH_BUFFER_SIZE_ARG_NAME
+        ),
+        patch_start_row_2pt5km=getattr(
+            INPUT_ARG_OBJECT, test_generator_args.PATCH_START_ROW_ARG_NAME
+        ),
+        patch_start_column_2pt5km=getattr(
+            INPUT_ARG_OBJECT, test_generator_args.PATCH_START_COLUMN_ARG_NAME
         ),
         use_fast_patch_generator=bool(getattr(
             INPUT_ARG_OBJECT, test_generator_args.USE_FAST_PATCH_GENERATOR_ARG_NAME
