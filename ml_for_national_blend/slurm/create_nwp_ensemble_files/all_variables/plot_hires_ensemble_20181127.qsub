@@ -46,3 +46,14 @@ python3 -u "${CODE_DIR_NAME}/plot_nwp_data.py" \
 --min_colour_percentiles 0 0 0 0 0 \
 --max_colour_percentiles 100 100 100 100 100 \
 --output_dir_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid/plots"
+
+python3 -u "${CODE_DIR_NAME}/plot_nwp_data.py" \
+--input_nwp_directory_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid" \
+--plot_interp_data=1 \
+--model_name="ensemble" \
+--init_time_string="${init_time_string}" \
+--forecast_hour=36 \
+--field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "wind_gust_10m_agl_m_s01" \
+--min_colour_percentiles 0 0 0 0 0 \
+--max_colour_percentiles 100 100 100 100 100 \
+--output_dir_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid/plots"
