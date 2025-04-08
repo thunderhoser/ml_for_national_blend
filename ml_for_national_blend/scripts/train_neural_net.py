@@ -63,6 +63,7 @@ def _run(template_file_name, output_dir_name,
          nbm_constant_field_names, nbm_constant_file_name,
          compare_to_baseline_in_loss, num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
+         patch_start_row_2pt5km, patch_start_column_2pt5km,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
          temporary_predictor_dir_name, require_all_predictors,
          do_residual_prediction, resid_baseline_model_name,
@@ -106,6 +107,8 @@ def _run(template_file_name, output_dir_name,
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
     :param patch_buffer_size_2pt5km_pixels: Same.
+    :param patch_start_row_2pt5km: Same.
+    :param patch_start_column_2pt5km: Same.
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param temporary_predictor_dir_name: Same.
@@ -150,6 +153,10 @@ def _run(template_file_name, output_dir_name,
         temporary_predictor_dir_name = None
     if patch_size_2pt5km_pixels < 0:
         patch_size_2pt5km_pixels = None
+    if patch_start_row_2pt5km < 0:
+        patch_start_row_2pt5km = None
+    if patch_start_column_2pt5km < 0:
+        patch_start_column_2pt5km = None
     if use_exp_moving_average_with_decay < 0:
         use_exp_moving_average_with_decay = None
 
@@ -231,6 +238,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
         neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        neural_net.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
+        neural_net.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
         neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
     }
 
@@ -265,6 +274,7 @@ def _run(template_file_name, output_dir_name,
         loss_function_string=mmd[neural_net.LOSS_FUNCTION_KEY],
         optimizer_function_string=mmd[neural_net.OPTIMIZER_FUNCTION_KEY],
         metric_function_strings=mmd[neural_net.METRIC_FUNCTIONS_KEY],
+        u_net_architecture_dict=mmd[neural_net.U_NET_ARCHITECTURE_KEY],
         chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
         chiu_net_pp_architecture_dict=
         mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
@@ -367,6 +377,12 @@ if __name__ == '__main__':
         ),
         patch_buffer_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_BUFFER_SIZE_ARG_NAME
+        ),
+        patch_start_row_2pt5km=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_START_ROW_ARG_NAME
+        ),
+        patch_start_column_2pt5km=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_START_COLUMN_ARG_NAME
         ),
         use_fast_patch_generator=bool(getattr(
             INPUT_ARG_OBJECT, training_args.USE_FAST_PATCH_GENERATOR_ARG_NAME

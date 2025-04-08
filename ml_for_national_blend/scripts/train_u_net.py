@@ -20,6 +20,7 @@ def _run(template_file_name, output_dir_name, nwp_lead_time_hours,
          target_lead_time_hours, target_field_names,
          compare_to_baseline_in_loss, num_examples_per_batch, sentinel_value,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
+         patch_start_row_2pt5km, patch_start_column_2pt5km,
          patch_overlap_size_2pt5km_pixels, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
          nwp_directory_names, target_dir_name,
@@ -47,6 +48,8 @@ def _run(template_file_name, output_dir_name, nwp_lead_time_hours,
     :param sentinel_value: Same.
     :param patch_size_2pt5km_pixels: Same.
     :param patch_buffer_size_2pt5km_pixels: Same.
+    :param patch_start_row_2pt5km: Same.
+    :param patch_start_column_2pt5km: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
     :param resid_baseline_model_name: Same.
     :param resid_baseline_lead_time_hours: Same.
@@ -69,6 +72,10 @@ def _run(template_file_name, output_dir_name, nwp_lead_time_hours,
         resid_baseline_model_dir_name = None
     if resid_baseline_lead_time_hours <= 0:
         resid_baseline_lead_time_hours = None
+    if patch_start_row_2pt5km < 0:
+        patch_start_row_2pt5km = None
+    if patch_start_column_2pt5km < 0:
+        patch_start_column_2pt5km = None
 
     nwp_directory_names = nwp_directory_names[:len(nwp_model_names)]
     nwp_model_to_dir_name = dict(zip(nwp_model_names, nwp_directory_names))
@@ -100,6 +107,8 @@ def _run(template_file_name, output_dir_name, nwp_lead_time_hours,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
         neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
         neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        neural_net.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
+        neural_net.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
         neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
         neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
         neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name
@@ -189,6 +198,12 @@ if __name__ == '__main__':
         ),
         patch_buffer_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_BUFFER_SIZE_ARG_NAME
+        ),
+        patch_start_row_2pt5km=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_START_ROW_ARG_NAME
+        ),
+        patch_start_column_2pt5km=getattr(
+            INPUT_ARG_OBJECT, training_args.PATCH_START_COLUMN_ARG_NAME
         ),
         patch_overlap_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_OVERLAP_SIZE_ARG_NAME

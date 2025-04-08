@@ -25,6 +25,8 @@ BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
 PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_2pt5km_pixels'
+PATCH_START_ROW_ARG_NAME = 'patch_start_row_2pt5km'
+PATCH_START_COLUMN_ARG_NAME = 'patch_start_column_2pt5km'
 USE_FAST_PATCH_GENERATOR_ARG_NAME = 'use_fast_patch_generator'
 PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 REQUIRE_ALL_PREDICTORS_ARG_NAME = 'require_all_predictors'
@@ -144,6 +146,17 @@ PATCH_BUFFER_SIZE_HELP_STRING = (
     'loss function).  This must be a non-negative integer.'
 ).format(
     PATCH_SIZE_ARG_NAME
+)
+PATCH_START_ROW_HELP_STRING = (
+    '[used only if {0:s} is positive] Indicates start row for training patch.  '
+    'For example, if {1:s} == k, the patch will always start at the [k]th row '
+    'on the 2.5-km grid.  If you want each patch to be at a different '
+    'location, leave this alone.'
+).format(
+    PATCH_SIZE_ARG_NAME, PATCH_START_ROW_ARG_NAME
+)
+PATCH_START_COLUMN_HELP_STRING = 'Same as {0:s} but for columns.'.format(
+    PATCH_START_ROW_ARG_NAME
 )
 USE_FAST_PATCH_GENERATOR_HELP_STRING = (
     '[used only if {0:s} is positive] Boolean flag.  If 1, will use fast '
@@ -300,6 +313,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + PATCH_BUFFER_SIZE_ARG_NAME, type=int, required=False, default=0,
         help=PATCH_BUFFER_SIZE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_START_ROW_ARG_NAME, type=int, required=False, default=-1,
+        help=PATCH_START_ROW_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + PATCH_START_COLUMN_ARG_NAME, type=int, required=False,
+        default=-1, help=PATCH_START_COLUMN_HELP_STRING
     )
     parser_object.add_argument(
         '--' + USE_FAST_PATCH_GENERATOR_ARG_NAME, type=int, required=False,
