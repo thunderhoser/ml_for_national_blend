@@ -12,6 +12,9 @@ dist/
 .idea/
 *.iml
 
+# Pylint settings.
+.pylintrc
+
 # Slurm scripts.
 slurm/
 
