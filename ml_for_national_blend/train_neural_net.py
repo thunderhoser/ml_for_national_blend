@@ -14,7 +14,9 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
 import nwp_model_utils
-import neural_net
+import neural_net_utils as nn_utils
+import neural_net_training_simple as nn_training_simple
+import neural_net_training_multipatch as nn_training_multipatch
 import training_args
 
 TIME_FORMAT = '%Y-%m-%d-%H'
@@ -216,85 +218,110 @@ def _run(template_file_name, output_dir_name,
     ], dtype=int)
 
     training_option_dict = {
-        neural_net.FIRST_INIT_TIMES_KEY: first_init_times_for_training_unix_sec,
-        neural_net.LAST_INIT_TIMES_KEY: last_init_times_for_training_unix_sec,
-        neural_net.NWP_LEAD_TIMES_KEY: nwp_lead_times_hours,
-        neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
-        neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
-        neural_net.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
-        neural_net.NWP_RESID_NORM_FILE_KEY: nwp_resid_norm_file_name,
-        neural_net.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
-        neural_net.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
-        neural_net.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
-        neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
-        neural_net.TARGET_FIELDS_KEY: target_field_names,
-        neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
-        neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
-        neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
-        neural_net.TARGET_RESID_NORM_FILE_KEY: target_resid_norm_file_name,
-        neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
-        neural_net.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
-        neural_net.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
-        neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
-        neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
-        neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: compare_to_baseline_in_loss,
-        neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
-        neural_net.SENTINEL_VALUE_KEY: sentinel_value,
-        neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
-        neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
-        neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
-        neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
-        neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
-        neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
-        neural_net.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
-        neural_net.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
-        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
+        nn_utils.FIRST_INIT_TIMES_KEY: first_init_times_for_training_unix_sec,
+        nn_utils.LAST_INIT_TIMES_KEY: last_init_times_for_training_unix_sec,
+        nn_utils.NWP_LEAD_TIMES_KEY: nwp_lead_times_hours,
+        nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
+        nn_utils.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
+        nn_utils.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
+        nn_utils.NWP_RESID_NORM_FILE_KEY: nwp_resid_norm_file_name,
+        nn_utils.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
+        nn_utils.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
+        nn_utils.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
+        nn_utils.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
+        nn_utils.TARGET_FIELDS_KEY: target_field_names,
+        nn_utils.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
+        nn_utils.TARGET_DIR_KEY: target_dir_name_for_training,
+        nn_utils.TARGET_NORM_FILE_KEY: target_normalization_file_name,
+        nn_utils.TARGET_RESID_NORM_FILE_KEY: target_resid_norm_file_name,
+        nn_utils.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
+        nn_utils.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
+        nn_utils.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
+        nn_utils.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
+        nn_utils.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
+        nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY: compare_to_baseline_in_loss,
+        nn_utils.BATCH_SIZE_KEY: num_examples_per_batch,
+        nn_utils.SENTINEL_VALUE_KEY: sentinel_value,
+        nn_utils.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
+        nn_utils.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
+        nn_utils.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
+        nn_utils.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
+        nn_utils.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
+        nn_utils.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        nn_utils.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
+        nn_utils.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
+        nn_utils.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors
     }
 
     validation_option_dict = {
-        neural_net.FIRST_INIT_TIMES_KEY:
-            first_init_times_for_validation_unix_sec,
-        neural_net.LAST_INIT_TIMES_KEY: last_init_times_for_validation_unix_sec,
-        neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_validation_dir_name,
-        neural_net.TARGET_DIR_KEY: target_dir_name_for_validation
+        nn_utils.FIRST_INIT_TIMES_KEY: first_init_times_for_validation_unix_sec,
+        nn_utils.LAST_INIT_TIMES_KEY: last_init_times_for_validation_unix_sec,
+        nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_validation_dir_name,
+        nn_utils.TARGET_DIR_KEY: target_dir_name_for_validation
     }
 
     print('Reading model template from: "{0:s}"...'.format(template_file_name))
-    model_object = neural_net.read_model(
+    model_object = nn_utils.read_model(
         hdf5_file_name=template_file_name, for_inference=False
     )
 
-    model_metafile_name = neural_net.find_metafile(
+    model_metafile_name = nn_utils.find_metafile(
         model_file_name=template_file_name, raise_error_if_missing=True
     )
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+    model_metadata_dict = nn_utils.read_metafile(model_metafile_name)
     mmd = model_metadata_dict
 
-    neural_net.train_model(
-        model_object=model_object,
-        num_epochs=num_epochs,
-        use_exp_moving_average_with_decay=use_exp_moving_average_with_decay,
-        num_training_batches_per_epoch=num_training_batches_per_epoch,
-        training_option_dict=training_option_dict,
-        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
-        validation_option_dict=validation_option_dict,
-        loss_function_string=mmd[neural_net.LOSS_FUNCTION_KEY],
-        optimizer_function_string=mmd[neural_net.OPTIMIZER_FUNCTION_KEY],
-        metric_function_strings=mmd[neural_net.METRIC_FUNCTIONS_KEY],
-        u_net_architecture_dict=mmd[neural_net.U_NET_ARCHITECTURE_KEY],
-        chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
-        chiu_net_pp_architecture_dict=
-        mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
-        chiu_next_pp_architecture_dict=
-        mmd[neural_net.CHIU_NEXT_PP_ARCHITECTURE_KEY],
-        plateau_patience_epochs=plateau_patience_epochs,
-        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs=early_stopping_patience_epochs,
-        patch_overlap_fast_gen_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
-        temporary_predictor_dir_name=temporary_predictor_dir_name,
-        output_dir_name=output_dir_name
-    )
+    if use_fast_patch_generator:
+        nn_training_multipatch.train_model(
+            model_object=model_object,
+            num_epochs=num_epochs,
+            use_exp_moving_average_with_decay=use_exp_moving_average_with_decay,
+            num_training_batches_per_epoch=num_training_batches_per_epoch,
+            training_option_dict=training_option_dict,
+            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+            validation_option_dict=validation_option_dict,
+            loss_function_string=mmd[nn_utils.LOSS_FUNCTION_KEY],
+            optimizer_function_string=mmd[nn_utils.OPTIMIZER_FUNCTION_KEY],
+            metric_function_strings=mmd[nn_utils.METRIC_FUNCTIONS_KEY],
+            u_net_architecture_dict=mmd[nn_utils.U_NET_ARCHITECTURE_KEY],
+            chiu_net_architecture_dict=mmd[nn_utils.CHIU_NET_ARCHITECTURE_KEY],
+            chiu_net_pp_architecture_dict=
+            mmd[nn_utils.CHIU_NET_PP_ARCHITECTURE_KEY],
+            chiu_next_pp_architecture_dict=
+            mmd[nn_utils.CHIU_NEXT_PP_ARCHITECTURE_KEY],
+            plateau_patience_epochs=plateau_patience_epochs,
+            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+            early_stopping_patience_epochs=early_stopping_patience_epochs,
+            patch_overlap_fast_gen_2pt5km_pixels=
+            patch_overlap_size_2pt5km_pixels,
+            temporary_predictor_dir_name=temporary_predictor_dir_name,
+            output_dir_name=output_dir_name
+        )
+    else:
+        nn_training_simple.train_model(
+            model_object=model_object,
+            num_epochs=num_epochs,
+            use_exp_moving_average_with_decay=use_exp_moving_average_with_decay,
+            num_training_batches_per_epoch=num_training_batches_per_epoch,
+            training_option_dict=training_option_dict,
+            num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+            validation_option_dict=validation_option_dict,
+            loss_function_string=mmd[nn_utils.LOSS_FUNCTION_KEY],
+            optimizer_function_string=mmd[nn_utils.OPTIMIZER_FUNCTION_KEY],
+            metric_function_strings=mmd[nn_utils.METRIC_FUNCTIONS_KEY],
+            u_net_architecture_dict=mmd[nn_utils.U_NET_ARCHITECTURE_KEY],
+            chiu_net_architecture_dict=mmd[nn_utils.CHIU_NET_ARCHITECTURE_KEY],
+            chiu_net_pp_architecture_dict=
+            mmd[nn_utils.CHIU_NET_PP_ARCHITECTURE_KEY],
+            chiu_next_pp_architecture_dict=
+            mmd[nn_utils.CHIU_NEXT_PP_ARCHITECTURE_KEY],
+            plateau_patience_epochs=plateau_patience_epochs,
+            plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+            early_stopping_patience_epochs=early_stopping_patience_epochs,
+            temporary_predictor_dir_name=temporary_predictor_dir_name,
+            output_dir_name=output_dir_name
+        )
 
 
 if __name__ == '__main__':

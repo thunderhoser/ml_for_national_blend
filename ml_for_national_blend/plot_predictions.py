@@ -22,7 +22,7 @@ import prediction_io
 import nbm_utils
 import urma_utils
 import misc_utils
-import neural_net
+import neural_net_utils as nn_utils
 import nwp_input
 import target_plotting
 import plotting_utils
@@ -797,14 +797,14 @@ def _run(prediction_dir_name, init_time_string, field_names,
     model_file_name = (
         prediction_table_xarray.attrs[prediction_io.MODEL_FILE_KEY]
     )
-    model_metafile_name = neural_net.find_metafile(
+    model_metafile_name = nn_utils.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
 
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-    training_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
-    lead_time_hours = training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
+    model_metadata_dict = nn_utils.read_metafile(model_metafile_name)
+    training_option_dict = model_metadata_dict[nn_utils.TRAINING_OPTIONS_KEY]
+    lead_time_hours = training_option_dict[nn_utils.TARGET_LEAD_TIME_KEY]
 
     _plot_everything_1sample(
         prediction_table_xarray=prediction_table_xarray,

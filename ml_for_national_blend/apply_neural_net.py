@@ -14,7 +14,9 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import time_conversion
 import prediction_io
 import nwp_model_utils
-import neural_net
+import neural_net_utils as nn_utils
+import neural_net_training_simple as nn_training_simple
+import neural_net_training_multipatch as nn_training_multipatch
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -36,7 +38,7 @@ PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_2pt5km_pixels'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 MODEL_FILE_HELP_STRING = (
-    'Path to trained model (will be read by `neural_net.read_model`).'
+    'Path to trained model (will be read by `neural_net_utils.read_model`).'
 )
 INIT_TIME_HELP_STRING = 'Forecast-initialization time (format "yyyy-mm-dd-HH").'
 NWP_MODELS_HELP_STRING = (
@@ -197,25 +199,24 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     """
 
     print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(
+    model_object = nn_utils.read_model(
         hdf5_file_name=model_file_name, for_inference=use_ema
     )
-    model_metafile_name = neural_net.find_metafile(
+    model_metafile_name = nn_utils.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
 
     print('Reading metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+    model_metadata_dict = nn_utils.read_metafile(model_metafile_name)
     mmd = model_metadata_dict
 
-    validation_option_dict = mmd[neural_net.VALIDATION_OPTIONS_KEY]
-    was_nn_trained_on_multi_patches = (
-        validation_option_dict[neural_net.PATCH_SIZE_KEY] is not None
-        and validation_option_dict[neural_net.PATCH_START_ROW_KEY] is None
-        and validation_option_dict[neural_net.PATCH_START_COLUMN_KEY] is None
-    )
+    is_nn_multipatch = mmd[nn_utils.PATCH_OVERLAP_FOR_FAST_GEN_KEY] is not None
+    if not is_nn_multipatch:
+        patches_to_full_grid = False
+
+    validation_option_dict = mmd[nn_utils.VALIDATION_OPTIONS_KEY]
     nwp_model_names_for_training = list(
-        validation_option_dict[neural_net.NWP_MODEL_TO_DIR_KEY].keys()
+        validation_option_dict[nn_utils.NWP_MODEL_TO_DIR_KEY].keys()
     )
     assert set(nwp_model_names) == set(nwp_model_names_for_training)
 
@@ -224,35 +225,52 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         nwp_model_names=nwp_model_names
     )
     validation_option_dict.update({
-        neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
-        neural_net.TARGET_DIR_KEY: target_dir_name
+        nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
+        nn_utils.TARGET_DIR_KEY: target_dir_name
     })
     init_time_unix_sec = time_conversion.string_to_unix_sec(
         init_time_string, TIME_FORMAT
     )
 
-    if not was_nn_trained_on_multi_patches:
-        patches_to_full_grid = False
-
     if patches_to_full_grid:
-        validation_option_dict[neural_net.PATCH_SIZE_KEY] = None
+        validation_option_dict[nn_utils.PATCH_SIZE_KEY] = None
 
-        data_dict = neural_net.create_data(
+        data_dict = nn_training_simple.create_data(
             option_dict=validation_option_dict,
             init_time_unix_sec=init_time_unix_sec
         )
+        predictor_matrices = data_dict[
+            nn_training_simple.PREDICTOR_MATRICES_KEY
+        ]
+        target_matrix_with_mask = data_dict[
+            nn_training_simple.TARGET_MATRIX_KEY
+        ]
+        init_times_unix_sec = data_dict[nn_training_simple.INIT_TIMES_KEY]
+        latitude_matrix_deg_n = data_dict[
+            nn_training_simple.LATITUDE_MATRIX_KEY
+        ]
+        longitude_matrix_deg_e = data_dict[
+            nn_training_simple.LONGITUDE_MATRIX_KEY
+        ]
     else:
-        data_dict = neural_net.create_data_fast_patches(
+        data_dict = nn_training_multipatch.create_data(
             option_dict=validation_option_dict,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
             init_time_unix_sec=init_time_unix_sec
         )
-
-    predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-    target_matrix_with_mask = data_dict[neural_net.TARGET_MATRIX_KEY]
-    init_times_unix_sec = data_dict[neural_net.INIT_TIMES_KEY]
-    latitude_matrix_deg_n = data_dict[neural_net.LATITUDE_MATRIX_KEY]
-    longitude_matrix_deg_e = data_dict[neural_net.LONGITUDE_MATRIX_KEY]
+        predictor_matrices = data_dict[
+            nn_training_multipatch.PREDICTOR_MATRICES_KEY
+        ]
+        target_matrix_with_mask = data_dict[
+            nn_training_multipatch.TARGET_MATRIX_KEY
+        ]
+        init_times_unix_sec = data_dict[nn_training_multipatch.INIT_TIMES_KEY]
+        latitude_matrix_deg_n = data_dict[
+            nn_training_multipatch.LATITUDE_MATRIX_KEY
+        ]
+        longitude_matrix_deg_e = data_dict[
+            nn_training_multipatch.LONGITUDE_MATRIX_KEY
+        ]
 
     target_matrix = target_matrix_with_mask[..., :-1]
     mask_matrix = target_matrix_with_mask[..., -1] >= MASK_PIXEL_IF_WEIGHT_BELOW
@@ -260,7 +278,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     vod = validation_option_dict
 
     if patches_to_full_grid:
-        prediction_matrix = neural_net.apply_patchwise_model_to_full_grid(
+        prediction_matrix = nn_training_multipatch.apply_model(
             model_object=model_object,
             full_predictor_matrices=predictor_matrices,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
@@ -275,12 +293,12 @@ def _run(model_file_name, init_time_string, nwp_model_names,
                 prediction_matrix, axis=-1, keepdims=True
             )
     else:
-        prediction_matrix = neural_net.apply_model(
+        prediction_matrix = nn_training_simple.apply_model(
             model_object=model_object,
             predictor_matrices=predictor_matrices,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
             verbose=True,
-            target_field_names=vod[neural_net.TARGET_FIELDS_KEY]
+            target_field_names=vod[nn_utils.TARGET_FIELDS_KEY]
         )
 
         if save_ensemble_mean_only:
@@ -306,7 +324,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         prediction_matrix=prediction_matrix[0, ...],
         latitude_matrix_deg_n=latitude_matrix_deg_n[0, ...],
         longitude_matrix_deg_e=longitude_matrix_deg_e[0, ...],
-        field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
+        field_names=validation_option_dict[nn_utils.TARGET_FIELDS_KEY],
         init_time_unix_sec=init_times_unix_sec[0],
         model_file_name=model_file_name,
         isotonic_model_file_names=None,
