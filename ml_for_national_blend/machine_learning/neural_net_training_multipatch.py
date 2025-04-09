@@ -2236,9 +2236,25 @@ def data_generator_for_u_net(option_dict, patch_overlap_size_2pt5km_pixels):
             # got a patch with NaN's, this means some of the patch has no
             # correct answers for training, so we just continue to the next
             # patch location.
+            # if numpy.any(numpy.isnan(
+            #         target_matrix[i, ..., :num_target_fields]
+            # )):
+            #     continue
+
+            # TODO(thunderhoser): This can also happen along edges of grid for
+            # residual baseline, if residual baseline is high-res ensemble.
             if numpy.any(numpy.isnan(
-                    target_matrix[i, ..., :num_target_fields]
+                    target_matrix[i, num_target_fields:(2 * num_target_fields)]
             )):
+                print('Residual baseline contains NaN values ({0:.6f}%).'.format(
+                    100 * numpy.mean(numpy.isnan(
+                        target_matrix[i, num_target_fields:(2 * num_target_fields)]
+                    ))
+                ))
+            else:
+                print('Residual baseline does NOT contain NaN values.')
+
+            if numpy.any(numpy.isnan(target_matrix[i, ...])):
                 continue
 
             predictor_matrix_2pt5km[i, ...] = (
