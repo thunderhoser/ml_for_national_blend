@@ -20,7 +20,7 @@ from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import nbm_utils
-from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import \
     longitude_conversion as lng_conversion
@@ -267,13 +267,13 @@ def _convert_nwp_forecasts_1init(
     )
 
     dummy_training_option_dict = {
-        neural_net.TARGET_LEAD_TIME_KEY: lead_time_hours,
-        neural_net.TARGET_FIELDS_KEY: urma_field_names
+        nn_utils.TARGET_LEAD_TIME_KEY: lead_time_hours,
+        nn_utils.TARGET_FIELDS_KEY: urma_field_names
     }
     dummy_model_file_name = '{0:s}/model.keras'.format(
         os.path.split(output_file_name)[0]
     )
-    dummy_model_metafile_name = neural_net.find_metafile(
+    dummy_model_metafile_name = nn_utils.find_metafile(
         model_file_name=dummy_model_file_name,
         raise_error_if_missing=False
     )
@@ -281,7 +281,7 @@ def _convert_nwp_forecasts_1init(
     print('Writing dummy metafile to: "{0:s}"...'.format(
         dummy_model_metafile_name
     ))
-    neural_net.write_metafile(
+    nn_utils.write_metafile(
         pickle_file_name=dummy_model_metafile_name,
         num_epochs=1000,
         num_training_batches_per_epoch=1000,
@@ -295,6 +295,7 @@ def _convert_nwp_forecasts_1init(
         plateau_learning_rate_multiplier=0.9,
         early_stopping_patience_epochs=100,
         patch_overlap_fast_gen_2pt5km_pixels=None,
+        u_net_architecture_dict=None,
         chiu_net_architecture_dict=None,
         chiu_net_pp_architecture_dict=None,
         chiu_next_pp_architecture_dict=None,

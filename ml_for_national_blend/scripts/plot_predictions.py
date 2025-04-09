@@ -15,7 +15,7 @@ from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import nbm_utils
 from ml_for_national_blend.utils import urma_utils
 from ml_for_national_blend.utils import misc_utils
-from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
 from ml_for_national_blend.machine_learning import nwp_input
 from ml_for_national_blend.plotting import target_plotting
 from ml_for_national_blend.plotting import plotting_utils
@@ -790,14 +790,14 @@ def _run(prediction_dir_name, init_time_string, field_names,
     model_file_name = (
         prediction_table_xarray.attrs[prediction_io.MODEL_FILE_KEY]
     )
-    model_metafile_name = neural_net.find_metafile(
+    model_metafile_name = nn_utils.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
 
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-    training_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
-    lead_time_hours = training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
+    model_metadata_dict = nn_utils.read_metafile(model_metafile_name)
+    training_option_dict = model_metadata_dict[nn_utils.TRAINING_OPTIONS_KEY]
+    lead_time_hours = training_option_dict[nn_utils.TARGET_LEAD_TIME_KEY]
 
     _plot_everything_1sample(
         prediction_table_xarray=prediction_table_xarray,

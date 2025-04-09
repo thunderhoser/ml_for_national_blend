@@ -4,7 +4,7 @@ import numpy
 import keras
 from ml_for_national_blend.machine_learning import custom_losses
 from ml_for_national_blend.machine_learning import custom_metrics
-from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
 from ml_for_national_blend.machine_learning import u_net_architecture
 from ml_for_national_blend.outside_code import architecture_utils
 from ml_for_national_blend.outside_code import file_system_utils
@@ -190,10 +190,10 @@ def _run():
         filepath=output_file_name, overwrite=True, include_optimizer=True
     )
 
-    # Write the metafile.  All arguments to `neural_net.write_metafile`, except
-    # the first four, are dummy arguments.  You should never need to change
-    # these dummy arguments.
-    metafile_name = neural_net.find_metafile(
+    # Write the metafile.  All arguments to `neural_net_utils.write_metafile`,
+    # except the first four, are dummy arguments.  You should never need to
+    # change these dummy arguments.
+    metafile_name = nn_utils.find_metafile(
         model_file_name=output_file_name,
         raise_error_if_missing=False
     )
@@ -211,7 +211,7 @@ def _run():
         OPTIMIZER_FUNCTION_STRING
     )
 
-    neural_net.write_metafile(
+    nn_utils.write_metafile(
         pickle_file_name=metafile_name,
         loss_function_string=LOSS_FUNCTION_STRING,
         optimizer_function_string=OPTIMIZER_FUNCTION_STRING,

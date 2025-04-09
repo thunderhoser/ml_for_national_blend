@@ -14,8 +14,12 @@ from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import border_io
 from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.utils import nbm_constant_utils
-from ml_for_national_blend.machine_learning import neural_net
 from ml_for_national_blend.machine_learning import nwp_input
+from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
+from ml_for_national_blend.machine_learning import \
+    neural_net_training_simple as nn_training_simple
+from ml_for_national_blend.machine_learning import \
+    neural_net_training_multipatch as nn_training_multipatch
 from ml_for_national_blend.plotting import plotting_utils
 from ml_for_national_blend.scripts import test_generator_args
 
@@ -192,39 +196,39 @@ def _run(output_dir_name, nwp_lead_times_hours,
     ], dtype=int)
 
     training_option_dict = {
-        neural_net.FIRST_INIT_TIMES_KEY: first_init_times_for_training_unix_sec,
-        neural_net.LAST_INIT_TIMES_KEY: last_init_times_for_training_unix_sec,
-        neural_net.NWP_LEAD_TIMES_KEY: nwp_lead_times_hours,
-        neural_net.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
-        neural_net.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
-        neural_net.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
-        neural_net.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
-        neural_net.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
-        neural_net.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
-        neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
-        neural_net.TARGET_FIELDS_KEY: target_field_names,
-        neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
-        neural_net.TARGET_DIR_KEY: target_dir_name_for_training,
-        neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
-        neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
-        neural_net.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
-        neural_net.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
-        neural_net.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
-        neural_net.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
-        neural_net.COMPARE_TO_BASELINE_IN_LOSS_KEY: True,
-        neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
-        neural_net.SENTINEL_VALUE_KEY: sentinel_value,
-        neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
-        neural_net.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
-        neural_net.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
-        neural_net.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
-        neural_net.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
-        neural_net.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
-        neural_net.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
-        neural_net.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
-        neural_net.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors,
-        neural_net.NWP_RESID_NORM_FILE_KEY: None,
-        neural_net.TARGET_RESID_NORM_FILE_KEY: None
+        nn_utils.FIRST_INIT_TIMES_KEY: first_init_times_for_training_unix_sec,
+        nn_utils.LAST_INIT_TIMES_KEY: last_init_times_for_training_unix_sec,
+        nn_utils.NWP_LEAD_TIMES_KEY: nwp_lead_times_hours,
+        nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_training_dir_name,
+        nn_utils.NWP_MODEL_TO_FIELDS_KEY: nwp_model_to_field_names,
+        nn_utils.NWP_NORM_FILE_KEY: nwp_normalization_file_name,
+        nn_utils.NWP_USE_QUANTILE_NORM_KEY: nwp_use_quantile_norm,
+        nn_utils.BACKUP_NWP_MODEL_KEY: backup_nwp_model_name,
+        nn_utils.BACKUP_NWP_DIR_KEY: backup_nwp_dir_name,
+        nn_utils.TARGET_LEAD_TIME_KEY: target_lead_time_hours,
+        nn_utils.TARGET_FIELDS_KEY: target_field_names,
+        nn_utils.TARGET_LAG_TIMES_KEY: target_lag_times_hours,
+        nn_utils.TARGET_DIR_KEY: target_dir_name_for_training,
+        nn_utils.TARGET_NORM_FILE_KEY: target_normalization_file_name,
+        nn_utils.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
+        nn_utils.RECENT_BIAS_LAG_TIMES_KEY: recent_bias_init_time_lags_hours,
+        nn_utils.RECENT_BIAS_LEAD_TIMES_KEY: recent_bias_lead_times_hours,
+        nn_utils.NBM_CONSTANT_FIELDS_KEY: nbm_constant_field_names,
+        nn_utils.NBM_CONSTANT_FILE_KEY: nbm_constant_file_name,
+        nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY: True,
+        nn_utils.BATCH_SIZE_KEY: num_examples_per_batch,
+        nn_utils.SENTINEL_VALUE_KEY: sentinel_value,
+        nn_utils.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
+        nn_utils.RESID_BASELINE_MODEL_KEY: resid_baseline_model_name,
+        nn_utils.RESID_BASELINE_LEAD_TIME_KEY: resid_baseline_lead_time_hours,
+        nn_utils.RESID_BASELINE_MODEL_DIR_KEY: resid_baseline_model_dir_name,
+        nn_utils.PATCH_SIZE_KEY: patch_size_2pt5km_pixels,
+        nn_utils.PATCH_BUFFER_SIZE_KEY: patch_buffer_size_2pt5km_pixels,
+        nn_utils.PATCH_START_ROW_KEY: patch_start_row_2pt5km,
+        nn_utils.PATCH_START_COLUMN_KEY: patch_start_column_2pt5km,
+        nn_utils.REQUIRE_ALL_PREDICTORS_KEY: require_all_predictors,
+        nn_utils.NWP_RESID_NORM_FILE_KEY: None,
+        nn_utils.TARGET_RESID_NORM_FILE_KEY: None
     }
 
     use_recent_biases = not (
@@ -243,12 +247,12 @@ def _run(output_dir_name, nwp_lead_times_hours,
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     if patch_overlap_size_2pt5km_pixels is None:
-        training_generator = neural_net.data_generator(
+        training_generator = nn_training_simple.data_generator(
             option_dict=training_option_dict,
             return_predictors_as_dict=True
         )
     else:
-        training_generator = neural_net.data_generator_fast_patches(
+        training_generator = nn_training_multipatch.data_generator(
             option_dict=training_option_dict,
             patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
             return_predictors_as_dict=True

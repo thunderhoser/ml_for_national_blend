@@ -7,7 +7,7 @@ from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.io import prediction_io
 from ml_for_national_blend.utils import evaluation
-from ml_for_national_blend.machine_learning import neural_net
+from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 HOURS_TO_SECONDS = 3600
@@ -247,17 +247,17 @@ def _run(prediction_dir_name, init_time_limit_strings,
         model_lead_time_hours = first_ptx.attrs['model_lead_time_hours']
     else:
         model_file_name = first_ptx.attrs[prediction_io.MODEL_FILE_KEY]
-        model_metafile_name = neural_net.find_metafile(
+        model_metafile_name = nn_utils.find_metafile(
             model_file_name=model_file_name, raise_error_if_missing=True
         )
 
         print('Reading model metadata from: "{0:s}"...'.format(
             model_metafile_name
         ))
-        model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+        model_metadata_dict = nn_utils.read_metafile(model_metafile_name)
         model_lead_time_hours = model_metadata_dict[
-            neural_net.TRAINING_OPTIONS_KEY
-        ][neural_net.TARGET_LEAD_TIME_KEY]
+            nn_utils.TRAINING_OPTIONS_KEY
+        ][nn_utils.TARGET_LEAD_TIME_KEY]
 
     init_times_unix_sec = numpy.array([
         prediction_io.file_name_to_init_time(f) for f in prediction_file_names
