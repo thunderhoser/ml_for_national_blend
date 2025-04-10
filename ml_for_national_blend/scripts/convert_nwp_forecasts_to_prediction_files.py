@@ -299,8 +299,7 @@ def _convert_nwp_forecasts_1init(
         chiu_net_architecture_dict=None,
         chiu_net_pp_architecture_dict=None,
         chiu_next_pp_architecture_dict=None,
-        use_exp_moving_average_with_decay=0.99,
-        temporary_predictor_dir_name=None
+        use_exp_moving_average_with_decay=0.99
     )
 
     print('Writing prediction file: "{0:s}"...'.format(output_file_name))
