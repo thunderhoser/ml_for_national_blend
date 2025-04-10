@@ -26,6 +26,8 @@ import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
 import nwp_input
+import custom_losses
+import custom_metrics
 
 TOLERANCE = 1e-6
 HOURS_TO_SECONDS = 3600
