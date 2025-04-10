@@ -102,6 +102,7 @@ while true; do
     --patch_buffer_size_2pt5km_pixels=50 \
     --use_fast_patch_generator=1 \
     --patch_overlap_size_2pt5km_pixels=64 \
+    --temporary_predictor_dir_name="${output_dir_name}/npz_example_files" \
     --require_all_predictors=0 \
     --do_residual_prediction=1 \
     --resid_baseline_model_name="ensemble" \
