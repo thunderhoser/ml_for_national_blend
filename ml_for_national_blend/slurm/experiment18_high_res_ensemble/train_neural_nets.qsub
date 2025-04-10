@@ -32,6 +32,7 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment17_high_res/templates"
 TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment18_high_res_ensemble"
+TOP_TEMPORARY_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_models/experiment18_high_res_ensemble"
 
 TARGET_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
 TARGET_NORMALIZATION_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
@@ -49,6 +50,7 @@ model_to_field_name_dict=${MODEL_TO_FIELD_NAME_DICTS[$SLURM_ARRAY_TASK_ID]}
 
 input_model_file_name="${TEMPLATE_DIR_NAME}/nwp-inputs=${model_names_one_string}/model.keras"
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nwp-inputs=${model_names_one_string}"
+temporary_dir_name="${TOP_TEMPORARY_DIR_NAME}/nwp-inputs=${model_names_one_string}/npz_example_files"
 echo $output_dir_name
 
 model_names_one_string=$(echo "$model_names_one_string" | sed -E 's/_/ /g; s/-/_/g')
@@ -102,7 +104,7 @@ while true; do
     --patch_buffer_size_2pt5km_pixels=50 \
     --use_fast_patch_generator=1 \
     --patch_overlap_size_2pt5km_pixels=64 \
-    --temporary_predictor_dir_name="${output_dir_name}/npz_example_files" \
+    --temporary_predictor_dir_name="${temporary_dir_name}" \
     --require_all_predictors=0 \
     --do_residual_prediction=1 \
     --resid_baseline_model_name="ensemble" \

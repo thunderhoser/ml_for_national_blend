@@ -1351,10 +1351,6 @@ def find_relevant_init_times(first_time_by_period_unix_sec,
     )
 
     error_checking.assert_is_string_list(nwp_model_names)
-    error_checking.assert_is_numpy_array(
-        numpy.array(nwp_model_names),
-        exact_dimensions=numpy.array([num_periods], dtype=int)
-    )
 
     nwp_init_time_intervals_sec = numpy.array([
         nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names
