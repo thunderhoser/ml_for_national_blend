@@ -860,7 +860,10 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
             nbmct[nbm_constant_utils.DATA_KEY].values[..., field_indices]
         )
 
+    numpy.random.shuffle(init_times_unix_sec)
+    orig_init_times_unix_sec = init_times_unix_sec + 0
     init_time_index = len(init_times_unix_sec)
+
     num_target_fields = len(target_field_names)
     if target_lag_times_hours is None:
         num_target_lag_times = 0
@@ -929,10 +932,6 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
         num_examples_in_memory = 0
 
         while num_examples_in_memory < num_examples_per_batch:
-            if init_time_index == len(init_times_unix_sec):
-                numpy.random.shuffle(init_times_unix_sec)
-                init_time_index = 0
-
             if patch_size_2pt5km_pixels is None:
                 patch_location_dict = None
             else:
@@ -953,6 +952,17 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                         raise_error_if_missing=False
                     )
                 )
+
+                if not found_temp_file and not numpy.array_equal(
+                        init_times_unix_sec, orig_init_times_unix_sec
+                ):
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
+                    continue
 
             i = num_examples_in_memory + 0
 
@@ -1081,7 +1091,12 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     this_target_matrix = None
 
                 if this_target_matrix is None:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 target_matrix[i, ..., :num_target_fields] = this_target_matrix
@@ -1138,7 +1153,12 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     this_predictor_matrix_lagged_targets = None
 
                 if this_predictor_matrix_lagged_targets is None:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 predictor_matrix_lagged_targets[i, ...] = (
@@ -1203,7 +1223,12 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     this_baseline_matrix = None
 
                 if this_baseline_matrix is None:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 predictor_matrix_resid_baseline[i, ...] = this_baseline_matrix
@@ -1261,11 +1286,21 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     found_all_predictors = False
 
                 if not found_any_predictors:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 if require_all_predictors and not found_all_predictors:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 if predictor_matrix_2pt5km is not None:
@@ -1326,11 +1361,21 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     found_all_predictors = False
 
                 if not found_any_predictors:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 if require_all_predictors and not found_all_predictors:
-                    init_time_index += 1
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
                     continue
 
                 if recent_bias_matrix_2pt5km is not None:
@@ -1351,7 +1396,12 @@ def data_generator(option_dict, temporary_predictor_dir_name=None,
                     )
 
             num_examples_in_memory += 1
-            init_time_index += 1
+            init_time_index, init_times_unix_sec = (
+                nn_utils.increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
+            )
 
         if temporary_predictor_dir_name is None:
             numpy_file_name = 'foo'
