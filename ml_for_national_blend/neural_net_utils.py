@@ -1585,7 +1585,7 @@ def read_model(hdf5_file_name, for_inference):
 
     u_net_architecture_dict = metadata_dict[U_NET_ARCHITECTURE_KEY]
     if u_net_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import u_net_architecture
+        import u_net_architecture
 
         arch_dict = u_net_architecture_dict
 
@@ -1611,7 +1611,7 @@ def read_model(hdf5_file_name, for_inference):
 
     chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
     if chiu_net_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import chiu_net_architecture
+        import chiu_net_architecture
 
         arch_dict = chiu_net_architecture_dict
 
@@ -1637,7 +1637,7 @@ def read_model(hdf5_file_name, for_inference):
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     if chiu_net_pp_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import \
+        import \
             chiu_net_pp_architecture
 
         arch_dict = chiu_net_pp_architecture_dict
@@ -1666,7 +1666,7 @@ def read_model(hdf5_file_name, for_inference):
         CHIU_NEXT_PP_ARCHITECTURE_KEY
     ]
     if chiu_next_pp_architecture_dict is not None:
-        from ml_for_national_blend.machine_learning import \
+        import \
             chiu_next_pp_architecture
 
         arch_dict = chiu_next_pp_architecture_dict
