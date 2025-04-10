@@ -4,6 +4,7 @@ import os
 import pickle
 import warnings
 import numpy
+import keras
 import tensorflow
 from tensorflow.keras.saving import load_model
 from ml_for_national_blend.io import urma_io
@@ -21,6 +22,8 @@ from ml_for_national_blend.outside_code import \
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking
 from ml_for_national_blend.machine_learning import nwp_input
+from ml_for_national_blend.machine_learning import custom_losses
+from ml_for_national_blend.machine_learning import custom_metrics
 
 TOLERANCE = 1e-6
 HOURS_TO_SECONDS = 3600
@@ -1343,10 +1346,6 @@ def find_relevant_init_times(first_time_by_period_unix_sec,
     )
 
     error_checking.assert_is_string_list(nwp_model_names)
-    error_checking.assert_is_numpy_array(
-        numpy.array(nwp_model_names),
-        exact_dimensions=numpy.array([num_periods], dtype=int)
-    )
 
     nwp_init_time_intervals_sec = numpy.array([
         nwp_model_utils.model_to_init_time_interval(m) for m in nwp_model_names

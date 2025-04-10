@@ -1121,6 +1121,7 @@ def data_generator(
         )
 
     numpy.random.shuffle(init_times_unix_sec)
+    orig_init_times_unix_sec = init_times_unix_sec + 0
     init_time_index = 0
 
     patch_metalocation_dict = init_patch_metalocation_dict(
@@ -1230,6 +1231,17 @@ def data_generator(
                         raise_error_if_missing=False
                     )
                 )
+
+                if not success and not numpy.array_equal(
+                        init_times_unix_sec, orig_init_times_unix_sec
+                ):
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
+                    continue
 
             try:
                 if full_target_matrix is None:
