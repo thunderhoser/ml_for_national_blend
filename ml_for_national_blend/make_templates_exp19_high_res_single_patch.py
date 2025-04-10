@@ -314,6 +314,7 @@ def _run():
             loss_function_string=LOSS_FUNCTION_STRING,
             optimizer_function_string=OPTIMIZER_FUNCTION_STRING,
             metric_function_strings=METRIC_FUNCTION_STRINGS,
+            u_net_architecture_dict=None,
             chiu_net_architecture_dict=None,
             chiu_net_pp_architecture_dict=None,
             chiu_next_pp_architecture_dict=option_dict,
