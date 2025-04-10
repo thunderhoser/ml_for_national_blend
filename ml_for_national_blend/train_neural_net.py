@@ -158,7 +158,6 @@ def _run(template_file_name, output_dir_name,
         resid_baseline_lead_time_hours = None
     if not use_fast_patch_generator:
         patch_overlap_size_2pt5km_pixels = None
-        temporary_predictor_dir_name = None
     if temporary_predictor_dir_name == '':
         temporary_predictor_dir_name = None
     if patch_size_2pt5km_pixels < 0:
