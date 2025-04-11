@@ -559,7 +559,8 @@ def create_data(option_dict, init_time_unix_sec,
         predictor_matrix_resid_baseline=predictor_matrix_resid_baseline,
         target_matrix=target_matrix,
         sentinel_value=sentinel_value,
-        return_predictors_as_dict=return_predictors_as_dict
+        return_predictors_as_dict=return_predictors_as_dict,
+        allow_nan=True
     )
 
     return {
