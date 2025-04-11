@@ -62,10 +62,15 @@ def read_file(npz_file_name):
     """
 
     error_checking.assert_file_exists(npz_file_name)
-    this_dict = numpy.load(npz_file_name, allow_pickle=True)
+    this_dict = numpy.load(npz_file_name)
+
+    predictor_keys = sorted(
+        [key for key in this_dict.files if key.startswith('predictor_matrix')],
+        key=lambda x: int(x.replace('predictor_matrix', ''))
+    )
 
     return (
-        tuple(this_dict['predictor_matrices'].tolist()),
+        tuple([this_dict[key] for key in predictor_keys]),
         this_dict['target_matrix']
     )
 
