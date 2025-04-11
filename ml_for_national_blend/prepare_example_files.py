@@ -5,6 +5,7 @@ import sys
 import copy
 import json
 import argparse
+import traceback
 import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -488,8 +489,8 @@ def _run(nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
                 option_dict=option_dict,
                 init_time_unix_sec=this_init_time_unix_sec
             )
-        except Exception as this_exception:
-            print(this_exception)
+        except Exception:
+            traceback.print_exc()
             pass
 
         if data_dict is None:
