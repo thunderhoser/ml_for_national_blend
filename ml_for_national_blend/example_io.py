@@ -80,24 +80,13 @@ def write_file(data_dict, npz_file_name):
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=npz_file_name)
 
-    print(type(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]))  # should be <class 'list'>
-    print([type(x) for x in data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]])  # should all be <class 'numpy.ndarray'>
-    print([x.shape for x in data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]])  # are all shapes shown?
+    output_dict = {
+        'predictor_matrix{0:d}'.format(i): this_array
+        for i, this_array in
+        enumerate(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY])
+    }
+    output_dict['target_matrix'] = data_dict[
+        nn_training_simple.TARGET_MATRIX_KEY
+    ]
 
-    big_array = numpy.array(
-        [pm for pm in data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]],
-        dtype=object
-    )
-    big_array = numpy.array(
-        numpy.array(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY], dtype=object),
-        dtype=object
-    )
-
-    numpy.savez(
-        npz_file_name,
-        predictor_matrices=numpy.array(
-            data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY].tolist(),
-            dtype=object
-        ),
-        target_matrix=data_dict[nn_training_simple.TARGET_MATRIX_KEY]
-    )
+    numpy.savez(npz_file_name, **output_dict)
