@@ -300,6 +300,14 @@ def create_data_dict_or_tuple(
         True, True,
         True, True,
         True, True,
+        allow_nan
+    ]
+    replace_nan_flags = [
+        True, False,
+        True, True,
+        True, True,
+        True, True,
+        True, True,
         False
     ]
 
@@ -318,11 +326,12 @@ def create_data_dict_or_tuple(
             numpy.nanmax(predictor_matrices[k])
         ))
 
-        if allow_nan_flags[k]:
+        if replace_nan_flags[k]:
             predictor_matrices[k][numpy.isnan(predictor_matrices[k])] = (
                 sentinel_value
             )
-        else:
+
+        if not allow_nan_flags[k]:
             error_checking.assert_is_numpy_array_without_nan(
                 predictor_matrices[k]
             )

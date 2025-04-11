@@ -560,7 +560,7 @@ def create_data(option_dict, init_time_unix_sec,
         target_matrix=target_matrix,
         sentinel_value=sentinel_value,
         return_predictors_as_dict=return_predictors_as_dict,
-        allow_nan=True
+        allow_nan=patch_location_dict is None
     )
 
     return {
@@ -1199,6 +1199,9 @@ def data_generator(option_dict, return_predictors_as_dict=False):
                             predict_gust_excess=True
                         )
                     )
+
+                    if numpy.any(numpy.isnan(this_baseline_matrix)):
+                        this_baseline_matrix = None
 
                     if compare_to_baseline_in_loss:
                         tfn = target_field_names
