@@ -3,6 +3,7 @@
 import copy
 import json
 import argparse
+import traceback
 import numpy
 from ml_for_national_blend.io import example_io
 from ml_for_national_blend.utils import nwp_model_utils
@@ -481,8 +482,8 @@ def _run(nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
                 option_dict=option_dict,
                 init_time_unix_sec=this_init_time_unix_sec
             )
-        except Exception as this_exception:
-            print(this_exception)
+        except Exception:
+            traceback.print_exc()
             pass
 
         if data_dict is None:
