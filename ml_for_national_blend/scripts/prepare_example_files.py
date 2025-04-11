@@ -474,11 +474,17 @@ def _run(nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
 
     for this_init_time_unix_sec in init_times_unix_sec:
         print(SEPARATOR_STRING)
+        data_dict = None
 
-        data_dict = nn_training_simple.create_data(
-            option_dict=option_dict,
-            init_time_unix_sec=this_init_time_unix_sec
-        )
+        try:
+            data_dict = nn_training_simple.create_data(
+                option_dict=option_dict,
+                init_time_unix_sec=this_init_time_unix_sec
+            )
+        except Exception as this_exception:
+            print(this_exception)
+            pass
+
         if data_dict is None:
             continue
 
