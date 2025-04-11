@@ -207,7 +207,8 @@ def create_data_dict_or_tuple(
         predictor_matrix_resid_baseline,
         recent_bias_matrix_2pt5km, recent_bias_matrix_10km,
         recent_bias_matrix_20km, recent_bias_matrix_40km,
-        target_matrix, sentinel_value, return_predictors_as_dict=False):
+        target_matrix, sentinel_value, return_predictors_as_dict=False,
+        allow_nan=False):
     """Finalizes data-processing by creating dictionary or tuple.
 
     The dictionary or tuple can be directly fed into a neural network.
@@ -229,12 +230,14 @@ def create_data_dict_or_tuple(
         `neural_net_training_simple.data_generator`.
     :param return_predictors_as_dict: Boolean flag.  If True (False), will
         return predictor matrices as dictionary (tuple).
+    :param allow_nan: Leave this alone for now.
     :return: predictor_matrices: Dictionary or tuple with 32-bit predictor
         matrices.
     """
 
     error_checking.assert_is_boolean(return_predictors_as_dict)
-    error_checking.assert_is_numpy_array_without_nan(target_matrix)
+    if not allow_nan:
+        error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
     print((
         'Shape of target matrix = {0:s} ... NaN fraction = {1:.4f}'
