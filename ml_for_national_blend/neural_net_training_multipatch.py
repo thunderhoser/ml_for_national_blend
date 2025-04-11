@@ -268,6 +268,9 @@ def create_data(
     ]
     nbm_constant_field_names = option_dict[nn_utils.NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[nn_utils.NBM_CONSTANT_FILE_KEY]
+    # compare_to_baseline_in_loss = option_dict[
+    #     nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY
+    # ]
     sentinel_value = option_dict[nn_utils.SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[nn_utils.PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[

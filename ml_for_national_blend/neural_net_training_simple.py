@@ -108,6 +108,9 @@ def create_data(option_dict, init_time_unix_sec,
     ]
     nbm_constant_field_names = option_dict[nn_utils.NBM_CONSTANT_FIELDS_KEY]
     nbm_constant_file_name = option_dict[nn_utils.NBM_CONSTANT_FILE_KEY]
+    compare_to_baseline_in_loss = option_dict[
+        nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY
+    ]
     sentinel_value = option_dict[nn_utils.SENTINEL_VALUE_KEY]
     patch_size_2pt5km_pixels = option_dict[nn_utils.PATCH_SIZE_KEY]
     patch_buffer_size_2pt5km_pixels = option_dict[
@@ -305,7 +308,11 @@ def create_data(option_dict, init_time_unix_sec,
     else:
         predictor_matrix_lagged_targets = None
 
-    if do_residual_prediction:
+    need_baseline = do_residual_prediction or compare_to_baseline_in_loss
+
+    if need_baseline:
+        raw_baseline_matrix = None
+
         try:
             predictor_matrix_resid_baseline = (
                 nwp_input.read_residual_baseline_one_example(
@@ -319,6 +326,25 @@ def create_data(option_dict, init_time_unix_sec,
                     predict_gust_excess=True
                 )
             )
+
+            if compare_to_baseline_in_loss:
+                tfn = target_field_names
+                if (
+                        urma_utils.DEWPOINT_2METRE_NAME in tfn
+                        or urma_utils.WIND_GUST_10METRE_NAME in tfn
+                ):
+                    raw_baseline_matrix = (
+                        nwp_input.read_residual_baseline_one_example(
+                            init_time_unix_sec=init_time_unix_sec,
+                            nwp_model_name=resid_baseline_model_name,
+                            nwp_lead_time_hours=resid_baseline_lead_time_hours,
+                            nwp_directory_name=resid_baseline_model_dir_name,
+                            target_field_names=target_field_names,
+                            patch_location_dict=patch_location_dict,
+                            predict_dewpoint_depression=False,
+                            predict_gust_excess=False
+                        )
+                    )
         except:
             warning_string = (
                 'POTENTIAL ERROR: Could not read residual baseline for '
@@ -339,6 +365,18 @@ def create_data(option_dict, init_time_unix_sec,
         predictor_matrix_resid_baseline = numpy.expand_dims(
             predictor_matrix_resid_baseline, axis=0
         )
+        if raw_baseline_matrix is not None:
+            raw_baseline_matrix = numpy.expand_dims(raw_baseline_matrix, axis=0)
+
+        if compare_to_baseline_in_loss:
+            if raw_baseline_matrix is None:
+                target_matrix = numpy.concatenate(
+                    [target_matrix, predictor_matrix_resid_baseline], axis=-1
+                )
+            else:
+                target_matrix = numpy.concatenate(
+                    [target_matrix, raw_baseline_matrix], axis=-1
+                )
     else:
         predictor_matrix_resid_baseline = None
 

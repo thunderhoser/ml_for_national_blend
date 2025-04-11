@@ -82,8 +82,8 @@ USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING = (
     PATCHES_TO_FULL_GRID_ARG_NAME
 )
 PATCH_OVERLAP_SIZE_HELP_STRING = (
-    'Overlap between adjacent patches, measured in number of pixels on the '
-    'finest-resolution (2.5-km) grid.'
+    '[used only if {0:s} == 1] Overlap between adjacent patches, measured in '
+    'number of pixels on the finest-resolution (2.5-km) grid.'
 ).format(
     PATCHES_TO_FULL_GRID_ARG_NAME
 )
@@ -226,7 +226,8 @@ def _run(model_file_name, init_time_string, nwp_model_names,
     )
     validation_option_dict.update({
         nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
-        nn_utils.TARGET_DIR_KEY: target_dir_name
+        nn_utils.TARGET_DIR_KEY: target_dir_name,
+        nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY: False
     })
     init_time_unix_sec = time_conversion.string_to_unix_sec(
         init_time_string, TIME_FORMAT
