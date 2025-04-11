@@ -75,7 +75,7 @@ def _run(template_file_name, output_dir_name,
          patch_size_2pt5km_pixels, patch_buffer_size_2pt5km_pixels,
          patch_start_row_2pt5km, patch_start_column_2pt5km,
          use_fast_patch_generator, patch_overlap_size_2pt5km_pixels,
-         temporary_predictor_dir_name, require_all_predictors,
+         require_all_predictors,
          do_residual_prediction, resid_baseline_model_name,
          resid_baseline_lead_time_hours, resid_baseline_model_dir_name,
          first_init_time_strings_for_training,
@@ -121,7 +121,6 @@ def _run(template_file_name, output_dir_name,
     :param patch_start_column_2pt5km: Same.
     :param use_fast_patch_generator: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
-    :param temporary_predictor_dir_name: Same.
     :param require_all_predictors: Same.
     :param do_residual_prediction: Same.
     :param resid_baseline_model_name: Same.
@@ -158,8 +157,6 @@ def _run(template_file_name, output_dir_name,
         resid_baseline_lead_time_hours = None
     if not use_fast_patch_generator:
         patch_overlap_size_2pt5km_pixels = None
-    if temporary_predictor_dir_name == '':
-        temporary_predictor_dir_name = None
     if patch_size_2pt5km_pixels < 0:
         patch_size_2pt5km_pixels = None
     if patch_start_row_2pt5km < 0:
@@ -294,7 +291,6 @@ def _run(template_file_name, output_dir_name,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
             patch_overlap_fast_gen_2pt5km_pixels=
             patch_overlap_size_2pt5km_pixels,
-            temporary_predictor_dir_name=temporary_predictor_dir_name,
             output_dir_name=output_dir_name
         )
     else:
@@ -318,7 +314,6 @@ def _run(template_file_name, output_dir_name,
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
-            temporary_predictor_dir_name=temporary_predictor_dir_name,
             output_dir_name=output_dir_name
         )
 
@@ -423,9 +418,6 @@ if __name__ == '__main__':
         )),
         patch_overlap_size_2pt5km_pixels=getattr(
             INPUT_ARG_OBJECT, training_args.PATCH_OVERLAP_SIZE_ARG_NAME
-        ),
-        temporary_predictor_dir_name=getattr(
-            INPUT_ARG_OBJECT, training_args.TEMPORARY_PREDICTOR_DIR_ARG_NAME
         ),
         require_all_predictors=bool(getattr(
             INPUT_ARG_OBJECT, training_args.REQUIRE_ALL_PREDICTORS_ARG_NAME

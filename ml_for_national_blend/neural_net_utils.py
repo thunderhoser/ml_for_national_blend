@@ -91,7 +91,6 @@ PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
-TEMPORARY_PREDICTOR_DIR_KEY = 'temporary_predictor_dir_name'
 
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, EMA_DECAY_KEY,
@@ -101,8 +100,7 @@ METADATA_KEYS = [
     U_NET_ARCHITECTURE_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
-    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY,
-    TEMPORARY_PREDICTOR_DIR_KEY
+    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY
 ]
 
 PREDICTOR_MATRIX_2PT5KM_KEY = 'predictor_matrix_2pt5km'
@@ -205,41 +203,6 @@ class EMAHelper:
 
         if raise_error_if_missing:
             assert found_any_diff
-
-
-def find_temporary_example_file(temporary_dir_name, init_time_unix_sec,
-                                raise_error_if_missing):
-    """Finds temporary .npz file with fully processed training example.
-    
-    :param temporary_dir_name: Path to temporary directory.
-    :param init_time_unix_sec: Forecast-initialization time.
-    :param raise_error_if_missing: Boolean flag.  If file is missing and
-        `raise_error_if_missing == True`, will throw error.  If file is missing
-        and `raise_error_if_missing == False`, will return *expected* file path.
-    :return: numpy_file_name: Path to .npz file with fully processed training
-        example.
-    :return: success: Boolean flag, indicating whether or not file exists.
-    :raises: ValueError: if file is missing
-        and `raise_error_if_missing == True`.
-    """
-
-    error_checking.assert_is_string(temporary_dir_name)
-    error_checking.assert_is_integer(init_time_unix_sec)
-    error_checking.assert_is_boolean(raise_error_if_missing)
-
-    numpy_file_name = '{0:s}/{1:s}.npz'.format(
-        temporary_dir_name,
-        time_conversion.unix_sec_to_string(init_time_unix_sec, '%Y-%m-%d-%H')
-    )
-
-    success = os.path.isfile(numpy_file_name)
-    if raise_error_if_missing and not success:
-        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
-            numpy_file_name
-        )
-        raise ValueError(error_string)
-
-    return numpy_file_name, success
 
 
 def create_data_dict_or_tuple(
@@ -1424,8 +1387,7 @@ def write_metafile(
         u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
-        temporary_predictor_dir_name):
+        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -1446,7 +1408,6 @@ def write_metafile(
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
     :param patch_overlap_fast_gen_2pt5km_pixels: Same.
-    :param temporary_predictor_dir_name: Same.
     """
 
     metadata_dict = {
@@ -1466,8 +1427,7 @@ def write_metafile(
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
-        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels,
-        TEMPORARY_PREDICTOR_DIR_KEY: temporary_predictor_dir_name
+        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels
     }
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=pickle_file_name)
@@ -1500,7 +1460,6 @@ def read_metafile(pickle_file_name):
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
     metadata_dict["patch_overlap_fast_gen_2pt5km_pixels"]: Same.
-    metadata_dict["temporary_predictor_dir_name"]: Same.
 
     :raises: ValueError: if any expected key is not found in dictionary.
     """
@@ -1513,8 +1472,6 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
-    if TEMPORARY_PREDICTOR_DIR_KEY not in metadata_dict:
-        metadata_dict[TEMPORARY_PREDICTOR_DIR_KEY] = None
     if U_NET_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[U_NET_ARCHITECTURE_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:

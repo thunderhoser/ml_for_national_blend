@@ -2,7 +2,6 @@
 
 import os
 import sys
-import time
 import warnings
 import numpy
 import pandas
@@ -13,9 +12,11 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import example_io
 import nwp_model_io
 import urma_io
 import nbm_constant_io
+import nwp_model_utils
 import misc_utils
 import urma_utils
 import nbm_utils
@@ -801,9 +802,246 @@ def create_data(
     }
 
 
+def data_generator_from_example_files(
+        example_dir_name, first_init_times_unix_sec, last_init_times_unix_sec,
+        num_examples_per_batch, patch_size_2pt5km_pixels,
+        patch_buffer_size_2pt5km_pixels, patch_overlap_size_2pt5km_pixels,
+        return_predictors_as_dict=False):
+    """Generates training or validation data from pre-processed .npz files.
+
+    :param example_dir_name: Path to directory with pre-processed .npz files.
+        Files will be found by `example_io.find_file` and read by
+        `example_io.read_file`.
+    :param first_init_times_unix_sec: length-P numpy array (where P = number of
+        continuous periods in dataset), containing start time of each continuous
+        period.
+    :param last_init_times_unix_sec: length-P numpy array (where P = number of
+        continuous periods in dataset), containing end time of each continuous
+        period.
+    :param num_examples_per_batch: Number of data examples per batch, usually
+        just called "batch size".
+    :param patch_size_2pt5km_pixels: Patch size, in units of 2.5-km pixels.  For
+        example, if patch_size_2pt5km_pixels = 448, then grid dimensions at the
+        finest resolution (2.5 km) are 448 x 448.
+    :param patch_buffer_size_2pt5km_pixels: Buffer between the outer domain
+        (used for predictors) and the inner domain (used to penalize predictions
+        in loss function).  This must be a non-negative integer.
+    :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
+        in terms of 2.5-km pixels.
+        
+    :param return_predictors_as_dict: See documentation for
+        `neural_net_utils.create_data_dict_or_tuple`.
+    :return: predictor_matrices: See documentation for `data_generator`.
+    :return: target_matrix: Same.
+    """
+
+    # Check input args.
+    error_checking.assert_is_numpy_array(
+        first_init_times_unix_sec, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(first_init_times_unix_sec)
+    num_periods = len(first_init_times_unix_sec)
+    expected_dim = numpy.array([num_periods], dtype=int)
+
+    error_checking.assert_is_numpy_array(
+        last_init_times_unix_sec, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_integer_numpy_array(last_init_times_unix_sec)
+    error_checking.assert_is_geq_numpy_array(
+        last_init_times_unix_sec - first_init_times_unix_sec,
+        0
+    )
+
+    error_checking.assert_is_integer(num_examples_per_batch)
+    error_checking.assert_is_geq(num_examples_per_batch, 1)
+    error_checking.assert_is_boolean(return_predictors_as_dict)
+
+    error_checking.assert_is_integer(patch_size_2pt5km_pixels)
+    error_checking.assert_is_greater(patch_size_2pt5km_pixels, 0)
+    error_checking.assert_is_integer(patch_buffer_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_buffer_size_2pt5km_pixels, 0)
+    error_checking.assert_is_less_than(
+        patch_buffer_size_2pt5km_pixels, patch_size_2pt5km_pixels // 2
+    )
+    error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
+
+    # Do actual stuff.
+    init_times_unix_sec = nn_utils.find_relevant_init_times(
+        first_time_by_period_unix_sec=first_init_times_unix_sec,
+        last_time_by_period_unix_sec=last_init_times_unix_sec,
+        nwp_model_names=[nwp_model_utils.HRRR_MODEL_NAME]
+    )
+    numpy.random.shuffle(init_times_unix_sec)
+    init_time_index = 0
+
+    patch_metalocation_dict = init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+    full_predictor_matrices = None
+    full_target_matrix = None
+    num_rows_in_full_grid = len(nbm_utils.NBM_Y_COORDS_METRES)
+
+    while True:
+        num_examples_in_memory = 0
+        predictor_matrices = None
+        target_matrix = None
+
+        while num_examples_in_memory < num_examples_per_batch:
+            patch_metalocation_dict = update_patch_metalocation_dict(
+                patch_metalocation_dict
+            )
+
+            if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
+                full_predictor_matrices = None
+                full_target_matrix = None
+
+                init_time_index, init_times_unix_sec = (
+                    nn_utils.increment_init_time(
+                        current_index=init_time_index,
+                        init_times_unix_sec=init_times_unix_sec
+                    )
+                )
+                continue
+
+            if full_predictor_matrices is None:
+                example_file_name = example_io.find_file(
+                    directory_name=example_dir_name,
+                    init_time_unix_sec=init_times_unix_sec[init_time_index],
+                    raise_error_if_missing=False
+                )
+
+                if not os.path.isfile(example_file_name):
+                    init_time_index, init_times_unix_sec = (
+                        nn_utils.increment_init_time(
+                            current_index=init_time_index,
+                            init_times_unix_sec=init_times_unix_sec
+                        )
+                    )
+                    continue
+
+                print('Reading data from: "{0:s}"...'.format(example_file_name))
+                full_predictor_matrices, full_target_matrix = (
+                    example_io.read_file(example_file_name)
+                )
+
+            patch_location_dict = misc_utils.determine_patch_locations(
+                patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+                start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
+                start_column_2pt5km=
+                patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+            )
+            pld = patch_location_dict
+
+            if predictor_matrices is None:
+                these_dim = (
+                    num_examples_per_batch, patch_size_2pt5km_pixels,
+                    patch_size_2pt5km_pixels
+                )
+                these_dim = these_dim + target_matrix.shape[3:]
+                target_matrix = numpy.full(these_dim, numpy.nan)
+
+                predictor_matrices = (
+                    [numpy.array([])] * len(full_predictor_matrices)
+                )
+
+                for m in range(len(full_predictor_matrices)):
+                    if (
+                            full_predictor_matrices[m].shape[1] ==
+                            num_rows_in_full_grid
+                    ):
+                        these_dim = (
+                            num_examples_per_batch, patch_size_2pt5km_pixels,
+                            patch_size_2pt5km_pixels
+                        )
+
+                    elif numpy.isclose(
+                            full_predictor_matrices[m].shape[1],
+                            num_rows_in_full_grid // 4, atol=1
+                    ):
+                        these_dim = (
+                            num_examples_per_batch, patch_size_2pt5km_pixels // 4,
+                            patch_size_2pt5km_pixels // 4
+                        )
+
+                    elif numpy.isclose(
+                            full_predictor_matrices[m].shape[1],
+                            num_rows_in_full_grid // 8, atol=1
+                    ):
+                        these_dim = (
+                            num_examples_per_batch, patch_size_2pt5km_pixels // 8,
+                            patch_size_2pt5km_pixels // 8
+                        )
+
+                    elif numpy.isclose(
+                            full_predictor_matrices[m].shape[1],
+                            num_rows_in_full_grid // 16, atol=1
+                    ):
+                        these_dim = (
+                            num_examples_per_batch, patch_size_2pt5km_pixels // 16,
+                            patch_size_2pt5km_pixels // 16
+                        )
+
+                    these_dim = these_dim + full_predictor_matrices[m].shape[3:]
+                    predictor_matrices[m] = numpy.full(these_dim, numpy.nan)
+
+            j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+            i = num_examples_in_memory + 0
+
+            target_matrix[i, ...] = (
+                full_target_matrix[0, j_start:j_end, k_start:k_end, ...]
+            )
+
+            for m in range(len(predictor_matrices)):
+                if predictor_matrices[m].shape[1] == patch_size_2pt5km_pixels:
+                    j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+                    j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+                    k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+                    k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+                elif (
+                        predictor_matrices[m].shape[1] ==
+                        patch_size_2pt5km_pixels // 4
+                ):
+                    j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+                    j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+                    k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+                    k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+                elif (
+                        predictor_matrices[m].shape[1] ==
+                        patch_size_2pt5km_pixels // 8
+                ):
+                    j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+                    j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+                    k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+                    k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+                elif (
+                        predictor_matrices[m].shape[1] ==
+                        patch_size_2pt5km_pixels // 16
+                ):
+                    j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+                    j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+                    k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+                    k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
+                predictor_matrices[m][i, ...] = (
+                    full_predictor_matrices[m][0, j_start:j_end, k_start:k_end, ...]
+                )
+
+            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+                continue
+
+            num_examples_in_memory += 1
+
+        yield predictor_matrices, target_matrix
+
+
 def data_generator(
         option_dict, patch_overlap_size_2pt5km_pixels,
-        temporary_predictor_dir_name=None, return_predictors_as_dict=False):
+        return_predictors_as_dict=False):
     """Generates data for multi-patch training.
 
     E = number of examples per batch = "batch size"
@@ -923,13 +1161,6 @@ def data_generator(
 
     :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
         in terms of 2.5-km pixels.
-    :param temporary_predictor_dir_name: Path to temporary directory, where
-        fully processed, full-grid training examples will be stored as .npz
-        files.  Thus, for each initialization time t_0, the data will be read
-        from the source directories only once (the first time t_0 is needed).
-        Subsequently, the data will be read from a .npz file in this temporary
-        directory.  If you do not want to use these .npz files, make the
-        argument None.
     :param return_predictors_as_dict: See documentation for
         `neural_net_utils.create_data_dict_or_tuple`.
 
@@ -1043,10 +1274,6 @@ def data_generator(
 
     error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
     error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
-    if temporary_predictor_dir_name is not None:
-        file_system_utils.mkdir_recursive_if_necessary(
-            directory_name=temporary_predictor_dir_name
-        )
 
     nwp_model_names = list(nwp_model_to_dir_name.keys())
     nwp_model_names.sort()
@@ -1127,7 +1354,6 @@ def data_generator(
         )
 
     numpy.random.shuffle(init_times_unix_sec)
-    orig_init_times_unix_sec = init_times_unix_sec + 0
     init_time_index = 0
 
     patch_metalocation_dict = init_patch_metalocation_dict(
@@ -1226,93 +1452,18 @@ def data_generator(
                 )
                 continue
 
-            if temporary_predictor_dir_name is None:
-                full_grid_numpy_file_name = 'foo'
-                success = False
-            else:
-                full_grid_numpy_file_name, success = (
-                    nn_utils.find_temporary_example_file(
-                        temporary_dir_name=temporary_predictor_dir_name,
-                        init_time_unix_sec=init_times_unix_sec[init_time_index],
-                        raise_error_if_missing=False
-                    )
-                )
-
-                if not success and not numpy.array_equal(
-                        init_times_unix_sec, orig_init_times_unix_sec
-                ):
-                    init_time_index, init_times_unix_sec = (
-                        nn_utils.increment_init_time(
-                            current_index=init_time_index,
-                            init_times_unix_sec=init_times_unix_sec
-                        )
-                    )
-                    continue
-
             try:
                 if full_target_matrix is None:
-                    if success:
-                        print('Reading data from: "{0:s}"...'.format(
-                            full_grid_numpy_file_name
-                        ))
-                        full_grid_dict = numpy.load(full_grid_numpy_file_name)
-                        fgd = full_grid_dict
-
-                        full_target_matrix = (
-                            None if fgd['full_target_matrix'].size == 0
-                            else fgd['full_target_matrix']
-                        )
-                        full_baseline_matrix = (
-                            None if fgd['full_baseline_matrix'].size == 0
-                            else fgd['full_baseline_matrix']
-                        )
-                        full_predictor_matrix_2pt5km = (
-                            None if fgd['full_predictor_matrix_2pt5km'].size == 0
-                            else fgd['full_predictor_matrix_2pt5km']
-                        )
-                        full_predictor_matrix_10km = (
-                            None if fgd['full_predictor_matrix_10km'].size == 0
-                            else fgd['full_predictor_matrix_10km']
-                        )
-                        full_predictor_matrix_20km = (
-                            None if fgd['full_predictor_matrix_20km'].size == 0
-                            else fgd['full_predictor_matrix_20km']
-                        )
-                        full_predictor_matrix_40km = (
-                            None if fgd['full_predictor_matrix_40km'].size == 0
-                            else fgd['full_predictor_matrix_40km']
-                        )
-                        full_recent_bias_matrix_2pt5km = (
-                            None if fgd['full_recent_bias_matrix_2pt5km'].size == 0
-                            else fgd['full_recent_bias_matrix_2pt5km']
-                        )
-                        full_recent_bias_matrix_10km = (
-                            None if fgd['full_recent_bias_matrix_10km'].size == 0
-                            else fgd['full_recent_bias_matrix_10km']
-                        )
-                        full_recent_bias_matrix_20km = (
-                            None if fgd['full_recent_bias_matrix_20km'].size == 0
-                            else fgd['full_recent_bias_matrix_20km']
-                        )
-                        full_recent_bias_matrix_40km = (
-                            None if fgd['full_recent_bias_matrix_40km'].size == 0
-                            else fgd['full_recent_bias_matrix_40km']
-                        )
-                        full_predictor_matrix_lagged_targets = (
-                            None if fgd['full_predictor_matrix_lagged_targets'].size == 0
-                            else fgd['full_predictor_matrix_lagged_targets']
-                        )
-                    else:
-                        full_target_matrix = nn_utils.read_targets_one_example(
-                            init_time_unix_sec=init_times_unix_sec[init_time_index],
-                            target_lead_time_hours=target_lead_time_hours,
-                            target_field_names=target_field_names,
-                            target_dir_name=target_dir_name,
-                            target_norm_param_table_xarray=None,
-                            target_resid_norm_param_table_xarray=None,
-                            use_quantile_norm=False,
-                            patch_location_dict=None
-                        )
+                    full_target_matrix = nn_utils.read_targets_one_example(
+                        init_time_unix_sec=init_times_unix_sec[init_time_index],
+                        target_lead_time_hours=target_lead_time_hours,
+                        target_field_names=target_field_names,
+                        target_dir_name=target_dir_name,
+                        target_norm_param_table_xarray=None,
+                        target_resid_norm_param_table_xarray=None,
+                        use_quantile_norm=False,
+                        patch_location_dict=None
+                    )
             except:
                 warning_string = (
                     'POTENTIAL ERROR: Could not read targets for init time '
@@ -1630,84 +1781,6 @@ def data_generator(
                     )
                 )
                 continue
-
-            if temporary_predictor_dir_name is None:
-                full_grid_numpy_file_name = 'foo'
-                success = True
-            else:
-                full_grid_numpy_file_name, success = (
-                    nn_utils.find_temporary_example_file(
-                        temporary_dir_name=temporary_predictor_dir_name,
-                        init_time_unix_sec=init_times_unix_sec[init_time_index],
-                        raise_error_if_missing=False
-                    )
-                )
-
-            if not success:
-                current_nanoseconds = int(numpy.round(time.time_ns()))
-
-                in_progress_file_name = '{0:s}_tmp{1:d}{2:s}'.format(
-                    os.path.splitext(full_grid_numpy_file_name)[0],
-                    current_nanoseconds,
-                    os.path.splitext(full_grid_numpy_file_name)[1]
-                )
-
-                print('Writing full-grid predictors to: "{0:s}"...'.format(
-                    in_progress_file_name
-                ))
-                numpy.savez(
-                    in_progress_file_name,
-                    full_target_matrix=(
-                        numpy.array([]) if full_target_matrix is None
-                        else full_target_matrix
-                    ),
-                    full_baseline_matrix=(
-                        numpy.array([]) if full_baseline_matrix is None
-                        else full_baseline_matrix
-                    ),
-                    full_predictor_matrix_2pt5km=(
-                        numpy.array([]) if full_predictor_matrix_2pt5km is None
-                        else full_predictor_matrix_2pt5km
-                    ),
-                    full_predictor_matrix_10km=(
-                        numpy.array([]) if full_predictor_matrix_10km is None
-                        else full_predictor_matrix_10km
-                    ),
-                    full_predictor_matrix_20km=(
-                        numpy.array([]) if full_predictor_matrix_20km is None
-                        else full_predictor_matrix_20km
-                    ),
-                    full_predictor_matrix_40km=(
-                        numpy.array([]) if full_predictor_matrix_40km is None
-                        else full_predictor_matrix_40km
-                    ),
-
-                    full_recent_bias_matrix_2pt5km=(
-                        numpy.array([]) if full_recent_bias_matrix_2pt5km is None
-                        else full_recent_bias_matrix_2pt5km
-                    ),
-                    full_recent_bias_matrix_10km=(
-                        numpy.array([]) if full_recent_bias_matrix_10km is None
-                        else full_recent_bias_matrix_10km
-                    ),
-                    full_recent_bias_matrix_20km=(
-                        numpy.array([]) if full_recent_bias_matrix_20km is None
-                        else full_recent_bias_matrix_20km
-                    ),
-                    full_recent_bias_matrix_40km=(
-                        numpy.array([]) if full_recent_bias_matrix_40km is None
-                        else full_recent_bias_matrix_40km
-                    ),
-                    full_predictor_matrix_lagged_targets=(
-                        numpy.array([]) if full_predictor_matrix_lagged_targets is None
-                        else full_predictor_matrix_lagged_targets
-                    )
-                )
-
-                try:
-                    os.rename(in_progress_file_name, full_grid_numpy_file_name)
-                except:
-                    os.remove(in_progress_file_name)
 
             patch_location_dict = misc_utils.determine_patch_locations(
                 patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
@@ -2446,8 +2519,7 @@ def train_u_net(
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
-        patch_overlap_fast_gen_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
-        temporary_predictor_dir_name=None
+        patch_overlap_fast_gen_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
     )
 
     model_object.fit(
@@ -2472,7 +2544,8 @@ def train_model(
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
-        temporary_predictor_dir_name, output_dir_name):
+        output_dir_name,
+        training_generator=None, validation_generator=None):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -2524,9 +2597,12 @@ def train_model(
         early_stopping_patience_epochs.
     :param patch_overlap_fast_gen_2pt5km_pixels: See documentation for
         `data_generator`.
-    :param temporary_predictor_dir_name: Same.
     :param output_dir_name: Path to output directory (model and training history
         will be saved here).
+    :param training_generator: Leave this alone if you don't know what you're
+        doing.
+    :param validation_generator: Leave this alone if you don't know what you're
+        doing.
     """
 
     file_system_utils.mkdir_recursive_if_necessary(
@@ -2612,16 +2688,17 @@ def train_model(
         backup_object
     ]
 
-    training_generator = data_generator(
-        option_dict=training_option_dict,
-        patch_overlap_size_2pt5km_pixels=patch_overlap_fast_gen_2pt5km_pixels,
-        temporary_predictor_dir_name=temporary_predictor_dir_name
-    )
-    validation_generator = data_generator(
-        option_dict=validation_option_dict,
-        patch_overlap_size_2pt5km_pixels=patch_overlap_fast_gen_2pt5km_pixels,
-        temporary_predictor_dir_name=temporary_predictor_dir_name
-    )
+    if training_generator is None or validation_generator is None:
+        training_generator = data_generator(
+            option_dict=training_option_dict,
+            patch_overlap_size_2pt5km_pixels=
+            patch_overlap_fast_gen_2pt5km_pixels
+        )
+        validation_generator = data_generator(
+            option_dict=validation_option_dict,
+            patch_overlap_size_2pt5km_pixels=
+            patch_overlap_fast_gen_2pt5km_pixels
+        )
 
     metafile_name = nn_utils.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=False
@@ -2647,8 +2724,7 @@ def train_model(
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
         patch_overlap_fast_gen_2pt5km_pixels=
-        patch_overlap_fast_gen_2pt5km_pixels,
-        temporary_predictor_dir_name=temporary_predictor_dir_name
+        patch_overlap_fast_gen_2pt5km_pixels
     )
 
     if use_exp_moving_average_with_decay is None:
