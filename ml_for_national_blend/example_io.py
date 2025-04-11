@@ -79,10 +79,14 @@ def write_file(data_dict, npz_file_name):
     """
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=npz_file_name)
+    print(len(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]))
+    print(type(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]))
+
     numpy.savez(
         npz_file_name,
         predictor_matrices=numpy.array(
-            data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY], dtype=object
+            data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY].tolist(),
+            dtype=object
         ),
         target_matrix=data_dict[nn_training_simple.TARGET_MATRIX_KEY]
     )
