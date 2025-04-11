@@ -85,6 +85,10 @@ def write_file(data_dict, npz_file_name):
     print([x.shape for x in data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]])  # are all shapes shown?
 
     big_array = numpy.array(
+        [pm for pm in data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY]],
+        dtype=object
+    )
+    big_array = numpy.array(
         numpy.array(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY], dtype=object),
         dtype=object
     )
