@@ -56,10 +56,15 @@ def read_file(npz_file_name):
     """
 
     error_checking.assert_file_exists(npz_file_name)
-    this_dict = numpy.load(npz_file_name, allow_pickle=True)
+    this_dict = numpy.load(npz_file_name)
+
+    predictor_keys = sorted(
+        [key for key in this_dict.files if key.startswith('predictor_matrix')],
+        key=lambda x: int(x.replace('predictor_matrix', ''))
+    )
 
     return (
-        tuple(this_dict['predictor_matrices'].tolist()),
+        tuple([this_dict[key] for key in predictor_keys]),
         this_dict['target_matrix']
     )
 
@@ -73,8 +78,14 @@ def write_file(data_dict, npz_file_name):
     """
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=npz_file_name)
-    numpy.savez(
-        npz_file_name,
-        predictor_matrices=data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY],
-        target_matrix=data_dict[nn_training_simple.TARGET_MATRIX_KEY]
-    )
+
+    output_dict = {
+        'predictor_matrix{0:d}'.format(i): this_array
+        for i, this_array in
+        enumerate(data_dict[nn_training_simple.PREDICTOR_MATRICES_KEY])
+    }
+    output_dict['target_matrix'] = data_dict[
+        nn_training_simple.TARGET_MATRIX_KEY
+    ]
+
+    numpy.savez(npz_file_name, **output_dict)

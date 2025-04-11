@@ -773,6 +773,63 @@ def create_data(
         [target_matrix, mask_matrix_for_loss], axis=-1
     )
 
+    bad_flags = numpy.any(
+        numpy.isnan(target_matrix),
+        axis=tuple(range(1, target_matrix.ndim))
+    )
+
+    if predictor_matrix_resid_baseline is not None:
+        second_bad_flags = numpy.any(
+            numpy.isnan(predictor_matrix_resid_baseline),
+            axis=tuple(range(1, predictor_matrix_resid_baseline.ndim))
+        )
+        bad_flags = numpy.logical_or(bad_flags, second_bad_flags)
+
+    good_indices = numpy.where(numpy.invert(bad_flags))[0]
+    if len(good_indices) == 0:
+        return None
+
+    all_matrix_dict = {
+        'predictor_matrix_2pt5km': predictor_matrix_2pt5km,
+        'nbm_constant_matrix': nbm_constant_matrix,
+        'predictor_matrix_lagged_targets': predictor_matrix_lagged_targets,
+        'predictor_matrix_10km': predictor_matrix_10km,
+        'predictor_matrix_20km': predictor_matrix_20km,
+        'predictor_matrix_40km': predictor_matrix_40km,
+        'recent_bias_matrix_2pt5km': recent_bias_matrix_2pt5km,
+        'recent_bias_matrix_10km': recent_bias_matrix_10km,
+        'recent_bias_matrix_20km': recent_bias_matrix_20km,
+        'recent_bias_matrix_40km': recent_bias_matrix_40km,
+        'predictor_matrix_resid_baseline': predictor_matrix_resid_baseline,
+        'target_matrix': target_matrix,
+        'init_times_unix_sec': numpy.full(num_patches, init_time_unix_sec),
+        'latitude_matrix_deg_n': latitude_matrix_deg_n,
+        'longitude_matrix_deg_e': longitude_matrix_deg_e
+    }
+
+    for this_key in all_matrix_dict:
+        if all_matrix_dict[this_key] is None:
+            continue
+
+        all_matrix_dict[this_key] = all_matrix_dict[this_key][good_indices, ...]
+
+    amd = all_matrix_dict
+    predictor_matrix_2pt5km = amd['predictor_matrix_2pt5km']
+    nbm_constant_matrix = amd['nbm_constant_matrix']
+    predictor_matrix_lagged_targets = amd['predictor_matrix_lagged_targets']
+    predictor_matrix_10km = amd['predictor_matrix_10km']
+    predictor_matrix_20km = amd['predictor_matrix_20km']
+    predictor_matrix_40km = amd['predictor_matrix_40km']
+    recent_bias_matrix_2pt5km = amd['recent_bias_matrix_2pt5km']
+    recent_bias_matrix_10km = amd['recent_bias_matrix_10km']
+    recent_bias_matrix_20km = amd['recent_bias_matrix_20km']
+    recent_bias_matrix_40km = amd['recent_bias_matrix_40km']
+    predictor_matrix_resid_baseline = amd['predictor_matrix_resid_baseline']
+    target_matrix = amd['target_matrix']
+    init_times_unix_sec = amd['init_times_unix_sec']
+    latitude_matrix_deg_n = amd['latitude_matrix_deg_n']
+    longitude_matrix_deg_e = amd['longitude_matrix_deg_e']
+
     predictor_matrices = nn_utils.create_data_dict_or_tuple(
         predictor_matrix_2pt5km=predictor_matrix_2pt5km,
         nbm_constant_matrix=nbm_constant_matrix,
@@ -793,7 +850,7 @@ def create_data(
     return {
         PREDICTOR_MATRICES_KEY: list(predictor_matrices),
         TARGET_MATRIX_KEY: target_matrix,
-        INIT_TIMES_KEY: numpy.full(num_patches, init_time_unix_sec),
+        INIT_TIMES_KEY: init_times_unix_sec,
         LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
         LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
     }
@@ -992,6 +1049,10 @@ def data_generator_from_example_files(
             target_matrix[i, ...] = (
                 full_target_matrix[0, j_start:j_end, k_start:k_end, ...]
             )
+            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+                continue
+
+            found_nan = False
 
             for m in range(len(predictor_matrices)):
                 if predictor_matrices[m].shape[1] == patch_size_2pt5km_pixels:
@@ -1028,7 +1089,11 @@ def data_generator_from_example_files(
                     full_predictor_matrices[m][0, j_start:j_end, k_start:k_end, ...]
                 )
 
-            if numpy.any(numpy.isnan(target_matrix[i, ...])):
+                if numpy.any(numpy.isnan(predictor_matrices[m][i, ...])):
+                    found_nan = True
+                    break
+
+            if found_nan:
                 continue
 
             num_examples_in_memory += 1
@@ -1824,6 +1889,9 @@ def data_generator(
                 predictor_matrix_resid_baseline[i, ...] = (
                     full_baseline_matrix[j_start:j_end, k_start:k_end, ...]
                 )
+
+                if numpy.any(numpy.isnan(predictor_matrix_resid_baseline[i, ...])):
+                    continue
 
             if predictor_matrix_lagged_targets is not None:
                 predictor_matrix_lagged_targets[i, ...] = (
