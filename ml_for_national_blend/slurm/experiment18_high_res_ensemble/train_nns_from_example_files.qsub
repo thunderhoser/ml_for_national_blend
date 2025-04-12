@@ -42,7 +42,7 @@ example_dir_name="${TOP_EXAMPLE_DIR_NAME}/nwp-inputs=${model_name_set}/npz_examp
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nwp-inputs=${model_names_one_string}"
 echo $output_dir_name
 
-python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+python3 -u "${CODE_DIR_NAME}/train_nn_from_example_files.py" \
 --input_template_file_name="${input_model_file_name}" \
 --input_example_dir_name="${example_dir_name}" \
 --output_model_dir_name="${output_dir_name}" \
