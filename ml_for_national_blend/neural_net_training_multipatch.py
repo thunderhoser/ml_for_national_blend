@@ -999,7 +999,7 @@ def data_generator_from_example_files(
                     num_examples_per_batch, patch_size_2pt5km_pixels,
                     patch_size_2pt5km_pixels
                 )
-                these_dim = these_dim + target_matrix.shape[3:]
+                these_dim = these_dim + full_target_matrix.shape[3:]
                 target_matrix = numpy.full(these_dim, numpy.nan)
 
                 predictor_matrices = (
