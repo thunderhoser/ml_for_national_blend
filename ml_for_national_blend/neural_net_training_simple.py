@@ -669,12 +669,14 @@ def data_generator_from_example_files(
                     these_predictor_matrices[j][0, ...]
                 )
 
-        init_time_index, init_times_unix_sec = (
-            nn_utils.increment_init_time(
-                current_index=init_time_index,
-                init_times_unix_sec=init_times_unix_sec
+            num_examples_in_memory += 1
+            init_time_index, init_times_unix_sec = (
+                nn_utils.increment_init_time(
+                    current_index=init_time_index,
+                    init_times_unix_sec=init_times_unix_sec
+                )
             )
-        )
+
         yield tuple(predictor_matrices), target_matrix
 
 
