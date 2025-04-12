@@ -38,7 +38,7 @@ MODEL_NAME_SETS_ONE_STRING=("ensemble_hrrr_wrf-arw" "ensemble_hrrr_nam-nest" "en
 model_names_one_string=${MODEL_NAME_SETS_ONE_STRING[$SLURM_ARRAY_TASK_ID]}
 
 input_model_file_name="${TEMPLATE_DIR_NAME}/nwp-inputs=${model_names_one_string}/model.keras"
-example_dir_name="${TOP_EXAMPLE_DIR_NAME}/nwp-inputs=${model_name_set}/npz_example_files"
+example_dir_name="${TOP_EXAMPLE_DIR_NAME}/nwp-inputs=${model_names_one_string}/npz_example_files"
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nwp-inputs=${model_names_one_string}"
 echo $output_dir_name
 
