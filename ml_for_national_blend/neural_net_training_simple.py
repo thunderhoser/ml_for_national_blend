@@ -675,7 +675,7 @@ def data_generator_from_example_files(
                 init_times_unix_sec=init_times_unix_sec
             )
         )
-        yield predictor_matrices, target_matrix
+        yield tuple(predictor_matrices), target_matrix
 
 
 def data_generator(option_dict, return_predictors_as_dict=False):

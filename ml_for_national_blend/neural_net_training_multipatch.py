@@ -1104,7 +1104,7 @@ def data_generator_from_example_files(
 
             num_examples_in_memory += 1
 
-        yield predictor_matrices, target_matrix
+        yield tuple(predictor_matrices), target_matrix
 
 
 def data_generator(
