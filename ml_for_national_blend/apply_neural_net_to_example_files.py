@@ -267,6 +267,9 @@ def _run(model_file_name, example_dir_name, init_time_string,
         while len(mask_matrix.shape) < len(prediction_matrix.shape):
             mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
 
+        print(prediction_matrix.shape)
+        print(mask_matrix.shape)
+
         prediction_matrix[mask_matrix == False] = numpy.nan
 
     output_file_name = prediction_io.find_file(
