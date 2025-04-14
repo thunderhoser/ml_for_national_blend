@@ -42,6 +42,105 @@ LATITUDE_MATRIX_KEY = 'latitude_matrix_deg_n'
 LONGITUDE_MATRIX_KEY = 'longitude_matrix_deg_e'
 
 
+def create_data_from_example_file(
+        example_dir_name, init_time_unix_sec,
+        patch_start_row_2pt5km=None, patch_start_column_2pt5km=None):
+    """Creates validation or testing data from pre-processed .npz file.
+
+    E = number of examples (data samples) = 1
+    M = number of rows in full-resolution (2.5-km) grid
+    N = number of columns in full-resolution (2.5-km) grid
+
+    :param example_dir_name: Path to directory with pre-processed .npz files.
+        Files will be found by `example_io.find_file` and read by
+        `example_io.read_file`.
+    :param init_time_unix_sec: Will return data only for this initialization
+        time.
+    :param patch_start_row_2pt5km: If the example file contains a patch rather
+        than the full NBM domain, this must be the start row of the patch.  If
+        the example file contains the full NBM domain, make this None.
+    :param patch_start_column_2pt5km: Same as above but for column.
+    :return: data_dict: Dictionary with the following keys.
+    data_dict["predictor_matrices"]: Same as output from `data_generator`.
+    data_dict["target_matrix"]: Same as output from `data_generator`.
+    data_dict["init_times_unix_sec"]: length-E numpy array of forecast-
+        initialization times.
+    data_dict["latitude_matrix_deg_n"]: E-by-M-by-N numpy array of grid-point
+        latitudes (deg north).
+    data_dict["longitude_matrix_deg_e"]: E-by-M-by-N numpy array of grid-point
+        longitudes (deg east).
+    """
+
+    # TODO(thunderhoser): patch_start_row_2pt5km and patch_start_row_2pt5km
+    # should be stored in the example files.  Forcing the user to supply these
+    # input args is error-prone.
+
+    # Check input args.
+    error_checking.assert_is_integer(init_time_unix_sec)
+
+    # Do actual stuff.
+    example_file_name = example_io.find_file(
+        directory_name=example_dir_name,
+        init_time_unix_sec=init_time_unix_sec,
+        raise_error_if_missing=False
+    )
+    if not os.path.isfile(example_file_name):
+        return None
+
+    print('Reading data from: "{0:s}"...'.format(example_file_name))
+    predictor_matrices, target_matrix = example_io.read_file(example_file_name)
+
+    full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+        nbm_utils.read_coords()
+    )
+    full_latitude_matrix_deg_n = numpy.expand_dims(
+        full_latitude_matrix_deg_n, axis=0
+    )
+    full_longitude_matrix_deg_e = numpy.expand_dims(
+        full_longitude_matrix_deg_e, axis=0
+    )
+
+    num_rows_in_patch = target_matrix.shape[1]
+    num_columns_in_patch = target_matrix.shape[2]
+    num_rows_in_full_grid = full_latitude_matrix_deg_n.shape[1]
+    num_columns_in_full_grid = full_latitude_matrix_deg_n.shape[2]
+
+    if (
+            num_rows_in_patch == num_rows_in_full_grid and
+            num_columns_in_patch == num_columns_in_full_grid
+    ):
+        latitude_matrix_deg_n = full_latitude_matrix_deg_n + 0.
+        longitude_matrix_deg_e = full_longitude_matrix_deg_e + 0.
+    else:
+        error_checking.assert_is_integer(patch_start_row_2pt5km)
+        error_checking.assert_is_geq(patch_start_row_2pt5km, 0)
+        error_checking.assert_is_integer(patch_start_column_2pt5km)
+        error_checking.assert_is_geq(patch_start_column_2pt5km, 0)
+
+        i_start = patch_start_row_2pt5km + 0
+        i_end = patch_start_row_2pt5km + num_rows_in_patch
+        j_start = patch_start_column_2pt5km + 0
+        j_end = patch_start_column_2pt5km + num_columns_in_patch
+
+        error_checking.assert_is_leq(i_end, num_rows_in_full_grid)
+        error_checking.assert_is_leq(j_end, num_columns_in_full_grid)
+
+        latitude_matrix_deg_n = (
+            full_latitude_matrix_deg_n[0, i_start:i_end, j_start:j_end]
+        )
+        longitude_matrix_deg_e = (
+            full_longitude_matrix_deg_e[0, i_start:i_end, j_start:j_end]
+        )
+
+    return {
+        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
+        TARGET_MATRIX_KEY: target_matrix,
+        INIT_TIMES_KEY: numpy.full(1, init_time_unix_sec),
+        LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
+        LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
+    }
+
+
 def create_data(option_dict, init_time_unix_sec,
                 return_predictors_as_dict=False):
     """Creates validation or testing data for neural network.

@@ -197,6 +197,240 @@ def update_patch_metalocation_dict(patch_metalocation_dict):
     return patch_metalocation_dict
 
 
+def create_data_from_example_files(
+        example_dir_name, init_time_unix_sec, patch_size_2pt5km_pixels,
+        patch_buffer_size_2pt5km_pixels, patch_overlap_size_2pt5km_pixels):
+    """Creates validation or testing data from pre-processed .npz files.
+
+    E = number of examples = number of patches in full NBM grid
+    M = number of rows in full-resolution (2.5-km) grid
+    N = number of columns in full-resolution (2.5-km) grid
+
+    :param example_dir_name: Path to directory with pre-processed .npz files.
+        Files will be found by `example_io.find_file` and read by
+        `example_io.read_file`.
+    :param init_time_unix_sec: Will return all patches for this initialization
+        time.
+    :param patch_size_2pt5km_pixels: Patch size, in units of 2.5-km pixels.  For
+        example, if patch_size_2pt5km_pixels = 448, then grid dimensions at the
+        finest resolution (2.5 km) are 448 x 448.
+    :param patch_buffer_size_2pt5km_pixels: Buffer between the outer domain
+        (used for predictors) and the inner domain (used to penalize predictions
+        in loss function).  This must be a non-negative integer.
+    :param patch_overlap_size_2pt5km_pixels: Overlap between adjacent patches,
+        in terms of 2.5-km pixels.
+    :return: data_dict: Dictionary with the following keys.
+    data_dict["predictor_matrices"]: Same as output from `data_generator`.
+    data_dict["target_matrix"]: Same as output from `data_generator`.
+    data_dict["init_times_unix_sec"]: length-E numpy array of forecast-
+        initialization times.
+    data_dict["latitude_matrix_deg_n"]: E-by-M-by-N numpy array of grid-point
+        latitudes (deg north).
+    data_dict["longitude_matrix_deg_e"]: E-by-M-by-N numpy array of grid-point
+        longitudes (deg east).
+    """
+
+    # Check input args.
+    error_checking.assert_is_integer(init_time_unix_sec)
+
+    error_checking.assert_is_integer(patch_size_2pt5km_pixels)
+    error_checking.assert_is_greater(patch_size_2pt5km_pixels, 0)
+    error_checking.assert_is_integer(patch_buffer_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_buffer_size_2pt5km_pixels, 0)
+    error_checking.assert_is_less_than(
+        patch_buffer_size_2pt5km_pixels, patch_size_2pt5km_pixels // 2
+    )
+    error_checking.assert_is_integer(patch_overlap_size_2pt5km_pixels)
+    error_checking.assert_is_geq(patch_overlap_size_2pt5km_pixels, 16)
+
+    # Do actual stuff.
+    example_file_name = example_io.find_file(
+        directory_name=example_dir_name,
+        init_time_unix_sec=init_time_unix_sec,
+        raise_error_if_missing=False
+    )
+    if not os.path.isfile(example_file_name):
+        return None
+
+    print('Reading data from: "{0:s}"...'.format(example_file_name))
+    full_predictor_matrices, full_target_matrix = example_io.read_file(
+        example_file_name
+    )
+    full_latitude_matrix_deg_n, full_longitude_matrix_deg_e = (
+        nbm_utils.read_coords()
+    )
+    num_rows_in_full_grid = full_latitude_matrix_deg_n.shape[0]
+
+    patch_metalocation_dict = init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+    pmld = patch_metalocation_dict
+    num_patches = 0
+
+    predictor_matrices = None
+    target_matrix = None
+    latitude_matrix_deg_n = None
+    longitude_matrix_deg_e = None
+
+    while True:
+        pmld = update_patch_metalocation_dict(pmld)
+        if pmld[PATCH_START_ROW_KEY] < 0:
+            break
+
+        num_patches += 1
+
+    patch_metalocation_dict = init_patch_metalocation_dict(
+        patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+        patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels
+    )
+    good_indices = []
+
+    for i in range(num_patches):
+        patch_metalocation_dict = update_patch_metalocation_dict(
+            patch_metalocation_dict
+        )
+        patch_location_dict = misc_utils.determine_patch_locations(
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+            start_row_2pt5km=patch_metalocation_dict[PATCH_START_ROW_KEY],
+            start_column_2pt5km=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+        )
+        pld = patch_location_dict
+
+        if predictor_matrices is None:
+            these_dim = (
+                num_patches, patch_size_2pt5km_pixels, patch_size_2pt5km_pixels
+            )
+            latitude_matrix_deg_n = numpy.full(these_dim, numpy.nan)
+            longitude_matrix_deg_e = numpy.full(these_dim, numpy.nan)
+
+            these_dim = these_dim + full_target_matrix.shape[3:]
+            target_matrix = numpy.full(these_dim, numpy.nan)
+
+            predictor_matrices = (
+                [numpy.array([])] * len(full_predictor_matrices)
+            )
+
+            for m in range(len(full_predictor_matrices)):
+                if (
+                        full_predictor_matrices[m].shape[1] ==
+                        num_rows_in_full_grid
+                ):
+                    these_dim = (
+                        num_patches, patch_size_2pt5km_pixels,
+                        patch_size_2pt5km_pixels
+                    )
+
+                elif numpy.isclose(
+                        full_predictor_matrices[m].shape[1],
+                        num_rows_in_full_grid // 4, atol=1
+                ):
+                    these_dim = (
+                        num_patches, patch_size_2pt5km_pixels // 4,
+                        patch_size_2pt5km_pixels // 4
+                    )
+
+                elif numpy.isclose(
+                        full_predictor_matrices[m].shape[1],
+                        num_rows_in_full_grid // 8, atol=1
+                ):
+                    these_dim = (
+                        num_patches, patch_size_2pt5km_pixels // 8,
+                        patch_size_2pt5km_pixels // 8
+                    )
+
+                elif numpy.isclose(
+                        full_predictor_matrices[m].shape[1],
+                        num_rows_in_full_grid // 16, atol=1
+                ):
+                    these_dim = (
+                        num_patches, patch_size_2pt5km_pixels // 16,
+                        patch_size_2pt5km_pixels // 16
+                    )
+
+                these_dim = these_dim + full_predictor_matrices[m].shape[3:]
+                predictor_matrices[m] = numpy.full(these_dim, numpy.nan)
+
+        j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+
+        target_matrix[i, ...] = (
+            full_target_matrix[0, j_start:j_end, k_start:k_end, ...]
+        )
+        if numpy.any(numpy.isnan(target_matrix[i, ...])):
+            continue
+
+        latitude_matrix_deg_n[i, ...] = (
+            full_latitude_matrix_deg_n[j_start:j_end, k_start:k_end]
+        )
+        longitude_matrix_deg_e[i, ...] = (
+            full_longitude_matrix_deg_e[j_start:j_end, k_start:k_end]
+        )
+
+        found_nan = False
+
+        for m in range(len(predictor_matrices)):
+            if predictor_matrices[m].shape[1] == patch_size_2pt5km_pixels:
+                j_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][1] + 1
+            elif (
+                    predictor_matrices[m].shape[1] ==
+                    patch_size_2pt5km_pixels // 4
+            ):
+                j_start = pld[misc_utils.ROW_LIMITS_10KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_10KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_10KM_KEY][1] + 1
+            elif (
+                    predictor_matrices[m].shape[1] ==
+                    patch_size_2pt5km_pixels // 8
+            ):
+                j_start = pld[misc_utils.ROW_LIMITS_20KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_20KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_20KM_KEY][1] + 1
+            elif (
+                    predictor_matrices[m].shape[1] ==
+                    patch_size_2pt5km_pixels // 16
+            ):
+                j_start = pld[misc_utils.ROW_LIMITS_40KM_KEY][0]
+                j_end = pld[misc_utils.ROW_LIMITS_40KM_KEY][1] + 1
+                k_start = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][0]
+                k_end = pld[misc_utils.COLUMN_LIMITS_40KM_KEY][1] + 1
+
+            predictor_matrices[m][i, ...] = (
+                full_predictor_matrices[m][0, j_start:j_end, k_start:k_end, ...]
+            )
+
+            if numpy.any(numpy.isnan(predictor_matrices[m][i, ...])):
+                found_nan = True
+                break
+
+        if found_nan:
+            continue
+
+        good_indices.append(i)
+
+    good_indices = numpy.array(good_indices, dtype=int)
+    predictor_matrices = [pm[good_indices, ...] for pm in predictor_matrices]
+    target_matrix = target_matrix[good_indices, ...]
+    latitude_matrix_deg_n = latitude_matrix_deg_n[good_indices, ...]
+    longitude_matrix_deg_e = longitude_matrix_deg_e[good_indices, ...]
+    init_times_unix_sec = numpy.full(len(good_indices), init_time_unix_sec)
+
+    return {
+        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
+        TARGET_MATRIX_KEY: target_matrix,
+        INIT_TIMES_KEY: init_times_unix_sec,
+        LATITUDE_MATRIX_KEY: latitude_matrix_deg_n,
+        LONGITUDE_MATRIX_KEY: longitude_matrix_deg_e
+    }
+
+
 def create_data(
         option_dict, patch_overlap_size_2pt5km_pixels, init_time_unix_sec,
         return_predictors_as_dict=False):
@@ -3011,6 +3245,12 @@ def apply_model(
                 this_full_pred_matrix[:, i_start:i_end, j_start:j_end, ...]
             )
 
+        found_nan = any([
+            numpy.any(numpy.isnan(ppm)) for ppm in patch_predictor_matrices
+        ])
+        if found_nan:
+            continue
+
         i_start = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][0]
         i_end = pld[misc_utils.ROW_LIMITS_2PT5KM_KEY][1] + 1
         j_start = pld[misc_utils.COLUMN_LIMITS_2PT5KM_KEY][0]
@@ -3034,7 +3274,7 @@ def apply_model(
             summed_prediction_matrix = numpy.full(these_dim, 0.)
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
-                weight_matrix * patch_prediction_matrix
+            weight_matrix * patch_prediction_matrix
         )
         prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
             weight_matrix
