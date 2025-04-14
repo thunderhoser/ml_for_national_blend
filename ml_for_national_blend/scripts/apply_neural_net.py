@@ -298,6 +298,7 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         while len(mask_matrix.shape) < len(prediction_matrix.shape):
             mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
 
+        mask_matrix = numpy.broadcast_to(mask_matrix, prediction_matrix.shape)
         prediction_matrix[mask_matrix == False] = numpy.nan
 
     output_file_name = prediction_io.find_file(

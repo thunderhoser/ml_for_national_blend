@@ -119,10 +119,10 @@ def create_data_from_example_file(
         error_checking.assert_is_leq(j_end, num_columns_in_full_grid)
 
         latitude_matrix_deg_n = (
-            full_latitude_matrix_deg_n[0, i_start:i_end, j_start:j_end]
+            full_latitude_matrix_deg_n[:, i_start:i_end, j_start:j_end]
         )
         longitude_matrix_deg_e = (
-            full_longitude_matrix_deg_e[0, i_start:i_end, j_start:j_end]
+            full_longitude_matrix_deg_e[:, i_start:i_end, j_start:j_end]
         )
 
     return {
