@@ -268,7 +268,7 @@ def _run(model_file_name, example_dir_name, init_time_string,
             mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
 
         mask_matrix = numpy.broadcast_to(mask_matrix, prediction_matrix.shape)
-        
+
         print(prediction_matrix.shape)
         print(mask_matrix.shape)
 
