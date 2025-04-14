@@ -1,11 +1,9 @@
-"""Applied trained neural network in inference mode."""
+"""Applies trained neural network to pre-processed .npz files."""
 
-import copy
 import argparse
 import numpy
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.io import prediction_io
-from ml_for_national_blend.utils import nwp_model_utils
 from ml_for_national_blend.machine_learning import neural_net_utils as nn_utils
 from ml_for_national_blend.machine_learning import \
     neural_net_training_simple as nn_training_simple
@@ -20,11 +18,11 @@ NUM_EXAMPLES_PER_BATCH = 5
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 MODEL_FILE_ARG_NAME = 'input_model_file_name'
+EXAMPLE_DIR_ARG_NAME = 'input_example_dir_name'
 INIT_TIME_ARG_NAME = 'init_time_string'
-NWP_MODELS_ARG_NAME = 'nwp_model_names'
-NWP_DIRECTORIES_ARG_NAME = 'input_nwp_directory_names'
-TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 PATCHES_TO_FULL_GRID_ARG_NAME = 'patches_to_full_grid'
+SINGLE_PATCH_START_ROW_ARG_NAME = 'single_patch_start_row_2pt5km'
+SINGLE_PATCH_START_COLUMN_ARG_NAME = 'single_patch_start_column_2pt5km'
 USE_EMA_ARG_NAME = 'use_ema'
 SAVE_MEAN_ONLY_ARG_NAME = 'save_ensemble_mean_only'
 USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME = 'use_trapezoidal_weighting'
@@ -34,27 +32,31 @@ OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 MODEL_FILE_HELP_STRING = (
     'Path to trained model (will be read by `neural_net_utils.read_model`).'
 )
+EXAMPLE_DIR_HELP_STRING = (
+    'Path to directory with processed .npz files.  The relevant file (for the '
+    'given forecast-init time) will be found by `example_io.find_file` and '
+    'read by `example_io.read_file`.'
+)
 INIT_TIME_HELP_STRING = 'Forecast-initialization time (format "yyyy-mm-dd-HH").'
-NWP_MODELS_HELP_STRING = (
-    'List of NWP models used to create predictors.  This list must match the '
-    'one used for training (although it may be in a different order).'
-)
-NWP_DIRECTORIES_HELP_STRING = (
-    'List of directory paths with NWP data.  This list must have the same '
-    'length as `{0:s}`.  Relevant files in each directory will be found by '
-    '`nwp_model_io.find_file` and read by `nwp_model_io.read_file`.'
-).format(
-    NWP_MODELS_ARG_NAME
-)
-TARGET_DIR_HELP_STRING = (
-    'Path to directory with target data.  Relevant files in this directory '
-    'will be found by `urma_io.find_file` and read by `urma_io.read_file`.'
-)
 PATCHES_TO_FULL_GRID_HELP_STRING = (
     '[used only if NN was trained with multiple patches] Boolean flag.  If '
     '1, will slide patch around the full grid to generate predictions on the '
     'full grid.  If 0, will generate predictions for patches of the same size '
     'used to train.'
+)
+SINGLE_PATCH_START_ROW_HELP_STRING = (
+    '[used only if NN was trained with a single patch] Start row of patch.  If '
+    '{0:s} == j, this means the patch starts at the [j]th row of the full NBM '
+    'grid.'
+).format(
+    SINGLE_PATCH_START_ROW_ARG_NAME
+)
+SINGLE_PATCH_START_COLUMN_HELP_STRING = (
+    '[used only if NN was trained with a single patch] Start column of patch.  '
+    'If {0:s} == k, this means the patch starts at the [k]th column of the '
+    'full NBM grid.'
+).format(
+    SINGLE_PATCH_START_ROW_ARG_NAME
 )
 USE_EMA_HELP_STRING = (
     'Boolean flag.  If {0:s} == 1 and the neural net was trained with the '
@@ -93,24 +95,24 @@ INPUT_ARG_PARSER.add_argument(
     help=MODEL_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + EXAMPLE_DIR_ARG_NAME, type=str, required=True,
+    help=EXAMPLE_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + INIT_TIME_ARG_NAME, type=str, required=True,
     help=INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + NWP_MODELS_ARG_NAME, type=str, nargs='+', required=True,
-    help=NWP_MODELS_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + NWP_DIRECTORIES_ARG_NAME, type=str, nargs='+', required=True,
-    help=NWP_DIRECTORIES_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + TARGET_DIR_ARG_NAME, type=str, required=True,
-    help=TARGET_DIR_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + PATCHES_TO_FULL_GRID_ARG_NAME, type=int, required=False, default=0,
     help=PATCHES_TO_FULL_GRID_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SINGLE_PATCH_START_ROW_ARG_NAME, type=int, required=False, default=-1,
+    help=SINGLE_PATCH_START_ROW_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SINGLE_PATCH_START_COLUMN_ARG_NAME, type=int, required=False,
+    default=-1, help=SINGLE_PATCH_START_COLUMN_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + USE_EMA_ARG_NAME, type=int, required=False, default=0,
@@ -134,57 +136,22 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _process_nwp_directories(nwp_directory_names, nwp_model_names):
-    """Processes NWP directories for either training or validation data.
-
-    :param nwp_directory_names: See documentation for input arg
-        "nwp_dir_names_for_training" to this script.
-    :param nwp_model_names: See documentation for input arg to this script.
-    :return: nwp_model_to_dir_name: Dictionary, where each key is the name of an
-        NWP model and the corresponding value is the input directory.
-    """
-
-    # assert len(nwp_model_names) == len(nwp_directory_names)
-    nwp_directory_names = nwp_directory_names[:len(nwp_model_names)]
-
-    if len(nwp_directory_names) == 1:
-        found_any_model_name_in_dir_name = any([
-            m in nwp_directory_names[0]
-            for m in nwp_model_utils.ALL_MODEL_NAMES_WITH_ENSEMBLE
-        ])
-        infer_directories = (
-            len(nwp_model_names) > 1 or
-            (len(nwp_model_names) == 1 and not found_any_model_name_in_dir_name)
-        )
-    else:
-        infer_directories = False
-
-    if infer_directories:
-        top_directory_name = copy.deepcopy(nwp_directory_names[0])
-        nwp_directory_names = [
-            '{0:s}/{1:s}/processed/interp_to_nbm_grid'.format(
-                top_directory_name, m
-            ) for m in nwp_model_names
-        ]
-
-    return dict(zip(nwp_model_names, nwp_directory_names))
-
-
-def _run(model_file_name, init_time_string, nwp_model_names,
-         nwp_directory_names, target_dir_name,
-         patches_to_full_grid, use_ema, save_ensemble_mean_only,
+def _run(model_file_name, example_dir_name, init_time_string,
+         patches_to_full_grid,
+         single_patch_start_row_2pt5km, single_patch_start_column_2pt5km,
+         use_ema, save_ensemble_mean_only,
          use_trapezoidal_weighting, patch_overlap_size_2pt5km_pixels,
          output_dir_name):
-    """Applies trained neural net -- inference time!
+    """Applies trained neural network to pre-processed .npz files.
 
-    Does inference for neural net trained with patchwise approach.
+    This is effectively the main method.
 
-    :param model_file_name: See documentation at top of this script.
+    :param model_file_name: Same.
+    :param example_dir_name: Same.
     :param init_time_string: Same.
-    :param nwp_model_names: Same.
-    :param nwp_directory_names: Same.
-    :param target_dir_name: Same.
     :param patches_to_full_grid: Same.
+    :param single_patch_start_row_2pt5km: Same.
+    :param single_patch_start_column_2pt5km: Same.
     :param use_ema: Same.
     :param save_ensemble_mean_only: Same.
     :param use_trapezoidal_weighting: Same.
@@ -209,60 +176,56 @@ def _run(model_file_name, init_time_string, nwp_model_names,
         patches_to_full_grid = False
 
     validation_option_dict = mmd[nn_utils.VALIDATION_OPTIONS_KEY]
-    nwp_model_names_for_training = list(
-        validation_option_dict[nn_utils.NWP_MODEL_TO_DIR_KEY].keys()
-    )
-    assert set(nwp_model_names) == set(nwp_model_names_for_training)
-
-    nwp_model_to_dir_name = _process_nwp_directories(
-        nwp_directory_names=nwp_directory_names,
-        nwp_model_names=nwp_model_names
-    )
-    validation_option_dict.update({
-        nn_utils.NWP_MODEL_TO_DIR_KEY: nwp_model_to_dir_name,
-        nn_utils.TARGET_DIR_KEY: target_dir_name,
-        nn_utils.COMPARE_TO_BASELINE_IN_LOSS_KEY: False
-    })
     init_time_unix_sec = time_conversion.string_to_unix_sec(
         init_time_string, TIME_FORMAT
     )
 
     if patches_to_full_grid:
-        validation_option_dict[nn_utils.PATCH_SIZE_KEY] = None
-
-        data_dict = nn_training_simple.create_data(
-            option_dict=validation_option_dict,
-            init_time_unix_sec=init_time_unix_sec
+        data_dict = nn_training_simple.create_data_from_example_file(
+            example_dir_name=example_dir_name,
+            init_time_unix_sec=init_time_unix_sec,
+            patch_start_row_2pt5km=None,
+            patch_start_column_2pt5km=None
         )
     elif is_nn_multipatch:
-        data_dict = nn_training_multipatch.create_data(
-            option_dict=validation_option_dict,
+        vod = validation_option_dict
+
+        data_dict = nn_training_multipatch.create_data_from_example_files(
+            example_dir_name=example_dir_name,
+            init_time_unix_sec=init_time_unix_sec,
+            patch_size_2pt5km_pixels=vod[nn_utils.PATCH_SIZE_KEY],
+            patch_buffer_size_2pt5km_pixels=vod[nn_utils.PATCH_BUFFER_SIZE_KEY],
             patch_overlap_size_2pt5km_pixels=
-            mmd[nn_utils.PATCH_OVERLAP_FOR_FAST_GEN_KEY],
-            init_time_unix_sec=init_time_unix_sec
+            mmd[nn_utils.PATCH_OVERLAP_FOR_FAST_GEN_KEY]
         )
     else:
-        data_dict = nn_training_simple.create_data(
-            option_dict=validation_option_dict,
-            init_time_unix_sec=init_time_unix_sec
+        if single_patch_start_row_2pt5km < 0:
+            single_patch_start_row_2pt5km = None
+        if single_patch_start_column_2pt5km < 0:
+            single_patch_start_column_2pt5km = None
+
+        data_dict = nn_training_simple.create_data_from_example_file(
+            example_dir_name=example_dir_name,
+            init_time_unix_sec=init_time_unix_sec,
+            patch_start_row_2pt5km=single_patch_start_row_2pt5km,
+            patch_start_column_2pt5km=single_patch_start_column_2pt5km
         )
 
     predictor_matrices = data_dict[
         nn_training_simple.PREDICTOR_MATRICES_KEY
     ]
-    target_matrix_with_mask = data_dict[
+    target_matrix_with_other_shit = data_dict[
         nn_training_simple.TARGET_MATRIX_KEY
     ]
     init_times_unix_sec = data_dict[nn_training_simple.INIT_TIMES_KEY]
-    latitude_matrix_deg_n = data_dict[
-        nn_training_simple.LATITUDE_MATRIX_KEY
-    ]
-    longitude_matrix_deg_e = data_dict[
-        nn_training_simple.LONGITUDE_MATRIX_KEY
-    ]
+    latitude_matrix_deg_n = data_dict[nn_training_simple.LATITUDE_MATRIX_KEY]
+    longitude_matrix_deg_e = data_dict[nn_training_simple.LONGITUDE_MATRIX_KEY]
 
-    target_matrix = target_matrix_with_mask[..., :-1]
-    mask_matrix = target_matrix_with_mask[..., -1] >= MASK_PIXEL_IF_WEIGHT_BELOW
+    num_target_fields = len(validation_option_dict[nn_utils.TARGET_FIELDS_KEY])
+    target_matrix = target_matrix_with_other_shit[..., :num_target_fields]
+    mask_matrix = (
+        target_matrix_with_other_shit[..., -1] >= MASK_PIXEL_IF_WEIGHT_BELOW
+    )
 
     vod = validation_option_dict
 
@@ -326,12 +289,16 @@ if __name__ == '__main__':
 
     _run(
         model_file_name=getattr(INPUT_ARG_OBJECT, MODEL_FILE_ARG_NAME),
+        example_dir_name=getattr(INPUT_ARG_OBJECT, EXAMPLE_DIR_ARG_NAME),
         init_time_string=getattr(INPUT_ARG_OBJECT, INIT_TIME_ARG_NAME),
-        nwp_model_names=getattr(INPUT_ARG_OBJECT, NWP_MODELS_ARG_NAME),
-        nwp_directory_names=getattr(INPUT_ARG_OBJECT, NWP_DIRECTORIES_ARG_NAME),
-        target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         patches_to_full_grid=bool(
             getattr(INPUT_ARG_OBJECT, PATCHES_TO_FULL_GRID_ARG_NAME)
+        ),
+        single_patch_start_row_2pt5km=getattr(
+            INPUT_ARG_OBJECT, SINGLE_PATCH_START_ROW_ARG_NAME
+        ),
+        single_patch_start_column_2pt5km=getattr(
+            INPUT_ARG_OBJECT, SINGLE_PATCH_START_COLUMN_ARG_NAME
         ),
         use_ema=bool(getattr(INPUT_ARG_OBJECT, USE_EMA_ARG_NAME)),
         save_ensemble_mean_only=bool(
