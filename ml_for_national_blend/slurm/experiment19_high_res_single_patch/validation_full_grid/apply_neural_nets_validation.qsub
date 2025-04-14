@@ -30,7 +30,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-TOP_EXAMPLE_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_models/experiment19_high_res_single_patch"
+TOP_EXAMPLE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment19_high_res_single_patch"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment19_high_res_single_patch"
 
 MODEL_NAME_SETS_ONE_STRING=("ensemble_hrrr_wrf-arw" "ensemble_hrrr_nam-nest" "ensemble_hrrr_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest" "ensemble_wrf-arw_gridded-gfs-mos" "ensemble_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest" "hrrr_wrf-arw_gridded-gfs-mos" "hrrr_nam-nest_gridded-gfs-mos" "wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest" "ensemble_hrrr_wrf-arw_gridded-gfs-mos" "ensemble_hrrr_nam-nest_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest_gridded-gfs-mos")
