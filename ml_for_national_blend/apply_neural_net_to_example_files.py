@@ -267,6 +267,8 @@ def _run(model_file_name, example_dir_name, init_time_string,
         while len(mask_matrix.shape) < len(prediction_matrix.shape):
             mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
 
+        mask_matrix = numpy.broadcast_to(mask_matrix, prediction_matrix.shape)
+        
         print(prediction_matrix.shape)
         print(mask_matrix.shape)
 
