@@ -55,6 +55,9 @@ NWP_MODEL_ARG_NAME = 'nwp_model_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 LEAD_TIME_ARG_NAME = 'lead_time_hours'
+PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
+PATCH_START_ROW_ARG_NAME = 'patch_start_row_2pt5km'
+PATCH_START_COLUMN_ARG_NAME = 'patch_start_column_2pt5km'
 OUTPUT_DIR_ARG_NAME = 'output_prediction_dir_name'
 
 NWP_FORECAST_DIR_HELP_STRING = (
@@ -84,6 +87,25 @@ LAST_INIT_TIME_HELP_STRING = 'See documentation for `{0:s}`.'.format(
 LEAD_TIME_HELP_STRING = (
     'Will convert NWP-forecast files to prediction files for this one lead '
     'time.'
+)
+PATCH_SIZE_HELP_STRING = (
+    'Patch size, in number of pixels on the 2.5-km NBM grid.  If {0:s} == M, '
+    'then only an M-by-M patch of the full grid will be written to prediction '
+    'files.  If you want the full NBM grid, make this argument -1.'
+).format(
+    PATCH_SIZE_ARG_NAME
+)
+PATCH_START_ROW_HELP_STRING = (
+    '[used only if {0:s} > -1] Start row of patch.  If {1:s} == j, the first '
+    'row of the patch is the [j]th row of the full NBM grid.'
+).format(
+    PATCH_SIZE_ARG_NAME, PATCH_START_ROW_ARG_NAME
+)
+PATCH_START_COLUMN_HELP_STRING = (
+    '[used only if {0:s} > -1] Start column of patch.  If {1:s} == k, the '
+    'first column of the patch is the [k]th column of the full NBM grid.'
+).format(
+    PATCH_SIZE_ARG_NAME, PATCH_START_COLUMN_ARG_NAME
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Prediction files will be written here by '
@@ -117,6 +139,18 @@ INPUT_ARG_PARSER.add_argument(
     help=LEAD_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_SIZE_ARG_NAME, type=int, required=False, default=-1,
+    help=PATCH_SIZE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_START_ROW_ARG_NAME, type=int, required=False, default=-1,
+    help=PATCH_START_ROW_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_START_COLUMN_ARG_NAME, type=int, required=False, default=-1,
+    help=PATCH_START_COLUMN_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -124,13 +158,17 @@ INPUT_ARG_PARSER.add_argument(
 
 def _convert_nwp_forecasts_1init(
         nwp_forecast_file_name, urma_directory_name, lead_time_hours,
-        prediction_dir_name):
+        patch_size_2pt5km_pixels, patch_start_row_2pt5km,
+        patch_start_column_2pt5km, prediction_dir_name):
     """Converts NWP forecasts from one model run (init time) to prediction file.
 
     :param nwp_forecast_file_name: Path to NWP-forecast file (will be read by
         `interp_nwp_model_io.read_file`).
     :param urma_directory_name: See documentation at top of this script.
     :param lead_time_hours: Same.
+    :param patch_size_2pt5km_pixels: Same.
+    :param patch_start_row_2pt5km: Same.
+    :param patch_start_column_2pt5km: Same.
     :param prediction_dir_name: Same.
     """
 
@@ -170,6 +208,30 @@ def _convert_nwp_forecasts_1init(
             use_nearest_neigh=False,
             interp_to_full_resolution=True,
             proj_object=nbm_utils.NBM_PROJECTION_OBJECT
+        )
+
+    if patch_size_2pt5km_pixels is None:
+        patch_row_indices = None
+        patch_column_indices = None
+    else:
+        patch_row_indices = numpy.linspace(
+            patch_start_row_2pt5km,
+            patch_start_row_2pt5km + patch_size_2pt5km_pixels - 1,
+            num=patch_size_2pt5km_pixels, dtype=int
+        )
+        patch_column_indices = numpy.linspace(
+            patch_start_column_2pt5km,
+            patch_start_column_2pt5km + patch_size_2pt5km_pixels - 1,
+            num=patch_size_2pt5km_pixels, dtype=int
+        )
+
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_row(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_row_indices=patch_row_indices
+        )
+        nwp_forecast_table_xarray = nwp_model_utils.subset_by_column(
+            nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+            desired_column_indices=patch_column_indices
         )
 
     urma_field_names = list(URMA_FIELD_TO_NWP_FIELD.keys())
@@ -256,6 +318,22 @@ def _convert_nwp_forecasts_1init(
         numpy.transpose(utx[urma_utils.LONGITUDE_KEY].values)
     )
 
+    if patch_size_2pt5km_pixels is not None:
+        target_matrix = target_matrix[patch_row_indices, ...]
+        target_matrix = target_matrix[:, patch_column_indices, ...]
+        urma_latitude_matrix_deg_n = (
+            urma_latitude_matrix_deg_n[patch_row_indices, :]
+        )
+        urma_latitude_matrix_deg_n = (
+            urma_latitude_matrix_deg_n[:, patch_column_indices]
+        )
+        urma_longitude_matrix_deg_e = (
+            urma_longitude_matrix_deg_e[patch_row_indices, :]
+        )
+        urma_longitude_matrix_deg_e = (
+            urma_longitude_matrix_deg_e[:, patch_column_indices]
+        )
+
     assert numpy.allclose(
         nwp_latitude_matrix_deg_n, urma_latitude_matrix_deg_n,
         atol=TOLERANCE_DEG
@@ -324,7 +402,8 @@ def _convert_nwp_forecasts_1init(
 
 def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
          first_init_time_string, last_init_time_string, lead_time_hours,
-         prediction_dir_name):
+         patch_size_2pt5km_pixels, patch_start_row_2pt5km,
+         patch_start_column_2pt5km, prediction_dir_name):
     """Converts NWP-forecast files to prediction files.
 
     This is effectively the main method.
@@ -335,6 +414,9 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
     :param lead_time_hours: Same.
+    :param patch_size_2pt5km_pixels: Same.
+    :param patch_start_row_2pt5km: Same.
+    :param patch_start_column_2pt5km: Same.
     :param prediction_dir_name: Same.
     """
 
@@ -342,6 +424,9 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
     #     nwp_model_name
     # )
     # error_checking.assert_equals(downsampling_factor, 1)
+
+    if patch_size_2pt5km_pixels <= 0:
+        patch_size_2pt5km_pixels = None
 
     first_init_time_unix_sec = time_conversion.string_to_unix_sec(
         first_init_time_string, TIME_FORMAT
@@ -396,6 +481,9 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
             nwp_forecast_file_name=this_forecast_file_name,
             urma_directory_name=urma_directory_name,
             lead_time_hours=lead_time_hours,
+            patch_size_2pt5km_pixels=patch_size_2pt5km_pixels,
+            patch_start_row_2pt5km=patch_start_row_2pt5km,
+            patch_start_column_2pt5km=patch_start_column_2pt5km,
             prediction_dir_name=prediction_dir_name
         )
 
@@ -416,5 +504,12 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
         ),
         lead_time_hours=getattr(INPUT_ARG_OBJECT, LEAD_TIME_ARG_NAME),
+        patch_size_2pt5km_pixels=getattr(INPUT_ARG_OBJECT, PATCH_SIZE_ARG_NAME),
+        patch_start_row_2pt5km=getattr(
+            INPUT_ARG_OBJECT, PATCH_START_ROW_ARG_NAME
+        ),
+        patch_start_column_2pt5km=getattr(
+            INPUT_ARG_OBJECT, PATCH_START_COLUMN_ARG_NAME
+        ),
         prediction_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
