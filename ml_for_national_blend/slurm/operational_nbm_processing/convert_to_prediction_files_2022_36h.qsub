@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="convert_to_prediction_files_2022_42h"
+#SBATCH --job-name="convert_to_prediction_files_2022_36h"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_to_prediction_files_2022_42h_%A_%a.out
+#SBATCH --output=convert_to_prediction_files_2022_36h_%A_%a.out
 
 conda init
 conda activate base
