@@ -167,16 +167,26 @@ def _convert_nwp_forecasts_1init(
     :param prediction_dir_name: Same.
     """
 
-    nwp_model_name = interp_nwp_model_io.file_name_to_model_name(
-        nwp_forecast_file_name
-    )
+    try:
+        nwp_model_name = interp_nwp_model_io.file_name_to_model_name(
+            nwp_forecast_file_name
+        )
+    except:
+        nwp_model_name = 'ensemble'
+
     downsampling_factor = nwp_model_utils.model_to_nbm_downsampling_factor(
         nwp_model_name
     )
 
-    init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
-        nwp_forecast_file_name
-    )
+    try:
+        init_time_unix_sec = interp_nwp_model_io.file_name_to_init_time(
+            nwp_forecast_file_name
+        )
+    except:
+        init_time_unix_sec = operational_nbm_io.file_name_to_init_time(
+            nwp_forecast_file_name
+        )
+
     valid_time_unix_sec = (
         init_time_unix_sec + lead_time_hours * HOURS_TO_SECONDS
     )
@@ -453,10 +463,16 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
             raise_error_if_any_missing=False
         )
 
-    init_times_unix_sec = numpy.array([
-        interp_nwp_model_io.file_name_to_init_time(f)
-        for f in nwp_forecast_file_names
-    ], dtype=int)
+    try:
+        init_times_unix_sec = numpy.array([
+            interp_nwp_model_io.file_name_to_init_time(f)
+            for f in nwp_forecast_file_names
+        ], dtype=int)
+    except:
+        init_times_unix_sec = numpy.array([
+            operational_nbm_io.file_name_to_init_time(f)
+            for f in nwp_forecast_file_names
+        ], dtype=int)
 
     if nwp_model_name == nwp_model_utils.RAP_MODEL_NAME:
         good_indices = numpy.where(numpy.logical_and(
