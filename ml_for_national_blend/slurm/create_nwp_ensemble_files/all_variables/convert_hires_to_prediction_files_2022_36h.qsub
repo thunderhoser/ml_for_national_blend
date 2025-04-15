@@ -1,0 +1,51 @@
+#!/bin/bash
+
+#SBATCH --job-name="convert_hires_to_prediction_files_2022_36h"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=0-11
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=convert_hires_to_prediction_files_2022_36h_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid"
+URMA_DIRECTORY_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files"
+
+FIRST_INIT_TIME_STRINGS=("2022-01-01-00" "2022-02-01-00" "2022-03-01-00" "2022-04-01-00" "2022-05-01-00" "2022-06-01-00" "2022-07-01-00" "2022-08-01-00" "2022-09-01-00" "2022-10-01-00" "2022-11-01-00" "2022-12-01-00")
+LAST_INIT_TIME_STRINGS=("2022-01-31-18" "2022-02-28-18" "2022-03-31-18" "2022-04-30-18" "2022-05-31-18" "2022-06-30-18" "2022-07-31-18" "2022-08-31-18" "2022-09-30-18" "2022-10-31-18" "2022-11-30-18" "2023-01-01-00")
+
+first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
+--input_nwp_forecast_dir_name="${NWP_FORECAST_DIR_NAME}" \
+--input_urma_directory_name="${URMA_DIRECTORY_NAME}" \
+--nwp_model_name="ensemble" \
+--first_init_time_string="${first_init_time_string}" \
+--last_init_time_string="${last_init_time_string}" \
+--lead_time_hours=36 \
+--output_prediction_dir_name="${PREDICTION_DIR_NAME}"
