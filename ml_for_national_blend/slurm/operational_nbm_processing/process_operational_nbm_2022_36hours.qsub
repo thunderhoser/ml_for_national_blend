@@ -48,7 +48,7 @@ python3 -u "${CODE_DIR_NAME}/process_operational_nbm_data.py" \
 --input_grib2_dir_name="${INPUT_DIR_NAME}" \
 --first_init_time_string="${first_init_time_string}" \
 --last_init_time_string="${last_init_time_string}" \
---forecast_hour=32 \
+--forecast_hour=36 \
 --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
 --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
 --output_netcdf_dir_name="${OUTPUT_DIR_NAME}"
