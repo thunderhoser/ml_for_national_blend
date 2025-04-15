@@ -85,8 +85,6 @@ def create_data_from_example_file(
         raise_error_if_missing=False
     )
     if not os.path.isfile(example_file_name):
-        print(example_file_name)
-        print('\n\n\n\n\n')
         return None
 
     print('Reading data from: "{0:s}"...'.format(example_file_name))
