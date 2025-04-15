@@ -233,11 +233,11 @@ def read_file(netcdf_file_name, keep_ensemble=False):
     v_index = v_indices[0]
 
     data_matrix = nwpft[nwp_model_utils.DATA_KEY].values
-    data_matrix[..., gust_index] = numpy.maximum(
-        data_matrix[..., gust_index],
+    data_matrix[:, :, :, gust_index, ...] = numpy.maximum(
+        data_matrix[:, :, :, gust_index, ...],
         numpy.sqrt(
-            data_matrix[..., u_index] ** 2 +
-            data_matrix[..., v_index] ** 2
+            data_matrix[:, :, :, u_index, ...] ** 2 +
+            data_matrix[:, :, :, v_index, ...] ** 2
         )
     )
 
