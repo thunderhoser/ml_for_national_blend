@@ -175,7 +175,7 @@ def _run(input_prediction_dir_name, first_init_time_string,
             prediction_matrix=tptx[prediction_io.PREDICTION_KEY].values,
             latitude_matrix_deg_n=tptx[prediction_io.LATITUDE_KEY].values,
             longitude_matrix_deg_e=tptx[prediction_io.LONGITUDE_KEY].values,
-            field_names=tptx[prediction_io.FIELD_NAME_KEY].values,
+            field_names=tptx[prediction_io.FIELD_NAME_KEY].values.tolist(),
             init_time_unix_sec=
             prediction_io.file_name_to_init_time(this_input_file_name),
             model_file_name=tptx.attrs[prediction_io.MODEL_FILE_KEY],
