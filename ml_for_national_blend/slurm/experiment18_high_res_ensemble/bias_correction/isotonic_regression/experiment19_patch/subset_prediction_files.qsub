@@ -46,7 +46,7 @@ last_init_time_string=${LAST_INIT_TIME_STRINGS[$j]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/nwp-inputs=${MODEL_NAME_SETS_ONE_STRING[$i]}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
+python3 -u "${CODE_DIR_NAME}/subset_prediction_files.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression" \
 --first_init_time_string="${first_init_time_string}" \
 --last_init_time_string="${last_init_time_string}" \
