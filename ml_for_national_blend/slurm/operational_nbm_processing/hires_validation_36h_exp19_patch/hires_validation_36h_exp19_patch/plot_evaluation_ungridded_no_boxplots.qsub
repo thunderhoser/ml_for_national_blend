@@ -3,7 +3,7 @@
 #SBATCH --job-name="plot_evaluation_ungridded_no_boxplots"
 #SBATCH --partition="bigmem"
 #SBATCH --account="mdl-sti"
-#SBATCH --qos="gpuwf"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
