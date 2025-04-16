@@ -78,6 +78,6 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --max_relia_bin_edge_by_target ${max_relia_bin_edge} \
 --per_grid_cell=1 \
 --keep_it_simple=1 \
---compute_ssrat=1 \
+--compute_ssrat=0 \
 --compute_ssrel=0 \
 --output_file_name="${model_dir_name}/training_full_grid/gridded_evaluation_${target_field_name}.nc"
