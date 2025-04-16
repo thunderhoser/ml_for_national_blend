@@ -1,0 +1,73 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_ensemble_ungridded"
+#SBATCH --partition="bigmem"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=01:00:00
+#SBATCH --array=0-4
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_ensemble_ungridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+PREDICTION_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_data/processed/prediction_files/experiment19_patch"
+TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
+target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
+
+if [ "$target_field_name" = "temperature_2m_agl_kelvins" ]; then
+    num_relia_bins=115
+    min_relia_bin_edge=-60
+    max_relia_bin_edge=55
+elif [ "$target_field_name" = "u_wind_10m_agl_m_s01" ]; then
+    num_relia_bins=80
+    min_relia_bin_edge=-40
+    max_relia_bin_edge=40
+elif [ "$target_field_name" = "v_wind_10m_agl_m_s01" ]; then
+    num_relia_bins=80
+    min_relia_bin_edge=-40
+    max_relia_bin_edge=40
+elif [ "$target_field_name" = "dewpoint_2m_agl_kelvins" ]; then
+    num_relia_bins=115
+    min_relia_bin_edge=-80
+    max_relia_bin_edge=35
+else
+    num_relia_bins=80
+    min_relia_bin_edge=0
+    max_relia_bin_edge=80
+fi
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${PREDICTION_DIR_NAME}" \
+--init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
+--num_bootstrap_reps=1 \
+--target_field_names "${target_field_name}" \
+--input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+--num_relia_bins_by_target ${num_relia_bins} \
+--min_relia_bin_edge_by_target ${min_relia_bin_edge} \
+--max_relia_bin_edge_by_target ${max_relia_bin_edge} \
+--per_grid_cell=0 \
+--keep_it_simple=0 \
+--compute_ssrat=0 \
+--compute_ssrel=0 \
+--output_file_name="${PREDICTION_DIR_NAME}/validation/ungridded_evaluation_${target_field_name}.nc"
