@@ -295,13 +295,21 @@ def _plot_distributions(
     ))
     exec_start_time_unix_sec = time.time()
 
-    target_kde_object = gaussian_kde(relevant_target_values, bw_method='scott')
-    prediction_kde_object = gaussian_kde(
-        relevant_predicted_values, bw_method='scott'
-    )
+    try:
+        target_kde_object = gaussian_kde(
+            relevant_target_values, bw_method='scott'
+        )
+        target_y_values = target_kde_object(x_values)
+    except:
+        target_y_values = numpy.full(len(x_values), 0.)
 
-    target_y_values = target_kde_object(x_values)
-    prediction_y_values = prediction_kde_object(x_values)
+    try:
+        prediction_kde_object = gaussian_kde(
+            relevant_predicted_values, bw_method='scott'
+        )
+        prediction_y_values = prediction_kde_object(x_values)
+    except:
+        prediction_y_values = numpy.full(len(x_values), 0.)
 
     print('Elapsed time = {0:.1f} seconds'.format(
         time.time() - exec_start_time_unix_sec
