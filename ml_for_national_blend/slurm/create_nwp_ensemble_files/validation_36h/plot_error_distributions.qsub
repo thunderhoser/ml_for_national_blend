@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_error_distributions_tails_only"
+#SBATCH --job-name="plot_error_distributions"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_error_distributions_tails_only_%A_%a.out
+#SBATCH --output=plot_error_distributions_%A_%a.out
 
 conda init
 conda activate base
@@ -29,7 +29,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-PREDICTION_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid/prediction_files/36hours"
+PREDICTION_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid/prediction_files/36hours"
 TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
@@ -64,7 +64,7 @@ python3 -u "${CODE_DIR_NAME}/plot_error_distributions.py" \
 --num_bins_by_target ${num_bins} \
 --min_bin_edge_by_target ${min_bin_edge} \
 --max_bin_edge_by_target ${max_bin_edge} \
---violin_or_box_plots=-1 \
+--violin_or_box_plots=1 \
 --left_tail_percentile=0.5 \
 --right_tail_percentile=99.5 \
 --max_num_pdf_values=1000000 \
