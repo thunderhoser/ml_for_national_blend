@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#SBATCH --job-name="subset_prediction_files"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=04:00:00
+#SBATCH --array=0-11
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=subset_prediction_files_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment15b_no_ema"
+
+MODEL_NAME_SETS_ONE_STRING=("convnext-v2=1_num-bottleneck-layers=2_spectral-norm=0_dropout-strategy=none_residual-norm=1")
+FIRST_INIT_TIME_STRINGS=("2022-01-01-00" "2022-02-01-00" "2022-03-01-00" "2022-04-01-00" "2022-05-01-00" "2022-06-01-00" "2022-07-01-00" "2022-08-01-00" "2022-09-01-00" "2022-10-01-00" "2022-11-01-00" "2022-12-01-00")
+LAST_INIT_TIME_STRINGS=("2022-01-31-18" "2022-02-28-18" "2022-03-31-18" "2022-04-30-18" "2022-05-31-18" "2022-06-30-18" "2022-07-31-18" "2022-08-31-18" "2022-09-30-18" "2022-10-31-18" "2022-11-30-18" "2022-12-31-18")
+
+num_rows=${#MODEL_NAME_SETS_ONE_STRING[@]}
+num_columns=${#FIRST_INIT_TIME_STRINGS[@]}
+
+i=$(( SLURM_ARRAY_TASK_ID / num_columns ))
+j=$(( SLURM_ARRAY_TASK_ID % num_columns ))
+
+first_init_time_string=${FIRST_INIT_TIME_STRINGS[$j]}
+last_init_time_string=${LAST_INIT_TIME_STRINGS[$j]}
+model_dir_name="${TOP_MODEL_DIR_NAME}/${MODEL_NAME_SETS_ONE_STRING[$i]}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/subset_prediction_files.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration" \
+--first_init_time_string="${first_init_time_string}" \
+--last_init_time_string="${last_init_time_string}" \
+--patch_size_2pt5km_pixels=272 \
+--patch_start_row_2pt5km=640 \
+--patch_start_column_2pt5km=784 \
+--output_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/uncertainty_calibration/experiment19_patch"
