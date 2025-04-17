@@ -68,7 +68,7 @@ else
 fi
 
 python3 -u "${CODE_DIR_NAME}/plot_error_distributions.py" \
---input_prediction_dir_name="${model_dir_name}/validation_full_gridisotonic_regression" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression" \
 --init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
 --target_field_names ${target_field_name} \
 --num_bins_by_target ${num_bins} \
@@ -78,4 +78,4 @@ python3 -u "${CODE_DIR_NAME}/plot_error_distributions.py" \
 --left_tail_percentile=0.5 \
 --right_tail_percentile=99.5 \
 --max_num_pdf_values=1000000 \
---output_dir_name="${model_dir_name}/validation_full_gridisotonic_regression/error_distributions"
+--output_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression/error_distributions"
