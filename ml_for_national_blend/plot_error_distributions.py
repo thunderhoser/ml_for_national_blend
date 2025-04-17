@@ -256,8 +256,20 @@ def _plot_distributions(
             predicted_values >= tail_threshold
         ]
     else:
-        relevant_target_values = target_values
-        relevant_predicted_values = predicted_values
+        relevant_target_values = target_values + 0.
+        relevant_predicted_values = predicted_values + 0.
+
+    if len(relevant_target_values) == 0 and len(relevant_predicted_values) == 0:
+        return
+
+    if len(relevant_target_values) == 0:
+        relevant_target_values = numpy.full(
+            2, numpy.mean(relevant_predicted_values)
+        )
+    if len(relevant_predicted_values) == 0:
+        relevant_predicted_values = numpy.full(
+            2, numpy.mean(relevant_target_values)
+        )
 
     x_min = min([
         numpy.min(relevant_target_values),
