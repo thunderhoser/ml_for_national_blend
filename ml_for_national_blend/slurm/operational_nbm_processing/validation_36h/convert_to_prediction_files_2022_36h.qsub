@@ -33,7 +33,7 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_data/processed"
 URMA_DIRECTORY_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
-PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment19_patch"
+PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/36hours"
 
 FIRST_INIT_TIME_STRINGS=("2022-01-01-00" "2022-02-01-00" "2022-03-01-00" "2022-04-01-00" "2022-05-01-00" "2022-06-01-00" "2022-07-01-00" "2022-08-01-00" "2022-09-01-00" "2022-10-01-00" "2022-11-01-00" "2022-12-01-00")
 LAST_INIT_TIME_STRINGS=("2022-01-31-18" "2022-02-28-18" "2022-03-31-18" "2022-04-30-18" "2022-05-31-18" "2022-06-30-18" "2022-07-31-18" "2022-08-31-18" "2022-09-30-18" "2022-10-31-18" "2022-11-30-18" "2023-01-01-00")
