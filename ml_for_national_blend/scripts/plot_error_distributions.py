@@ -248,8 +248,20 @@ def _plot_distributions(
             predicted_values >= tail_threshold
         ]
     else:
-        relevant_target_values = target_values
-        relevant_predicted_values = predicted_values
+        relevant_target_values = target_values + 0.
+        relevant_predicted_values = predicted_values + 0.
+
+    if len(relevant_target_values) == 0 and len(relevant_predicted_values) == 0:
+        return
+
+    if len(relevant_target_values) == 0:
+        relevant_target_values = numpy.full(
+            2, numpy.mean(relevant_predicted_values)
+        )
+    if len(relevant_predicted_values) == 0:
+        relevant_predicted_values = numpy.full(
+            2, numpy.mean(relevant_target_values)
+        )
 
     x_min = min([
         numpy.min(relevant_target_values),
@@ -275,13 +287,21 @@ def _plot_distributions(
     ))
     exec_start_time_unix_sec = time.time()
 
-    target_kde_object = gaussian_kde(relevant_target_values, bw_method='scott')
-    prediction_kde_object = gaussian_kde(
-        relevant_predicted_values, bw_method='scott'
-    )
+    try:
+        target_kde_object = gaussian_kde(
+            relevant_target_values, bw_method='scott'
+        )
+        target_y_values = target_kde_object(x_values)
+    except:
+        target_y_values = numpy.full(len(x_values), 0.)
 
-    target_y_values = target_kde_object(x_values)
-    prediction_y_values = prediction_kde_object(x_values)
+    try:
+        prediction_kde_object = gaussian_kde(
+            relevant_predicted_values, bw_method='scott'
+        )
+        prediction_y_values = prediction_kde_object(x_values)
+    except:
+        prediction_y_values = numpy.full(len(x_values), 0.)
 
     print('Elapsed time = {0:.1f} seconds'.format(
         time.time() - exec_start_time_unix_sec
