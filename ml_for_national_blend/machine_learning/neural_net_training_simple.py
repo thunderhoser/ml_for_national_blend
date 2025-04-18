@@ -1545,7 +1545,9 @@ def train_model(
         u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs, output_dir_name,
+        early_stopping_patience_epochs,
+        cosine_annealing_dict, cosine_annealing_with_restarts_dict,
+        output_dir_name,
         training_generator=None, validation_generator=None):
     """Trains neural net with generator.
 
@@ -1596,6 +1598,15 @@ def train_model(
     :param early_stopping_patience_epochs: Training will be stopped early if
         validation loss has not decreased in the last N epochs, where N =
         early_stopping_patience_epochs.
+    :param cosine_annealing_dict: Dictionary with arguments for cosine annealing
+        of learning rate.  If you do not want cosine_annealing_dict, make this
+        None.
+    cosine_annealing_dict["min_learning_rate"]: Minimum learning rate in cycle.
+    cosine_annealing_dict["max_learning_rate"]: Maximum learning rate in cycle.
+    cosine_annealing_dict["num_epochs_in_cycle"]: Number of epochs in cycle.
+
+    :param cosine_annealing_with_restarts_dict: Same as above but for cosine
+        annealing with warm restarts.
     :param output_dir_name: Path to output directory (model and training history
         will be saved here).
     :param training_generator: Leave this alone if you don't know what you're
@@ -1628,7 +1639,7 @@ def train_model(
     error_checking.assert_is_integer(plateau_patience_epochs)
     error_checking.assert_is_geq(plateau_patience_epochs, 2)
     error_checking.assert_is_greater(plateau_learning_rate_multiplier, 0.)
-    error_checking.assert_is_less_than(plateau_learning_rate_multiplier, 1.)
+    # error_checking.assert_is_less_than(plateau_learning_rate_multiplier, 1.)
     error_checking.assert_is_integer(early_stopping_patience_epochs)
     error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
 
@@ -1672,20 +1683,46 @@ def train_model(
         monitor='val_loss', min_delta=0.,
         patience=early_stopping_patience_epochs, verbose=1, mode='min'
     )
-    plateau_object = keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss', factor=plateau_learning_rate_multiplier,
-        patience=plateau_patience_epochs, verbose=1, mode='min',
-        min_delta=0., cooldown=0
-    )
     backup_object = keras.callbacks.BackupAndRestore(
         backup_dir_name, save_freq='epoch', delete_checkpoint=False
     )
-
     list_of_callback_objects = [
         history_object, checkpoint_object,
-        early_stopping_object, plateau_object,
-        backup_object
+        early_stopping_object, backup_object
     ]
+
+    if cosine_annealing_with_restarts_dict is not None:
+        cosine_annealing_dict = None
+        plateau_learning_rate_multiplier = 10.
+    if cosine_annealing_dict is not None:
+        plateau_learning_rate_multiplier = 10.
+
+    if plateau_learning_rate_multiplier < 1:
+        plateau_object = keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss', factor=plateau_learning_rate_multiplier,
+            patience=plateau_patience_epochs, verbose=1, mode='min',
+            min_delta=0., cooldown=0
+        )
+        list_of_callback_objects.append(plateau_object)
+
+    if cosine_annealing_with_restarts_dict is not None:
+        cawrd = cosine_annealing_with_restarts_dict
+
+        cosine_annealing_object = nn_utils.CosineAnnealingWarmRestarts(
+            num_epochs_in_first_cycle=cawrd['num_epochs_in_cycle'],
+            min_learning_rate=cawrd['min_learning_rate'],
+            max_learning_rate=cawrd['max_learning_rate'],
+            cycle_length_multiplier=1
+        )
+        list_of_callback_objects.append(cosine_annealing_object)
+
+    if cosine_annealing_dict is not None:
+        cosine_annealing_object = nn_utils.CosineAnnealingScheduler(
+            num_epochs_in_cycle=cosine_annealing_dict['num_epochs_in_cycle'],
+            min_learning_rate=cosine_annealing_dict['min_learning_rate'],
+            max_learning_rate=cosine_annealing_dict['max_learning_rate']
+        )
+        list_of_callback_objects.append(cosine_annealing_object)
 
     if training_generator is None or validation_generator is None:
         training_generator = data_generator(training_option_dict)
@@ -1714,7 +1751,9 @@ def train_model(
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
-        patch_overlap_fast_gen_2pt5km_pixels=None
+        patch_overlap_fast_gen_2pt5km_pixels=None,
+        cosine_annealing_dict=cosine_annealing_dict,
+        cosine_annealing_with_restarts_dict=cosine_annealing_with_restarts_dict
     )
 
     if use_exp_moving_average_with_decay is None:

@@ -229,7 +229,9 @@ def _run():
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
-        patch_overlap_fast_gen_2pt5km_pixels=144
+        patch_overlap_fast_gen_2pt5km_pixels=144,
+        cosine_annealing_dict=None,
+        cosine_annealing_with_restarts_dict=None
     )
 
 

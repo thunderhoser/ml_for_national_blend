@@ -34,6 +34,10 @@ NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
 PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'
 PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'
+COSINE_ANNEALING_MIN_LR_ARG_NAME = 'cosine_annealing_min_learning_rate'
+COSINE_ANNEALING_MAX_LR_ARG_NAME = 'cosine_annealing_max_learning_rate'
+COSINE_ANNEALING_LENGTH_ARG_NAME = 'cosine_annealing_cycle_length_epochs'
+COSINE_ANNEALING_RESTARTS_ARG_NAME = 'cosine_annealing_do_restarts'
 
 TEMPLATE_FILE_HELP_STRING = (
     'Path to template file, containing model architecture.  This will be read '
@@ -114,6 +118,21 @@ EARLY_STOPPING_PATIENCE_HELP_STRING = (
 ).format(
     EARLY_STOPPING_PATIENCE_ARG_NAME
 )
+COSINE_ANNEALING_MIN_LR_HELP_STRING = (
+    'Minimum learning rate in cosine-annealing schedule.  If you do not want '
+    'cosine annealing, leave this alone.'
+)
+COSINE_ANNEALING_MAX_LR_HELP_STRING = (
+    'Max learning rate in cosine-annealing schedule.  If you do not want '
+    'cosine annealing, leave this alone.'
+)
+COSINE_ANNEALING_LENGTH_HELP_STRING = (
+    'Cycle length in cosine-annealing schedule.  If you do not want cosine '
+    'annealing, leave this alone.'
+)
+COSINE_ANNEALING_RESTARTS_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will do cosine annealing with(out) warm restarts.'
+)
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
@@ -192,6 +211,22 @@ INPUT_ARG_PARSER.add_argument(
     '--' + EARLY_STOPPING_PATIENCE_ARG_NAME, type=int, required=False,
     default=100, help=EARLY_STOPPING_PATIENCE_HELP_STRING
 )
+INPUT_ARG_PARSER.add_argument(
+    '--' + COSINE_ANNEALING_MIN_LR_ARG_NAME, type=float, required=False,
+    default=1., help=COSINE_ANNEALING_MIN_LR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + COSINE_ANNEALING_MAX_LR_ARG_NAME, type=float, required=False,
+    default=-1., help=COSINE_ANNEALING_MAX_LR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + COSINE_ANNEALING_LENGTH_ARG_NAME, type=int, required=False,
+    default=-1, help=COSINE_ANNEALING_LENGTH_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + COSINE_ANNEALING_RESTARTS_ARG_NAME, type=int, required=False,
+    default=0, help=COSINE_ANNEALING_RESTARTS_HELP_STRING
+)
 
 
 def _run(template_file_name, example_dir_name, output_dir_name,
@@ -204,7 +239,9 @@ def _run(template_file_name, example_dir_name, output_dir_name,
          num_epochs, use_exp_moving_average_with_decay,
          num_training_batches_per_epoch, num_validation_batches_per_epoch,
          plateau_patience_epochs, plateau_learning_rate_multiplier,
-         early_stopping_patience_epochs):
+         early_stopping_patience_epochs,
+         cosine_annealing_min_learning_rate, cosine_annealing_max_learning_rate,
+         cosine_annealing_cycle_length_epochs, cosine_annealing_do_restarts):
     """Trains neural net from pre-processed example files.
 
     This is effectively the main method.
@@ -227,6 +264,10 @@ def _run(template_file_name, example_dir_name, output_dir_name,
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
+    :param cosine_annealing_min_learning_rate: Same.
+    :param cosine_annealing_max_learning_rate: Same.
+    :param cosine_annealing_cycle_length_epochs: Same.
+    :param cosine_annealing_do_restarts: Same.
     """
 
     if patch_size_2pt5km_pixels < 0:
@@ -247,6 +288,29 @@ def _run(template_file_name, example_dir_name, output_dir_name,
 
     if use_exp_moving_average_with_decay < 0:
         use_exp_moving_average_with_decay = None
+
+    cosine_annealing_dict = None
+    cosine_annealing_with_restarts_dict = None
+
+    if (
+            cosine_annealing_min_learning_rate >
+            cosine_annealing_max_learning_rate
+            or cosine_annealing_cycle_length_epochs < 1
+    ):
+        pass
+    else:
+        if cosine_annealing_do_restarts:
+            cosine_annealing_with_restarts_dict = {
+                'min_learning_rate': cosine_annealing_min_learning_rate,
+                'max_learning_rate': cosine_annealing_max_learning_rate,
+                'num_epochs_in_cycle': cosine_annealing_cycle_length_epochs
+            }
+        else:
+            cosine_annealing_dict = {
+                'min_learning_rate': cosine_annealing_min_learning_rate,
+                'max_learning_rate': cosine_annealing_max_learning_rate,
+                'num_epochs_in_cycle': cosine_annealing_cycle_length_epochs
+            }
 
     first_init_times_for_training_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, TIME_FORMAT)
@@ -379,6 +443,9 @@ def _run(template_file_name, example_dir_name, output_dir_name,
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
+            cosine_annealing_dict=cosine_annealing_dict,
+            cosine_annealing_with_restarts_dict=
+            cosine_annealing_with_restarts_dict,
             output_dir_name=output_dir_name,
             training_generator=training_generator,
             validation_generator=validation_generator
@@ -406,6 +473,9 @@ def _run(template_file_name, example_dir_name, output_dir_name,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
             patch_overlap_fast_gen_2pt5km_pixels=
             patch_overlap_size_2pt5km_pixels,
+            cosine_annealing_dict=cosine_annealing_dict,
+            cosine_annealing_with_restarts_dict=
+            cosine_annealing_with_restarts_dict,
             output_dir_name=output_dir_name,
             training_generator=training_generator,
             validation_generator=validation_generator
@@ -457,5 +527,17 @@ if __name__ == '__main__':
         ),
         early_stopping_patience_epochs=getattr(
             INPUT_ARG_OBJECT, EARLY_STOPPING_PATIENCE_ARG_NAME
-        )
+        ),
+        cosine_annealing_min_learning_rate=getattr(
+            INPUT_ARG_OBJECT, COSINE_ANNEALING_MIN_LR_ARG_NAME
+        ),
+        cosine_annealing_max_learning_rate=getattr(
+            INPUT_ARG_OBJECT, COSINE_ANNEALING_MAX_LR_ARG_NAME
+        ),
+        cosine_annealing_cycle_length_epochs=getattr(
+            INPUT_ARG_OBJECT, COSINE_ANNEALING_LENGTH_ARG_NAME
+        ),
+        cosine_annealing_do_restarts=bool(getattr(
+            INPUT_ARG_OBJECT, COSINE_ANNEALING_RESTARTS_ARG_NAME
+        ))
     )

@@ -324,7 +324,7 @@ def _run(input_dir_name, model_name, target_vars_only,
             ]
         else:
             field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
-        
+
         field_names = set(field_names)
         field_names.remove(nwp_model_utils.WIND_GUST_10METRE_NAME)
         field_names = list(field_names)
