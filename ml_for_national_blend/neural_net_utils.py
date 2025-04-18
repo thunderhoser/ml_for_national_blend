@@ -158,20 +158,7 @@ class CosineAnnealingScheduler(keras.callbacks.Callback):
             multiplier * (self.max_learning_rate - self.min_learning_rate)
         )
 
-        lr_object = self.model.optimizer.learning_rate
-        print(lr_object)
-        lr_object.assign(current_learning_rate)
-
-        if isinstance(
-                lr_object,
-                tensorflow.keras.optimizers.schedules.LearningRateSchedule
-        ):
-            raise ValueError('Cannot modify scheduled learning rate.')
-        elif isinstance(lr_object, tensorflow.Variable):
-            lr_object.assign(current_learning_rate)
-        else:
-            tf_backend.set_value(lr_object, current_learning_rate)
-
+        self.model.optimizer.learning_rate.assign(current_learning_rate)
         print((
             'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
             '{1:.4g}!'
