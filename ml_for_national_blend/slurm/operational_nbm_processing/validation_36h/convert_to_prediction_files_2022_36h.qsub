@@ -48,7 +48,4 @@ python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
 --first_init_time_string="${first_init_time_string}" \
 --last_init_time_string="${last_init_time_string}" \
 --lead_time_hours=36 \
---patch_size_2pt5km_pixels=272 \
---patch_start_row_2pt5km=640 \
---patch_start_column_2pt5km=784 \
 --output_prediction_dir_name="${PREDICTION_DIR_NAME}"
