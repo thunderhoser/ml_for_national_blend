@@ -160,6 +160,7 @@ class CosineAnnealingScheduler(keras.callbacks.Callback):
 
         lr_object = self.model.optimizer.learning_rate
         print(lr_object)
+        lr_object.assign(current_learning_rate)
 
         if isinstance(
                 lr_object,
