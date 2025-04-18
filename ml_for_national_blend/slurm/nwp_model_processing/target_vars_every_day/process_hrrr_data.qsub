@@ -47,6 +47,7 @@ last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
 python3 -u "${CODE_DIR_NAME}/process_nwp_data.py" \
 --input_grib2_dir_name="${INPUT_DIR_NAME}" \
 --model_name="hrrr" \
+--target_vars_only=1 \
 --first_init_time_string="${first_init_time_string}" \
 --last_init_time_string="${last_init_time_string}" \
 --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
