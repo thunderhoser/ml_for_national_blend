@@ -42,6 +42,7 @@ TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
 MODEL_ARG_NAME = 'model_name'
+TARGET_VARS_ONLY_ARG_NAME = 'target_vars_only'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 START_LATITUDE_ARG_NAME = 'start_latitude_deg_n'
@@ -61,6 +62,10 @@ INPUT_DIR_HELP_STRING = (
 MODEL_HELP_STRING = (
     'Name of NWP model (must be accepted by '
     '`nwp_model_utils.check_model_name`).'
+)
+TARGET_VARS_ONLY_HELP_STRING = (
+    'Boolean flag.  If 1, will process only target variables.  If 0, will '
+    'process all variables.'
 )
 FIRST_INIT_TIME_HELP_STRING = (
     'First init time (format "yyyy-mm-dd-HH").  This script will process model '
@@ -112,6 +117,10 @@ INPUT_ARG_PARSER.add_argument(
     '--' + MODEL_ARG_NAME, type=str, required=True, help=MODEL_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TARGET_VARS_ONLY_ARG_NAME, type=int, required=False, default=0,
+    help=TARGET_VARS_ONLY_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=True,
     help=FIRST_INIT_TIME_HELP_STRING
 )
@@ -153,7 +162,7 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(input_dir_name, model_name,
+def _run(input_dir_name, model_name, target_vars_only,
          first_init_time_string, last_init_time_string,
          start_latitude_deg_n, end_latitude_deg_n,
          start_longitude_deg_e, end_longitude_deg_e,
@@ -165,6 +174,7 @@ def _run(input_dir_name, model_name,
 
     :param input_dir_name: See documentation at top of this script.
     :param model_name: Same.
+    :param target_vars_only: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
     :param start_latitude_deg_n: Same.
@@ -296,8 +306,32 @@ def _run(input_dir_name, model_name,
             nwp_model_utils.U_WIND_10METRE_NAME,
             nwp_model_utils.V_WIND_10METRE_NAME
         ]
+    elif model_name == nwp_model_utils.GRIDDED_MOS_MODEL_NAME:
+        field_names = [
+            nwp_model_utils.TEMPERATURE_2METRE_NAME,
+            nwp_model_utils.DEWPOINT_2METRE_NAME,
+            nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME,
+            nwp_model_utils.WIND_GUST_10METRE_NAME,
+            nwp_model_utils.U_WIND_10METRE_NAME,
+            nwp_model_utils.V_WIND_10METRE_NAME
+        ]
+
+        if target_vars_only:
+            field_names = set(field_names)
+            field_names.remove(nwp_model_utils.RELATIVE_HUMIDITY_2METRE_NAME)
+            field_names = list(field_names)
     else:
-        field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
+        if target_vars_only:
+            field_names = [
+                nwp_model_utils.TEMPERATURE_2METRE_NAME,
+                nwp_model_utils.DEWPOINT_2METRE_NAME,
+                nwp_model_utils.WIND_GUST_10METRE_NAME,
+                nwp_model_utils.U_WIND_10METRE_NAME,
+                nwp_model_utils.V_WIND_10METRE_NAME
+            ]
+        else:
+            field_names = copy.deepcopy(nwp_model_utils.ALL_FIELD_NAMES)
+        
         field_names = set(field_names)
         field_names.remove(nwp_model_utils.WIND_GUST_10METRE_NAME)
         field_names = list(field_names)
@@ -581,6 +615,9 @@ if __name__ == '__main__':
     _run(
         input_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
         model_name=getattr(INPUT_ARG_OBJECT, MODEL_ARG_NAME),
+        target_vars_only=bool(
+            getattr(INPUT_ARG_OBJECT, TARGET_VARS_ONLY_ARG_NAME)
+        ),
         first_init_time_string=getattr(
             INPUT_ARG_OBJECT, FIRST_INIT_TIME_ARG_NAME
         ),
