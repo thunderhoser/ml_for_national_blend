@@ -7,6 +7,7 @@ import warnings
 import numpy
 import keras
 import tensorflow
+from tensorflow.keras import backend as tf_backend
 from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -157,7 +158,7 @@ class CosineAnnealingScheduler(keras.callbacks.Callback):
             multiplier * (self.max_learning_rate - self.min_learning_rate)
         )
 
-        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        tf_backend.set_value(self.model.optimizer.lr, current_learning_rate)
         print((
             'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
             '{1:.4g}!'
@@ -218,7 +219,7 @@ class CosineAnnealingWarmRestarts(keras.callbacks.Callback):
             multiplier * (self.max_learning_rate - self.min_learning_rate)
         )
 
-        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        tf_backend.set_value(self.model.optimizer.lr, current_learning_rate)
         print((
             'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
             '{1:.4g}!'
