@@ -471,7 +471,9 @@ def _run(nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
-        patch_overlap_fast_gen_2pt5km_pixels=144
+        patch_overlap_fast_gen_2pt5km_pixels=144,
+        cosine_annealing_dict=None,
+        cosine_annealing_with_restarts_dict=None
     )
 
     init_times_unix_sec = nn_utils.find_relevant_init_times(
@@ -491,7 +493,6 @@ def _run(nwp_lead_times_hours, nwp_model_names, nwp_model_to_field_names,
             )
         except Exception:
             traceback.print_exc()
-            pass
 
         if data_dict is None:
             continue

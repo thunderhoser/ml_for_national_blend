@@ -50,6 +50,10 @@ NUM_VALIDATION_BATCHES_ARG_NAME = 'num_validation_batches_per_epoch'
 PLATEAU_PATIENCE_ARG_NAME = 'plateau_patience_epochs'
 PLATEAU_MULTIPLIER_ARG_NAME = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_ARG_NAME = 'early_stopping_patience_epochs'
+COSINE_ANNEALING_MIN_LR_ARG_NAME = 'cosine_annealing_min_learning_rate'
+COSINE_ANNEALING_MAX_LR_ARG_NAME = 'cosine_annealing_max_learning_rate'
+COSINE_ANNEALING_LENGTH_ARG_NAME = 'cosine_annealing_cycle_length_epochs'
+COSINE_ANNEALING_RESTARTS_ARG_NAME = 'cosine_annealing_do_restarts'
 
 TEMPLATE_FILE_HELP_STRING = (
     'Path to template file, containing model architecture.  This will be read '
@@ -195,6 +199,21 @@ EARLY_STOPPING_PATIENCE_HELP_STRING = (
 ).format(
     EARLY_STOPPING_PATIENCE_ARG_NAME
 )
+COSINE_ANNEALING_MIN_LR_HELP_STRING = (
+    'Minimum learning rate in cosine-annealing schedule.  If you do not want '
+    'cosine annealing, leave this alone.'
+)
+COSINE_ANNEALING_MAX_LR_HELP_STRING = (
+    'Max learning rate in cosine-annealing schedule.  If you do not want '
+    'cosine annealing, leave this alone.'
+)
+COSINE_ANNEALING_LENGTH_HELP_STRING = (
+    'Cycle length in cosine-annealing schedule.  If you do not want cosine '
+    'annealing, leave this alone.'
+)
+COSINE_ANNEALING_RESTARTS_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will do cosine annealing with(out) warm restarts.'
+)
 
 
 def add_input_args(parser_object):
@@ -336,6 +355,22 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + EARLY_STOPPING_PATIENCE_ARG_NAME, type=int, required=False,
         default=100, help=EARLY_STOPPING_PATIENCE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + COSINE_ANNEALING_MIN_LR_ARG_NAME, type=float, required=False,
+        default=1., help=COSINE_ANNEALING_MIN_LR_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + COSINE_ANNEALING_MAX_LR_ARG_NAME, type=float, required=False,
+        default=-1., help=COSINE_ANNEALING_MAX_LR_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + COSINE_ANNEALING_LENGTH_ARG_NAME, type=int, required=False,
+        default=-1, help=COSINE_ANNEALING_LENGTH_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + COSINE_ANNEALING_RESTARTS_ARG_NAME, type=int, required=False,
+        default=0, help=COSINE_ANNEALING_RESTARTS_HELP_STRING
     )
 
     return parser_object

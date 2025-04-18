@@ -87,7 +87,9 @@ def _run(template_file_name, output_dir_name,
          num_epochs, use_exp_moving_average_with_decay,
          num_training_batches_per_epoch, num_validation_batches_per_epoch,
          plateau_patience_epochs, plateau_learning_rate_multiplier,
-         early_stopping_patience_epochs):
+         early_stopping_patience_epochs,
+         cosine_annealing_min_learning_rate, cosine_annealing_max_learning_rate,
+         cosine_annealing_cycle_length_epochs, cosine_annealing_do_restarts):
     """Trains neural net.
 
     This is effectively the main method.
@@ -141,6 +143,10 @@ def _run(template_file_name, output_dir_name,
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
+    :param cosine_annealing_min_learning_rate: Same.
+    :param cosine_annealing_max_learning_rate: Same.
+    :param cosine_annealing_cycle_length_epochs: Same.
+    :param cosine_annealing_do_restarts: Same.
     """
 
     if nwp_resid_norm_file_name == '':
@@ -186,6 +192,29 @@ def _run(template_file_name, output_dir_name,
             recent_bias_lead_times_hours[0] < 0
     ):
         recent_bias_lead_times_hours = None
+
+    cosine_annealing_dict = None
+    cosine_annealing_with_restarts_dict = None
+
+    if (
+            cosine_annealing_min_learning_rate >
+            cosine_annealing_max_learning_rate
+            or cosine_annealing_cycle_length_epochs < 1
+    ):
+        pass
+    else:
+        if cosine_annealing_do_restarts:
+            cosine_annealing_with_restarts_dict = {
+                'min_learning_rate': cosine_annealing_min_learning_rate,
+                'max_learning_rate': cosine_annealing_max_learning_rate,
+                'num_epochs_in_cycle': cosine_annealing_cycle_length_epochs
+            }
+        else:
+            cosine_annealing_dict = {
+                'min_learning_rate': cosine_annealing_min_learning_rate,
+                'max_learning_rate': cosine_annealing_max_learning_rate,
+                'num_epochs_in_cycle': cosine_annealing_cycle_length_epochs
+            }
 
     nwp_model_to_training_dir_name = _process_nwp_directories(
         nwp_directory_names=nwp_dir_names_for_training,
@@ -291,6 +320,9 @@ def _run(template_file_name, output_dir_name,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
             patch_overlap_fast_gen_2pt5km_pixels=
             patch_overlap_size_2pt5km_pixels,
+            cosine_annealing_dict=cosine_annealing_dict,
+            cosine_annealing_with_restarts_dict=
+            cosine_annealing_with_restarts_dict,
             output_dir_name=output_dir_name
         )
     else:
@@ -314,6 +346,9 @@ def _run(template_file_name, output_dir_name,
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
+            cosine_annealing_dict=cosine_annealing_dict,
+            cosine_annealing_with_restarts_dict=
+            cosine_annealing_with_restarts_dict,
             output_dir_name=output_dir_name
         )
 
@@ -476,5 +511,17 @@ if __name__ == '__main__':
         ),
         early_stopping_patience_epochs=getattr(
             INPUT_ARG_OBJECT, training_args.EARLY_STOPPING_PATIENCE_ARG_NAME
-        )
+        ),
+        cosine_annealing_min_learning_rate=getattr(
+            INPUT_ARG_OBJECT, training_args.COSINE_ANNEALING_MIN_LR_ARG_NAME
+        ),
+        cosine_annealing_max_learning_rate=getattr(
+            INPUT_ARG_OBJECT, training_args.COSINE_ANNEALING_MAX_LR_ARG_NAME
+        ),
+        cosine_annealing_cycle_length_epochs=getattr(
+            INPUT_ARG_OBJECT, training_args.COSINE_ANNEALING_LENGTH_ARG_NAME
+        ),
+        cosine_annealing_do_restarts=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.COSINE_ANNEALING_RESTARTS_ARG_NAME
+        ))
     )

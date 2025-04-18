@@ -91,6 +91,8 @@ PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 PATCH_OVERLAP_FOR_FAST_GEN_KEY = 'patch_overlap_fast_gen_2pt5km_pixels'
+COSINE_ANNEALING_KEY = 'cosine_annealing_dict'
+COSINE_ANNEALING_WITH_RESTARTS_KEY = 'cosine_annealing_with_restarts_dict'
 
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, EMA_DECAY_KEY,
@@ -100,7 +102,8 @@ METADATA_KEYS = [
     U_NET_ARCHITECTURE_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
-    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY
+    EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY,
+    COSINE_ANNEALING_KEY, COSINE_ANNEALING_WITH_RESTARTS_KEY
 ]
 
 PREDICTOR_MATRIX_2PT5KM_KEY = 'predictor_matrix_2pt5km'
@@ -114,6 +117,114 @@ RECENT_BIAS_MATRIX_40KM_KEY = 'recent_bias_matrix_40km'
 PREDICTOR_MATRIX_BASELINE_KEY = 'predictor_matrix_resid_baseline'
 PREDICTOR_MATRIX_LAGTGT_KEY = 'predictor_matrix_lagged_targets'
 TARGET_MATRIX_KEY = 'target_matrix'
+
+
+class CosineAnnealingScheduler(keras.callbacks.Callback):
+    """Implements cosine-annealing schedule for learning rate."""
+
+    def __init__(self, num_epochs_in_cycle, min_learning_rate,
+                 max_learning_rate):
+        """Initializer.
+
+        :param num_epochs_in_cycle: Length of annealing cycle.
+        :param max_learning_rate: Max learning rate.
+        :param min_learning_rate: Minimum learning rate.
+        """
+
+        error_checking.assert_is_integer(num_epochs_in_cycle)
+        error_checking.assert_is_geq(num_epochs_in_cycle, 10)
+        error_checking.assert_is_greater(max_learning_rate, min_learning_rate)
+        error_checking.assert_is_greater(min_learning_rate, 0.)
+
+        super().__init__()
+        self.num_epochs_in_cycle = num_epochs_in_cycle
+        self.min_learning_rate = min_learning_rate
+        self.max_learning_rate = max_learning_rate
+
+    def on_epoch_begin(self, epoch, logs=None):
+        """This method triggers at the beginning of each epoch.
+
+        :param epoch: Epoch number.
+        :param logs: I don't know why this argument is here.  Just leave it
+            alone.
+        """
+
+        multiplier = 0.5 * (
+            1 + numpy.cos(numpy.pi * epoch / self.num_epochs_in_cycle)
+        )
+        current_learning_rate = (
+            self.min_learning_rate +
+            multiplier * (self.max_learning_rate - self.min_learning_rate)
+        )
+
+        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        print((
+            'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
+            '{1:.4g}!'
+        ).format(
+            epoch, current_learning_rate
+        ))
+
+
+class CosineAnnealingWarmRestarts(keras.callbacks.Callback):
+    """Implements cosine-annealing schedule with warm restarts."""
+
+    def __init__(self, min_learning_rate, max_learning_rate,
+                 num_epochs_in_first_cycle, cycle_length_multiplier):
+        """Initializer.
+
+        :param max_learning_rate: Max learning rate.
+        :param min_learning_rate: Minimum learning rate.
+        :param num_epochs_in_first_cycle: Length of first annealing cycle.
+        :param cycle_length_multiplier: Multiplier for length of subsequent
+            annealing cycles.
+        """
+
+        error_checking.assert_is_greater(max_learning_rate, min_learning_rate)
+        error_checking.assert_is_greater(min_learning_rate, 0.)
+        error_checking.assert_is_integer(num_epochs_in_first_cycle)
+        error_checking.assert_is_geq(num_epochs_in_first_cycle, 10)
+        error_checking.assert_is_integer(cycle_length_multiplier)
+        error_checking.assert_is_greater(cycle_length_multiplier, 0)
+
+        super().__init__()
+        self.min_learning_rate = min_learning_rate
+        self.max_learning_rate = max_learning_rate
+        self.num_epochs_in_first_cycle = num_epochs_in_first_cycle
+        self.cycle_length_multiplier = cycle_length_multiplier
+
+    def on_epoch_begin(self, epoch, logs=None):
+        """This method triggers at the beginning of each epoch.
+
+        :param epoch: Epoch number.
+        :param logs: I don't know why this argument is here.  Just leave it
+            alone.
+        """
+
+        num_epochs_in_this_cycle = self.num_epochs_in_first_cycle + 0
+        epochs_into_this_cycle = epoch + 0
+        cycle_index = 0
+
+        while epochs_into_this_cycle >= num_epochs_in_this_cycle:
+            epochs_into_this_cycle -= num_epochs_in_this_cycle
+            num_epochs_in_this_cycle *= self.cycle_length_multiplier
+            cycle_index += 1
+
+        multiplier = 0.5 * (1 + numpy.cos(
+            numpy.pi * epochs_into_this_cycle / num_epochs_in_this_cycle
+        ))
+        current_learning_rate = (
+            self.min_learning_rate +
+            multiplier * (self.max_learning_rate - self.min_learning_rate)
+        )
+
+        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        print((
+            'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
+            '{1:.4g}!'
+        ).format(
+            epoch, current_learning_rate
+        ))
 
 
 class EMAHelper:
@@ -1399,7 +1510,8 @@ def write_metafile(
         u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels):
+        early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
+        cosine_annealing_dict, cosine_annealing_with_restarts_dict):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -1420,6 +1532,8 @@ def write_metafile(
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
     :param patch_overlap_fast_gen_2pt5km_pixels: Same.
+    :param cosine_annealing_dict: Same.
+    :param cosine_annealing_with_restarts_dict: Same.
     """
 
     metadata_dict = {
@@ -1439,7 +1553,9 @@ def write_metafile(
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
-        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels
+        PATCH_OVERLAP_FOR_FAST_GEN_KEY: patch_overlap_fast_gen_2pt5km_pixels,
+        COSINE_ANNEALING_KEY: cosine_annealing_dict,
+        COSINE_ANNEALING_WITH_RESTARTS_KEY: cosine_annealing_with_restarts_dict
     }
 
     file_system_utils.mkdir_recursive_if_necessary(file_name=pickle_file_name)
@@ -1472,6 +1588,8 @@ def read_metafile(pickle_file_name):
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
     metadata_dict["patch_overlap_fast_gen_2pt5km_pixels"]: Same.
+    metadata_dict["cosine_annealing_dict"]: Same.
+    metadata_dict["cosine_annealing_with_restarts_dict"]: Same.
 
     :raises: ValueError: if any expected key is not found in dictionary.
     """
@@ -1484,6 +1602,10 @@ def read_metafile(pickle_file_name):
 
     if PATCH_OVERLAP_FOR_FAST_GEN_KEY not in metadata_dict:
         metadata_dict[PATCH_OVERLAP_FOR_FAST_GEN_KEY] = None
+    if COSINE_ANNEALING_KEY not in metadata_dict:
+        metadata_dict[COSINE_ANNEALING_KEY] = None
+    if COSINE_ANNEALING_WITH_RESTARTS_KEY not in metadata_dict:
+        metadata_dict[COSINE_ANNEALING_WITH_RESTARTS_KEY] = None
     if U_NET_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[U_NET_ARCHITECTURE_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
