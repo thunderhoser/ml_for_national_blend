@@ -1,0 +1,77 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_nns_from_example_files"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=168:00:00
+#SBATCH --array=0-43
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_nns_from_example_files_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment21_cosine_annealing_and_weight_decay/templates"
+TOP_EXAMPLE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment19_high_res_single_patch"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment21_cosine_annealing_and_weight_decay"
+
+OPTIMIZER_NAMES=("adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "adamw" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion" "lion")
+WEIGHT_DECAY_VALUES=("0.000010" "0.000030" "0.000050" "0.000070" "0.000090" "0.000110" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000010" "0.000030" "0.000050" "0.000070" "0.000090" "0.000110" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000" "0.000000")
+ANNEALING_MIN_LEARNING_RATES=("1" "1" "1" "1" "1" "1" "0.00001"  "0.00004"  "0.00007"  "0.00010" "0.00001"  "0.00004"  "0.00007"  "0.00010" "0.00001"  "0.00004"  "0.00007"  "0.00010" "1" "1" "1" "1" "1" "1" "0.00001"  "0.00004"  "0.00007"  "0.00010" "0.00001"  "0.00004"  "0.00007"  "0.00010" "0.00001"  "0.00004"  "0.00007"  "0.00010")
+ANNEALING_CYCLE_LENGTHS=("-1" "-1" "-1" "-1" "-1" "-1" "50" "50" "50" "50" "100" "100" "100" "100" "150" "150" "150" "150" "200" "200" "200" "200" "-1" "-1" "-1" "-1" "-1" "-1" "50" "50" "50" "50" "100" "100" "100" "100" "150" "150" "150" "150" "200" "200" "200" "200")
+ANNEALING_STRINGS=("none" "none" "none" "none" "none" "none" "050epochs-min0.00001" "050epochs-min0.00004" "050epochs-min0.00007" "050epochs-min0.00010" "100epochs-min0.00001" "100epochs-min0.00004" "100epochs-min0.00007" "100epochs-min0.00010" "150epochs-min0.00001" "150epochs-min0.00004" "150epochs-min0.00007" "150epochs-min0.00010" "200epochs-min0.00001" "200epochs-min0.00004" "200epochs-min0.00007" "200epochs-min0.00010" "none" "none" "none" "none" "none" "none" "050epochs-min0.00001" "050epochs-min0.00004" "050epochs-min0.00007" "050epochs-min0.00010" "100epochs-min0.00001" "100epochs-min0.00004" "100epochs-min0.00007" "100epochs-min0.00010" "150epochs-min0.00001" "150epochs-min0.00004" "150epochs-min0.00007" "150epochs-min0.00010" "200epochs-min0.00001" "200epochs-min0.00004" "200epochs-min0.00007" "200epochs-min0.00010")
+
+optimizer_name=${OPTIMIZER_NAMES[$SLURM_ARRAY_TASK_ID]}
+weight_decay_value=${WEIGHT_DECAY_VALUES[$SLURM_ARRAY_TASK_ID]}
+annealing_min_learning_rate=${ANNEALING_MIN_LEARNING_RATES[$SLURM_ARRAY_TASK_ID]}
+annealing_cycle_length=${ANNEALING_CYCLE_LENGTHS[$SLURM_ARRAY_TASK_ID]}
+annealing_string=${ANNEALING_STRINGS[$SLURM_ARRAY_TASK_ID]}
+
+model_names_one_string="ensemble_hrrr_gridded-gfs-mos"
+
+input_model_file_name="${TEMPLATE_DIR_NAME}/optimizer=${optimizer_name}_weight-decay=${weight_decay_value}/model.keras"
+example_dir_name="${TOP_EXAMPLE_DIR_NAME}/nwp-inputs=${model_names_one_string}/npz_example_files"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/optimizer=${optimizer_name}_weight-decay=${weight_decay_value}_annealing=${annealing_string}"
+echo $output_dir_name
+
+while true; do
+    python3 -u "${CODE_DIR_NAME}/train_nn_from_example_files.py" \
+    --input_template_file_name="${input_model_file_name}" \
+    --input_example_dir_name="${example_dir_name}" \
+    --output_model_dir_name="${output_dir_name}" \
+    --num_examples_per_batch=1 \
+    --patch_size_2pt5km_pixels=-1 \
+    --first_init_time_strings_for_training "2017-01-01-00" \
+    --last_init_time_strings_for_training "2021-12-20-18" \
+    --first_init_time_strings_for_validation "2022-01-01-00" \
+    --last_init_time_strings_for_validation "2022-12-20-18" \
+    --num_epochs=30000 \
+    --num_training_batches_per_epoch=50 \
+    --num_validation_batches_per_epoch=25 \
+    --plateau_patience_epochs=10 \
+    --plateau_learning_rate_multiplier=0.95 \
+    --early_stopping_patience_epochs=10000 \
+    --cosine_annealing_min_learning_rate=${annealing_min_learning_rate} \
+    --cosine_annealing_max_learning_rate=0.001 \
+    --cosine_annealing_cycle_length_epochs=${annealing_cycle_length} \
+    --cosine_annealing_do_restarts=1
+done
