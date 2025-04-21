@@ -19,6 +19,7 @@ import copy
 import shutil
 import argparse
 import warnings
+import traceback
 import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -465,6 +466,7 @@ def _run(input_dir_name, model_name, target_vars_only,
             continue
 
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
+        continue_flag = False
 
         for k in range(num_forecast_hours):
             if not os.path.isfile(input_file_names[k]):
@@ -484,21 +486,44 @@ def _run(input_dir_name, model_name, target_vars_only,
             # It reads all the desired fields, converts them to SI units
             # (if necessary), rotates wind vectors to Earth-relative
             # (if necessary), and subsets the global grid (if necessary).
-            if using_old_gfs_or_gefs:
-                nwp_forecast_tables_xarray[k] = (
-                    raw_nwp_model_io.read_old_gfs_or_gefs_file(
-                        grib2_file_name=input_file_names[k],
-                        model_name=model_name,
-                        desired_row_indices=desired_row_indices,
-                        desired_column_indices=desired_column_indices,
-                        wgrib2_exe_name=wgrib2_exe_name,
-                        temporary_dir_name=temporary_dir_name,
-                        field_names=field_names
+            try:
+                if using_old_gfs_or_gefs:
+                    nwp_forecast_tables_xarray[k] = (
+                        raw_nwp_model_io.read_old_gfs_or_gefs_file(
+                            grib2_file_name=input_file_names[k],
+                            model_name=model_name,
+                            desired_row_indices=desired_row_indices,
+                            desired_column_indices=desired_column_indices,
+                            wgrib2_exe_name=wgrib2_exe_name,
+                            temporary_dir_name=temporary_dir_name,
+                            field_names=field_names
+                        )
                     )
-                )
-            elif using_oldish_gfs:
-                nwp_forecast_tables_xarray[k] = (
-                    raw_nwp_model_io.read_oldish_gfs_file(
+                elif using_oldish_gfs:
+                    nwp_forecast_tables_xarray[k] = (
+                        raw_nwp_model_io.read_oldish_gfs_file(
+                            grib2_file_name=input_file_names[k],
+                            model_name=model_name,
+                            desired_row_indices=desired_row_indices,
+                            desired_column_indices=desired_column_indices,
+                            wgrib2_exe_name=wgrib2_exe_name,
+                            temporary_dir_name=temporary_dir_name,
+                            field_names=field_names,
+                        )
+                    )
+                elif model_name == nwp_model_utils.ECMWF_MODEL_NAME:
+                    nwp_forecast_tables_xarray[k] = (
+                        raw_nwp_model_io.read_ecmwf_file(
+                            grib_file_name=input_file_names[k],
+                            desired_row_indices=desired_row_indices,
+                            desired_column_indices=desired_column_indices,
+                            wgrib_exe_name=wgrib2_exe_name,
+                            temporary_dir_name=temporary_dir_name,
+                            field_names=field_names
+                        )
+                    )
+                else:
+                    nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
                         grib2_file_name=input_file_names[k],
                         model_name=model_name,
                         desired_row_indices=desired_row_indices,
@@ -506,33 +531,18 @@ def _run(input_dir_name, model_name, target_vars_only,
                         wgrib2_exe_name=wgrib2_exe_name,
                         temporary_dir_name=temporary_dir_name,
                         field_names=field_names,
+                        rotate_winds=this_rotate_flag,
+                        read_incremental_precip=read_incremental_precip
                     )
-                )
-            elif model_name == nwp_model_utils.ECMWF_MODEL_NAME:
-                nwp_forecast_tables_xarray[k] = (
-                    raw_nwp_model_io.read_ecmwf_file(
-                        grib_file_name=input_file_names[k],
-                        desired_row_indices=desired_row_indices,
-                        desired_column_indices=desired_column_indices,
-                        wgrib_exe_name=wgrib2_exe_name,
-                        temporary_dir_name=temporary_dir_name,
-                        field_names=field_names
-                    )
-                )
-            else:
-                nwp_forecast_tables_xarray[k] = raw_nwp_model_io.read_file(
-                    grib2_file_name=input_file_names[k],
-                    model_name=model_name,
-                    desired_row_indices=desired_row_indices,
-                    desired_column_indices=desired_column_indices,
-                    wgrib2_exe_name=wgrib2_exe_name,
-                    temporary_dir_name=temporary_dir_name,
-                    field_names=field_names,
-                    rotate_winds=this_rotate_flag,
-                    read_incremental_precip=read_incremental_precip
-                )
+            except Exception:
+                traceback.print_exc()
+                continue_flag = True
+                break
 
             print(SEPARATOR_STRING)
+
+        if continue_flag:
+            continue
 
         # The above for-loop creates one xarray table per forecast hour.
         # Concatenate these all into one table.
