@@ -49,6 +49,6 @@ INIT_DATE_STRINGS=("2022-01-01-00" "2022-01-06-00" "2022-01-11-00" "2022-01-16-0
 
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
---init_time_limit_strings "${INIT_DATE_STRINGS}" "${INIT_DATE_STRINGS}" \
+--init_time_limit_strings "${INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
 --isotonic_model_file_names "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_temperature_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_u_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_v_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_dewpoint_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_wind_gust_10m_agl_m_s01.dill" \
 --output_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression"
