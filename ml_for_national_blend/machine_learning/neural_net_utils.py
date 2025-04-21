@@ -152,7 +152,7 @@ class CosineAnnealingScheduler(keras.callbacks.Callback):
             multiplier * (self.max_learning_rate - self.min_learning_rate)
         )
 
-        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        self.model.optimizer.learning_rate.assign(current_learning_rate)
         print((
             'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
             '{1:.4g}!'
@@ -213,9 +213,9 @@ class CosineAnnealingWarmRestarts(keras.callbacks.Callback):
             multiplier * (self.max_learning_rate - self.min_learning_rate)
         )
 
-        keras.backend.set_value(self.model.optimizer.lr, current_learning_rate)
+        self.model.optimizer.learning_rate.assign(current_learning_rate)
         print((
-            'Epoch {0:d}: CosineAnnealingScheduler setting learning rate to '
+            'Epoch {0:d}: CosineAnnealingWarmRestarts setting learning rate to '
             '{1:.4g}!'
         ).format(
             epoch, current_learning_rate
