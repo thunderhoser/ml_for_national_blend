@@ -2,8 +2,8 @@
 
 #SBATCH --job-name="train_nns_from_example_files"
 #SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpu"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
