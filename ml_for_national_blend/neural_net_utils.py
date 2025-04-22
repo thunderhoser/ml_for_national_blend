@@ -87,6 +87,7 @@ U_NET_ARCHITECTURE_KEY = 'u_net_architecture_dict'
 CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
 CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
 CHIU_NEXT_PP_ARCHITECTURE_KEY = 'chiu_next_pp_architecture_dict'
+CHIU_NEXT_PPP_ARCHITECTURE_KEY = 'chiu_next_ppp_architecture_dict'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
@@ -101,6 +102,7 @@ METADATA_KEYS = [
     OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY,
     U_NET_ARCHITECTURE_KEY, CHIU_NET_ARCHITECTURE_KEY,
     CHIU_NET_PP_ARCHITECTURE_KEY, CHIU_NEXT_PP_ARCHITECTURE_KEY,
+    CHIU_NEXT_PPP_ARCHITECTURE_KEY,
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
     EARLY_STOPPING_PATIENCE_KEY, PATCH_OVERLAP_FOR_FAST_GEN_KEY,
     COSINE_ANNEALING_KEY, COSINE_ANNEALING_WITH_RESTARTS_KEY
@@ -1509,6 +1511,7 @@ def write_metafile(
         metric_function_strings,
         u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
+        chiu_next_ppp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs, patch_overlap_fast_gen_2pt5km_pixels,
         cosine_annealing_dict, cosine_annealing_with_restarts_dict):
@@ -1528,6 +1531,7 @@ def write_metafile(
     :param chiu_net_architecture_dict: Same.
     :param chiu_net_pp_architecture_dict: Same.
     :param chiu_next_pp_architecture_dict: Same.
+    :param chiu_next_ppp_architecture_dict: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -1550,6 +1554,7 @@ def write_metafile(
         CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
         CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
         CHIU_NEXT_PP_ARCHITECTURE_KEY: chiu_next_pp_architecture_dict,
+        CHIU_NEXT_PPP_ARCHITECTURE_KEY: chiu_next_ppp_architecture_dict,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs,
@@ -1584,6 +1589,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["chiu_net_architecture_dict"]: Same.
     metadata_dict["chiu_net_pp_architecture_dict"]: Same.
     metadata_dict["chiu_next_pp_architecture_dict"]: Same.
+    metadata_dict["chiu_next_ppp_architecture_dict"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -1610,6 +1616,8 @@ def read_metafile(pickle_file_name):
         metadata_dict[U_NET_ARCHITECTURE_KEY] = None
     if CHIU_NEXT_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NEXT_PP_ARCHITECTURE_KEY] = None
+    if CHIU_NEXT_PPP_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NEXT_PPP_ARCHITECTURE_KEY] = None
     if EMA_DECAY_KEY not in metadata_dict:
         metadata_dict[EMA_DECAY_KEY] = None
 
@@ -1772,6 +1780,35 @@ def read_model(hdf5_file_name, for_inference):
                 arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
         model_object = chiu_next_pp_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+
+        if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
+            set_model_weights_to_ema(
+                model_object=model_object, metafile_name=metafile_name
+            )
+
+        return model_object
+
+    chiu_next_ppp_architecture_dict = metadata_dict[
+        CHIU_NEXT_PPP_ARCHITECTURE_KEY
+    ]
+    if chiu_next_ppp_architecture_dict is not None:
+        import \
+            chiu_next_ppp_architecture
+
+        arch_dict = chiu_next_ppp_architecture_dict
+
+        for this_key in [
+            chiu_next_ppp_architecture.LOSS_FUNCTION_KEY,
+            chiu_next_ppp_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_next_ppp_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_next_ppp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
 
         if for_inference and metadata_dict[EMA_DECAY_KEY] is not None:
