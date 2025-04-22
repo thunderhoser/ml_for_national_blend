@@ -309,6 +309,8 @@ def _run(template_file_name, output_dir_name,
             mmd[nn_utils.CHIU_NET_PP_ARCHITECTURE_KEY],
             chiu_next_pp_architecture_dict=
             mmd[nn_utils.CHIU_NEXT_PP_ARCHITECTURE_KEY],
+            chiu_next_ppp_architecture_dict=
+            mmd[nn_utils.CHIU_NEXT_PPP_ARCHITECTURE_KEY],
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -337,6 +339,8 @@ def _run(template_file_name, output_dir_name,
             mmd[nn_utils.CHIU_NET_PP_ARCHITECTURE_KEY],
             chiu_next_pp_architecture_dict=
             mmd[nn_utils.CHIU_NEXT_PP_ARCHITECTURE_KEY],
+            chiu_next_ppp_architecture_dict=
+            mmd[nn_utils.CHIU_NEXT_PPP_ARCHITECTURE_KEY],
             plateau_patience_epochs=plateau_patience_epochs,
             plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
             early_stopping_patience_epochs=early_stopping_patience_epochs,

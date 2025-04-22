@@ -226,6 +226,7 @@ def _run():
         chiu_net_architecture_dict=None,
         chiu_net_pp_architecture_dict=None,
         chiu_next_pp_architecture_dict=None,
+        chiu_next_ppp_architecture_dict=None,
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
