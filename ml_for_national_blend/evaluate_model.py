@@ -254,6 +254,9 @@ def _run(prediction_dir_name, init_time_limit_strings,
         model_lead_time_hours = first_ptx.attrs['model_lead_time_hours']
     else:
         model_file_name = first_ptx.attrs[prediction_io.MODEL_FILE_KEY]
+
+        # TODO(thunderhoser): HACK.
+        model_file_name = model_file_name.split(' ')[0]
         model_metafile_name = nn_utils.find_metafile(
             model_file_name=model_file_name, raise_error_if_missing=True
         )
