@@ -1551,6 +1551,7 @@ def train_model(
         metric_function_strings,
         u_net_architecture_dict, chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict, chiu_next_pp_architecture_dict,
+        chiu_next_ppp_architecture_dict,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs,
         cosine_annealing_dict, cosine_annealing_with_restarts_dict,
@@ -1596,6 +1597,9 @@ def train_model(
         is not a Chiu-net++, make this None.
     :param chiu_next_pp_architecture_dict: Dictionary with architecture options
         for `chiu_next_pp_architecture.create_model`.  If the model being
+        trained is not a Chiu-next++, make this None.
+    :param chiu_next_ppp_architecture_dict: Dictionary with architecture options
+        for `chiu_next_ppp_architecture.create_model`.  If the model being
         trained is not a Chiu-next++, make this None.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
@@ -1755,6 +1759,7 @@ def train_model(
         chiu_net_architecture_dict=chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
         chiu_next_pp_architecture_dict=chiu_next_pp_architecture_dict,
+        chiu_next_ppp_architecture_dict=chiu_next_ppp_architecture_dict,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
