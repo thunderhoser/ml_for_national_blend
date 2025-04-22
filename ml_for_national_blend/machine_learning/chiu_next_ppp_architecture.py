@@ -2803,11 +2803,7 @@ def create_model(option_dict):
             this_pooling_layer_object, name=this_name
         )(lagtgt_encoder_conv_layer_objects[i])
 
-    # last_conv_layer_matrix = numpy.full(
-    #     (num_levels + 1, num_levels + 1), '', dtype=object
-    # )
     fcst_module_layer_objects = [None] * (num_levels + 1)
-    decoder_layer_objects = [None] * num_levels
 
     for i in range(num_levels)[::-1]:
         these_layer_objects = [nwp_fcst_module_layer_objects[i]]
@@ -2824,6 +2820,9 @@ def create_model(option_dict):
                 axis=-1, name=this_name
             )(these_layer_objects)
 
+    decoder_layer_objects = [None] * num_levels
+
+    for i in range(num_levels)[::-1]:
         layer_objects_to_concat = []
 
         for j in range(i + 1, num_levels + 1):
