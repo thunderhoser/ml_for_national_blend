@@ -118,7 +118,7 @@ def _create_ensemble_one_init_time(
 
         ptx_i = prediction_tables_xarray[i]
         model_file_names[i] = ptx_i.attrs[prediction_io.MODEL_FILE_KEY]
-        these_target_field_names = ptx_i[prediction_io.FIELD_NAME_KEY].values
+        these_target_field_names = ptx_i[prediction_io.FIELD_NAME_KEY].values.tolist()
         this_latitude_matrix_deg_n = ptx_i[prediction_io.LATITUDE_KEY].values
         this_longitude_matrix_deg_e = ptx_i[prediction_io.LONGITUDE_KEY].values
         this_target_matrix = ptx_i[prediction_io.TARGET_KEY].values
