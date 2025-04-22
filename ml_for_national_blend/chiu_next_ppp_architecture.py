@@ -2812,7 +2812,7 @@ def create_model(option_dict):
 
     fcst_module_layer_objects = [None] * (num_levels + 1)
 
-    for i in range(num_levels)[::-1]:
+    for i in range(num_levels + 1):
         these_layer_objects = [nwp_fcst_module_layer_objects[i]]
         if use_recent_biases:
             these_layer_objects.append(rctbias_fcst_module_layer_objects[i])
