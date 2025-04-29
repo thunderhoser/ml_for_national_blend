@@ -3,6 +3,7 @@
 import os
 import sys
 import argparse
+import traceback
 import numpy
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -11,21 +12,26 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import time_periods
 import prediction_io
 import neural_net_utils as nn_utils
 import neural_net_training_simple as nn_training_simple
 import neural_net_training_multipatch as nn_training_multipatch
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+NONE_STRINGS = ['', 'none', 'None']
 
 TIME_FORMAT = '%Y-%m-%d-%H'
-NUM_EXAMPLES_PER_BATCH = 5
+SYNOPTIC_TIME_INTERVAL_SEC = 6 * 3600
 
+NUM_EXAMPLES_PER_BATCH = 5
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 MODEL_FILE_ARG_NAME = 'input_model_file_name'
 EXAMPLE_DIR_ARG_NAME = 'input_example_dir_name'
 INIT_TIME_ARG_NAME = 'init_time_string'
+FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
+LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 PATCHES_TO_FULL_GRID_ARG_NAME = 'patches_to_full_grid'
 SINGLE_PATCH_START_ROW_ARG_NAME = 'single_patch_start_row_2pt5km'
 SINGLE_PATCH_START_COLUMN_ARG_NAME = 'single_patch_start_column_2pt5km'
@@ -43,7 +49,20 @@ EXAMPLE_DIR_HELP_STRING = (
     'given forecast-init time) will be found by `example_io.find_file` and '
     'read by `example_io.read_file`.'
 )
-INIT_TIME_HELP_STRING = 'Forecast-initialization time (format "yyyy-mm-dd-HH").'
+INIT_TIME_HELP_STRING = (
+    'Forecast-initialization time (format "yyyy-mm-dd-HH").  If you want '
+    'multiple times, leave this argument alone; use `{0:s}` and `{1:s}`, '
+    'instead.'
+).format(
+    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
+)
+FIRST_INIT_TIME_HELP_STRING = (
+    'Will apply neural net to all forecast-init times in the period '
+    '`{0:s}`...`{1:s}`.  If you want just one init time, use `{2:s}`, instead.'
+).format(
+    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME, INIT_TIME_ARG_NAME
+)
+LAST_INIT_TIME_HELP_STRING = FIRST_INIT_TIME_HELP_STRING
 PATCHES_TO_FULL_GRID_HELP_STRING = (
     '[used only if NN was trained with multiple patches] Boolean flag.  If '
     '1, will slide patch around the full grid to generate predictions on the '
@@ -105,8 +124,16 @@ INPUT_ARG_PARSER.add_argument(
     help=EXAMPLE_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + INIT_TIME_ARG_NAME, type=str, required=True,
+    '--' + INIT_TIME_ARG_NAME, type=str, required=False, default='',
     help=INIT_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
+    help=FIRST_INIT_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
+    help=LAST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PATCHES_TO_FULL_GRID_ARG_NAME, type=int, required=False, default=0,
@@ -142,33 +169,28 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(model_file_name, example_dir_name, init_time_string,
-         patches_to_full_grid,
-         single_patch_start_row_2pt5km, single_patch_start_column_2pt5km,
-         use_ema, save_ensemble_mean_only,
-         use_trapezoidal_weighting, patch_overlap_size_2pt5km_pixels,
-         output_dir_name):
-    """Applies trained neural network to pre-processed .npz files.
+def _apply_nn_one_init_time(
+        example_dir_name, init_time_unix_sec, patches_to_full_grid,
+        single_patch_start_row_2pt5km, single_patch_start_column_2pt5km,
+        save_ensemble_mean_only,
+        use_trapezoidal_weighting, patch_overlap_size_2pt5km_pixels,
+        model_object, model_file_name, output_dir_name):
+    """Applies neural net to one forecast-init time.
 
-    This is effectively the main method.
-
-    :param model_file_name: Same.
-    :param example_dir_name: Same.
-    :param init_time_string: Same.
+    :param example_dir_name: See documentation at top of this script.
+    :param init_time_unix_sec: Same.
     :param patches_to_full_grid: Same.
     :param single_patch_start_row_2pt5km: Same.
     :param single_patch_start_column_2pt5km: Same.
-    :param use_ema: Same.
     :param save_ensemble_mean_only: Same.
     :param use_trapezoidal_weighting: Same.
     :param patch_overlap_size_2pt5km_pixels: Same.
+    :param model_object: Trained model (instance of `keras.models.Model` or
+        `keras.models.Sequential`).
+    :param model_file_name: See documentation at top of this script.
     :param output_dir_name: Same.
     """
 
-    print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = nn_utils.read_model(
-        hdf5_file_name=model_file_name, for_inference=use_ema
-    )
     model_metafile_name = nn_utils.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
@@ -182,9 +204,6 @@ def _run(model_file_name, example_dir_name, init_time_string,
         patches_to_full_grid = False
 
     validation_option_dict = mmd[nn_utils.VALIDATION_OPTIONS_KEY]
-    init_time_unix_sec = time_conversion.string_to_unix_sec(
-        init_time_string, TIME_FORMAT
-    )
 
     if patches_to_full_grid:
         data_dict = nn_training_simple.create_data_from_example_file(
@@ -291,6 +310,75 @@ def _run(model_file_name, example_dir_name, init_time_string,
     )
 
 
+def _run(model_file_name, example_dir_name, init_time_string,
+         first_init_time_string, last_init_time_string,
+         patches_to_full_grid,
+         single_patch_start_row_2pt5km, single_patch_start_column_2pt5km,
+         use_ema, save_ensemble_mean_only,
+         use_trapezoidal_weighting, patch_overlap_size_2pt5km_pixels,
+         output_dir_name):
+    """Applies trained neural network to pre-processed .npz files.
+
+    This is effectively the main method.
+
+    :param model_file_name: Same.
+    :param example_dir_name: Same.
+    :param init_time_string: Same.
+    :param first_init_time_string: Same.
+    :param last_init_time_string: Same.
+    :param patches_to_full_grid: Same.
+    :param single_patch_start_row_2pt5km: Same.
+    :param single_patch_start_column_2pt5km: Same.
+    :param use_ema: Same.
+    :param save_ensemble_mean_only: Same.
+    :param use_trapezoidal_weighting: Same.
+    :param patch_overlap_size_2pt5km_pixels: Same.
+    :param output_dir_name: Same.
+    """
+
+    print('Reading model from: "{0:s}"...'.format(model_file_name))
+    model_object = nn_utils.read_model(
+        hdf5_file_name=model_file_name, for_inference=use_ema
+    )
+
+    if init_time_string in NONE_STRINGS:
+        first_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            first_init_time_string, TIME_FORMAT
+        )
+        last_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            last_init_time_string, TIME_FORMAT
+        )
+        init_times_unix_sec = time_periods.range_and_interval_to_list(
+            start_time_unix_sec=first_init_time_unix_sec,
+            end_time_unix_sec=last_init_time_unix_sec,
+            time_interval_sec=SYNOPTIC_TIME_INTERVAL_SEC,
+            include_endpoint=True
+        )
+    else:
+        init_time_unix_sec = time_conversion.string_to_unix_sec(
+            init_time_string, TIME_FORMAT
+        )
+        init_times_unix_sec = numpy.array([init_time_unix_sec], dtype=int)
+
+    for this_init_time_unix_sec in init_times_unix_sec:
+        try:
+            _apply_nn_one_init_time(
+                example_dir_name=example_dir_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                patches_to_full_grid=patches_to_full_grid,
+                single_patch_start_row_2pt5km=single_patch_start_row_2pt5km,
+                single_patch_start_column_2pt5km=single_patch_start_column_2pt5km,
+                save_ensemble_mean_only=save_ensemble_mean_only,
+                use_trapezoidal_weighting=use_trapezoidal_weighting,
+                patch_overlap_size_2pt5km_pixels=patch_overlap_size_2pt5km_pixels,
+                model_object=model_object,
+                model_file_name=model_file_name,
+                output_dir_name=output_dir_name
+            )
+        except Exception:
+            traceback.print_exc()
+
+
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
@@ -298,6 +386,12 @@ if __name__ == '__main__':
         model_file_name=getattr(INPUT_ARG_OBJECT, MODEL_FILE_ARG_NAME),
         example_dir_name=getattr(INPUT_ARG_OBJECT, EXAMPLE_DIR_ARG_NAME),
         init_time_string=getattr(INPUT_ARG_OBJECT, INIT_TIME_ARG_NAME),
+        first_init_time_string=getattr(
+            INPUT_ARG_OBJECT, FIRST_INIT_TIME_ARG_NAME
+        ),
+        last_init_time_string=getattr(
+            INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
+        ),
         patches_to_full_grid=bool(
             getattr(INPUT_ARG_OBJECT, PATCHES_TO_FULL_GRID_ARG_NAME)
         ),
