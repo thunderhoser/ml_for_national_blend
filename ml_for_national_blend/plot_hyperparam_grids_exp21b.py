@@ -308,7 +308,7 @@ def _print_ranking_all_scores(
                 ),
                 mm[..., 0].shape
             )
-            for f in num_target_fields
+            for f in range(num_target_fields)
         ]
     
         return numpy.mean(numpy.stack(rank_matrix_by_field), axis=-1)
