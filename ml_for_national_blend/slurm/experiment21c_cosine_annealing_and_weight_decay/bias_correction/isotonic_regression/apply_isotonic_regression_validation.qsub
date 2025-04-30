@@ -1,0 +1,50 @@
+#!/bin/bash
+
+#SBATCH --job-name="apply_isotonic_regression_validation"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=04:00:00
+#SBATCH --array=0-124
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_isotonic_regression_validation_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment21c_cosine_annealing_and_weight_decay"
+TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
+
+WEIGHT_DECAY_VALUES=("0.00001" "0.00001" "0.00001" "0.00001" "0.00001" "0.00003" "0.00003" "0.00003" "0.00003" "0.00003" "0.00005" "0.00005" "0.00005" "0.00005" "0.00005" "0.00007" "0.00007" "0.00007" "0.00007" "0.00007" "0.00009" "0.00009" "0.00009" "0.00009" "0.00009" "0.00001" "0.00001" "0.00001" "0.00001" "0.00001" "0.00003" "0.00003" "0.00003" "0.00003" "0.00003" "0.00005" "0.00005" "0.00005" "0.00005" "0.00005" "0.00007" "0.00007" "0.00007" "0.00007" "0.00007" "0.00009" "0.00009" "0.00009" "0.00009" "0.00009" "0.00001" "0.00001" "0.00001" "0.00001" "0.00001" "0.00003" "0.00003" "0.00003" "0.00003" "0.00003" "0.00005" "0.00005" "0.00005" "0.00005" "0.00005" "0.00007" "0.00007" "0.00007" "0.00007" "0.00007" "0.00009" "0.00009" "0.00009" "0.00009" "0.00009" "0.00001" "0.00001" "0.00001" "0.00001" "0.00001" "0.00003" "0.00003" "0.00003" "0.00003" "0.00003" "0.00005" "0.00005" "0.00005" "0.00005" "0.00005" "0.00007" "0.00007" "0.00007" "0.00007" "0.00007" "0.00009" "0.00009" "0.00009" "0.00009" "0.00009" "0.00001" "0.00001" "0.00001" "0.00001" "0.00001" "0.00003" "0.00003" "0.00003" "0.00003" "0.00003" "0.00005" "0.00005" "0.00005" "0.00005" "0.00005" "0.00007" "0.00007" "0.00007" "0.00007" "0.00007" "0.00009" "0.00009" "0.00009" "0.00009" "0.00009")
+ANNEALING_CYCLE_LENGTHS=("100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "300" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "400" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500" "500")
+ANNEALING_MIN_LEARNING_RATES=("0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009" "0.00001" "0.00003" "0.00005" "0.00007" "0.00009")
+
+weight_decay_value=${WEIGHT_DECAY_VALUES[$SLURM_ARRAY_TASK_ID]}
+annealing_cycle_length=${ANNEALING_CYCLE_LENGTHS[$SLURM_ARRAY_TASK_ID]}
+annealing_min_learning_rate=${ANNEALING_MIN_LEARNING_RATES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/weight-decay=${weight_decay_value}_annealing=${annealing_cycle_length}epochs-min${annealing_min_learning_rate}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_full_grid" \
+--init_time_limit_strings "2022-01-01-00" "2022-12-31-18" \
+--isotonic_model_file_names "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_temperature_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_u_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_v_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_dewpoint_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_wind_gust_10m_agl_m_s01.dill" \
+--output_prediction_dir_name="${model_dir_name}/validation_full_grid/isotonic_regression"
