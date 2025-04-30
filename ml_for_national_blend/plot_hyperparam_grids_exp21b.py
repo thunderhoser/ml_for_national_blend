@@ -1314,7 +1314,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=dwmse_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=dwmse_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1332,7 +1332,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=rmse_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=rmse_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1350,7 +1350,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=mae_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=mae_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1368,7 +1368,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=bias_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=bias_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1386,7 +1386,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=stdev_bias_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=stdev_bias_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1404,7 +1404,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=spatial_min_bias_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=spatial_min_bias_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1422,7 +1422,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=spatial_max_bias_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=spatial_max_bias_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1440,7 +1440,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=correlation_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=correlation_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1458,7 +1458,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=kge_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=kge_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
@@ -1476,7 +1476,7 @@ def _run(experiment_dir_name, output_dir_name):
             concat_figure_file_name
         ))
         imagemagick_utils.concatenate_images(
-            input_file_names=reliability_panel_file_name_matrix[k, :].tolist(),
+            input_file_names=reliability_panel_file_name_matrix[:, m].tolist(),
             output_file_name=concat_figure_file_name,
             num_panel_rows=3,
             num_panel_columns=2
