@@ -533,31 +533,31 @@ def _run(experiment_dir_name, output_dir_name):
         print(SEPARATOR_STRING)
 
         _print_ranking_all_scores(
-            dwmse_matrix=dwmse_matrix[..., m],
-            rmse_matrix=rmse_matrix[..., m],
-            mae_matrix=mae_matrix[..., m],
-            bias_matrix=bias_matrix[..., m],
-            stdev_bias_matrix=stdev_bias_matrix[..., m],
-            spatial_min_bias_matrix=spatial_min_bias_matrix[..., m],
-            spatial_max_bias_matrix=spatial_max_bias_matrix[..., m],
-            correlation_matrix=correlation_matrix[..., m],
-            kge_matrix=kge_matrix[..., m],
-            reliability_matrix=reliability_matrix[..., m],
+            dwmse_matrix=dwmse_matrix[..., m] + 0.,
+            rmse_matrix=rmse_matrix[..., m] + 0.,
+            mae_matrix=mae_matrix[..., m] + 0.,
+            bias_matrix=bias_matrix[..., m] + 0.,
+            stdev_bias_matrix=stdev_bias_matrix[..., m] + 0.,
+            spatial_min_bias_matrix=spatial_min_bias_matrix[..., m] + 0.,
+            spatial_max_bias_matrix=spatial_max_bias_matrix[..., m] + 0.,
+            correlation_matrix=correlation_matrix[..., m] + 0.,
+            kge_matrix=kge_matrix[..., m] + 0.,
+            reliability_matrix=reliability_matrix[..., m] + 0.,
             target_field_name=TARGET_FIELD_NAMES[m]
         )
         print(SEPARATOR_STRING)
 
     _print_ranking_all_scores(
-        dwmse_matrix=dwmse_matrix,
-        rmse_matrix=rmse_matrix,
-        mae_matrix=mae_matrix,
-        bias_matrix=bias_matrix,
-        stdev_bias_matrix=stdev_bias_matrix,
-        spatial_min_bias_matrix=spatial_min_bias_matrix,
-        spatial_max_bias_matrix=spatial_max_bias_matrix,
-        correlation_matrix=correlation_matrix,
-        kge_matrix=kge_matrix,
-        reliability_matrix=reliability_matrix,
+        dwmse_matrix=dwmse_matrix + 0.,
+        rmse_matrix=rmse_matrix + 0.,
+        mae_matrix=mae_matrix + 0.,
+        bias_matrix=bias_matrix + 0.,
+        stdev_bias_matrix=stdev_bias_matrix + 0.,
+        spatial_min_bias_matrix=spatial_min_bias_matrix + 0.,
+        spatial_max_bias_matrix=spatial_max_bias_matrix + 0.,
+        correlation_matrix=correlation_matrix + 0.,
+        kge_matrix=kge_matrix + 0.,
+        reliability_matrix=reliability_matrix + 0.,
         target_field_name='all fields'
     )
     print(SEPARATOR_STRING)
