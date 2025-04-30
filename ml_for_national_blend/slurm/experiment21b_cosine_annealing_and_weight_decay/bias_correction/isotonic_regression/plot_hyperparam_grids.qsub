@@ -30,6 +30,6 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment21b_cosine_annealing_and_weight_decay"
 
-python3 -u "${CODE_DIR_NAME}/plot_hyperparam_grids.py" \
+python3 -u "${CODE_DIR_NAME}/plot_hyperparam_grids_exp21b.py" \
 --experiment_dir_name="${TOP_MODEL_DIR_NAME}" \
 --output_dir_name="${TOP_MODEL_DIR_NAME}/hyperparam_grids/isotonic_regression"
