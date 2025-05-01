@@ -286,6 +286,8 @@ def _print_ranking_all_scores(
         correlation_matrix = numpy.expand_dims(correlation_matrix, axis=-1)
         kge_matrix = numpy.expand_dims(kge_matrix, axis=-1)
         reliability_matrix = numpy.expand_dims(reliability_matrix, axis=-1)
+
+    print('SHAPE: {0:s}'.format(str(dwmse_matrix.shape)))
     
     def rank_one_metric(metric_matrix):
         """Ranks values of one metric across all hyperparams.
