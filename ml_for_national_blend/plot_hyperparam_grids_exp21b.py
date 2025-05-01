@@ -272,22 +272,26 @@ def _print_ranking_all_scores(
     """
 
     if len(dwmse_matrix.shape) == 3:
-        dwmse_matrix = numpy.expand_dims(dwmse_matrix, axis=-1)
-        rmse_matrix = numpy.expand_dims(rmse_matrix, axis=-1)
-        mae_matrix = numpy.expand_dims(mae_matrix, axis=-1)
-        bias_matrix = numpy.expand_dims(bias_matrix, axis=-1)
-        stdev_bias_matrix = numpy.expand_dims(stdev_bias_matrix, axis=-1)
-        spatial_min_bias_matrix = numpy.expand_dims(
-            spatial_min_bias_matrix, axis=-1
+        dwmse_matrix = numpy.stack([dwmse_matrix, dwmse_matrix], axis=-1)
+        rmse_matrix = numpy.stack([rmse_matrix, rmse_matrix], axis=-1)
+        mae_matrix = numpy.stack([mae_matrix, mae_matrix], axis=-1)
+        bias_matrix = numpy.stack([bias_matrix, bias_matrix], axis=-1)
+        stdev_bias_matrix = numpy.stack(
+            [stdev_bias_matrix, stdev_bias_matrix], axis=-1
         )
-        spatial_max_bias_matrix = numpy.expand_dims(
-            spatial_max_bias_matrix, axis=-1
+        spatial_min_bias_matrix = numpy.stack(
+            [spatial_min_bias_matrix, spatial_min_bias_matrix], axis=-1
         )
-        correlation_matrix = numpy.expand_dims(correlation_matrix, axis=-1)
-        kge_matrix = numpy.expand_dims(kge_matrix, axis=-1)
-        reliability_matrix = numpy.expand_dims(reliability_matrix, axis=-1)
-
-    print('SHAPE: {0:s}'.format(str(dwmse_matrix.shape)))
+        spatial_max_bias_matrix = numpy.stack(
+            [spatial_max_bias_matrix, spatial_max_bias_matrix], axis=-1
+        )
+        correlation_matrix = numpy.stack(
+            [correlation_matrix, correlation_matrix], axis=-1
+        )
+        kge_matrix = numpy.stack([kge_matrix, kge_matrix], axis=-1)
+        reliability_matrix = numpy.stack(
+            [reliability_matrix, reliability_matrix], axis=-1
+        )
     
     def rank_one_metric(metric_matrix):
         """Ranks values of one metric across all hyperparams.
