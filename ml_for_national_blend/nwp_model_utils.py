@@ -428,7 +428,11 @@ def model_to_maybe_missing_fields(model_name):
             MIN_RELATIVE_HUMIDITY_2METRE_NAME, MAX_RELATIVE_HUMIDITY_2METRE_NAME
         ]
 
-    return [WIND_GUST_10METRE_NAME]
+    return [
+        WIND_GUST_10METRE_NAME,
+        MIN_RELATIVE_HUMIDITY_2METRE_NAME,
+        MAX_RELATIVE_HUMIDITY_2METRE_NAME
+    ]
 
 
 def model_to_projection(model_name):
