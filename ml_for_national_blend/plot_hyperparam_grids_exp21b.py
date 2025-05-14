@@ -316,10 +316,6 @@ def _print_ranking_all_scores(
             )
             for f in range(num_target_fields)
         ]
-
-        print('SHAPE of metric_matrix = {0:s}'.format(str(metric_matrix.shape)))
-        print('SHAPE of rank_matrix_by_field = {0:s}'.format(str([rm.shape for rm in rank_matrix_by_field])))
-        print('SHAPE of rank_matrix = {0:s}'.format(str(numpy.mean(numpy.stack(rank_matrix_by_field, axis=-1), axis=-1).shape)))
     
         return numpy.mean(numpy.stack(rank_matrix_by_field, axis=-1), axis=-1)
 
