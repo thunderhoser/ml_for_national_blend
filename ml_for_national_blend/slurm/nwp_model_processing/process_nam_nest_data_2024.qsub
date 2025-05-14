@@ -34,7 +34,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-INPUT_DIR_NAME="/scratch2/STI/mdl-sti/Allison.Layne/firewx_data/nam_nest/grib2"
+INPUT_DIR_NAME="/scratch1/STI/mdl-sti/Allison.Layne/firewx_data/nam_nest/grib2"
 OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed"
 WGRIB2_EXE_NAME="wgrib2"
 
