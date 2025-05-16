@@ -1,0 +1,66 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_nns_from_example_files"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=48:00:00
+#SBATCH --array=0-23
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_nns_from_example_files_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models/template"
+TOP_EXAMPLE_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models"
+
+REGION_NAMES=("region1-1" "region2-1" "region3-1" "region4-1" "region1-2" "region2-2" "region3-2" "region4-2" "region1-3" "region2-3" "region3-3" "region4-3" "region1-4" "region2-4" "region3-4" "region4-4" "region1-5" "region2-5" "region3-5" "region4-5" "region1-6" "region2-6" "region3-6" "region4-6")
+region_name=${REGION_NAMES[$SLURM_ARRAY_TASK_ID]}
+
+input_model_file_name="${TEMPLATE_DIR_NAME}/model.keras"
+example_dir_name="${TOP_EXAMPLE_DIR_NAME}/${region_name}/npz_example_files"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/${region_name}"
+echo $output_dir_name
+
+while true; do
+    python3 -u "${CODE_DIR_NAME}/train_nn_from_example_files.py" \
+    --input_template_file_name="${input_model_file_name}" \
+    --input_example_dir_name="${example_dir_name}" \
+    --output_model_dir_name="${output_dir_name}" \
+    --num_examples_per_batch=1 \
+    --patch_size_2pt5km_pixels=-1 \
+    --first_init_time_strings_for_training "2017-01-01-00" \
+    --last_init_time_strings_for_training "2021-12-20-18" \
+    --first_init_time_strings_for_validation "2022-01-01-00" \
+    --last_init_time_strings_for_validation "2022-12-20-18" \
+    --num_epochs=30000 \
+    --num_training_batches_per_epoch=50 \
+    --num_validation_batches_per_epoch=50 \
+    --plateau_patience_epochs=100000 \
+    --plateau_learning_rate_multiplier=0.95 \
+    --early_stopping_patience_epochs=10000 \
+    --cosine_annealing_min_learning_rate=0.00003 \
+    --cosine_annealing_max_learning_rate=0.001 \
+    --cosine_annealing_cycle_length_epochs=500 \
+    --cosine_annealing_do_restarts=1
+done
