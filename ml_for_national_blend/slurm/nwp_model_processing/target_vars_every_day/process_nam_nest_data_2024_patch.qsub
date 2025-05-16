@@ -12,7 +12,7 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=03:30:00
-#SBATCH --array=0-11
+#SBATCH --array=0-1
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -38,8 +38,8 @@ INPUT_DIR_NAME="/scratch1/STI/mdl-sti/Allison.Layne/firewx_data/nam_nest/grib2"
 OUTPUT_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/target_vars_every_day/processed"
 WGRIB2_EXE_NAME="wgrib2"
 
-FIRST_INIT_TIME_STRINGS=("2024-01-15-18" "2024-02-02-18" "2024-03-29-12" "2024-06-08-00" "2024-07-01-00" "2024-07-08-12" "2024-08-13-06" "2024-08-26-12" "2024-09-16-12" "2024-10-24-00" "2024-11-02-06" "2024-12-16-00")
-LAST_INIT_TIME_STRINGS=("2024-01-15-18" "2024-02-04-18" "2024-03-30-18" "2024-06-08-18" "2024-07-03-18" "2024-07-08-18" "2024-08-17-18" "2024-08-27-18" "2024-09-16-18" "2024-10-26-18" "2024-11-03-18" "2024-12-20-18")
+FIRST_INIT_TIME_STRINGS=("2024-12-16-06" "2024-12-31-12")
+LAST_INIT_TIME_STRINGS=("2024-12-20-18" "2024-12-31-18")
 
 first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
 last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
