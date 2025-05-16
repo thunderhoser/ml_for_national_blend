@@ -16,7 +16,7 @@ import nwp_model_utils
 import custom_losses
 import custom_metrics
 import neural_net_utils as nn_utils
-import chiu_next_ppp_architecture as chiu_next_ppp_arch
+import chiu_next_pp_architecture as chiu_next_pp_arch
 import architecture_utils
 import file_system_utils
 
@@ -151,72 +151,72 @@ TARGET_FIELD_NAMES = [
 ]
 
 DEFAULT_OPTION_DICT = {
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array(
+    chiu_next_pp_arch.INPUT_DIMENSIONS_CONST_KEY: numpy.array(
         [PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 4], dtype=int),
-    # chiu_next_ppp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: INPUT_DIMS_2PT5KM,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY:
+    # chiu_next_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: INPUT_DIMS_2PT5KM,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_10KM_RES_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_20KM_RES_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_40KM_RES_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_LAGGED_TARGETS_KEY:
         INPUT_DIMS_LAGGED_TARGETS,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_10KM_RCTBIAS_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_20KM_RCTBIAS_KEY: None,
-    chiu_next_ppp_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY: None,
-    chiu_next_ppp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 5], dtype=int),
+    chiu_next_pp_arch.INPUT_DIMENSIONS_2PT5KM_RCTBIAS_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_10KM_RCTBIAS_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_20KM_RCTBIAS_KEY: None,
+    chiu_next_pp_arch.INPUT_DIMENSIONS_40KM_RCTBIAS_KEY: None,
+    chiu_next_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array([PATCH_SIZE_ONE_DIM, PATCH_SIZE_ONE_DIM, 5], dtype=int),
 
-    # chiu_next_ppp_arch.DO_CONVNEXT_V2_KEY: True,
-    # chiu_next_ppp_arch.USE_SPECTRAL_NORM_KEY: True,
+    # chiu_next_pp_arch.DO_CONVNEXT_V2_KEY: True,
+    # chiu_next_pp_arch.USE_SPECTRAL_NORM_KEY: True,
 
-    chiu_next_ppp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([24, 32, 48, 64, 96, 128, 192], dtype=int),
-    chiu_next_ppp_arch.NWP_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
-    chiu_next_ppp_arch.NWP_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-    # chiu_next_ppp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    # chiu_next_ppp_arch.NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
+    chiu_next_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([24, 32, 48, 64, 96, 128, 192], dtype=int),
+    chiu_next_pp_arch.NWP_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
+    chiu_next_pp_arch.NWP_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
+    # chiu_next_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    # chiu_next_pp_arch.NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
     #     numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     #     numpy.array([3], dtype=int)
     # ]),
-    # chiu_next_ppp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    chiu_next_ppp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
+    # chiu_next_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    chiu_next_pp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_ppp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
-    chiu_next_ppp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
-    chiu_next_ppp_arch.LAGTGT_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-    # chiu_next_ppp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    # chiu_next_ppp_arch.LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
+    chiu_next_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
+    chiu_next_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
+    chiu_next_pp_arch.LAGTGT_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
+    # chiu_next_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    # chiu_next_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
     #     numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     #     numpy.array([3], dtype=int)
     # ]),
-    # chiu_next_ppp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    chiu_next_ppp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
+    # chiu_next_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    chiu_next_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_ppp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
-    chiu_next_ppp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
-    chiu_next_ppp_arch.RCTBIAS_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-    # chiu_next_ppp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    # chiu_next_ppp_arch.RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
+    chiu_next_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
+    chiu_next_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
+    chiu_next_pp_arch.RCTBIAS_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
+    # chiu_next_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    # chiu_next_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY: numpy.concatenate([
     #     numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     #     numpy.array([3], dtype=int)
     # ]),
-    # chiu_next_ppp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
-    chiu_next_ppp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
+    # chiu_next_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
+    chiu_next_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_ppp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([32, 44, 64, 88, 128, 176], dtype=int),
-    chiu_next_ppp_arch.DECODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
-    # chiu_next_ppp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.1),
-    chiu_next_ppp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.),
+    chiu_next_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([32, 44, 64, 88, 128, 176], dtype=int),
+    chiu_next_pp_arch.DECODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
+    # chiu_next_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.1),
+    chiu_next_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.),
 
-    chiu_next_ppp_arch.INCLUDE_PENULTIMATE_KEY: False,
-    chiu_next_ppp_arch.PENULTIMATE_DROPOUT_RATE_KEY: 0.,
-    chiu_next_ppp_arch.OUTPUT_ACTIV_FUNCTION_KEY: None,
-    chiu_next_ppp_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
-    chiu_next_ppp_arch.L1_WEIGHT_KEY: 0.,
-    chiu_next_ppp_arch.L2_WEIGHT_KEY: 1e-7,
-    chiu_next_ppp_arch.ENSEMBLE_SIZE_KEY: 25,
-    chiu_next_ppp_arch.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
-    chiu_next_ppp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
-    chiu_next_ppp_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS,
-    # chiu_next_ppp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
+    chiu_next_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
+    chiu_next_pp_arch.PENULTIMATE_DROPOUT_RATE_KEY: 0.,
+    chiu_next_pp_arch.OUTPUT_ACTIV_FUNCTION_KEY: None,
+    chiu_next_pp_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
+    chiu_next_pp_arch.L1_WEIGHT_KEY: 0.,
+    chiu_next_pp_arch.L2_WEIGHT_KEY: 1e-7,
+    chiu_next_pp_arch.ENSEMBLE_SIZE_KEY: 25,
+    chiu_next_pp_arch.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
+    chiu_next_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
+    chiu_next_pp_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS,
+    # chiu_next_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 
 WEIGHT_DECAY = 0.00001
@@ -267,29 +267,29 @@ def _run():
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
 
     option_dict.update({
-        chiu_next_ppp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: input_dims_2pt5km,
+        chiu_next_pp_arch.INPUT_DIMENSIONS_2PT5KM_RES_KEY: input_dims_2pt5km,
 
-        chiu_next_ppp_arch.DO_CONVNEXT_V2_KEY: False,
-        chiu_next_ppp_arch.USE_SPECTRAL_NORM_KEY: False,
+        chiu_next_pp_arch.DO_CONVNEXT_V2_KEY: False,
+        chiu_next_pp_arch.USE_SPECTRAL_NORM_KEY: False,
 
-        chiu_next_ppp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
-        chiu_next_ppp_arch.NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
-        chiu_next_ppp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.NWP_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
+        chiu_next_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
 
-        chiu_next_ppp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
-        chiu_next_ppp_arch.LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
-        chiu_next_ppp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
+        chiu_next_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
 
-        chiu_next_ppp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
-        chiu_next_ppp_arch.RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
-        chiu_next_ppp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: encoder_dropout_rates,
+        chiu_next_pp_arch.RCTBIAS_FC_MODULE_NUM_CONV_BLOCKS_KEY: fc_module_conv_block_counts,
+        chiu_next_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: encoder_dropout_rates,
 
-        chiu_next_ppp_arch.UPSAMPLING_DROPOUT_RATES_KEY: decoder_dropout_rates,
+        chiu_next_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: decoder_dropout_rates,
 
-        chiu_next_ppp_arch.OPTIMIZER_FUNCTION_KEY: optimizer_function
+        chiu_next_pp_arch.OPTIMIZER_FUNCTION_KEY: optimizer_function
     })
 
-    model_object = chiu_next_ppp_arch.create_model(option_dict)
+    model_object = chiu_next_pp_arch.create_model(option_dict)
 
     output_file_name = '{0:s}/model.keras'.format(OUTPUT_DIR_NAME)
     file_system_utils.mkdir_recursive_if_necessary(file_name=output_file_name)
@@ -303,13 +303,13 @@ def _run():
         model_file_name=output_file_name,
         raise_error_if_missing=False
     )
-    option_dict[chiu_next_ppp_arch.LOSS_FUNCTION_KEY] = (
+    option_dict[chiu_next_pp_arch.LOSS_FUNCTION_KEY] = (
         LOSS_FUNCTION_STRING
     )
-    option_dict[chiu_next_ppp_arch.METRIC_FUNCTIONS_KEY] = (
+    option_dict[chiu_next_pp_arch.METRIC_FUNCTIONS_KEY] = (
         METRIC_FUNCTION_STRINGS
     )
-    option_dict[chiu_next_ppp_arch.OPTIMIZER_FUNCTION_KEY] = (
+    option_dict[chiu_next_pp_arch.OPTIMIZER_FUNCTION_KEY] = (
         optimizer_function_string
     )
 
@@ -327,8 +327,8 @@ def _run():
         u_net_architecture_dict=None,
         chiu_net_architecture_dict=None,
         chiu_net_pp_architecture_dict=None,
-        chiu_next_pp_architecture_dict=None,
-        chiu_next_ppp_architecture_dict=option_dict,
+        chiu_next_pp_architecture_dict=option_dict,
+        chiu_next_ppp_architecture_dict=None,
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
