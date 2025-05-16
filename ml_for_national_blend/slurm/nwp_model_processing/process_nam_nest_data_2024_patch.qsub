@@ -1,0 +1,55 @@
+#!/bin/bash
+
+#SBATCH --job-name="process_nam_nest_data_2024"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:30:00
+#SBATCH --array=0-11
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_nam_nest_data_2024_%A_%a.out
+
+module load gnu/9.2.0
+module load wgrib2/3.1.2_ncep
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+INPUT_DIR_NAME="/scratch1/STI/mdl-sti/Allison.Layne/firewx_data/nam_nest/grib2"
+OUTPUT_DIR_NAME="/scratch2/NCEPDEV/stmp/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/nam_nest/processed"
+WGRIB2_EXE_NAME="wgrib2"
+
+FIRST_INIT_TIME_STRINGS=("2024-07-29-12" "2024-07-29-18" "2024-02-10-18" "2024-08-13-06" "2024-08-13-12" "2024-08-13-18" "2024-10-17-06" "2024-10-17-12" "2024-10-17-18" "2024-12-16-06" "2024-12-16-12" "2024-12-16-18")
+LAST_INIT_TIME_STRINGS=("2024-07-29-12" "2024-07-29-18" "2024-02-10-18" "2024-08-13-06" "2024-08-13-12" "2024-08-13-18" "2024-10-17-06" "2024-10-17-12" "2024-10-17-18" "2024-12-16-06" "2024-12-16-12" "2024-12-16-18")
+
+first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_nwp_data.py" \
+--input_grib2_dir_name="${INPUT_DIR_NAME}" \
+--model_name="nam_nest" \
+--first_init_time_string="${first_init_time_string}" \
+--last_init_time_string="${last_init_time_string}" \
+--wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_time_string}" \
+--tar_output_files=1 \
+--output_zarr_dir_name="${OUTPUT_DIR_NAME}"
