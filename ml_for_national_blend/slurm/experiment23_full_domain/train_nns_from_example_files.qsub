@@ -10,12 +10,13 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=168:00:00
+#SBATCH --array=0-4
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=train_nns_from_example_files_%A.out
+#SBATCH --output=train_nns_from_example_files_%A_%a.out
 
 module load cuda/12.3.1
 conda init
@@ -35,7 +36,7 @@ TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_
 
 input_model_file_name="${TEMPLATE_DIR_NAME}/model.keras"
 example_dir_name="${TOP_EXAMPLE_DIR_NAME}/npz_example_files"
-output_dir_name="${TOP_OUTPUT_DIR_NAME}"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/random_seed${SLURM_ARRAY_TASK_ID}"
 echo $output_dir_name
 
 while true; do
