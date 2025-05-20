@@ -1,31 +1,26 @@
 """Input/output methods for processed NWP-model data."""
 
-import os
-import re
-import copy
-import shutil
+import glob
 import xarray
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
 from ml_for_national_blend.outside_code import file_system_utils
 from ml_for_national_blend.outside_code import error_checking
-from ml_for_national_blend.utils import misc_utils
+from ml_for_national_blend.io import interp_nwp_model_io
 from ml_for_national_blend.utils import nwp_model_utils
 
 TIME_FORMAT = '%Y-%m-%d-%H'
 
 
-def find_file(directory_name, init_time_unix_sec, model_name, allow_tar=False,
+def find_file(directory_name, init_time_unix_sec, forecast_hour, model_name,
               raise_error_if_missing=True):
-    """Finds zarr file with NWP output (forecasts) for 1 model run (init time).
+    """Finds NetCDF file with NWP forecasts for one init time & one fcst hour.
 
     :param directory_name: Path to input directory.
     :param init_time_unix_sec: Initialization time.
+    :param forecast_hour: Forecast hour.
     :param model_name: Name of NWP model (must be accepted by
         `nwp_model_utils.check_model_name`).
-    :param allow_tar: Boolean flag.  If True, will allow tar file (but will
-        look for untarred file first).  If False, will look only for untarred
-        file.
     :param raise_error_if_missing: Boolean flag.  If file is missing and
         `raise_error_if_missing == True`, will throw error.  If file is missing
         and `raise_error_if_missing == False`, will return *expected* file path.
@@ -34,64 +29,39 @@ def find_file(directory_name, init_time_unix_sec, model_name, allow_tar=False,
         and `raise_error_if_missing == True`.
     """
 
-    error_checking.assert_is_string(directory_name)
-    nwp_model_utils.check_init_time(
-        init_time_unix_sec=init_time_unix_sec, model_name=model_name
+    return interp_nwp_model_io.find_file(
+        directory_name=directory_name,
+        init_time_unix_sec=init_time_unix_sec,
+        forecast_hour=forecast_hour,
+        model_name=model_name,
+        raise_error_if_missing=raise_error_if_missing
     )
-    error_checking.assert_is_boolean(allow_tar)
-    error_checking.assert_is_boolean(raise_error_if_missing)
-
-    nwp_forecast_file_name = '{0:s}/{1:s}_{2:s}.zarr'.format(
-        directory_name,
-        model_name,
-        time_conversion.unix_sec_to_string(init_time_unix_sec, TIME_FORMAT)
-    )
-
-    if os.path.isdir(nwp_forecast_file_name) or not raise_error_if_missing:
-        return nwp_forecast_file_name
-
-    if allow_tar:
-        nwp_forecast_file_name = re.sub(
-            '.zarr$', '.tar', nwp_forecast_file_name
-        )
-
-    if os.path.isfile(nwp_forecast_file_name):
-        return nwp_forecast_file_name
-
-    nwp_forecast_file_name = re.sub(
-        '.tar$', '.zarr', nwp_forecast_file_name
-    )
-    error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
-        nwp_forecast_file_name
-    )
-    raise ValueError(error_string)
 
 
 def find_files_for_period(
         directory_name, model_name,
-        first_init_time_unix_sec, last_init_time_unix_sec, allow_tar=False,
+        first_init_time_unix_sec, last_init_time_unix_sec,
         raise_error_if_any_missing=False, raise_error_if_all_missing=True):
-    """Finds many zarr files, each with NWP output for 1 model run (init time).
+    """Finds many NetCDF files, each with NWP forecasts for one init/valid time.
+
+    All files must pertain to the same model -- but in general, the files will
+    contain different forecast hours.
 
     :param directory_name: Path to input directory.
     :param model_name: Name of NWP model (must be accepted by
         `nwp_model_utils.check_model_name`).
     :param first_init_time_unix_sec: First initialization time in period.
     :param last_init_time_unix_sec: Last initialization time in period.
-    :param allow_tar: Boolean flag.  If True, will allow tar file (but will
-        look for untarred file first).  If False, will look only for untarred
-        file.
     :param raise_error_if_any_missing: Boolean flag.  If any file is missing and
         `raise_error_if_any_missing == True`, will throw error.
     :param raise_error_if_all_missing: Boolean flag.  If all files are missing
         and `raise_error_if_all_missing == True`, will throw error.
-    :return: zarr_file_names: 1-D list of paths to zarr files with NWP
-        forecasts, one per model run.
+    :return: nwp_forecast_file_names: 1-D list of paths to NetCDF files with NWP
+        forecasts, one for each pair of init/valid time.
     :raises: ValueError: if all files are missing and
         `raise_error_if_all_missing == True`.
     """
 
-    error_checking.assert_is_boolean(allow_tar)
     error_checking.assert_is_boolean(raise_error_if_any_missing)
     error_checking.assert_is_boolean(raise_error_if_all_missing)
 
@@ -103,27 +73,38 @@ def find_files_for_period(
         include_endpoint=True
     )
 
-    zarr_file_names = []
+    nwp_forecast_file_names = []
 
     for this_init_time_unix_sec in init_times_unix_sec:
-        try:
-            this_file_name = find_file(
-                directory_name=directory_name,
-                model_name=model_name,
-                init_time_unix_sec=this_init_time_unix_sec,
-                allow_tar=allow_tar,
-                raise_error_if_missing=True
+        this_file_pattern = (
+            '{0:s}/{1:s}/{2:s}_{1:s}_hour[0-9][0-9][0-9].nc'
+        ).format(
+            directory_name,
+            time_conversion.unix_sec_to_string(
+                this_init_time_unix_sec, TIME_FORMAT
+            ),
+            model_name
+        )
+
+        these_file_names = glob.glob(this_file_pattern)
+
+        if raise_error_if_any_missing and len(these_file_names) == 0:
+            error_string = (
+                'Cannot find any files for init time {0:s}.  Expected glob '
+                'pattern: "{1:s}"'
+            ).format(
+                time_conversion.unix_sec_to_string(
+                    this_init_time_unix_sec, TIME_FORMAT
+                ),
+                this_file_pattern
             )
-        except ValueError as this_error:
-            if raise_error_if_any_missing:
-                raise this_error
 
-            continue
+            raise ValueError(error_string)
 
-        if os.path.isdir(this_file_name) or os.path.isfile(this_file_name):
-            zarr_file_names.append(this_file_name)
+        these_file_names.sort()
+        nwp_forecast_file_names += these_file_names
 
-    if raise_error_if_all_missing and len(zarr_file_names) == 0:
+    if raise_error_if_all_missing and len(nwp_forecast_file_names) == 0:
         error_string = (
             'Cannot find any file in directory "{0:s}" from init times {1:s} '
             'to {2:s}.'
@@ -138,7 +119,7 @@ def find_files_for_period(
         )
         raise ValueError(error_string)
 
-    return zarr_file_names
+    return nwp_forecast_file_names
 
 
 def file_name_to_init_time(nwp_forecast_file_name):
@@ -148,19 +129,7 @@ def file_name_to_init_time(nwp_forecast_file_name):
     :return: init_time_unix_sec: Initialization time.
     """
 
-    pathless_file_name = os.path.split(nwp_forecast_file_name)[1]
-    extensionless_file_name = os.path.splitext(pathless_file_name)[0]
-    init_time_string = extensionless_file_name.split('_')[-1]
-    model_name = '_'.join(extensionless_file_name.split('_')[:-1])
-
-    init_time_unix_sec = time_conversion.string_to_unix_sec(
-        init_time_string, TIME_FORMAT
-    )
-    nwp_model_utils.check_init_time(
-        init_time_unix_sec=init_time_unix_sec, model_name=model_name
-    )
-
-    return init_time_unix_sec
+    return interp_nwp_model_io.file_name_to_init_time(nwp_forecast_file_name)
 
 
 def file_name_to_model_name(nwp_forecast_file_name):
@@ -170,66 +139,44 @@ def file_name_to_model_name(nwp_forecast_file_name):
     :return: model_name: Model name.
     """
 
-    pathless_file_name = os.path.split(nwp_forecast_file_name)[1]
-    extensionless_file_name = os.path.splitext(pathless_file_name)[0]
+    return interp_nwp_model_io.file_name_to_model_name(nwp_forecast_file_name)
 
-    model_name = '_'.join(extensionless_file_name.split('_')[:-1])
-    nwp_model_utils.check_model_name(
-        model_name=model_name, allow_ensemble=False
+
+def file_name_to_forecast_hour(nwp_forecast_file_name):
+    """Parses forecast hour from name of file with NWP forecasts.
+
+    :param nwp_forecast_file_name: File path.
+    :return: forecast_hour: Forecast hour.
+    """
+
+    return interp_nwp_model_io.file_name_to_forecast_hour(
+        nwp_forecast_file_name
     )
 
-    return model_name
 
+def read_file(netcdf_file_name):
+    """Reads NWP forecasts from NetCDF file.
 
-def read_file(zarr_file_name, allow_tar=False):
-    """Reads NWP output (forecasts) from zarr file.
-
-    :param zarr_file_name: Path to input file.
-    :param allow_tar: Boolean flag.  If False, input file must be untarred.
-        If True and input file is tarred, will untar, read the untarred file,
-        then delete the untarred file -- leaving the original tar in place.
+    :param netcdf_file_name: Path to input file.
     :return: nwp_forecast_table_xarray: xarray table.  Documentation in the
         xarray table should make values self-explanatory.
     """
 
-    error_checking.assert_is_boolean(allow_tar)
-    if not (allow_tar and zarr_file_name.endswith('.tar')):
-        return xarray.open_zarr(zarr_file_name)
-
-    tar_file_name = copy.deepcopy(zarr_file_name)
-    misc_utils.untar_zarr_or_netcdf_file(
-        tar_file_name=tar_file_name,
-        target_dir_name=os.path.split(tar_file_name)[0]
-    )
-
-    zarr_file_name = re.sub('.tar$', '.zarr', tar_file_name)
-    nwp_forecast_table_xarray = xarray.open_zarr(zarr_file_name)
-    # shutil.rmtree(zarr_file_name)
-
-    return nwp_forecast_table_xarray
+    error_checking.assert_file_exists(netcdf_file_name)
+    return xarray.open_dataset(netcdf_file_name)
 
 
-def write_file(nwp_forecast_table_xarray, zarr_file_name):
-    """Writes NWP output (forecasts) to zarr file.
+def write_file(nwp_forecast_table_xarray, netcdf_file_name):
+    """Writes NWP output (forecasts) to NetCDF file.
 
     :param nwp_forecast_table_xarray: xarray table in format returned by
         `read_file`.
-    :param zarr_file_name: Path to output file.
+    :param netcdf_file_name: Path to output file.
     """
 
-    error_checking.assert_is_string(zarr_file_name)
-    if os.path.isdir(zarr_file_name):
-        shutil.rmtree(zarr_file_name)
-
-    file_system_utils.mkdir_recursive_if_necessary(
-        directory_name=zarr_file_name
-    )
-
-    encoding_dict = {
-        nwp_model_utils.DATA_KEY: {'dtype': 'float32'}
-    }
-    nwp_forecast_table_xarray.to_zarr(
-        store=zarr_file_name, mode='w', encoding=encoding_dict
+    interp_nwp_model_io.write_file(
+        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
+        netcdf_file_name=netcdf_file_name
     )
 
 

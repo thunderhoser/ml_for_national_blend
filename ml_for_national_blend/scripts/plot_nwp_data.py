@@ -321,18 +321,14 @@ def _run(nwp_directory_name, plot_interp_data, model_name, init_time_string,
         nwp_file_name = nwp_model_io.find_file(
             directory_name=nwp_directory_name,
             init_time_unix_sec=init_time_unix_sec,
+            forecast_hour=forecast_hour,
             model_name=model_name,
-            allow_tar=False,
             raise_error_if_missing=True
         )
 
         print('Reading data from: "{0:s}"...'.format(nwp_file_name))
         nwp_forecast_table_xarray = nwp_model_io.read_file(nwp_file_name)
 
-    nwp_forecast_table_xarray = nwp_model_utils.subset_by_forecast_hour(
-        nwp_forecast_table_xarray=nwp_forecast_table_xarray,
-        desired_forecast_hours=numpy.array([forecast_hour], dtype=int)
-    )
     nwpft = nwp_forecast_table_xarray
 
     valid_time_unix_sec = (

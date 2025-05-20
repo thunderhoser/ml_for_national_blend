@@ -15,7 +15,6 @@ run (init time).
 
 import os
 import copy
-import shutil
 import argparse
 import warnings
 import numpy
@@ -26,7 +25,6 @@ from ml_for_national_blend.io import raw_nwp_model_io
 from ml_for_national_blend.utils import gfs_utils
 from ml_for_national_blend.utils import gefs_utils
 from ml_for_national_blend.utils import nwp_model_utils
-from ml_for_national_blend.utils import misc_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
@@ -34,31 +32,22 @@ HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
-MODEL_ARG_NAME = 'model_name'
-TARGET_VARS_ONLY_ARG_NAME = 'target_vars_only'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
+MODEL_ARG_NAME = 'model_name'
+TARGET_VARS_ONLY_ARG_NAME = 'target_vars_only'
 START_LATITUDE_ARG_NAME = 'start_latitude_deg_n'
 END_LATITUDE_ARG_NAME = 'end_latitude_deg_n'
 START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
-TAR_OUTPUTS_ARG_NAME = 'tar_output_files'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
     'Name of main input directory, containing one GRIB2 file per model run '
     '(init time) and forecast hour (lead time).  Files therein will be found '
     'by `raw_nwp_model_io.find_file`.'
-)
-MODEL_HELP_STRING = (
-    'Name of NWP model (must be accepted by '
-    '`nwp_model_utils.check_model_name`).'
-)
-TARGET_VARS_ONLY_HELP_STRING = (
-    'Boolean flag.  If 1, will process only target variables.  If 0, will '
-    'process all variables.'
 )
 FIRST_INIT_TIME_HELP_STRING = (
     'First init time (format "yyyy-mm-dd-HH").  This script will process model '
@@ -69,7 +58,14 @@ FIRST_INIT_TIME_HELP_STRING = (
 LAST_INIT_TIME_HELP_STRING = 'See documentation for {0:s}.'.format(
     FIRST_INIT_TIME_ARG_NAME
 )
-
+MODEL_HELP_STRING = (
+    'Name of NWP model (must be accepted by '
+    '`nwp_model_utils.check_model_name`).'
+)
+TARGET_VARS_ONLY_HELP_STRING = (
+    'Boolean flag.  If 1, will process only target variables.  If 0, will '
+    'process all variables.'
+)
 START_LATITUDE_HELP_STRING = (
     'Start latitude.  This script will process all latitudes in the '
     'contiguous domain {0:s}...{1:s}.'
@@ -94,11 +90,11 @@ WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
 )
-TAR_OUTPUTS_HELP_STRING = 'Boolean flag.  If 1, will tar output files.'
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
-    'zarr file per model run) by `nwp_model_io.write_file`, to exact locations '
-    'determined by `nwp_model_io.find_file`.'
+    'NetCDF file per init time and forecast hour) by '
+    '`nwp_model_io.write_file`, to exact locations determined by '
+    '`nwp_model_io.find_file`.'
 )
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
@@ -107,19 +103,19 @@ INPUT_ARG_PARSER.add_argument(
     help=INPUT_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MODEL_ARG_NAME, type=str, required=True, help=MODEL_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + TARGET_VARS_ONLY_ARG_NAME, type=int, required=False, default=0,
-    help=TARGET_VARS_ONLY_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=True,
     help=FIRST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=True,
     help=LAST_INIT_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_ARG_NAME, type=str, required=True, help=MODEL_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + TARGET_VARS_ONLY_ARG_NAME, type=int, required=False, default=0,
+    help=TARGET_VARS_ONLY_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + START_LATITUDE_ARG_NAME, type=float, required=False, default=1001,
@@ -146,10 +142,6 @@ INPUT_ARG_PARSER.add_argument(
     help=TEMPORARY_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + TAR_OUTPUTS_ARG_NAME, type=int, required=False, default=0,
-    help=TAR_OUTPUTS_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -159,8 +151,7 @@ def _run(input_dir_name, model_name, target_vars_only,
          first_init_time_string, last_init_time_string,
          start_latitude_deg_n, end_latitude_deg_n,
          start_longitude_deg_e, end_longitude_deg_e,
-         wgrib2_exe_name, temporary_dir_name, tar_output_files,
-         output_dir_name):
+         wgrib2_exe_name, temporary_dir_name, output_dir_name):
     """Processes NWP data.
 
     This is effectively the main method.
@@ -176,7 +167,6 @@ def _run(input_dir_name, model_name, target_vars_only,
     :param end_longitude_deg_e: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
-    :param tar_output_files: Same.
     :param output_dir_name: Same.
     """
 
@@ -569,39 +559,32 @@ def _run(input_dir_name, model_name, target_vars_only,
                 )
             )
 
-        # Write the output -- one xarray table for the whole model run -- to a
-        # zarr file.
-        output_file_name = nwp_model_io.find_file(
-            directory_name=output_dir_name,
-            model_name=model_name,
-            init_time_unix_sec=this_init_time_unix_sec,
-            raise_error_if_missing=False
-        )
+        # Write the output to NetCDF files -- one file per forecast hour.
+        remaining_forecast_hours = nwp_forecast_table_xarray.coords[
+            nwp_model_utils.FORECAST_HOUR_DIM
+        ].values
 
-        print('Writing data to: "{0:s}"...'.format(output_file_name))
-        nwp_model_io.write_file(
-            zarr_file_name=output_file_name,
-            nwp_forecast_table_xarray=nwp_forecast_table_xarray
-        )
+        for this_forecast_hour in remaining_forecast_hours:
+            output_file_name = nwp_model_io.find_file(
+                directory_name=output_dir_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                forecast_hour=this_forecast_hour,
+                model_name=model_name,
+                raise_error_if_missing=False
+            )
+
+            output_table_xarray = nwp_forecast_table_xarray.sel({
+                nwp_model_utils.FORECAST_HOUR_DIM:
+                    numpy.array([this_forecast_hour], dtype=int)
+            })
+
+            print('Writing data to: "{0:s}"...'.format(output_file_name))
+            nwp_model_io.write_file(
+                netcdf_file_name=output_file_name,
+                nwp_forecast_table_xarray=output_table_xarray
+            )
+
         print(SEPARATOR_STRING)
-
-        if not tar_output_files:
-            continue
-
-        # Put the zarr file inside a tar archive.  A "zarr file" actually
-        # contains thousands of tiny files, which is hard on Hera (can easily
-        # put you over the disk quota).  But if you store the whole thing in a
-        # tar, Hera sees it as only one file, so you're in the clear!
-        output_file_name_tarred = '{0:s}.tar'.format(
-            os.path.splitext(output_file_name)[0]
-        )
-        print('Creating tar file: "{0:s}"...'.format(output_file_name_tarred))
-
-        misc_utils.create_tar_file(
-            source_paths_to_tar=[output_file_name],
-            tar_file_name=output_file_name_tarred
-        )
-        shutil.rmtree(output_file_name)
 
 
 if __name__ == '__main__':
@@ -627,6 +610,5 @@ if __name__ == '__main__':
         end_longitude_deg_e=getattr(INPUT_ARG_OBJECT, END_LONGITUDE_ARG_NAME),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
-        tar_output_files=bool(getattr(INPUT_ARG_OBJECT, TAR_OUTPUTS_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

@@ -14,15 +14,12 @@ The output will contain the same data, in zarr format, with one file for every
 individual model run (init time).
 """
 
-import os
-import shutil
 import argparse
 import numpy
 from ml_for_national_blend.outside_code import time_conversion
 from ml_for_national_blend.outside_code import time_periods
 from ml_for_national_blend.io import nwp_model_io
 from ml_for_national_blend.io import raw_gridded_mos_io
-from ml_for_national_blend.utils import misc_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -33,7 +30,6 @@ FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 PROCESS_00Z_ARG_NAME = 'process_00z_runs'
 PROCESS_12Z_ARG_NAME = 'process_12z_runs'
-TAR_OUTPUTS_ARG_NAME = 'tar_output_files'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -63,7 +59,6 @@ PROCESS_12Z_HELP_STRING = (
 ).format(
     FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
 )
-TAR_OUTPUTS_HELP_STRING = 'Boolean flag.  If 1, will tar output files.'
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
     'zarr file per individual model run) by `nwp_model_io.write_file`, to '
@@ -92,17 +87,13 @@ INPUT_ARG_PARSER.add_argument(
     help=PROCESS_12Z_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + TAR_OUTPUTS_ARG_NAME, type=int, required=False, default=0,
-    help=TAR_OUTPUTS_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
 
 
 def _run(input_dir_name, first_init_time_string, last_init_time_string,
-         process_00z_runs, process_12z_runs, tar_output_files, output_dir_name):
+         process_00z_runs, process_12z_runs, output_dir_name):
     """Processes gridded MOS data.
 
     This is effectively the main method.
@@ -112,7 +103,6 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
     :param last_init_time_string: Same.
     :param process_00z_runs: Same.
     :param process_12z_runs: Same.
-    :param tar_output_files: Same.
     :param output_dir_name: Same.
     """
 
@@ -171,33 +161,31 @@ def _run(input_dir_name, first_init_time_string, last_init_time_string,
             forecast_table_xarray
         )
 
-        output_file_name = nwp_model_io.find_file(
-            directory_name=output_dir_name,
-            model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
-            init_time_unix_sec=this_init_time_unix_sec,
-            raise_error_if_missing=False
-        )
+        remaining_forecast_hours = forecast_table_xarray.coords[
+            nwp_model_utils.FORECAST_HOUR_DIM
+        ].values
 
-        print('Writing data to: "{0:s}"...'.format(output_file_name))
-        nwp_model_io.write_file(
-            zarr_file_name=output_file_name,
-            nwp_forecast_table_xarray=forecast_table_xarray
-        )
+        for this_forecast_hour in remaining_forecast_hours:
+            output_file_name = nwp_model_io.find_file(
+                directory_name=output_dir_name,
+                init_time_unix_sec=this_init_time_unix_sec,
+                forecast_hour=this_forecast_hour,
+                model_name=nwp_model_utils.GRIDDED_MOS_MODEL_NAME,
+                raise_error_if_missing=False
+            )
+
+            output_table_xarray = forecast_table_xarray.sel({
+                nwp_model_utils.FORECAST_HOUR_DIM:
+                    numpy.array([this_forecast_hour], dtype=int)
+            })
+
+            print('Writing data to: "{0:s}"...'.format(output_file_name))
+            nwp_model_io.write_file(
+                netcdf_file_name=output_file_name,
+                nwp_forecast_table_xarray=output_table_xarray
+            )
+
         print(SEPARATOR_STRING)
-
-        if not tar_output_files:
-            continue
-
-        output_file_name_tarred = '{0:s}.tar'.format(
-            os.path.splitext(output_file_name)[0]
-        )
-        print('Creating tar file: "{0:s}"...'.format(output_file_name_tarred))
-
-        misc_utils.create_tar_file(
-            source_paths_to_tar=[output_file_name],
-            tar_file_name=output_file_name_tarred
-        )
-        shutil.rmtree(output_file_name)
 
 
 if __name__ == '__main__':
@@ -213,6 +201,5 @@ if __name__ == '__main__':
         ),
         process_00z_runs=bool(getattr(INPUT_ARG_OBJECT, PROCESS_00Z_ARG_NAME)),
         process_12z_runs=bool(getattr(INPUT_ARG_OBJECT, PROCESS_12Z_ARG_NAME)),
-        tar_output_files=bool(getattr(INPUT_ARG_OBJECT, TAR_OUTPUTS_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
