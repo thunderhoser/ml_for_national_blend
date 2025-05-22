@@ -1,0 +1,66 @@
+#!/bin/bash
+
+#SBATCH --job-name="convert_to_prediction_files_2022"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=0-239%50
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=convert_to_prediction_files_2022_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_data/processed"
+URMA_DIRECTORY_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
+PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regional_models/36hours"
+
+PATCH_START_ROWS_AXIS1=("64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152")
+PATCH_START_COLUMNS_AXIS1=("64" "64" "64" "64" "64" "336" "336" "336" "336" "336" "608" "608" "608" "608" "608" "880" "880" "880" "880" "880" "1152" "1152" "1152" "1152" "1152" "1424" "1424" "1424" "1424" "1424" "1696" "1696" "1696" "1696" "1696" "1904" "1904" "1904" "1904" "1904")
+REGION_NAMES_AXIS1=("region1-1" "region2-1" "region3-1" "region4-1" "region5-1" "region1-2" "region2-2" "region3-2" "region4-2" "region5-2" "region1-3" "region2-3" "region3-3" "region4-3" "region5-3" "region1-4" "region2-4" "region3-4" "region4-4" "region5-4" "region1-5" "region2-5" "region3-5" "region4-5" "region5-5" "region1-6" "region2-6" "region3-6" "region4-6" "region5-6" "region1-7" "region2-7" "region3-7" "region4-7" "region5-7" "region1-8" "region2-8" "region3-8" "region4-8" "region5-8")
+FIRST_INIT_TIME_STRINGS_AXIS2=("2022-01-01-00" "2022-03-01-00" "2022-05-01-00" "2022-07-01-00" "2022-09-01-00" "2022-11-01-00")
+LAST_INIT_TIME_STRINGS_AXIS2=("2022-02-28-18" "2022-04-30-18" "2022-06-30-18" "2022-08-31-18" "2022-10-31-18" "2023-01-01-00")
+
+num_rows=${#PATCH_START_ROWS_AXIS1[@]}
+num_columns=${#FIRST_INIT_TIME_STRINGS_AXIS2[@]}
+
+i=$(( SLURM_ARRAY_TASK_ID / num_columns ))
+j=$(( SLURM_ARRAY_TASK_ID % num_columns ))
+
+patch_start_row=${PATCH_START_ROWS_AXIS1[$i]}
+patch_start_column=${PATCH_START_COLUMNS_AXIS1[$i]}
+region_name=${REGION_NAMES_AXIS1[$i]}
+first_init_time_string=${FIRST_INIT_TIME_STRINGS_AXIS2[$j]}
+last_init_time_string=${LAST_INIT_TIME_STRINGS_AXIS2[$j]}
+
+python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
+--input_nwp_forecast_dir_name="${NWP_FORECAST_DIR_NAME}" \
+--input_urma_directory_name="${URMA_DIRECTORY_NAME}" \
+--nwp_model_name="operational_nbm" \
+--first_init_time_string="${first_init_time_string}" \
+--last_init_time_string="${last_init_time_string}" \
+--lead_time_hours=36 \
+--patch_size_2pt5km_pixels=368 \
+--patch_start_row_2pt5km=${patch_start_row} \
+--patch_start_column_2pt5km=${patch_start_column} \
+--output_prediction_dir_name="${PREDICTION_DIR_NAME}/${region_name}"
