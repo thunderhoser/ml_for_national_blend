@@ -464,6 +464,8 @@ def _run(input_dir_name, model_name, target_vars_only,
 
         if continue_flag:
             continue
+        if target_vars_only:
+            read_incremental_precip = False
 
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
         continue_flag = False
