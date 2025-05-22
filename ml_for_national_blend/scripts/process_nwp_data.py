@@ -26,12 +26,14 @@ from ml_for_national_blend.utils import gfs_utils
 from ml_for_national_blend.utils import gefs_utils
 from ml_for_national_blend.utils import nwp_model_utils
 
+NONE_STRINGS = ['', 'none', 'None']
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
 
 INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
+INPUT_FILE_ARG_NAME = 'input_grib2_file_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
 MODEL_ARG_NAME = 'model_name'
@@ -45,14 +47,26 @@ TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
-    'Name of main input directory, containing one GRIB2 file per model run '
+    'Path to input directory, containing one GRIB2 file per model run '
     '(init time) and forecast hour (lead time).  Files therein will be found '
-    'by `raw_nwp_model_io.find_file`.'
+    'by `raw_nwp_model_io.find_file`.  If you would rather specify a single '
+    'GRIB file, leave this argument alone and use `{0:s}`.'
+).format(
+    INPUT_FILE_ARG_NAME
+)
+INPUT_FILE_HELP_STRING = (
+    'Path to single input file, containing data for one model run (init time) '
+    'and one forecast hour (lead time).  If you would rather work on many '
+    'files, leave this argument alone and use `{0:s}`.'
+).format(
+    INPUT_DIR_ARG_NAME
 )
 FIRST_INIT_TIME_HELP_STRING = (
+    '[used only if `{0:s}` is specified, not if `{1:s}` is specified] '
     'First init time (format "yyyy-mm-dd-HH").  This script will process model '
-    'runs initialized at all times in the continuous period {0:s}...{1:s}.'
+    'runs initialized at all times in the continuous period {2:s}...{3:s}.'
 ).format(
+    INPUT_DIR_ARG_NAME, INPUT_FILE_ARG_NAME,
     FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
 )
 LAST_INIT_TIME_HELP_STRING = 'See documentation for {0:s}.'.format(
@@ -99,15 +113,19 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
+    '--' + INPUT_DIR_ARG_NAME, type=str, required=False, default='',
     help=INPUT_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=True,
+    '--' + INPUT_FILE_ARG_NAME, type=str, required=False, default='',
+    help=INPUT_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
     help=FIRST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=True,
+    '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
     help=LAST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
@@ -147,8 +165,9 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(input_dir_name, model_name, target_vars_only,
+def _run(input_dir_name, input_file_name,
          first_init_time_string, last_init_time_string,
+         model_name, target_vars_only,
          start_latitude_deg_n, end_latitude_deg_n,
          start_longitude_deg_e, end_longitude_deg_e,
          wgrib2_exe_name, temporary_dir_name, output_dir_name):
@@ -157,10 +176,11 @@ def _run(input_dir_name, model_name, target_vars_only,
     This is effectively the main method.
 
     :param input_dir_name: See documentation at top of this script.
-    :param model_name: Same.
-    :param target_vars_only: Same.
+    :param input_file_name: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
+    :param model_name: Same.
+    :param target_vars_only: Same.
     :param start_latitude_deg_n: Same.
     :param end_latitude_deg_n: Same.
     :param start_longitude_deg_e: Same.
@@ -169,6 +189,18 @@ def _run(input_dir_name, model_name, target_vars_only,
     :param temporary_dir_name: Same.
     :param output_dir_name: Same.
     """
+
+    if input_dir_name in NONE_STRINGS:
+        input_dir_name = None
+    else:
+        input_file_name = None
+
+    if input_file_name in NONE_STRINGS:
+        input_file_name = None
+    else:
+        input_dir_name = None
+
+    assert not (input_dir_name is None and input_file_name is None)
 
     # start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e, and
     # end_longitude_deg_e are used to subset the domain for global models.
@@ -196,12 +228,20 @@ def _run(input_dir_name, model_name, target_vars_only,
 
     # For the given model, find all initialization times in the specified period
     # (first_init_time_unix_sec to last_init_time_unix_sec).
-    first_init_time_unix_sec = time_conversion.string_to_unix_sec(
-        first_init_time_string, TIME_FORMAT
-    )
-    last_init_time_unix_sec = time_conversion.string_to_unix_sec(
-        last_init_time_string, TIME_FORMAT
-    )
+    if input_file_name is None:
+        first_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            first_init_time_string, TIME_FORMAT
+        )
+        last_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            last_init_time_string, TIME_FORMAT
+        )
+    else:
+        first_init_time_unix_sec = raw_nwp_model_io.file_name_to_init_time(
+            nwp_forecast_file_name=input_file_name,
+            model_name=model_name
+        )
+        last_init_time_unix_sec = first_init_time_unix_sec + 0
+
     init_time_interval_sec = nwp_model_utils.model_to_init_time_interval(
         model_name
     )
@@ -324,23 +364,34 @@ def _run(input_dir_name, model_name, target_vars_only,
 
         # For the given model and init time, determine which forecast hours
         # should be available.
-        forecast_hours = nwp_model_utils.model_to_forecast_hours(
-            model_name=model_name, init_time_unix_sec=this_init_time_unix_sec
-        )
+        if input_file_name is None:
+            forecast_hours = nwp_model_utils.model_to_forecast_hours(
+                model_name=model_name,
+                init_time_unix_sec=this_init_time_unix_sec
+            )
+        else:
+            forecast_hour = raw_nwp_model_io.file_name_to_forecast_hour(
+                input_file_name
+            )
+            forecast_hours = numpy.array([forecast_hour], dtype=int)
+
         num_forecast_hours = len(forecast_hours)
 
         # Find all input files (one GRIB2 file per forecast hour) for this
         # model run.
-        input_file_names = [
-            raw_nwp_model_io.find_file(
-                directory_name=input_dir_name,
-                model_name=model_name,
-                init_time_unix_sec=this_init_time_unix_sec,
-                forecast_hour=h,
-                raise_error_if_missing=False
-            )
-            for h in forecast_hours
-        ]
+        if input_file_name is None:
+            input_file_names = [
+                raw_nwp_model_io.find_file(
+                    directory_name=input_dir_name,
+                    model_name=model_name,
+                    init_time_unix_sec=this_init_time_unix_sec,
+                    forecast_hour=h,
+                    raise_error_if_missing=False
+                )
+                for h in forecast_hours
+            ]
+        else:
+            input_file_names = [input_file_name]
 
         found_all_inputs = all([os.path.isfile(f) for f in input_file_names])
         continue_flag = False
@@ -438,6 +489,8 @@ def _run(input_dir_name, model_name, target_vars_only,
         if continue_flag:
             continue
         if target_vars_only:
+            read_incremental_precip = False
+        if input_dir_name is None:
             read_incremental_precip = False
 
         nwp_forecast_tables_xarray = [None] * num_forecast_hours
@@ -592,15 +645,16 @@ if __name__ == '__main__':
 
     _run(
         input_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
-        model_name=getattr(INPUT_ARG_OBJECT, MODEL_ARG_NAME),
-        target_vars_only=bool(
-            getattr(INPUT_ARG_OBJECT, TARGET_VARS_ONLY_ARG_NAME)
-        ),
+        input_file_name=getattr(INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME),
         first_init_time_string=getattr(
             INPUT_ARG_OBJECT, FIRST_INIT_TIME_ARG_NAME
         ),
         last_init_time_string=getattr(
             INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
+        ),
+        model_name=getattr(INPUT_ARG_OBJECT, MODEL_ARG_NAME),
+        target_vars_only=bool(
+            getattr(INPUT_ARG_OBJECT, TARGET_VARS_ONLY_ARG_NAME)
         ),
         start_latitude_deg_n=getattr(INPUT_ARG_OBJECT, START_LATITUDE_ARG_NAME),
         end_latitude_deg_n=getattr(INPUT_ARG_OBJECT, END_LATITUDE_ARG_NAME),
