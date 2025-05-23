@@ -249,20 +249,40 @@ def _run():
     if WEIGHT_DECAY > 1e-10:
         optimizer_function = keras.optimizers.Lion(
             gradient_accumulation_steps=10,
+            clipnorm=1.,
             weight_decay=WEIGHT_DECAY
         )
         optimizer_function_string = (
             'keras.optimizers.Lion('
-            'gradient_accumulation_steps=10, weight_decay={0:.6f}'
+            'gradient_accumulation_steps=10, clipnorm=1., weight_decay={0:.6f}'
             ')'
         ).format(WEIGHT_DECAY)
     else:
         optimizer_function = keras.optimizers.Lion(
-            gradient_accumulation_steps=10
+            gradient_accumulation_steps=10,
+            clipnorm=1.
         )
         optimizer_function_string = (
-            'keras.optimizers.Lion(gradient_accumulation_steps=10)'
+            'keras.optimizers.Lion(gradient_accumulation_steps=10, clipnorm=1.)'
         )
+
+    # if WEIGHT_DECAY > 1e-10:
+    #     optimizer_function = keras.optimizers.AdamW(
+    #         gradient_accumulation_steps=10,
+    #         weight_decay=WEIGHT_DECAY
+    #     )
+    #     optimizer_function_string = (
+    #         'keras.optimizers.AdamW('
+    #         'gradient_accumulation_steps=10, weight_decay={0:.6f}'
+    #         ')'
+    #     ).format(WEIGHT_DECAY)
+    # else:
+    #     optimizer_function = keras.optimizers.AdamW(
+    #         gradient_accumulation_steps=10
+    #     )
+    #     optimizer_function_string = (
+    #         'keras.optimizers.AdamW(gradient_accumulation_steps=10)'
+    #     )
 
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
 
