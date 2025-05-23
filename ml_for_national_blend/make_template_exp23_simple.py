@@ -246,11 +246,11 @@ def _run():
         numpy.array([1], dtype=int)
     ])
 
-    optimizer_function = keras.optimizers.Lion(
+    optimizer_function = keras.optimizers.AdamW(
         gradient_accumulation_steps=10
     )
     optimizer_function_string = (
-        'keras.optimizers.Lion(gradient_accumulation_steps=10)'
+        'keras.optimizers.AdamW(gradient_accumulation_steps=10)'
     )
 
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
