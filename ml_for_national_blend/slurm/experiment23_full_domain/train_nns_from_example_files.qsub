@@ -45,9 +45,9 @@ while true; do
     --input_example_dir_name="${example_dir_name}" \
     --output_model_dir_name="${output_dir_name}" \
     --num_examples_per_batch=1 \
-    --patch_size_2pt5km_pixels=496 \
-    --patch_buffer_size_2pt5km_pixels=64 \
-    --patch_overlap_size_2pt5km_pixels=128 \
+    --patch_size_2pt5km_pixels=208 \
+    --patch_buffer_size_2pt5km_pixels=50 \
+    --patch_overlap_size_2pt5km_pixels=64 \
     --first_init_time_strings_for_training "2017-01-01-00" \
     --last_init_time_strings_for_training "2021-12-20-18" \
     --first_init_time_strings_for_validation "2022-01-01-00" \
