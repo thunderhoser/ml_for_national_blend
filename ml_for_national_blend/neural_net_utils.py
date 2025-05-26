@@ -1887,6 +1887,7 @@ def apply_many_single_patch_models(
 
     for k in range(num_models):
         this_vod = model_metadata_dicts[k][VALIDATION_OPTIONS_KEY]
+        print(this_vod)  # TODO
         this_buffer_size = this_vod[PATCH_BUFFER_SIZE_KEY]
         these_field_names = this_vod[TARGET_FIELDS_KEY]
 
