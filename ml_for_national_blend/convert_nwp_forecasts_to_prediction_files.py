@@ -38,8 +38,16 @@ import temperature_conversions as temperature_conv
 # for fair evaluation.
 
 TOLERANCE_DEG = 1e-3
+NONE_STRINGS = ['', 'none', 'None']
+
 HOURS_TO_SECONDS = 3600
 TIME_FORMAT = '%Y-%m-%d-%H'
+VERY_EARLY_TIME_UNIX_SEC = time_conversion.string_to_unix_sec(
+    '1970-01-01-00', '%Y-%m-%d-%H'
+)
+VERY_LATE_TIME_UNIX_SEC = time_conversion.string_to_unix_sec(
+    '2040-01-01-00', '%Y-%m-%d-%H'
+)
 
 URMA_FIELD_TO_NWP_FIELD = {
     urma_utils.TEMPERATURE_2METRE_NAME: nwp_model_utils.TEMPERATURE_2METRE_NAME,
@@ -54,6 +62,7 @@ URMA_DIRECTORY_ARG_NAME = 'input_urma_directory_name'
 NWP_MODEL_ARG_NAME = 'nwp_model_name'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
 LAST_INIT_TIME_ARG_NAME = 'last_init_time_string'
+NN_PREDICTION_DIR_ARG_NAME = 'nn_prediction_dir_name'
 LEAD_TIME_ARG_NAME = 'lead_time_hours'
 PATCH_SIZE_ARG_NAME = 'patch_size_2pt5km_pixels'
 PATCH_START_ROW_ARG_NAME = 'patch_start_row_2pt5km'
@@ -77,12 +86,25 @@ NWP_MODEL_HELP_STRING = (
 FIRST_INIT_TIME_HELP_STRING = (
     'First initialization time (format "yyyy-mm-dd-HH").  This script will '
     'convert NWP-forecast files to prediction files for every init time in the '
-    'period `{0:s}`...`{1:s}`.'
+    'period `{0:s}`....`{1:s}`.  Or, if you would rather take init times from '
+    'a list (all init times for which predictions from a given NN are '
+    'available), leave these two arguments alone and use `{2:s}`.'
 ).format(
-    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
+    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME,
+    NN_PREDICTION_DIR_ARG_NAME
 )
 LAST_INIT_TIME_HELP_STRING = 'See documentation for `{0:s}`.'.format(
     FIRST_INIT_TIME_ARG_NAME
+)
+NN_PREDICTION_DIR_HELP_STRING = (
+    'Path to directory with NN predictions.  Files therein will be found by '
+    '`prediction_io.find_file`, and the init time for each prediction file '
+    'will be determined by `prediction_io.file_name_to_init_time` -- this is '
+    'how the full list of init times will be determined.  If you would rather '
+    'just specify a continuous time period instead, leave this argument alone '
+    'and use `{0:s}` and `{1:s}`.'
+).format(
+    FIRST_INIT_TIME_ARG_NAME, LAST_INIT_TIME_ARG_NAME
 )
 LEAD_TIME_HELP_STRING = (
     'Will convert NWP-forecast files to prediction files for this one lead '
@@ -127,12 +149,16 @@ INPUT_ARG_PARSER.add_argument(
     help=NWP_MODEL_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=True,
+    '--' + FIRST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
     help=FIRST_INIT_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=True,
+    '--' + LAST_INIT_TIME_ARG_NAME, type=str, required=False, default='',
     help=LAST_INIT_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + NN_PREDICTION_DIR_ARG_NAME, type=str, required=False, default='',
+    help=NN_PREDICTION_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + LEAD_TIME_ARG_NAME, type=int, required=True,
@@ -414,8 +440,8 @@ def _convert_nwp_forecasts_1init(
 
 
 def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
-         first_init_time_string, last_init_time_string, lead_time_hours,
-         patch_size_2pt5km_pixels, patch_start_row_2pt5km,
+         first_init_time_string, last_init_time_string, nn_prediction_dir_name,
+         lead_time_hours, patch_size_2pt5km_pixels, patch_start_row_2pt5km,
          patch_start_column_2pt5km, prediction_dir_name):
     """Converts NWP-forecast files to prediction files.
 
@@ -426,6 +452,7 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
     :param nwp_model_name: Same.
     :param first_init_time_string: Same.
     :param last_init_time_string: Same.
+    :param nn_prediction_dir_name: Same.
     :param lead_time_hours: Same.
     :param patch_size_2pt5km_pixels: Same.
     :param patch_start_row_2pt5km: Same.
@@ -440,36 +467,80 @@ def _run(nwp_forecast_dir_name, urma_directory_name, nwp_model_name,
 
     if patch_size_2pt5km_pixels <= 0:
         patch_size_2pt5km_pixels = None
+    if first_init_time_string in NONE_STRINGS:
+        first_init_time_string = None
+    if last_init_time_string in NONE_STRINGS:
+        last_init_time_string = None
+    if nn_prediction_dir_name in NONE_STRINGS:
+        nn_prediction_dir_name = None
 
-    first_init_time_unix_sec = time_conversion.string_to_unix_sec(
-        first_init_time_string, TIME_FORMAT
-    )
-    last_init_time_unix_sec = time_conversion.string_to_unix_sec(
-        last_init_time_string, TIME_FORMAT
-    )
-
-    # TODO(thunderhoser): This is a HACK.
-    if nwp_model_name == 'operational_nbm':
-        nwp_forecast_file_names = operational_nbm_io.find_files_for_period(
-            directory_name=nwp_forecast_dir_name,
-            forecast_hour=lead_time_hours,
-            first_init_time_unix_sec=first_init_time_unix_sec,
-            last_init_time_unix_sec=last_init_time_unix_sec,
-            raise_error_if_all_missing=True,
-            raise_error_if_any_missing=False
+    if first_init_time_string is None or last_init_time_string is None:
+        nn_prediction_file_names = prediction_io.find_files_for_period(
+            directory_name=nn_prediction_dir_name,
+            first_init_time_unix_sec=VERY_EARLY_TIME_UNIX_SEC,
+            last_init_time_unix_sec=VERY_LATE_TIME_UNIX_SEC,
+            raise_error_if_any_missing=False,
+            raise_error_if_all_missing=True
         )
+        init_times_unix_sec = numpy.array([
+            prediction_io.file_name_to_init_time(f)
+            for f in nn_prediction_file_names
+        ], dtype=int)
 
-        nwp_model_name = nwp_model_utils.ENSEMBLE_MODEL_NAME
+        init_times_unix_sec = numpy.sort(init_times_unix_sec)
+
+        # TODO(thunderhoser): This is a HACK.
+        if nwp_model_name == 'operational_nbm':
+            nwp_forecast_file_names = [
+                operational_nbm_io.find_file(
+                    directory_name=nwp_forecast_dir_name,
+                    init_time_unix_sec=t,
+                    forecast_hour=lead_time_hours,
+                    raise_error_if_missing=True
+                ) for t in init_times_unix_sec
+            ]
+
+            nwp_model_name = nwp_model_utils.ENSEMBLE_MODEL_NAME
+        else:
+            nwp_forecast_file_names = [
+                interp_nwp_model_io.find_file(
+                    directory_name=nwp_forecast_dir_name,
+                    init_time_unix_sec=t,
+                    forecast_hour=lead_time_hours,
+                    model_name=nwp_model_name,
+                    raise_error_if_missing=True
+                ) for t in init_times_unix_sec
+            ]
     else:
-        nwp_forecast_file_names = interp_nwp_model_io.find_files_for_period(
-            directory_name=nwp_forecast_dir_name,
-            model_name=nwp_model_name,
-            forecast_hour=lead_time_hours,
-            first_init_time_unix_sec=first_init_time_unix_sec,
-            last_init_time_unix_sec=last_init_time_unix_sec,
-            raise_error_if_all_missing=True,
-            raise_error_if_any_missing=False
+        first_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            first_init_time_string, TIME_FORMAT
         )
+        last_init_time_unix_sec = time_conversion.string_to_unix_sec(
+            last_init_time_string, TIME_FORMAT
+        )
+
+        # TODO(thunderhoser): This is a HACK.
+        if nwp_model_name == 'operational_nbm':
+            nwp_forecast_file_names = operational_nbm_io.find_files_for_period(
+                directory_name=nwp_forecast_dir_name,
+                forecast_hour=lead_time_hours,
+                first_init_time_unix_sec=first_init_time_unix_sec,
+                last_init_time_unix_sec=last_init_time_unix_sec,
+                raise_error_if_all_missing=True,
+                raise_error_if_any_missing=False
+            )
+
+            nwp_model_name = nwp_model_utils.ENSEMBLE_MODEL_NAME
+        else:
+            nwp_forecast_file_names = interp_nwp_model_io.find_files_for_period(
+                directory_name=nwp_forecast_dir_name,
+                model_name=nwp_model_name,
+                forecast_hour=lead_time_hours,
+                first_init_time_unix_sec=first_init_time_unix_sec,
+                last_init_time_unix_sec=last_init_time_unix_sec,
+                raise_error_if_all_missing=True,
+                raise_error_if_any_missing=False
+            )
 
     try:
         init_times_unix_sec = numpy.array([
@@ -521,6 +592,9 @@ if __name__ == '__main__':
         ),
         last_init_time_string=getattr(
             INPUT_ARG_OBJECT, LAST_INIT_TIME_ARG_NAME
+        ),
+        nn_prediction_dir_name=getattr(
+            INPUT_ARG_OBJECT, NN_PREDICTION_DIR_ARG_NAME
         ),
         lead_time_hours=getattr(INPUT_ARG_OBJECT, LEAD_TIME_ARG_NAME),
         patch_size_2pt5km_pixels=getattr(INPUT_ARG_OBJECT, PATCH_SIZE_ARG_NAME),
