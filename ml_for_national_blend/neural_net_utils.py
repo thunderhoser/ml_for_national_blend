@@ -2,6 +2,7 @@
 
 import os
 import sys
+import copy
 import pickle
 import warnings
 import numpy
@@ -15,6 +16,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import urma_io
+import nbm_utils
 import misc_utils
 import nwp_model_utils
 import urma_utils
@@ -27,11 +29,13 @@ import temperature_conversions as temperature_conv
 import file_system_utils
 import error_checking
 import nwp_input
+import neural_net_training_simple as nn_training_simple
 import custom_losses
 import custom_metrics
 
 TOLERANCE = 1e-6
 HOURS_TO_SECONDS = 3600
+POSSIBLE_DOWNSAMPLING_FACTORS = numpy.array([1, 4, 8, 16], dtype=int)
 
 FIRST_INIT_TIMES_KEY = 'first_init_times_unix_sec'
 LAST_INIT_TIMES_KEY = 'last_init_times_unix_sec'
@@ -1835,3 +1839,184 @@ def read_model(hdf5_file_name, for_inference):
     )
 
     return model_object
+
+
+def apply_many_single_patch_models(
+        model_objects, full_predictor_matrices, num_examples_per_batch,
+        model_metadata_dicts, verbose=True):
+    """Stitches together predictions from many single-patch (subdomain) models.
+
+    A = number of models
+
+    E = number of examples
+    M = number of rows in full grid
+    N = number of columns in full grid
+    F = number of target fields
+    S = ensemble size
+
+    :param model_objects: length-A list of trained neural nets (instances of
+        `keras.models.Model`).
+    :param full_predictor_matrices: See output doc for
+        `neural_net_training_simple.data_generator`.
+    :param num_examples_per_batch: Batch size.
+    :param model_metadata_dicts: length-A list of dictionaries returned by
+        `neural_net_utils.read_metafile`.
+    :param verbose: Boolean flag.  If True, will print progress messages.
+    :return: prediction_matrix: E-by-M-by-N-by-F-by-S numpy array of predicted
+        values.
+    """
+
+    # Check input args.
+    error_checking.assert_is_list(model_objects)
+    num_models = len(model_objects)
+
+    error_checking.assert_is_list(model_metadata_dicts)
+    assert len(model_metadata_dicts) == num_models
+
+    error_checking.assert_is_boolean(verbose)
+
+    # Do actual stuff.
+    num_rows_2pt5km = len(nbm_utils.NBM_Y_COORDS_METRES)
+    num_columns_2pt5km = len(nbm_utils.NBM_X_COORDS_METRES)
+
+    patch_buffer_size = -1
+    target_field_names = []
+    patch_start_row_by_model = numpy.full(num_models, -1, dtype=int)
+    patch_start_column_by_model = numpy.full(num_models, -1, dtype=int)
+    patch_size_by_model = numpy.full(num_models, -1, dtype=int)
+
+    for k in range(num_models):
+        this_vod = model_metadata_dicts[k][VALIDATION_OPTIONS_KEY]
+        this_buffer_size = this_vod[PATCH_BUFFER_SIZE_KEY]
+        these_field_names = this_vod[TARGET_FIELDS_KEY]
+
+        if k == 0:
+            patch_buffer_size = this_buffer_size + 0
+            target_field_names = copy.deepcopy(these_field_names)
+
+        assert this_buffer_size == patch_buffer_size
+        assert these_field_names == target_field_names
+
+        patch_start_row_by_model[k] = this_vod[PATCH_START_ROW_KEY]
+        patch_start_column_by_model[k] = this_vod[PATCH_START_COLUMN_KEY]
+        patch_size_by_model[k] = this_vod[PATCH_SIZE_KEY]
+
+    assert numpy.all(patch_start_row_by_model >= 0)
+    assert numpy.all(patch_start_column_by_model >= 0)
+    assert numpy.all(patch_size_by_model > 0)
+    assert (
+        len(patch_start_row_by_model) ==
+        len(numpy.unique(patch_start_row_by_model))
+    )
+    assert (
+        len(patch_start_column_by_model) ==
+        len(numpy.unique(patch_start_column_by_model))
+    )
+
+    num_target_fields = len(target_field_names)
+    num_examples = full_predictor_matrices[0].shape[0]
+    these_dim = (
+        num_examples, num_rows_2pt5km, num_columns_2pt5km, num_target_fields, 1
+    )
+
+    # TODO(thunderhoser): I don't know if this is the best way to handle varying
+    # ensemble size by grid point.
+    prediction_count_matrix = numpy.full(these_dim, 0, dtype=float)
+    summed_prediction_matrix = None
+
+    for k in range(num_models):
+        if verbose:
+            i_start = patch_start_row_by_model[k] + 0
+            i_end = i_start + patch_size_by_model[k] - 1
+            j_start = patch_start_column_by_model[k] + 0
+            j_end = j_start + patch_size_by_model[k] - 1
+
+            print((
+                'Applying {0:d}th of {1:d} models '
+                'to rows {2:d}-{3:d} of {4:d}, '
+                'and columns {5:d}-{6:d} of {7:d}, in finest-resolution grid...'
+            ).format(
+                k + 1, num_models,
+                i_start, i_end, num_rows_2pt5km,
+                j_start, j_end, num_columns_2pt5km
+            ))
+
+        patch_predictor_matrices = []
+
+        for this_full_pred_matrix in full_predictor_matrices:
+            this_downsampling_factor = int(numpy.round(
+                float(num_rows_2pt5km) /
+                this_full_pred_matrix.shape[1]
+            ))
+            assert this_downsampling_factor in POSSIBLE_DOWNSAMPLING_FACTORS
+
+            i_start = patch_start_row_by_model[k] + 0
+            i_end = i_start + patch_size_by_model[k]
+            j_start = patch_start_column_by_model[k] + 0
+            j_end = j_start + patch_size_by_model[k]
+
+            i_start = i_start // this_downsampling_factor
+            i_end = i_end // this_downsampling_factor
+            j_start = j_start // this_downsampling_factor
+            j_end = j_end // this_downsampling_factor
+
+            patch_predictor_matrices.append(
+                this_full_pred_matrix[:, i_start:i_end, j_start:j_end, ...]
+            )
+
+        found_nan = any([
+            numpy.any(numpy.isnan(ppm)) for ppm in patch_predictor_matrices
+        ])
+        if found_nan:
+            warning_string = (
+                'POTENTIAL MAJOR ERROR: Found NaN values in predictor matrices '
+                'for {0:d}th of {1:d} models!'
+            ).format(
+                k + 1, num_models
+            )
+
+            warnings.warn(warning_string)
+            continue
+
+        patch_prediction_matrix = nn_training_simple.apply_model(
+            model_object=model_objects[k],
+            predictor_matrices=patch_predictor_matrices,
+            num_examples_per_batch=num_examples_per_batch,
+            target_field_names=target_field_names,
+            verbose=False
+        )
+
+        if summed_prediction_matrix is None:
+            ensemble_size = patch_prediction_matrix.shape[-1]
+            these_dim = (
+                num_examples, num_rows_2pt5km, num_columns_2pt5km,
+                num_target_fields, ensemble_size
+            )
+            summed_prediction_matrix = numpy.full(these_dim, 0.)
+
+        i_start = patch_start_row_by_model[k] + 0
+        i_end = i_start + patch_size_by_model[k]
+        j_start = patch_start_column_by_model[k] + 0
+        j_end = j_start + patch_size_by_model[k]
+
+        weight_matrix = patch_buffer_to_mask(
+            patch_size_2pt5km_pixels=patch_size_by_model[k],
+            patch_buffer_size_2pt5km_pixels=patch_buffer_size
+        )
+        weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
+        weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+        weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+
+        summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
+            weight_matrix * patch_prediction_matrix
+        )
+        prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
+            weight_matrix
+        )
+
+    if verbose:
+        print('Have applied model everywhere in full grid!')
+
+    prediction_count_matrix = prediction_count_matrix.astype(float)
+    prediction_count_matrix[prediction_count_matrix < TOLERANCE] = numpy.nan
+    return summed_prediction_matrix / prediction_count_matrix
