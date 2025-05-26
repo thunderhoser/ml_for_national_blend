@@ -119,8 +119,8 @@ METRIC_FUNCTION_STRINGS = [
     'custom_metrics.dual_weighted_mse(channel_index=4, temperature_index=0, u_wind_index=1, v_wind_index=2, dewpoint_index=3, gust_index=4, expect_ensemble=True, function_name="gust_dwmse_celsius3")'
 ]
 
-MODEL_DEPTH = 6
-PATCH_SIZE_ONE_DIM = 496
+MODEL_DEPTH = 5
+PATCH_SIZE_ONE_DIM = 208
 NUM_CONV_BLOCKS_PER_LEVEL = 1
 
 NUM_NWP_LEAD_TIMES = 5
@@ -168,7 +168,7 @@ DEFAULT_OPTION_DICT = {
     # chiu_next_pp_arch.DO_CONVNEXT_V2_KEY: True,
     # chiu_next_pp_arch.USE_SPECTRAL_NORM_KEY: True,
 
-    chiu_next_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([24, 32, 48, 64, 96, 128, 192], dtype=int),
+    chiu_next_pp_arch.NWP_ENCODER_NUM_CHANNELS_KEY: numpy.array([32, 48, 64, 96, 128, 192], dtype=int),
     chiu_next_pp_arch.NWP_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
     chiu_next_pp_arch.NWP_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     # chiu_next_pp_arch.NWP_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
@@ -179,7 +179,7 @@ DEFAULT_OPTION_DICT = {
     # chiu_next_pp_arch.NWP_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
     chiu_next_pp_arch.NWP_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
+    chiu_next_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
     chiu_next_pp_arch.LAGTGT_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
     chiu_next_pp_arch.LAGTGT_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     # chiu_next_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
@@ -190,7 +190,7 @@ DEFAULT_OPTION_DICT = {
     # chiu_next_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
     chiu_next_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48, 64], dtype=int),
+    chiu_next_pp_arch.RCTBIAS_ENCODER_NUM_CHANNELS_KEY: numpy.array([8, 12, 16, 24, 32, 48], dtype=int),
     chiu_next_pp_arch.RCTBIAS_POOLING_SIZE_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
     chiu_next_pp_arch.RCTBIAS_ENCODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH + 1, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     # chiu_next_pp_arch.RCTBIAS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
@@ -201,7 +201,7 @@ DEFAULT_OPTION_DICT = {
     # chiu_next_pp_arch.RCTBIAS_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.1),
     chiu_next_pp_arch.RCTBIAS_FC_MODULE_USE_3D_CONV: True,
 
-    chiu_next_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([32, 44, 64, 88, 128, 176], dtype=int),
+    chiu_next_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array([40, 60, 80, 120, 160], dtype=int),
     chiu_next_pp_arch.DECODER_NUM_CONV_BLOCKS_KEY: numpy.full(MODEL_DEPTH, NUM_CONV_BLOCKS_PER_LEVEL, dtype=int),
     # chiu_next_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.1),
     chiu_next_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.),
