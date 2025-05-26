@@ -407,20 +407,15 @@ def _get_rel_curve_one_scalar(
     mean_observations = numpy.full(num_bins, numpy.nan)
     example_counts = numpy.full(num_bins, numpy.nan)
 
+    bin_edges = numpy.linspace(min_bin_edge, max_bin_edge, num=num_bins + 1)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
     if len(real_indices) == 0:
-        return mean_predictions, mean_observations, example_counts
+        return bin_centers, mean_observations, example_counts
 
-    # example_to_bin_indices = histograms.create_histogram(
-    #     input_values=real_target_values if invert else real_predicted_values,
-    #     num_bins=num_bins,
-    #     min_value=min_bin_edge,
-    #     max_value=max_bin_edge
-    # )[0]
-
-    bin_cutoffs = numpy.linspace(min_bin_edge, max_bin_edge, num=num_bins + 1)
     example_to_bin_indices = numpy.digitize(
         real_target_values if invert else real_predicted_values,
-        bin_cutoffs,
+        bin_edges,
         right=False
     ) - 1
     example_to_bin_indices = numpy.clip(example_to_bin_indices, 0, num_bins - 1)
@@ -441,6 +436,10 @@ def _get_rel_curve_one_scalar(
         mean_observations[j] = numpy.mean(
             real_target_values[example_indices_by_bin[j]]
         )
+
+    mean_predictions[numpy.isnan(mean_predictions)] = bin_centers[
+        numpy.isnan(mean_predictions)
+    ]
 
     return mean_predictions, mean_observations, example_counts
 
