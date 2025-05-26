@@ -238,10 +238,11 @@ def _plot_distributions(
     plotting_right_tail = tail_percentile > 50.
 
     if plotting_left_tail or plotting_right_tail:
-        tail_threshold = numpy.nanpercentile(
-            numpy.concatenate([target_values, predicted_values]),
-            tail_percentile
-        )
+        # tail_threshold = numpy.nanpercentile(
+        #     numpy.concatenate([target_values, predicted_values]),
+        #     tail_percentile
+        # )
+        tail_threshold = numpy.nanpercentile(target_values, tail_percentile)
     else:
         tail_threshold = None
 
@@ -271,14 +272,16 @@ def _plot_distributions(
             2, numpy.mean(relevant_target_values)
         )
 
-    x_min = min([
-        numpy.min(relevant_target_values),
-        numpy.min(relevant_predicted_values)
-    ])
-    x_max = max([
-        numpy.max(relevant_target_values),
-        numpy.max(relevant_predicted_values)
-    ])
+    # x_min = min([
+    #     numpy.min(relevant_target_values),
+    #     numpy.min(relevant_predicted_values)
+    # ])
+    # x_max = max([
+    #     numpy.max(relevant_target_values),
+    #     numpy.max(relevant_predicted_values)
+    # ])
+    x_min = numpy.min(relevant_target_values)
+    x_max = numpy.max(relevant_target_values)
 
     if plotting_left_tail:
         x_values = numpy.linspace(x_min, tail_threshold, num=1001)
@@ -430,7 +433,6 @@ def _plot_error_distribution(
         'linewidth': 2
     }
     x_values = numpy.linspace(0, num_bins - 1, num=num_bins, dtype=float)
-    good_bin_indices = []
 
     for j in range(num_bins):
         print((
@@ -461,8 +463,6 @@ def _plot_error_distribution(
         good_indices = numpy.where(good_flags)[0]
         if len(good_indices) == 0:
             continue
-
-        good_bin_indices.append(j)
 
         if violin_or_box_plots:
             violin_handles = axes_object.violinplot(
@@ -498,20 +498,12 @@ def _plot_error_distribution(
                 positions=x_values[[j]]
             )
 
-    good_bin_indices = numpy.array(good_bin_indices, dtype=int)
-    good_bin_indices = numpy.linspace(
-        numpy.min(good_bin_indices), numpy.max(good_bin_indices),
-        num=numpy.max(good_bin_indices) - numpy.min(good_bin_indices) + 1,
-        dtype=int
-    )
-
     x_tick_strings = [
         '[{0:.1f}, {1:.1f})'.format(a, b) for a, b in
         zip(bin_edges[:-1], bin_edges[1:])
     ]
     x_tick_strings[0] = '< {0:.1f}'.format(bin_edges[1])
     x_tick_strings[-1] = '>= {0:.1f}'.format(bin_edges[-2])
-    x_tick_strings = [x_tick_strings[j] for j in good_bin_indices]
 
     for j in range(len(x_tick_strings)):
         if j == 0 or j == len(x_tick_strings) - 1:
@@ -521,11 +513,8 @@ def _plot_error_distribution(
 
         x_tick_strings[j] = ' '
 
-    x_values = x_values[good_bin_indices]
-
     axes_object.set_xticks(x_values)
     axes_object.set_xticklabels(x_tick_strings, rotation=90, fontsize=15)
-    axes_object.set_xlim(good_bin_indices[0] - 0.5, good_bin_indices[-1] + 0.5)
 
     axes_object.set_xlabel('{0:s} value'.format(
         'Actual' if bin_by_target_or_predicted_values
