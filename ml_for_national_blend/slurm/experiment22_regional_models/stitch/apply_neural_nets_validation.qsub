@@ -9,13 +9,14 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=24:00:00
+#SBATCH --time=01:00:00
+#SBATCH --array=0-73
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=apply_neural_nets_validation_%A.out
+#SBATCH --output=apply_neural_nets_validation_%A_%a.out
 
 module load cuda/12.3.1
 conda init
@@ -33,19 +34,32 @@ TOP_EXAMPLE_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blen
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models"
 
 REGION_NAMES=("region1-1" "region2-1" "region3-1" "region4-1" "region5-1" "region1-2" "region2-2" "region3-2" "region4-2" "region5-2" "region1-3" "region2-3" "region3-3" "region4-3" "region5-3" "region1-4" "region2-4" "region3-4" "region4-4" "region5-4" "region1-5" "region2-5" "region3-5" "region4-5" "region5-5" "region1-6" "region2-6" "region3-6" "region4-6" "region5-6" "region1-7" "region2-7" "region3-7" "region4-7" "region5-7" "region1-8" "region2-8" "region3-8" "region4-8" "region5-8")
-model_file_names_one_string=""
+PATCH_START_ROWS=("0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088" "0" "272" "544" "816" "1088")
+PATCH_START_COLUMNS=("0" "0" "0" "0" "0" "272" "272" "272" "272" "272" "544" "544" "544" "544" "544" "816" "816" "816" "816" "816" "1088" "1088" "1088" "1088" "1088" "1360" "1360" "1360" "1360" "1360" "1632" "1632" "1632" "1632" "1632" "1840" "1840" "1840" "1840" "1840")
 
-for this_region_name in "${REGION_NAMES[@]}"; do
-    model_file_names_one_string="${model_file_names_one_string} ${TOP_MODEL_DIR_NAME}/${this_region_name}/model.weights.h5"
+model_file_names_one_string=""
+patch_start_rows_one_string=""
+patch_start_columns_one_string=""
+
+for i in "${!REGION_NAMES[@]}"; do
+    model_file_names_one_string="${model_file_names_one_string} ${TOP_MODEL_DIR_NAME}/${REGION_NAMES[$i]}/model.weights.h5"
+    patch_start_rows_one_string="${patch_start_rows_one_string} ${PATCH_START_ROWS[$i]}"
+    patch_start_columns_one_string="${patch_start_columns_one_string} ${PATCH_START_COLUMNS[$i]}"
 done
 
 example_dir_name="${TOP_EXAMPLE_DIR_NAME}/npz_example_files"
 
+FIRST_INIT_TIME_STRINGS=("2022-01-01-00" "2022-01-06-00" "2022-01-11-00" "2022-01-16-00" "2022-01-21-00" "2022-01-26-00" "2022-01-31-00" "2022-02-05-00" "2022-02-10-00" "2022-02-15-00" "2022-02-20-00" "2022-02-25-00" "2022-03-02-00" "2022-03-07-00" "2022-03-12-00" "2022-03-17-00" "2022-03-22-00" "2022-03-27-00" "2022-04-01-00" "2022-04-06-00" "2022-04-11-00" "2022-04-16-00" "2022-04-21-00" "2022-04-26-00" "2022-05-01-00" "2022-05-06-00" "2022-05-11-00" "2022-05-16-00" "2022-05-21-00" "2022-05-26-00" "2022-05-31-00" "2022-06-05-00" "2022-06-10-00" "2022-06-15-00" "2022-06-20-00" "2022-06-25-00" "2022-06-30-00" "2022-07-05-00" "2022-07-10-00" "2022-07-15-00" "2022-07-20-00" "2022-07-25-00" "2022-07-30-00" "2022-08-04-00" "2022-08-09-00" "2022-08-14-00" "2022-08-19-00" "2022-08-24-00" "2022-08-29-00" "2022-09-03-00" "2022-09-08-00" "2022-09-13-00" "2022-09-18-00" "2022-09-23-00" "2022-09-28-00" "2022-10-03-00" "2022-10-08-00" "2022-10-13-00" "2022-10-18-00" "2022-10-23-00" "2022-10-28-00" "2022-11-01-00" "2022-11-06-00" "2022-11-11-00" "2022-11-16-00" "2022-11-21-00" "2022-11-26-00" "2022-12-01-00" "2022-12-06-00" "2022-12-11-00" "2022-12-16-00" "2022-12-21-00" "2022-12-26-00" "2022-12-31-00")
+LAST_INIT_TIME_STRINGS=("2022-01-01-18" "2022-01-06-18" "2022-01-11-18" "2022-01-16-18" "2022-01-21-18" "2022-01-26-18" "2022-01-31-18" "2022-02-05-18" "2022-02-10-18" "2022-02-15-18" "2022-02-20-18" "2022-02-25-18" "2022-03-02-18" "2022-03-07-18" "2022-03-12-18" "2022-03-17-18" "2022-03-22-18" "2022-03-27-18" "2022-04-01-18" "2022-04-06-18" "2022-04-11-18" "2022-04-16-18" "2022-04-21-18" "2022-04-26-18" "2022-05-01-18" "2022-05-06-18" "2022-05-11-18" "2022-05-16-18" "2022-05-21-18" "2022-05-26-18" "2022-05-31-18" "2022-06-05-18" "2022-06-10-18" "2022-06-15-18" "2022-06-20-18" "2022-06-25-18" "2022-06-30-18" "2022-07-05-18" "2022-07-10-18" "2022-07-15-18" "2022-07-20-18" "2022-07-25-18" "2022-07-30-18" "2022-08-04-18" "2022-08-09-18" "2022-08-14-18" "2022-08-19-18" "2022-08-24-18" "2022-08-29-18" "2022-09-03-18" "2022-09-08-18" "2022-09-13-18" "2022-09-18-18" "2022-09-23-18" "2022-09-28-18" "2022-10-03-18" "2022-10-08-18" "2022-10-13-18" "2022-10-18-18" "2022-10-23-18" "2022-10-28-18" "2022-11-01-18" "2022-11-06-18" "2022-11-11-18" "2022-11-16-18" "2022-11-21-18" "2022-11-26-18" "2022-12-01-18" "2022-12-06-18" "2022-12-11-18" "2022-12-16-18" "2022-12-21-18" "2022-12-26-18" "2022-12-31-18")
+
 python3 -u "${CODE_DIR_NAME}/apply_many_single_patch_nns_to_example_files.py" \
 --input_model_file_names ${model_file_names_one_string} \
+--patch_buffer_size_px=64 \
+--patch_start_row_by_model ${patch_start_rows_one_string} \
+--patch_start_column_by_model ${patch_start_columns_one_string} \
 --input_example_dir_name="${example_dir_name}" \
---first_init_time_string="2022-01-01-00" \
---last_init_time_string="2022-12-31-18" \
+--first_init_time_string="${FIRST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
+--last_init_time_string="${LAST_INIT_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
 --use_ema=0 \
 --save_ensemble_mean_only=1 \
 --output_dir_name="${TOP_MODEL_DIR_NAME}/stitched/validation_full_grid"

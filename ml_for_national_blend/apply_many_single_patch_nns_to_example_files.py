@@ -27,6 +27,9 @@ NUM_EXAMPLES_PER_BATCH = 5
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 MODEL_FILES_ARG_NAME = 'input_model_file_names'
+PATCH_BUFFER_SIZE_ARG_NAME = 'patch_buffer_size_px'
+PATCH_START_ROWS_ARG_NAME = 'patch_start_row_by_model'
+PATCH_START_COLUMNS_ARG_NAME = 'patch_start_column_by_model'
 EXAMPLE_DIR_ARG_NAME = 'input_example_dir_name'
 INIT_TIME_ARG_NAME = 'init_time_string'
 FIRST_INIT_TIME_ARG_NAME = 'first_init_time_string'
@@ -39,6 +42,21 @@ MODEL_FILES_HELP_STRING = (
     'List of paths to trained models.  Each model will be read by '
     '`neural_net_utils.read_model`, and each should cover a single patch '
     '(subdomain) of the full NBM grid.'
+)
+PATCH_BUFFER_SIZE_HELP_STRING = (
+    'Size of buffer zone between inner (target) and outer (predictor) domains.'
+    '  Units are number of pixels on the 2.5-km NBM grid.'
+)
+PATCH_START_ROWS_HELP_STRING = (
+    'List with the same length as {0:s}, where {1:s}[k] is the first row in '
+    'the subdomain covered by the [k]th model.  This should be a row index on '
+    'the 2.5-km NBM grid, and it should be the first row in the outer domain, '
+    'not the inner domain.'
+).format(
+    MODEL_FILES_ARG_NAME, PATCH_START_ROWS_ARG_NAME
+)
+PATCH_START_COLUMNS_HELP_STRING = 'Same as {0:s} but for columns.'.format(
+    PATCH_START_ROWS_ARG_NAME
 )
 EXAMPLE_DIR_HELP_STRING = (
     'Path to directory with processed .npz files.  The relevant file (for the '
@@ -83,6 +101,18 @@ INPUT_ARG_PARSER.add_argument(
     help=MODEL_FILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_BUFFER_SIZE_ARG_NAME, type=int, required=True,
+    help=PATCH_BUFFER_SIZE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_START_ROWS_ARG_NAME, type=int, nargs='+', required=True,
+    help=PATCH_START_ROWS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_START_COLUMNS_ARG_NAME, type=int, nargs='+', required=True,
+    help=PATCH_START_COLUMNS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + EXAMPLE_DIR_ARG_NAME, type=str, required=True,
     help=EXAMPLE_DIR_HELP_STRING
 )
@@ -113,7 +143,8 @@ INPUT_ARG_PARSER.add_argument(
 
 
 def _apply_nns_one_init_time(
-        model_objects, model_file_names, example_dir_name,
+        model_objects, model_file_names, patch_buffer_size_px,
+        patch_start_row_by_model, patch_start_column_by_model, example_dir_name,
         init_time_unix_sec, save_ensemble_mean_only, output_dir_name):
     """Applies suite of neural nets to one forecast-init time.
 
@@ -122,7 +153,10 @@ def _apply_nns_one_init_time(
     :param model_objects: length-A list of trained models (instances of
         `keras.models.Model` or `keras.models.Sequential`).
     :param model_file_names: length-A list of paths to model files.
-    :param example_dir_name: See documentation at top of this script.
+    :param patch_buffer_size_px: See documentation at top of this script.
+    :param patch_start_row_by_model: Same.
+    :param patch_start_column_by_model: Same.
+    :param example_dir_name: Same.
     :param init_time_unix_sec: Same.
     :param save_ensemble_mean_only: Same.
     :param output_dir_name: Same.
@@ -165,9 +199,12 @@ def _apply_nns_one_init_time(
 
     prediction_matrix = nn_utils.apply_many_single_patch_models(
         model_objects=model_objects,
+        model_metadata_dicts=model_metadata_dicts,
         full_predictor_matrices=predictor_matrices,
         num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
-        model_metadata_dicts=model_metadata_dicts,
+        patch_buffer_size_px=patch_buffer_size_px,
+        patch_start_row_by_model=patch_start_row_by_model,
+        patch_start_column_by_model=patch_start_column_by_model,
         verbose=True
     )
 
@@ -197,7 +234,9 @@ def _apply_nns_one_init_time(
     )
 
 
-def _run(model_file_names, example_dir_name, init_time_string,
+def _run(model_file_names, patch_buffer_size_px,
+         patch_start_row_by_model, patch_start_column_by_model,
+         example_dir_name, init_time_string,
          first_init_time_string, last_init_time_string,
          use_ema, save_ensemble_mean_only, output_dir_name):
     """Applies many single-patch NNs to pre-processed .npz files.
@@ -205,6 +244,9 @@ def _run(model_file_names, example_dir_name, init_time_string,
     This is effectively the main method.
 
     :param model_file_names: See documentation at top of this script.
+    :param patch_buffer_size_px: Same.
+    :param patch_start_row_by_model: Same.
+    :param patch_start_column_by_model: Same.
     :param example_dir_name: Same.
     :param init_time_string: Same.
     :param first_init_time_string: Same.
@@ -247,6 +289,9 @@ def _run(model_file_names, example_dir_name, init_time_string,
             _apply_nns_one_init_time(
                 model_objects=model_objects,
                 model_file_names=model_file_names,
+                patch_buffer_size_px=patch_buffer_size_px,
+                patch_start_row_by_model=patch_start_row_by_model,
+                patch_start_column_by_model=patch_start_column_by_model,
                 example_dir_name=example_dir_name,
                 init_time_unix_sec=this_init_time_unix_sec,
                 save_ensemble_mean_only=save_ensemble_mean_only,
@@ -261,6 +306,15 @@ if __name__ == '__main__':
 
     _run(
         model_file_names=getattr(INPUT_ARG_OBJECT, MODEL_FILES_ARG_NAME),
+        patch_buffer_size_px=getattr(
+            INPUT_ARG_OBJECT, PATCH_BUFFER_SIZE_ARG_NAME
+        ),
+        patch_start_row_by_model=numpy.array(
+            getattr(INPUT_ARG_OBJECT, PATCH_START_ROWS_ARG_NAME), dtype=int
+        ),
+        patch_start_column_by_model=numpy.array(
+            getattr(INPUT_ARG_OBJECT, PATCH_START_COLUMNS_ARG_NAME), dtype=int
+        ),
         example_dir_name=getattr(INPUT_ARG_OBJECT, EXAMPLE_DIR_ARG_NAME),
         init_time_string=getattr(INPUT_ARG_OBJECT, INIT_TIME_ARG_NAME),
         first_init_time_string=getattr(
