@@ -758,8 +758,8 @@ def check_generator_args(option_dict):
         )
 
     use_recent_biases = not (
-            option_dict[RECENT_BIAS_LAG_TIMES_KEY] is None
-            or option_dict[RECENT_BIAS_LEAD_TIMES_KEY] is None
+        option_dict[RECENT_BIAS_LAG_TIMES_KEY] is None
+        or option_dict[RECENT_BIAS_LEAD_TIMES_KEY] is None
     )
 
     if use_recent_biases:
@@ -788,8 +788,8 @@ def check_generator_args(option_dict):
         )
 
         lookahead_times_hours = (
-                option_dict[RECENT_BIAS_LEAD_TIMES_KEY] -
-                option_dict[RECENT_BIAS_LAG_TIMES_KEY]
+            option_dict[RECENT_BIAS_LEAD_TIMES_KEY] -
+            option_dict[RECENT_BIAS_LAG_TIMES_KEY]
         )
         error_checking.assert_is_leq_numpy_array(lookahead_times_hours, 0)
 
@@ -836,24 +836,24 @@ def check_generator_args(option_dict):
         error_checking.assert_is_geq(option_dict[PATCH_START_COLUMN_KEY], 0)
 
     predict_dewpoint_depression = (
-            urma_utils.DEWPOINT_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        urma_utils.DEWPOINT_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
     )
     if predict_dewpoint_depression:
         assert (
-                urma_utils.TEMPERATURE_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+            urma_utils.TEMPERATURE_2METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
         option_dict[TARGET_FIELDS_KEY].remove(urma_utils.DEWPOINT_2METRE_NAME)
         option_dict[TARGET_FIELDS_KEY].append(urma_utils.DEWPOINT_2METRE_NAME)
 
     predict_gust_excess = (
-            urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+        urma_utils.WIND_GUST_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
     )
     if predict_gust_excess:
         assert (
-                urma_utils.U_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+            urma_utils.U_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
         assert (
-                urma_utils.V_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
+            urma_utils.V_WIND_10METRE_NAME in option_dict[TARGET_FIELDS_KEY]
         )
         option_dict[TARGET_FIELDS_KEY].remove(urma_utils.WIND_GUST_10METRE_NAME)
         option_dict[TARGET_FIELDS_KEY].append(urma_utils.WIND_GUST_10METRE_NAME)
@@ -994,7 +994,7 @@ def check_u_net_generator_args(option_dict):
     # If predicting dewpoint depression, make this the last target field in the
     # list.
     predict_dewpoint_depression = (
-            urma_utils.DEWPOINT_2METRE_NAME in target_field_names
+        urma_utils.DEWPOINT_2METRE_NAME in target_field_names
     )
     if predict_dewpoint_depression:
         assert urma_utils.TEMPERATURE_2METRE_NAME in target_field_names
@@ -1003,7 +1003,7 @@ def check_u_net_generator_args(option_dict):
 
     # If predicting gust excess, make this the last target field in the list.
     predict_gust_excess = (
-            urma_utils.WIND_GUST_10METRE_NAME in target_field_names
+        urma_utils.WIND_GUST_10METRE_NAME in target_field_names
     )
     if predict_gust_excess:
         assert urma_utils.U_WIND_10METRE_NAME in target_field_names
@@ -1316,7 +1316,7 @@ def read_targets_one_example(
         # assert target_norm_param_table_xarray is not None
 
     target_valid_time_unix_sec = (
-            init_time_unix_sec + HOURS_TO_SECONDS * target_lead_time_hours
+        init_time_unix_sec + HOURS_TO_SECONDS * target_lead_time_hours
     )
     target_valid_date_string = time_conversion.unix_sec_to_string(
         target_valid_time_unix_sec, urma_io.DATE_FORMAT
@@ -1688,8 +1688,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = u_net_architecture_dict
 
         for this_key in [
-            u_net_architecture.LOSS_FUNCTION_KEY,
-            u_net_architecture.OPTIMIZER_FUNCTION_KEY
+                u_net_architecture.LOSS_FUNCTION_KEY,
+                u_net_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -1714,8 +1714,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = chiu_net_architecture_dict
 
         for this_key in [
-            chiu_net_architecture.LOSS_FUNCTION_KEY,
-            chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_net_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -1741,8 +1741,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = chiu_net_pp_architecture_dict
 
         for this_key in [
-            chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
-            chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -1770,8 +1770,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = chiu_next_pp_architecture_dict
 
         for this_key in [
-            chiu_next_pp_architecture.LOSS_FUNCTION_KEY,
-            chiu_next_pp_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_next_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_next_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -1799,8 +1799,8 @@ def read_model(hdf5_file_name, for_inference):
         arch_dict = chiu_next_ppp_architecture_dict
 
         for this_key in [
-            chiu_next_ppp_architecture.LOSS_FUNCTION_KEY,
-            chiu_next_ppp_architecture.OPTIMIZER_FUNCTION_KEY
+                chiu_next_ppp_architecture.LOSS_FUNCTION_KEY,
+                chiu_next_ppp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
@@ -1838,8 +1838,10 @@ def read_model(hdf5_file_name, for_inference):
 
 
 def apply_many_single_patch_models(
-        model_objects, full_predictor_matrices, num_examples_per_batch,
-        model_metadata_dicts, verbose=True):
+        model_objects, model_metadata_dicts, full_predictor_matrices,
+        num_examples_per_batch, patch_buffer_size_px,
+        patch_start_row_by_model, patch_start_column_by_model,
+        verbose=True):
     """Stitches together predictions from many single-patch (subdomain) models.
 
     A = number of models
@@ -1852,11 +1854,19 @@ def apply_many_single_patch_models(
 
     :param model_objects: length-A list of trained neural nets (instances of
         `keras.models.Model`).
+    :param model_metadata_dicts: length-A list of dictionaries returned by
+        `neural_net_utils.read_metafile`.
     :param full_predictor_matrices: See output doc for
         `neural_net_training_simple.data_generator`.
     :param num_examples_per_batch: Batch size.
-    :param model_metadata_dicts: length-A list of dictionaries returned by
-        `neural_net_utils.read_metafile`.
+    :param patch_buffer_size_px: Size of buffer zone between inner (target) and
+        outer (predictor) domains.  Units are number of pixels on the 2.5-km NBM
+        grid.
+    :param patch_start_row_by_model: length-A numpy array, where
+        patch_start_row_by_model[k] is the first row in the subdomain covered by
+        the [k]th model.  This should be a row index on the 2.5-km NBM grid, and
+        it should be the first row in the outer domain, not the inner domain.
+    :param patch_start_column_by_model: Same as above but for columns.
     :param verbose: Boolean flag.  If True, will print progress messages.
     :return: prediction_matrix: E-by-M-by-N-by-F-by-S numpy array of predicted
         values.
@@ -1869,45 +1879,49 @@ def apply_many_single_patch_models(
     error_checking.assert_is_list(model_metadata_dicts)
     assert len(model_metadata_dicts) == num_models
 
+    error_checking.assert_is_integer(patch_buffer_size_px)
+    error_checking.assert_is_greater(patch_buffer_size_px, 0)
+
+    error_checking.assert_is_integer_numpy_array(patch_start_row_by_model)
+    error_checking.assert_is_geq_numpy_array(patch_start_row_by_model, 0)
+    error_checking.assert_is_numpy_array(
+        patch_start_row_by_model,
+        exact_dimensions=numpy.array([num_models], dtype=int)
+    )
+    error_checking.assert_equals(
+        len(patch_start_row_by_model),
+        len(numpy.unique(patch_start_row_by_model))
+    )
+
+    error_checking.assert_is_integer_numpy_array(patch_start_column_by_model)
+    error_checking.assert_is_geq_numpy_array(patch_start_column_by_model, 0)
+    error_checking.assert_is_numpy_array(
+        patch_start_column_by_model,
+        exact_dimensions=numpy.array([num_models], dtype=int)
+    )
+    error_checking.assert_equals(
+        len(patch_start_column_by_model),
+        len(numpy.unique(patch_start_column_by_model))
+    )
+
     error_checking.assert_is_boolean(verbose)
 
     # Do actual stuff.
     num_rows_2pt5km = len(nbm_utils.NBM_Y_COORDS_METRES)
     num_columns_2pt5km = len(nbm_utils.NBM_X_COORDS_METRES)
 
-    patch_buffer_size = -1
     target_field_names = []
-    patch_start_row_by_model = numpy.full(num_models, -1, dtype=int)
-    patch_start_column_by_model = numpy.full(num_models, -1, dtype=int)
-    patch_size_by_model = numpy.full(num_models, -1, dtype=int)
+    patch_size_by_model_px = numpy.full(num_models, -1, dtype=int)
 
     for k in range(num_models):
         this_vod = model_metadata_dicts[k][VALIDATION_OPTIONS_KEY]
-        this_buffer_size = this_vod[PATCH_BUFFER_SIZE_KEY]
         these_field_names = this_vod[TARGET_FIELDS_KEY]
-
         if k == 0:
-            patch_buffer_size = this_buffer_size + 0
             target_field_names = copy.deepcopy(these_field_names)
 
-        assert this_buffer_size == patch_buffer_size
         assert these_field_names == target_field_names
 
-        patch_start_row_by_model[k] = this_vod[PATCH_START_ROW_KEY]
-        patch_start_column_by_model[k] = this_vod[PATCH_START_COLUMN_KEY]
-        patch_size_by_model[k] = this_vod[PATCH_SIZE_KEY]
-
-    assert numpy.all(patch_start_row_by_model >= 0)
-    assert numpy.all(patch_start_column_by_model >= 0)
-    assert numpy.all(patch_size_by_model > 0)
-    assert (
-        len(patch_start_row_by_model) ==
-        len(numpy.unique(patch_start_row_by_model))
-    )
-    assert (
-        len(patch_start_column_by_model) ==
-        len(numpy.unique(patch_start_column_by_model))
-    )
+        patch_size_by_model_px[k] = model_objects[k].layers[-1].output.shape[1]
 
     num_target_fields = len(target_field_names)
     num_examples = full_predictor_matrices[0].shape[0]
@@ -1923,9 +1937,9 @@ def apply_many_single_patch_models(
     for k in range(num_models):
         if verbose:
             i_start = patch_start_row_by_model[k] + 0
-            i_end = i_start + patch_size_by_model[k] - 1
+            i_end = i_start + patch_size_by_model_px[k] - 1
             j_start = patch_start_column_by_model[k] + 0
-            j_end = j_start + patch_size_by_model[k] - 1
+            j_end = j_start + patch_size_by_model_px[k] - 1
 
             print((
                 'Applying {0:d}th of {1:d} models '
@@ -1947,9 +1961,9 @@ def apply_many_single_patch_models(
             assert this_downsampling_factor in POSSIBLE_DOWNSAMPLING_FACTORS
 
             i_start = patch_start_row_by_model[k] + 0
-            i_end = i_start + patch_size_by_model[k]
+            i_end = i_start + patch_size_by_model_px[k]
             j_start = patch_start_column_by_model[k] + 0
-            j_end = j_start + patch_size_by_model[k]
+            j_end = j_start + patch_size_by_model_px[k]
 
             i_start = i_start // this_downsampling_factor
             i_end = i_end // this_downsampling_factor
@@ -1991,13 +2005,13 @@ def apply_many_single_patch_models(
             summed_prediction_matrix = numpy.full(these_dim, 0.)
 
         i_start = patch_start_row_by_model[k] + 0
-        i_end = i_start + patch_size_by_model[k]
+        i_end = i_start + patch_size_by_model_px[k]
         j_start = patch_start_column_by_model[k] + 0
-        j_end = j_start + patch_size_by_model[k]
+        j_end = j_start + patch_size_by_model_px[k]
 
         weight_matrix = patch_buffer_to_mask(
-            patch_size_2pt5km_pixels=patch_size_by_model[k],
-            patch_buffer_size_2pt5km_pixels=patch_buffer_size
+            patch_size_2pt5km_pixels=patch_size_by_model_px[k],
+            patch_buffer_size_2pt5km_pixels=patch_buffer_size_px
         )
         weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
         weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
