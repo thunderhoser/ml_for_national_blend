@@ -1892,10 +1892,6 @@ def apply_many_single_patch_models(
         patch_start_row_by_model,
         exact_dimensions=numpy.array([num_models], dtype=int)
     )
-    error_checking.assert_equals(
-        len(patch_start_row_by_model),
-        len(numpy.unique(patch_start_row_by_model))
-    )
 
     error_checking.assert_is_integer_numpy_array(patch_start_column_by_model)
     error_checking.assert_is_geq_numpy_array(patch_start_column_by_model, 0)
@@ -1903,9 +1899,13 @@ def apply_many_single_patch_models(
         patch_start_column_by_model,
         exact_dimensions=numpy.array([num_models], dtype=int)
     )
+
+    patch_start_rowcol_matrix = numpy.transpose(numpy.vstack(
+        [patch_start_row_by_model, patch_start_column_by_model]
+    ))
     error_checking.assert_equals(
-        len(patch_start_column_by_model),
-        len(numpy.unique(patch_start_column_by_model))
+        patch_start_rowcol_matrix.shape[0],
+        numpy.unique(patch_start_rowcol_matrix, axis=0).shape[0]
     )
 
     error_checking.assert_is_boolean(verbose)
