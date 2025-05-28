@@ -21,6 +21,7 @@ $version="0.2";
 
 # ***** if wgrib2 is not on path, add it here
 $wgrib2='wgrib2';
+# $wgrib2='/home/ralager/wgrib2/grib2/wgrib2/wgrib2';
 
 if ($#ARGV != 0) {
    print "grid_defn.pl version$version\n";
