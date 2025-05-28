@@ -12,13 +12,12 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=24:00:00
-#SBATCH --array=0-39
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_to_prediction_files_%A_%a.out
+#SBATCH --output=convert_to_prediction_files_%A.out
 
 conda init
 conda activate base
@@ -33,23 +32,14 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
 NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_data/processed"
 URMA_DIRECTORY_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed"
-PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regional_models/36hours"
-
-PATCH_START_ROWS=("64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152" "64" "336" "608" "880" "1152")
-PATCH_START_COLUMNS=("64" "64" "64" "64" "64" "336" "336" "336" "336" "336" "608" "608" "608" "608" "608" "880" "880" "880" "880" "880" "1152" "1152" "1152" "1152" "1152" "1424" "1424" "1424" "1424" "1424" "1696" "1696" "1696" "1696" "1696" "1904" "1904" "1904" "1904" "1904")
-REGION_NAMES=("region1-1" "region2-1" "region3-1" "region4-1" "region5-1" "region1-2" "region2-2" "region3-2" "region4-2" "region5-2" "region1-3" "region2-3" "region3-3" "region4-3" "region5-3" "region1-4" "region2-4" "region3-4" "region4-4" "region5-4" "region1-5" "region2-5" "region3-5" "region4-5" "region5-5" "region1-6" "region2-6" "region3-6" "region4-6" "region5-6" "region1-7" "region2-7" "region3-7" "region4-7" "region5-7" "region1-8" "region2-8" "region3-8" "region4-8" "region5-8")
-
-patch_start_row=${PATCH_START_ROWS[$SLURM_ARRAY_TASK_ID]}
-patch_start_column=${PATCH_START_COLUMNS[$SLURM_ARRAY_TASK_ID]}
-region_name=${REGION_NAMES[$SLURM_ARRAY_TASK_ID]}
+PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regional_models/stitched/36hours"
 
 python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
 --input_nwp_forecast_dir_name="${NWP_FORECAST_DIR_NAME}" \
 --input_urma_directory_name="${URMA_DIRECTORY_NAME}" \
 --nwp_model_name="operational_nbm" \
---nn_prediction_dir_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models/${region_name}/validation_full_grid" \
+--nn_prediction_dir_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models/stitched/validation_full_grid" \
 --lead_time_hours=36 \
---patch_size_2pt5km_pixels=368 \
---patch_start_row_2pt5km=${patch_start_row} \
---patch_start_column_2pt5km=${patch_start_column} \
---output_prediction_dir_name="${PREDICTION_DIR_NAME}/${region_name}"
+--patch_dimensions_2pt5km_pixels 1456 2208 \
+--patch_start_coords_2pt5km 64 64 \
+--output_prediction_dir_name="${PREDICTION_DIR_NAME}"
