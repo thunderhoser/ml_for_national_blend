@@ -354,8 +354,7 @@ def read_file(
         nwp_model_utils.check_field_name(this_field_name)
 
     # Do actual stuff.
-    # forecast_hour = file_name_to_forecast_hour(grib2_file_name)
-    forecast_hour = 2
+    forecast_hour = file_name_to_forecast_hour(grib2_file_name)
 
     num_grid_rows = len(desired_row_indices)
     num_grid_columns = len(desired_column_indices)
