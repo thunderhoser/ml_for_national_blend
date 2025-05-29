@@ -30,6 +30,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_data/processed"
 PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regional_models/stitched/without_edges"
 
 python3 -u "${CODE_DIR_NAME}/subset_prediction_files.py" \
