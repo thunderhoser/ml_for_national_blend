@@ -313,14 +313,14 @@ def read_file(netcdf_file_name):
         PREDICTION_KEY: (ptx[PREDICTION_KEY].dims, prediction_matrix)
     })
 
-    _, good_row_indices, good_column_indices = (
-        misc_utils.trim_nans_from_2d_matrix(
-            numpy.nanmax(target_matrix, axis=-1)
-        )
-    )
-
-    ptx = ptx.isel({ROW_DIM: good_row_indices})
-    ptx = ptx.isel({COLUMN_DIM: good_column_indices})
+    # _, good_row_indices, good_column_indices = (
+    #     misc_utils.trim_nans_from_2d_matrix(
+    #         numpy.nanmax(target_matrix, axis=-1)
+    #     )
+    # )
+    #
+    # ptx = ptx.isel({ROW_DIM: good_row_indices})
+    # ptx = ptx.isel({COLUMN_DIM: good_column_indices})
 
     prediction_table_xarray = ptx
     return prediction_table_xarray
