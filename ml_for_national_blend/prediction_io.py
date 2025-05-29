@@ -16,6 +16,7 @@ import time_periods
 import longitude_conversion as lng_conversion
 import file_system_utils
 import error_checking
+import misc_utils
 
 TOLERANCE = 1e-6
 TIME_FORMAT = '%Y-%m-%d-%H'
@@ -247,51 +248,82 @@ def read_file(netcdf_file_name):
             ptx.attrs[UNCERTAINTY_CALIB_MODEL_FILES_KEY].split(' ')
         )
 
-    if INIT_TIME_KEY not in ptx.data_vars:
-        return ptx
+    if INIT_TIME_KEY in ptx.data_vars:
+        init_times_unix_sec = ptx[INIT_TIME_KEY].values
+        assert len(init_times_unix_sec) == 1
 
-    init_times_unix_sec = ptx[INIT_TIME_KEY].values
-    assert len(init_times_unix_sec) == 1
-
-    target_matrix = ptx[TARGET_KEY].values[0, ...]
-    prediction_matrix = numpy.expand_dims(
-        ptx[PREDICTION_KEY].values[0, ...], axis=-1
-    )
-    latitude_matrix_deg_n = ptx[LATITUDE_KEY].values[0, ...]
-    longitude_matrix_deg_e = ptx[LONGITUDE_KEY].values[0, ...]
-
-    main_data_dict = {
-        TARGET_KEY: (
-            (ROW_DIM, COLUMN_DIM, FIELD_DIM),
-            target_matrix
-        ),
-        PREDICTION_KEY: (
-            (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM),
-            prediction_matrix
-        ),
-        LATITUDE_KEY: (
-            (ROW_DIM, COLUMN_DIM),
-            latitude_matrix_deg_n
-        ),
-        LONGITUDE_KEY: (
-            (ROW_DIM, COLUMN_DIM),
-            longitude_matrix_deg_e
-        ),
-        FIELD_NAME_KEY: (
-            (FIELD_DIM,),
-            target_field_names
+        target_matrix = ptx[TARGET_KEY].values[0, ...]
+        prediction_matrix = numpy.expand_dims(
+            ptx[PREDICTION_KEY].values[0, ...], axis=-1
         )
-    }
+        latitude_matrix_deg_n = ptx[LATITUDE_KEY].values[0, ...]
+        longitude_matrix_deg_e = ptx[LONGITUDE_KEY].values[0, ...]
 
-    attribute_dict = {
-        MODEL_FILE_KEY: ptx.attrs[MODEL_FILE_KEY],
-        ISOTONIC_MODEL_FILES_KEY: ptx.attrs[ISOTONIC_MODEL_FILES_KEY],
-        UNCERTAINTY_CALIB_MODEL_FILES_KEY:
-            ptx.attrs[UNCERTAINTY_CALIB_MODEL_FILES_KEY],
-        INIT_TIME_KEY: int(numpy.round(init_times_unix_sec[0]))
-    }
+        main_data_dict = {
+            TARGET_KEY: (
+                (ROW_DIM, COLUMN_DIM, FIELD_DIM),
+                target_matrix
+            ),
+            PREDICTION_KEY: (
+                (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM),
+                prediction_matrix
+            ),
+            LATITUDE_KEY: (
+                (ROW_DIM, COLUMN_DIM),
+                latitude_matrix_deg_n
+            ),
+            LONGITUDE_KEY: (
+                (ROW_DIM, COLUMN_DIM),
+                longitude_matrix_deg_e
+            ),
+            FIELD_NAME_KEY: (
+                (FIELD_DIM,),
+                target_field_names
+            )
+        }
 
-    return xarray.Dataset(data_vars=main_data_dict, attrs=attribute_dict)
+        attribute_dict = {
+            MODEL_FILE_KEY: ptx.attrs[MODEL_FILE_KEY],
+            ISOTONIC_MODEL_FILES_KEY: ptx.attrs[ISOTONIC_MODEL_FILES_KEY],
+            UNCERTAINTY_CALIB_MODEL_FILES_KEY:
+                ptx.attrs[UNCERTAINTY_CALIB_MODEL_FILES_KEY],
+            INIT_TIME_KEY: int(numpy.round(init_times_unix_sec[0]))
+        }
+
+        ptx = xarray.Dataset(data_vars=main_data_dict, attrs=attribute_dict)
+
+    target_matrix = ptx[TARGET_KEY].values
+    prediction_matrix = ptx[PREDICTION_KEY].values
+
+    target_is_nan_matrix = numpy.isnan(target_matrix)
+    target_is_nan_matrix = numpy.repeat(
+        a=numpy.expand_dims(target_is_nan_matrix, axis=-1),
+        axis=-1,
+        repeats=prediction_matrix.shape[-1]
+    )
+    prediction_matrix[target_is_nan_matrix] = numpy.nan
+
+    prediction_is_nan_matrix = numpy.all(
+        numpy.isnan(prediction_matrix), axis=-1
+    )
+    target_matrix[prediction_is_nan_matrix] = numpy.nan
+
+    ptx = ptx.assign({
+        TARGET_KEY: (ptx[TARGET_KEY].dims, target_matrix),
+        PREDICTION_KEY: (ptx[PREDICTION_KEY].dims, prediction_matrix)
+    })
+
+    _, good_row_indices, good_column_indices = (
+        misc_utils.trim_nans_from_2d_matrix(
+            numpy.nanmax(target_matrix, axis=-1)
+        )
+    )
+
+    ptx = ptx.isel({ROW_DIM: good_row_indices})
+    ptx = ptx.isel({COLUMN_DIM: good_column_indices})
+
+    prediction_table_xarray = ptx
+    return prediction_table_xarray
 
 
 def write_file(

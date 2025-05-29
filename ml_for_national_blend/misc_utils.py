@@ -433,3 +433,46 @@ def dilate_binary_matrix(binary_matrix, buffer_distance_px):
         border_value=0
     )
     return dilated_binary_matrix.astype(binary_matrix.dtype)
+
+
+def trim_nans_from_2d_matrix(input_matrix):
+    """Trims NaN values from 2-D matrix.
+
+    :param input_matrix: 2-D numpy array of floats.
+    :return: output_matrix: 2-D numpy array of floats, which may be smaller
+        than the input.
+    :return: good_row_indices: 1-D numpy array of rows that were kept from the
+        input matrix.
+    :return: good_column_indices: 1-D numpy array of columns that were kept from
+        the input matrix.
+    """
+
+    good_row_flags = numpy.invert(
+        numpy.all(numpy.isnan(input_matrix), axis=1)
+    )
+    good_column_flags = numpy.invert(
+        numpy.all(numpy.isnan(input_matrix), axis=0)
+    )
+
+    good_row_indices = numpy.where(good_row_flags)[0]
+    good_column_indices = numpy.where(good_column_flags)[0]
+
+    if len(good_row_indices) == 0 or len(good_column_indices) == 0:
+        output_matrix = numpy.zeros(shape=(0, 0))
+        return output_matrix, good_row_indices, good_column_indices
+
+    good_row_indices = numpy.linspace(
+        good_row_indices[0], good_row_indices[-1],
+        num=good_row_indices[-1] - good_row_indices[0] + 1,
+        dtype=int
+    )
+    good_column_indices = numpy.linspace(
+        good_column_indices[0], good_column_indices[-1],
+        num=good_column_indices[-1] - good_column_indices[0] + 1,
+        dtype=int
+    )
+
+    output_matrix = input_matrix[good_row_indices, :]
+    output_matrix = output_matrix[:, good_column_indices]
+
+    return output_matrix, good_row_indices, good_column_indices
