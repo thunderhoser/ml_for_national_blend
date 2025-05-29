@@ -183,13 +183,13 @@ def _run(input_prediction_dir_name, first_init_time_string,
             this_target_matrix = tptx[prediction_io.TARGET_KEY].values
             this_prediction_matrix = tptx[prediction_io.PREDICTION_KEY].values
 
-            for f in this_target_matrix.shape[-1]:
+            for f in range(this_target_matrix.shape[-1]):
                 this_target_matrix[..., f][
                     region_mask_matrix == False
                 ] = numpy.nan
 
-            for f in this_prediction_matrix.shape[-2]:
-                for e in this_prediction_matrix.shape[-1]:
+            for f in range(this_prediction_matrix.shape[-2]):
+                for e in range(this_prediction_matrix.shape[-1]):
                     this_prediction_matrix[..., f, e][
                         region_mask_matrix == False
                     ] = numpy.nan
