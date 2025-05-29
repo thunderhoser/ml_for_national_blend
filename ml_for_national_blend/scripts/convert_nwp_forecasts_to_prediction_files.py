@@ -155,12 +155,12 @@ INPUT_ARG_PARSER.add_argument(
     help=LEAD_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + PATCH_DIMENSIONS_ARG_NAME, type=int, required=False, default=[-1],
-    help=PATCH_DIMENSIONS_HELP_STRING
+    '--' + PATCH_DIMENSIONS_ARG_NAME, type=int, nargs='+', required=False,
+    default=[-1], help=PATCH_DIMENSIONS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + PATCH_START_COORDS_ARG_NAME, type=int, required=False, default=[-1],
-    help=PATCH_START_COORDS_HELP_STRING
+    '--' + PATCH_START_COORDS_ARG_NAME, type=int, nargs='+', required=False,
+    default=[-1], help=PATCH_START_COORDS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,

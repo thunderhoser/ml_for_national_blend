@@ -803,6 +803,24 @@ def _get_scores_one_replicate(
             prediction_matrix, axis=0
         )
     else:
+        # matchy_target_matrix = target_matrix + 0.
+        # matchy_prediction_matrix = prediction_matrix + 0.
+        # matchy_target_matrix[numpy.isnan(matchy_prediction_matrix)] = numpy.nan
+        # matchy_prediction_matrix[numpy.isnan(matchy_target_matrix)] = numpy.nan
+        #
+        # t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
+        #     matchy_target_matrix, ddof=1, axis=(0, 1, 2)
+        # )
+        # t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
+        #     matchy_prediction_matrix, ddof=1, axis=(0, 1, 2)
+        # )
+        # t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
+        #     matchy_target_matrix, axis=(0, 1, 2)
+        # )
+        # t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
+        #     matchy_prediction_matrix, axis=(0, 1, 2)
+        # )
+
         t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
             target_matrix, ddof=1, axis=(0, 1, 2)
         )
