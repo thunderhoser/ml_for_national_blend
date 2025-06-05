@@ -9,8 +9,8 @@ Storage System (HPSS) with the following options:
 - Full resolution
 - Variables: all keys in list `nwp_model_utils.ALL_FIELD_NAMES`
 
-The output will contain the same data, in zarr format, with one file per model
-run (init time).
+The output will contain the same data, in NetCDF format, with one file per model
+run (init timw) per forecast hour (lead time).
 """
 
 import os
@@ -44,7 +44,7 @@ START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
-OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
+OUTPUT_DIR_ARG_NAME = 'output_netcdf_dir_name'
 
 INPUT_DIR_HELP_STRING = (
     'Path to input directory, containing one GRIB2 file per model run '
