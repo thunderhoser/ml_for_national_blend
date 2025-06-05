@@ -10,7 +10,7 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=01:00:00
-#SBATCH --array=0-79
+#SBATCH --array=0-99
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -29,20 +29,20 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment18_high_res_ensemble"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment23_full_domain"
 TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
-MODEL_NAME_SETS_ONE_STRING=("ensemble_hrrr_wrf-arw" "ensemble_hrrr_nam-nest" "ensemble_hrrr_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest" "ensemble_wrf-arw_gridded-gfs-mos" "ensemble_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest" "hrrr_wrf-arw_gridded-gfs-mos" "hrrr_nam-nest_gridded-gfs-mos" "wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest" "ensemble_hrrr_wrf-arw_gridded-gfs-mos" "ensemble_hrrr_nam-nest_gridded-gfs-mos" "ensemble_wrf-arw_nam-nest_gridded-gfs-mos" "hrrr_wrf-arw_nam-nest_gridded-gfs-mos" "ensemble_hrrr_wrf-arw_nam-nest_gridded-gfs-mos")
+MODEL_DESCRIPTION_STRINGS=("adamw/random_seed0" "adamw/random_seed1" "adamw/random_seed2" "adamw/random_seed3" "adamw/random_seed4" "adamw_cycle050/random_seed0" "adamw_cycle050/random_seed1" "adamw_cycle050/random_seed2" "adamw_cycle050/random_seed3" "adamw_cycle050/random_seed4" "adamw_cycle100/random_seed0" "adamw_cycle100/random_seed1" "adamw_cycle100/random_seed2" "adamw_cycle100/random_seed3" "adamw_cycle100/random_seed4" "adamw_cycle200/random_seed0" "adamw_cycle200/random_seed1" "adamw_cycle200/random_seed2" "adamw_cycle200/random_seed3" "adamw_cycle200/random_seed4")
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
 
-num_rows=${#MODEL_NAME_SETS_ONE_STRING[@]}
+num_rows=${#MODEL_DESCRIPTION_STRINGS[@]}
 num_columns=${#TARGET_FIELD_NAMES[@]}
 
 i=$(( SLURM_ARRAY_TASK_ID / num_columns ))
 j=$(( SLURM_ARRAY_TASK_ID % num_columns ))
 
 target_field_name=${TARGET_FIELD_NAMES[$j]}
-model_dir_name="${TOP_MODEL_DIR_NAME}/nwp-inputs=${MODEL_NAME_SETS_ONE_STRING[$i]}"
+model_dir_name="${TOP_MODEL_DIR_NAME}/${MODEL_DESCRIPTION_STRINGS[$i]}"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
