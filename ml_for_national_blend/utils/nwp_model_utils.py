@@ -1203,6 +1203,101 @@ def old_gfs_or_gefs_precip_from_incr_to_full(nwp_forecast_table_xarray,
     return nwp_forecast_table_xarray
 
 
+def real_time_precip_from_incr_to_full(
+        nwp_forecast_table_xarray, model_name, init_time_unix_sec,
+        be_lenient_with_forecast_hours=False):
+    """Same as precip_from_incremental_to_full_run but for real-time data.
+
+    "Real-time data" = data encountered at inference time
+
+    :param nwp_forecast_table_xarray: xarray table with NWP forecasts.
+    :param model_name: Name of NWP model.
+    :param init_time_unix_sec: Initialization time.
+    :param be_lenient_with_forecast_hours: Boolean flag.
+    :return: nwp_forecast_table_xarray: Same as input but with full-run precip.
+    """
+
+    check_model_name(model_name=model_name, allow_ensemble=False)
+    assert model_name not in [GFS_MODEL_NAME, HRRR_MODEL_NAME, ECMWF_MODEL_NAME]
+    error_checking.assert_is_boolean(be_lenient_with_forecast_hours)
+
+    forecast_hours = nwp_forecast_table_xarray.coords[FORECAST_HOUR_DIM].values
+    all_forecast_hours = model_to_forecast_hours(
+        model_name=model_name, init_time_unix_sec=init_time_unix_sec
+    )
+
+    if be_lenient_with_forecast_hours:
+        all_forecast_hours = all_forecast_hours[
+            all_forecast_hours <= numpy.max(forecast_hours)
+        ]
+
+    assert numpy.all(numpy.isin(
+        element=all_forecast_hours,
+        test_elements=forecast_hours
+    ))
+
+    data_matrix = nwp_forecast_table_xarray[DATA_KEY].values
+    num_forecast_hours = len(forecast_hours)
+
+    for j in range(num_forecast_hours)[::-1]:
+        if model_name in [
+            WRF_ARW_MODEL_NAME, NAM_MODEL_NAME,
+            RAP_MODEL_NAME, GRIDDED_MOS_MODEL_NAME
+        ]:
+            addend_indices = numpy.where(forecast_hours <= forecast_hours[j])[0]
+        elif model_name == NAM_NEST_MODEL_NAME:
+            addend_flags = numpy.logical_or(
+                numpy.mod(forecast_hours, 3) == 0,
+                forecast_hours == forecast_hours[j]
+            )
+            addend_flags = numpy.logical_and(
+                addend_flags, forecast_hours <= forecast_hours[j]
+            )
+            addend_indices = numpy.where(addend_flags)[0]
+        elif model_name == GEFS_MODEL_NAME:
+            addend_flags = numpy.logical_or(
+                numpy.mod(forecast_hours, 6) == 0,
+                forecast_hours == forecast_hours[j]
+            )
+            addend_flags = numpy.logical_and(
+                addend_flags, forecast_hours <= forecast_hours[j]
+            )
+            addend_indices = numpy.where(addend_flags)[0]
+        else:
+            addend_indices = None
+
+        for this_field_name in [PRECIP_NAME]:
+            k = numpy.where(
+                nwp_forecast_table_xarray.coords[FIELD_DIM].values ==
+                this_field_name
+            )[0][0]
+
+            print((
+                'Adding incremental precip from forecast hours {0:s} to get '
+                'full-run precip at forecast hour {1:d}...'
+            ).format(
+                str(forecast_hours[addend_indices]),
+                forecast_hours[j]
+            ))
+
+            data_matrix[j, ..., k] = numpy.sum(
+                data_matrix[addend_indices, ..., k], axis=0
+            )
+
+    try:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign({
+            DATA_KEY: (
+                nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix
+            )
+        })
+    except:
+        nwp_forecast_table_xarray = nwp_forecast_table_xarray.assign(
+            DATA_KEY=(nwp_forecast_table_xarray[DATA_KEY].dims, data_matrix)
+        )
+
+    return nwp_forecast_table_xarray
+
+
 def remove_negative_precip(nwp_forecast_table_xarray):
     """Removes negative precip accumulations.
 
