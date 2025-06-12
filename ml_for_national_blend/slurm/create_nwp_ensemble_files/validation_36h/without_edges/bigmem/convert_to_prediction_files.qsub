@@ -37,7 +37,7 @@ PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regi
 python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
 --input_nwp_forecast_dir_name="${NWP_FORECAST_DIR_NAME}" \
 --input_urma_directory_name="${URMA_DIRECTORY_NAME}" \
---nwp_model_name="operational_nbm" \
+--nwp_model_name="ensemble" \
 --nn_prediction_dir_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models/stitched/validation_full_grid" \
 --lead_time_hours=36 \
 --patch_dimensions_2pt5km_pixels 1456 2208 \
