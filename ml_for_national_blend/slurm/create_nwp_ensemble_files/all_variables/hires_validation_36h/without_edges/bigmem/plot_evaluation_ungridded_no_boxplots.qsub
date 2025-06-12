@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH --job-name="plot_evaluation_ungridded_no_boxplots"
-#SBATCH --partition="fge"
+#SBATCH --partition="bigmem"
 #SBATCH --account="mdl-sti"
-#SBATCH --qos="gpuwf"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
@@ -29,7 +29,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
-PREDICTION_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid/prediction_files/36hours"
+PREDICTION_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/high_res_ensemble_all_variables/processed/interp_to_nbm_grid/prediction_files/experiment22_regional_models/stitched/without_edges"
 TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
 TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")

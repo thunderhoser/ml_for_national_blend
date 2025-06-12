@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#SBATCH --job-name="subset_prediction_files"
+#SBATCH --partition="fge"
+#SBATCH --account="mdl-sti"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=subset_prediction_files_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_standalone/ml_for_national_blend"
+NWP_FORECAST_DIR_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nwp_model_data_final/ensemble/processed/interp_to_nbm_grid"
+PREDICTION_DIR_NAME="${NWP_FORECAST_DIR_NAME}/prediction_files/experiment22_regional_models/stitched/without_edges"
+
+python3 -u "${CODE_DIR_NAME}/subset_prediction_files.py" \
+--input_prediction_dir_name="${PREDICTION_DIR_NAME}" \
+--first_init_time_string="2022-01-01-00" \
+--last_init_time_string="2022-12-31-18" \
+--region_mask_file_name="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/nbm_without_edges_mask.nc" \
+--output_prediction_dir_name="${PREDICTION_DIR_NAME}"
