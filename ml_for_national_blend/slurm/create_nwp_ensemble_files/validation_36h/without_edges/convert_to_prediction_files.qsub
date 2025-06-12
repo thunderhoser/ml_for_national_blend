@@ -40,6 +40,4 @@ python3 -u "${CODE_DIR_NAME}/convert_nwp_forecasts_to_prediction_files.py" \
 --nwp_model_name="ensemble" \
 --nn_prediction_dir_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_blend_models/experiment22_regional_models/stitched/validation_full_grid" \
 --lead_time_hours=36 \
---patch_dimensions_2pt5km_pixels 1456 2208 \
---patch_start_coords_2pt5km 64 64 \
 --output_prediction_dir_name="${PREDICTION_DIR_NAME}"
