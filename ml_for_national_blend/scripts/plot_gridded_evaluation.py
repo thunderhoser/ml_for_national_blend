@@ -727,7 +727,7 @@ def _run(eval_file_name_or_pattern, by_month, by_hour,
 
                 title_string = (
                     '{0:s}{1:s} for {2:s}{3:s}\n'
-                    'Min/avg/max = {4:.2g}, {5:.2g}, {6:.2g}'
+                    'Min/avg/max = {4:.3f}, {5:.3f}, {6:.3f}'
                 ).format(
                     METRIC_NAME_TO_VERBOSE[metric_names[m]][0].upper(),
                     METRIC_NAME_TO_VERBOSE[metric_names[m]][1:],

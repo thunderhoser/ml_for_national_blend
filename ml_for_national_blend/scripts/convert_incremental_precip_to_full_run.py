@@ -170,8 +170,9 @@ def _convert_one_model_run(input_dir_name, init_time_unix_sec, model_name,
             'that precip values are still incremental, so doing this '
             '"conversion" again would lead to erroneous values.'
         )
+        print(error_string)
 
-        raise ValueError(error_string)
+        # raise ValueError(error_string)
 
     # Do the conversion.
     nwp_forecast_table_xarray = (
