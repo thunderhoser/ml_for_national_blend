@@ -29,6 +29,10 @@ import file_system_utils
 import error_checking
 import urma_utils
 
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+
 SENTINEL_VALUE = 9.999e20
 
 HOURS_TO_SECONDS = 3600
@@ -217,13 +221,18 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
         new_grib2_file_name = None
         grib2_file_name_to_use = grib2_file_name
 
+    grib_inventory_file_name = None
+
     for f in range(num_fields):
         grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
 
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             grib_search_string, grib2_file_name_to_use
         ))
-        this_data_matrix = grib_io.read_field_from_grib_file(
+
+        (
+            this_data_matrix, grib_inventory_file_name
+        ) = grib_io.read_field_from_grib_file(
             grib_file_name=grib2_file_name_to_use,
             field_name_grib1=grib_search_string,
             num_grid_rows=num_grid_rows,
@@ -232,6 +241,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=SENTINEL_VALUE,
+            grib_inventory_file_name=grib_inventory_file_name,
             raise_error_if_fails=True
             # field_names[f] not in wrf_arw_utils.MAYBE_MISSING_FIELD_NAMES
         )

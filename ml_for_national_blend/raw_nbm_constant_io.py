@@ -63,7 +63,7 @@ def read_file(grib2_file_name, wgrib2_exe_name, temporary_dir_name, field_name):
         temporary_dir_name=temporary_dir_name,
         sentinel_value=None,
         raise_error_if_fails=True
-    )
+    )[0]
 
     # orig_dimensions = data_matrix.shape
     # data_matrix = numpy.reshape(

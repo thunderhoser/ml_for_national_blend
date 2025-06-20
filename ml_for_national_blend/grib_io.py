@@ -223,6 +223,7 @@ def read_field_from_grib_file(
         downward (in the positive direction of the first axis).  If the grid is
         regular in lat-long, replace "x" and "y" in the previous sentence with
         "long" and "lat," respectively.
+    :return: grib_inventory_file_name: Path to inventory file.
     :raises: ValueError: if extraction fails and raise_error_if_fails = True.
     """
 
@@ -287,7 +288,7 @@ def read_field_from_grib_file(
             ).format(command_string, str(this_exception))
 
             warnings.warn(warning_string)
-            return None
+            return None, grib_inventory_file_name
 
     # Extract field to temporary file.
     # if grib_file_type == GRIB1_FILE_TYPE:
@@ -345,7 +346,7 @@ def read_field_from_grib_file(
         ).format(command_string, str(this_exception))
 
         warnings.warn(warning_string)
-        return None
+        return None, grib_inventory_file_name
 
     # Read field from temporary file.
     field_vector = numpy.loadtxt(temporary_file_name)
@@ -362,17 +363,20 @@ def read_field_from_grib_file(
             mode='constant',
             constant_values=numpy.nan
         )
-        return _sentinel_value_to_nan(
+        field_matrix = _sentinel_value_to_nan(
             data_matrix=field_matrix, sentinel_value=sentinel_value
         )
+
+        return field_matrix, grib_inventory_file_name
 
     if len(field_vector) == num_grid_columns * num_grid_rows:
         field_matrix = numpy.reshape(
             field_vector, (num_grid_rows, num_grid_columns)
         )
-        return _sentinel_value_to_nan(
+        field_matrix = _sentinel_value_to_nan(
             data_matrix=field_matrix, sentinel_value=sentinel_value
         )
+        return field_matrix, grib_inventory_file_name
 
     try:
         num_values = len(field_vector)
@@ -421,11 +425,12 @@ def read_field_from_grib_file(
         ).format(str(this_exception))
 
         warnings.warn(warning_string)
-        return None
+        return None, grib_inventory_file_name
 
-    return _sentinel_value_to_nan(
+    field_matrix = _sentinel_value_to_nan(
         data_matrix=field_matrix, sentinel_value=sentinel_value
     )
+    return field_matrix, grib_inventory_file_name
 
 
 def is_u_wind_field(field_name_grib1):

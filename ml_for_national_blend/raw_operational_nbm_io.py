@@ -169,6 +169,8 @@ def read_file(
         (num_grid_rows, num_grid_columns, num_fields), numpy.nan
     )
 
+    grib_inventory_file_name = None
+
     for f in range(num_fields):
         wind_10m_names = [
             nwp_model_utils.U_WIND_10METRE_NAME,
@@ -180,7 +182,10 @@ def read_file(
             print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
                 grib_search_string, grib2_file_name
             ))
-            speed_matrix_m_s01 = grib_io.read_field_from_grib_file(
+
+            (
+                speed_matrix_m_s01, grib_inventory_file_name
+            ) = grib_io.read_field_from_grib_file(
                 grib_file_name=grib2_file_name,
                 field_name_grib1=grib_search_string,
                 num_grid_rows=latitude_matrix_deg_n.shape[0],
@@ -189,6 +194,7 @@ def read_file(
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 sentinel_value=SENTINEL_VALUE,
+                grib_inventory_file_name=grib_inventory_file_name,
                 raise_error_if_fails=True
             )
 
@@ -196,7 +202,10 @@ def read_file(
             print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
                 grib_search_string, grib2_file_name
             ))
-            direction_matrix_deg = grib_io.read_field_from_grib_file(
+
+            (
+                direction_matrix_deg, grib_inventory_file_name
+            ) = grib_io.read_field_from_grib_file(
                 grib_file_name=grib2_file_name,
                 field_name_grib1=grib_search_string,
                 num_grid_rows=latitude_matrix_deg_n.shape[0],
@@ -205,6 +214,7 @@ def read_file(
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
                 sentinel_value=SENTINEL_VALUE,
+                grib_inventory_file_name=grib_inventory_file_name,
                 raise_error_if_fails=True
             )
 
@@ -235,7 +245,10 @@ def read_file(
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             grib_search_string, grib2_file_name
         ))
-        this_data_matrix = grib_io.read_field_from_grib_file(
+
+        (
+            this_data_matrix, grib_inventory_file_name
+        ) = grib_io.read_field_from_grib_file(
             grib_file_name=grib2_file_name,
             field_name_grib1=grib_search_string,
             num_grid_rows=latitude_matrix_deg_n.shape[0],
@@ -244,6 +257,7 @@ def read_file(
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=SENTINEL_VALUE,
+            grib_inventory_file_name=grib_inventory_file_name,
             raise_error_if_fails=True
         )
 
