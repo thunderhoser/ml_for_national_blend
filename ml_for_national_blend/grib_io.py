@@ -244,12 +244,8 @@ def read_field_from_grib_file(
             directory_name=temporary_dir_name
         )
 
-    if grib_inventory_file_name is None:
+    if grib_inventory_file_name is not None:
         error_checking.assert_is_string(grib_inventory_file_name)
-    else:
-        grib_inventory_file_name = tempfile.NamedTemporaryFile(
-            dir=temporary_dir_name, delete=False
-        ).name
 
     # Housekeeping.
     grib_file_type = file_name_to_type(grib_file_name)
@@ -262,6 +258,10 @@ def read_field_from_grib_file(
 
     # Create inventory file, if necessary.
     if grib_inventory_file_name is None:
+        grib_inventory_file_name = tempfile.NamedTemporaryFile(
+            dir=temporary_dir_name, delete=False
+        ).name
+
         if grib_file_type == GRIB1_FILE_TYPE:
             command_string = '"{0:s}" "{1:s}" > "{2:s}"'.format(
                 wgrib_exe_name, grib_file_name, grib_inventory_file_name
