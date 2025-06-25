@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_evaluation_gridded"
+#SBATCH --job-name="apply_isotonic_regression_training"
 #SBATCH --partition="fge"
 #SBATCH --account="mdl-sti"
 #SBATCH --qos="gpuwf"
@@ -9,14 +9,14 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=01:00:00
-#SBATCH --array=0-99
+#SBATCH --time=04:00:00
+#SBATCH --array=0-239%60
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_gridded_%A_%a.out
+#SBATCH --output=apply_isotonic_regression_training_%A_%a.out
 
 conda init
 conda activate base
@@ -33,22 +33,22 @@ TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_national_b
 TARGET_NORM_FILE_NAME="/scratch1/STI/mdl-sti/Ryan.Lagerquist/ml_for_national_blend_project/urma_data_final/processed/normalization_params_20170101-20211220.nc"
 
 MODEL_DESCRIPTION_STRINGS=("adamw/random_seed0" "adamw/random_seed1" "adamw/random_seed2" "adamw/random_seed3" "adamw/random_seed4" "adamw_cycle050/random_seed0" "adamw_cycle050/random_seed1" "adamw_cycle050/random_seed2" "adamw_cycle050/random_seed3" "adamw_cycle050/random_seed4" "adamw_cycle100/random_seed0" "adamw_cycle100/random_seed1" "adamw_cycle100/random_seed2" "adamw_cycle100/random_seed3" "adamw_cycle100/random_seed4" "adamw_cycle200/random_seed0" "adamw_cycle200/random_seed1" "adamw_cycle200/random_seed2" "adamw_cycle200/random_seed3" "adamw_cycle200/random_seed4")
-TARGET_FIELD_NAMES=("temperature_2m_agl_kelvins" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "dewpoint_2m_agl_kelvins" "wind_gust_10m_agl_m_s01")
+FIRST_INIT_TIME_STRINGS=("2021-01-01-00" "2021-02-01-00" "2021-03-01-00" "2021-04-01-00" "2021-05-01-00" "2021-06-01-00" "2021-07-01-00" "2021-08-01-00" "2021-09-01-00" "2021-10-01-00" "2021-11-01-00" "2021-12-01-00")
+LAST_INIT_TIME_STRINGS=("2021-01-31-18" "2021-02-28-18" "2021-03-31-18" "2021-04-30-18" "2021-05-31-18" "2021-06-30-18" "2021-07-31-18" "2021-08-31-18" "2021-09-30-18" "2021-10-31-18" "2021-11-30-18" "2021-12-31-18")
 
-num_rows=${#MODEL_DESCRIPTION_STRINGS[@]}
-num_columns=${#TARGET_FIELD_NAMES[@]}
+num_rows=${#MODEL_NAME_SETS_ONE_STRING[@]}
+num_columns=${#FIRST_INIT_TIME_STRINGS[@]}
 
 i=$(( SLURM_ARRAY_TASK_ID / num_columns ))
 j=$(( SLURM_ARRAY_TASK_ID % num_columns ))
 
-target_field_name=${TARGET_FIELD_NAMES[$j]}
+first_init_time_string=${FIRST_INIT_TIME_STRINGS[$j]}
+last_init_time_string=${LAST_INIT_TIME_STRINGS[$j]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/${MODEL_DESCRIPTION_STRINGS[$i]}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
---input_eval_file_name_or_pattern="${model_dir_name}/training_full_grid/gridded_evaluation_${target_field_name}.nc" \
---target_field_name="${target_field_name}" \
---metric_names "bias" \
---min_colour_percentiles 0.5 \
---max_colour_percentiles 99.5 \
---output_dir_name="${model_dir_name}/training_full_grid/gridded_evaluation"
+python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
+--input_prediction_dir_name="${model_dir_name}/training_full_grid" \
+--init_time_limit_strings "${first_init_time_string}" "${last_init_time_string}" \
+--isotonic_model_file_names "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_temperature_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_u_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_v_wind_10m_agl_m_s01.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_dewpoint_2m_agl_kelvins.dill" "${model_dir_name}/training_full_grid/isotonic_regression/isotonic_regression_wind_gust_10m_agl_m_s01.dill" \
+--output_prediction_dir_name="${model_dir_name}/training_full_grid/isotonic_regression"
